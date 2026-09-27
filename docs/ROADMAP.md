@@ -3,7 +3,7 @@
 Work top to bottom. Tick boxes as they land. Each milestone ends with a
 demo you can actually use.
 
-## Milestone 0 — Protocol (the contract)  ← current
+## Milestone 0 — Protocol (the contract)
 - [x] Workspace, rules, CI, testing guide
 - [x] `Machine`, `Session` + `SessionState` state machine
 - [x] `Command` (with duration and outcome)
@@ -16,14 +16,16 @@ demo you can actually use.
 
 **Done when:** `just check` passes and every wire type has a fixture.
 
-## Milestone 1 — Persistent sessions (v0.1)
+## Milestone 1 — Persistent sessions (v0.1)  ← current
 - [ ] `daemon` crate: spawn shell in a PTY, keep it alive
 - [ ] Create / list / attach / detach / resize / input / kill over WebSocket
 - [ ] Screen state via VT parser, sent on reattach
 - [ ] Scrollback ring buffer + compressed on-disk log
 - [ ] Minimal `cli` to attach from another terminal
 - [ ] Minimal web page with xterm.js
-- [ ] Bind to Tailscale IP only, token auth, audit log
+- [ ] Safe daemon config, localhost/Tailscale binding, token auth, audit log
+- [ ] systemd and launchd user service files
+- [ ] Fast fake-backed tests plus ignored real-PTY and Playwright smoke tests
 
 **Demo:** start `python long_job.py`, close everything, reattach from your phone.
 
