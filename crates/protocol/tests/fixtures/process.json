@@ -1,0 +1,11 @@
+{
+  "pid": 4242,
+  "parent_pid": 4200,
+  "name": "python",
+  "cmdline": ["python", "train.py", "--config", "moe.yaml"],
+  "state": "RUNNING",
+  "cpu_percent": 187.5,
+  "rss_bytes": 8589934592,
+  "gpu_mem_bytes": 12884901888,
+  "started_at": 1790000120000
+}

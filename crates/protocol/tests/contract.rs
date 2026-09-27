@@ -1,0 +1,197 @@
+//! Contract tests: freeze the JSON wire format.
+//!
+//! Each fixture in `tests/fixtures/` is a real example message. For each one we
+//! check that:
+//!   1. it parses into the Rust type (old messages keep working), and
+//!   2. serialising it again gives the same JSON (no field renamed or dropped).
+//!
+//! If one of these fails, you changed the protocol. Read `docs/TESTING.md`.
+
+// Test helpers may panic freely; a panic is a test failure.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+use protocol::{
+    ClientRequest, Command, DaemonMessage, Envelope, Event, Machine, MachineMetrics, Process,
+    Recipe, Session, SessionMetrics,
+};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
+use std::path::PathBuf;
+
+fn load(name: &str) -> Value {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name);
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    serde_json::from_str(&text).unwrap_or_else(|e| panic!("{name} is not valid JSON: {e}"))
+}
+
+/// Parse `fixture` as `T`, serialise it back, and require identical JSON.
+fn assert_round_trip<T: DeserializeOwned + Serialize>(fixture: &Value, name: &str) {
+    let parsed: T = serde_json::from_value(fixture.clone())
+        .unwrap_or_else(|e| panic!("{name} does not parse: {e}"));
+    let back = serde_json::to_value(&parsed).unwrap();
+    assert_eq!(&back, fixture, "{name} changed shape after a round trip");
+}
+
+fn assert_each_round_trips<T: DeserializeOwned + Serialize>(file: &str) {
+    let Value::Array(items) = load(file) else {
+        panic!("{file} must be a JSON array");
+    };
+    assert!(!items.is_empty(), "{file} is empty");
+    for (i, item) in items.iter().enumerate() {
+        assert_round_trip::<T>(item, &format!("{file}[{i}]"));
+    }
+}
+
+#[test]
+fn machine_contract() {
+    assert_round_trip::<Machine>(&load("machine.json"), "machine.json");
+}
+
+#[test]
+fn session_contract() {
+    assert_round_trip::<Session>(&load("session.json"), "session.json");
+}
+
+#[test]
+fn running_command_contract() {
+    assert_round_trip::<Command>(&load("command_running.json"), "command_running.json");
+}
+
+#[test]
+fn finished_command_contract() {
+    assert_round_trip::<Command>(&load("command_finished.json"), "command_finished.json");
+}
+
+#[test]
+fn event_contract() {
+    assert_each_round_trips::<Event>("events.json");
+}
+
+#[test]
+fn recipe_contract() {
+    assert_round_trip::<Recipe>(&load("recipe.json"), "recipe.json");
+}
+
+#[test]
+fn process_contract() {
+    assert_round_trip::<Process>(&load("process.json"), "process.json");
+}
+
+#[test]
+fn machine_metrics_contract() {
+    assert_round_trip::<MachineMetrics>(&load("machine_metrics.json"), "machine_metrics.json");
+}
+
+#[test]
+fn session_metrics_contract() {
+    assert_round_trip::<SessionMetrics>(&load("session_metrics.json"), "session_metrics.json");
+}
+
+#[test]
+fn client_request_contract() {
+    assert_each_round_trips::<Envelope<ClientRequest>>("client_requests.json");
+}
+
+#[test]
+fn daemon_message_contract() {
+    assert_each_round_trips::<Envelope<DaemonMessage>>("daemon_messages.json");
+}
+
+/// Every event kind must appear in `events.json`, so no kind escapes the contract.
+#[test]
+fn every_event_kind_has_a_fixture() {
+    let all_kinds = [
+        "COMMAND_STARTED",
+        "COMMAND_FINISHED",
+        "PROCESS_STARTED",
+        "PROCESS_EXITED",
+        "PROGRESS_UPDATED",
+        "WARNING_DETECTED",
+        "ERROR_DETECTED",
+        "RESOURCE_HIGH",
+        "WAITING_FOR_INPUT",
+        "POSSIBLY_STALLED",
+        "CHECKPOINT_CREATED",
+        "SERVER_STARTED",
+    ];
+    let events = load("events.json");
+    let present: Vec<&str> = events
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["kind"]["type"].as_str().unwrap())
+        .collect();
+    for kind in all_kinds {
+        assert!(present.contains(&kind), "events.json has no {kind} example");
+    }
+}
+
+/// Every client request type must appear in `client_requests.json`.
+#[test]
+fn every_client_request_has_a_fixture() {
+    let all = [
+        "GET_MACHINE",
+        "LIST_SESSIONS",
+        "CREATE_SESSION",
+        "ATTACH",
+        "DETACH",
+        "RESIZE",
+        "KILL",
+        "GET_HISTORY",
+    ];
+    let requests = load("client_requests.json");
+    let present: Vec<&str> = requests
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["payload"]["type"].as_str().unwrap())
+        .collect();
+    for kind in all {
+        assert!(
+            present.contains(&kind),
+            "client_requests.json has no {kind} example"
+        );
+    }
+}
+
+/// Every daemon message type must appear in `daemon_messages.json`.
+#[test]
+fn every_daemon_message_has_a_fixture() {
+    let all = [
+        "MACHINE",
+        "SESSIONS",
+        "SESSION_UPDATED",
+        "COMMAND_UPDATED",
+        "EVENT",
+        "MACHINE_METRICS",
+        "SESSION_METRICS",
+        "ERROR",
+    ];
+    let messages = load("daemon_messages.json");
+    let present: Vec<&str> = messages
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["payload"]["type"].as_str().unwrap())
+        .collect();
+    for kind in all {
+        assert!(
+            present.contains(&kind),
+            "daemon_messages.json has no {kind} example"
+        );
+    }
+}
+
+/// The recipe fixture must also be a *valid* recipe, not just valid JSON.
+#[test]
+fn recipe_fixture_renders() {
+    let recipe: Recipe = serde_json::from_value(load("recipe.json")).unwrap();
+    let cmd = recipe.render(&Default::default()).unwrap();
+    assert_eq!(
+        cmd,
+        "vllm serve Qwen/Qwen3-8B --port 8000 --max-model-len 32768"
+    );
+}

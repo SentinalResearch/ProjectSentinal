@@ -1,0 +1,11 @@
+{
+  "id": "qwen-vllm",
+  "name": "Qwen vLLM Server",
+  "machine_id": "rtx-pc",
+  "command": "vllm serve {model} --port {port} --max-model-len {context}",
+  "params": [
+    { "name": "model", "default": "Qwen/Qwen3-8B", "description": "Hugging Face model ID" },
+    { "name": "port", "default": "8000", "description": null },
+    { "name": "context", "default": "32768", "description": "Max context length" }
+  ]
+}

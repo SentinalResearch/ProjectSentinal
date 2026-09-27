@@ -1,0 +1,30 @@
+[
+  { "version": 1, "payload": { "type": "MACHINE", "machine": {
+      "id": "rtx-pc", "name": "RTX-PC", "os": "LINUX",
+      "cpu": "AMD Ryzen 9 7950X", "cpu_cores": 32, "ram_bytes": 68719476736,
+      "gpus": [{ "name": "NVIDIA GeForce RTX 4090", "vram_bytes": 25769803776 }],
+      "status": "ONLINE", "last_seen": 1790000000000 } } },
+  { "version": 1, "payload": { "type": "SESSIONS", "sessions": [] } },
+  { "version": 1, "payload": { "type": "SESSION_UPDATED", "session": {
+      "id": 128, "machine_id": "rtx-pc", "project_id": "tim", "title": "Qwen Training",
+      "shell": "/bin/zsh", "cwd": "~/Projects/TIM", "state": "RUNNING",
+      "current_command": 8192, "created_at": 1790000000000, "updated_at": 1790000120000 } } },
+  { "version": 1, "payload": { "type": "COMMAND_UPDATED", "command": {
+      "id": 8192, "session_id": 128, "machine_id": "rtx-pc",
+      "text": "python train.py --config moe.yaml", "cwd": "~/Projects/TIM",
+      "started_at": 1790000120000, "finished_at": null, "exit_code": null,
+      "class": "ML_TRAINING" } } },
+  { "version": 1, "payload": { "type": "EVENT", "event": {
+      "id": 3, "session_id": 128, "command_id": 8192, "at": 1790000600000,
+      "kind": { "type": "PROGRESS_UPDATED", "current": 37, "total": 100, "unit": "epoch" } } } },
+  { "version": 1, "payload": { "type": "MACHINE_METRICS", "metrics": {
+      "at": 1790000600000, "cpu_percent": 42.5,
+      "ram_used_bytes": 34359738368, "ram_total_bytes": 68719476736,
+      "gpus": [{ "index": 0, "util_percent": 96.0, "vram_used_bytes": 21474836480,
+        "vram_total_bytes": 25769803776, "temp_c": 71.5 }] } } },
+  { "version": 1, "payload": { "type": "SESSION_METRICS", "metrics": {
+      "session_id": 128, "at": 1790000600000,
+      "totals": { "cpu_percent": 187.5, "rss_bytes": 8589934592,
+        "gpu_mem_bytes": 12884901888 } } } },
+  { "version": 1, "payload": { "type": "ERROR", "message": "unknown session #999" } }
+]

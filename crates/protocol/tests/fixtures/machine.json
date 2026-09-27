@@ -1,0 +1,11 @@
+{
+  "id": "rtx-pc",
+  "name": "RTX-PC",
+  "os": "LINUX",
+  "cpu": "AMD Ryzen 9 7950X",
+  "cpu_cores": 32,
+  "ram_bytes": 68719476736,
+  "gpus": [{ "name": "NVIDIA GeForce RTX 4090", "vram_bytes": 25769803776 }],
+  "status": "ONLINE",
+  "last_seen": 1790000000000
+}

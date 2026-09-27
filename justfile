@@ -1,0 +1,55 @@
+# Install `just`: https://github.com/casey/just  (brew install just / cargo install just)
+# Run `just` with no arguments to list commands.
+
+default:
+    @just --list
+
+# Format all code
+fmt:
+    cargo fmt --all
+
+# Run all fast tests
+test:
+    cargo test --workspace
+
+# Lint with warnings as errors
+lint:
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+# Generate TypeScript protocol bindings, or verify committed bindings with --check
+gen-ts mode="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    destination="$(pwd)/web/src/protocol"
+    output="$(mktemp -d)"
+    trap 'rm -rf "$output"' EXIT
+    case "{{mode}}" in
+      "")
+        ;;
+      "--check")
+        ;;
+      *)
+        echo "usage: just gen-ts [--check]" >&2
+        exit 2
+        ;;
+    esac
+    TS_RS_EXPORT_DIR="$output" TS_RS_LARGE_INT=number \
+      cargo test -p protocol --features ts export_bindings --quiet
+    if [[ "{{mode}}" == "--check" ]]; then
+      diff -ru "$destination" "$output"
+    else
+      mkdir -p "$destination"
+      find "$destination" -maxdepth 1 -type f -name '*.ts' -delete
+      cp "$output"/*.ts "$destination"/
+    fi
+
+# Everything CI runs. Run this before every commit.
+check:
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    cargo test --workspace
+    just gen-ts --check
+
+# Slow tests that need a real shell / PTY
+test-integration:
+    cargo test --workspace -- --ignored

@@ -1,0 +1,11 @@
+{
+  "id": 8192,
+  "session_id": 128,
+  "machine_id": "rtx-pc",
+  "text": "python train.py --config moe.yaml",
+  "cwd": "~/Projects/TIM",
+  "started_at": 1790000120000,
+  "finished_at": null,
+  "exit_code": null,
+  "class": "ML_TRAINING"
+}

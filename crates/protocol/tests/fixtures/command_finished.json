@@ -1,0 +1,11 @@
+{
+  "id": 8193,
+  "session_id": 128,
+  "machine_id": "rtx-pc",
+  "text": "pytest tests/",
+  "cwd": "~/MentalAnimAItion",
+  "started_at": 1790000000000,
+  "finished_at": 1790000042000,
+  "exit_code": 1,
+  "class": null
+}

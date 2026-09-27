@@ -1,0 +1,15 @@
+{
+  "at": 1790000600000,
+  "cpu_percent": 42.5,
+  "ram_used_bytes": 34359738368,
+  "ram_total_bytes": 68719476736,
+  "gpus": [
+    {
+      "index": 0,
+      "util_percent": 96.0,
+      "vram_used_bytes": 21474836480,
+      "vram_total_bytes": 25769803776,
+      "temp_c": 71.5
+    }
+  ]
+}

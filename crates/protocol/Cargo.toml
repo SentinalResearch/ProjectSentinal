@@ -1,0 +1,20 @@
+[package]
+name = "protocol"
+description = "Shared wire types for terminal-agent: the contract every component speaks."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+ts = ["dep:ts-rs"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+ts-rs = { workspace = true, optional = true, features = ["format", "no-serde-warnings"] }
+
+[lints]
+workspace = true
