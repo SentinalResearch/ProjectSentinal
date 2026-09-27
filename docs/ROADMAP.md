@@ -16,16 +16,16 @@ demo you can actually use.
 
 **Done when:** `just check` passes and every wire type has a fixture.
 
-## Milestone 1 — Persistent sessions (v0.1)  ← current
-- [ ] `daemon` crate: spawn shell in a PTY, keep it alive
-- [ ] Create / list / attach / detach / resize / input / kill over WebSocket
-- [ ] Screen state via VT parser, sent on reattach
-- [ ] Scrollback ring buffer + compressed on-disk log
-- [ ] Minimal `cli` to attach from another terminal
-- [ ] Minimal web page with xterm.js
-- [ ] Safe daemon config, localhost/Tailscale binding, token auth, audit log
-- [ ] systemd and launchd user service files
-- [ ] Fast fake-backed tests plus ignored real-PTY and Playwright smoke tests
+## Milestone 1 — Persistent sessions (v0.1)
+- [x] `daemon` crate: spawn shell in a PTY, keep it alive
+- [x] Create / list / attach / detach / resize / input / kill over WebSocket
+- [x] Screen state via VT parser, sent on reattach
+- [x] Scrollback ring buffer + compressed on-disk log
+- [x] Minimal `cli` to attach from another terminal
+- [x] Minimal web page with xterm.js
+- [x] Safe daemon config, localhost/Tailscale binding, token auth, audit log
+- [x] systemd and launchd user service files
+- [x] Fast fake-backed tests plus ignored real-PTY and Playwright smoke tests
 
 **Demo:** start `python long_job.py`, close everything, reattach from your phone.
 
