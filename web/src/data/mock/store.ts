@@ -13,6 +13,7 @@ import type {
 } from "../types";
 
 export function delay<T>(value: T, minMs = 300, maxMs = 800): Promise<T> {
+  if (import.meta.env.MODE === "test") return Promise.resolve(value);
   const ms = minMs + Math.random() * (maxMs - minMs);
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }

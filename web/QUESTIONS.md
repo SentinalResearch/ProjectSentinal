@@ -84,8 +84,8 @@ Marked `// QUESTION:` at the point in the code where a judgment call was made.
     replays the session's `events` as scrollback and turns typed lines into
     `dataAdapter.sendInput()` calls, instead of a real byte stream. The real
     (`VITE_DATA=api`) path uses `useRealTerminalSession`, extracted from the old
-    `src/App.tsx` (Milestone 1) — untested against a live daemon, since none is
-    reachable in this environment. Two things worth confirming: (a) real daemon
+    `src/App.tsx` (Milestone 1), and is exercised by the fake-daemon Playwright
+    smoke test. Two things worth confirming: (a) real daemon
     session ids are numeric (`protocol/SessionId.ts`) but the mock's `Session.id`
     is a string slug (`"qwen"`) — `TerminalPane` always takes a string and
     `Number()`s it for the real path; (b) each `TerminalPane` opens its own

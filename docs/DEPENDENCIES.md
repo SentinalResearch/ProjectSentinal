@@ -35,7 +35,9 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 
 ## Web (Milestone 1+)
 `vite`, `typescript`, `react`, `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-webgl`,
-`@tanstack/react-query`, `vitest`, Testing Library, Playwright
+`@tanstack/react-query`, `vitest`, Testing Library, Playwright, `react-router-dom`
+(client-side application routes), `@fontsource/archivo` and
+`@fontsource/jetbrains-mono` (self-host the approved UI fonts)
 
 ## Intelligence (V2)
 `llama.cpp` (server), `fastapi`, `transformers`, `trl`, `peft`, `datasets`

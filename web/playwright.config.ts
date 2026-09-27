@@ -19,7 +19,7 @@ export default defineConfig({
     },
     {
       command:
-        "VITE_DAEMON_URL=ws://127.0.0.1:7421/api/v1/ws pnpm dev --host 127.0.0.1 --port 4173",
+        "VITE_DATA=api VITE_DAEMON_URL=ws://127.0.0.1:7421/api/v1/ws pnpm dev --host 127.0.0.1 --port 4173",
       url: "http://127.0.0.1:4173",
       reuseExistingServer: false,
       timeout: 60_000,

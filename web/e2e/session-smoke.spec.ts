@@ -1,19 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-test("connects to a fake daemon, creates a session, and attaches", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByLabel("Token").fill("test-token");
-  await page.getByRole("button", { name: "Connect" }).click();
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+test("signs in to a fake daemon, creates a session, and attaches", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Daemon token").fill("test-token");
+  await page.getByRole("button", { name: "Sign in" }).click();
 
-  await page.getByRole("button", { name: "New" }).click();
-  const session = page.getByRole("button", { name: /Session 1/ });
-  await expect(session).toBeVisible();
-  await session.click();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await page.getByRole("button", { name: "New session" }).click();
 
-  await expect(session).toHaveClass(/active/);
-  await expect(page.getByTestId("terminal").locator(".xterm")).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/sessions\/1$/);
+  await expect(page.getByRole("heading", { name: "Session 1" })).toBeVisible();
+  await expect(page.getByTestId("terminal-host").locator(".xterm")).toBeVisible();
+  await expect(page.getByText("attached", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });

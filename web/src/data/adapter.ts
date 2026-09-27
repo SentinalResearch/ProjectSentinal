@@ -34,12 +34,13 @@ export class NotImplemented extends Error {
 
 /**
  * The single seam between UI components and data. `src/data/mock` implements this
- * against `fixtures.json`; `src/data/api` will implement it against the daemon's
+ * against `fixtures.json`; `src/data/api` implements the Milestone 1 daemon
  * real HTTP/WebSocket API. Select which one loads via `VITE_DATA=mock|api`.
  */
 export interface DataAdapter {
   getMachines(): Promise<Machine[]>;
   getSessions(): Promise<Session[]>;
+  createSession(): Promise<Session>;
   getRecipes(): Promise<Recipe[]>;
   getHistory(filters?: HistoryFilters): Promise<HistoryEntry[]>;
 

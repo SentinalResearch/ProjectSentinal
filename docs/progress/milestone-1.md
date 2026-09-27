@@ -18,6 +18,9 @@
 - [x] Implement the React/xterm session list and terminal, resize handling, token
   entry, and mobile key bar; prove framing and keys with Vitest and the main flow
   with one Playwright smoke test.
+- [x] Reconcile the design-handoff frontend with the Milestone 1 API adapter;
+  prove token login, Machine/Session mapping, Session creation, input framing,
+  and the redesigned browser flow with Vitest and Playwright.
 - [x] Add systemd and launchd user service files, document the manual demo, run all
   Rust/web/integration checks, update the roadmap, and commit the milestone.
 
@@ -29,7 +32,7 @@
 ## Verification
 
 - `just check` passes Rust formatting, all-target/all-feature Clippy with warnings
-  denied, 134 fast Rust tests, 30 TypeScript generation checks, and 9 Vitest tests.
+  denied, 134 fast Rust tests, 30 TypeScript generation checks, and 34 Vitest tests.
 - `just test-integration` passes the real PTY persistence test. The raw terminal
   integration test also passed inside a controlling pseudo-terminal.
 - `pnpm -C web test:e2e` passes the Chromium flow against `tad` with `FakePty`:

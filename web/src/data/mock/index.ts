@@ -27,6 +27,24 @@ export const mockAdapter: DataAdapter = {
     return delay(store.sessions.map((s) => ({ ...s })));
   },
 
+  async createSession() {
+    await delay(undefined);
+    const machine = store.machines.find((entry) => entry.status === "ONLINE");
+    if (!machine) throw new Error("cannot create session: no online machine");
+    const id = `session-${Date.now()}`;
+    const session: Session = {
+      id,
+      machine: machine.id,
+      name: "New session",
+      state: "CREATED",
+      runningFor: "0s",
+      events: [[nowTime(), "SESSION_CREATED", "terminal session created"]],
+    };
+    store.sessions.push(session);
+    updateSession(id, { state: "CREATED" });
+    return { ...session };
+  },
+
   async getRecipes() {
     return delay(store.recipes.map((r) => ({ ...r })));
   },

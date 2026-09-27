@@ -1,6 +1,7 @@
 import type { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { DAEMON_TOKEN_KEY, defaultDaemonUrl } from "../data/api";
 import { decodeTerminalFrame, encodeTerminalFrame } from "../frame";
 import type { ClientRequest } from "../protocol/ClientRequest";
 import type { DaemonMessage } from "../protocol/DaemonMessage";
@@ -8,13 +9,6 @@ import type { Envelope } from "../protocol/Envelope";
 
 const PROTOCOL_VERSION = 1;
 const encoder = new TextEncoder();
-
-function defaultDaemonUrl(): string {
-  return (
-    import.meta.env.VITE_DAEMON_URL ??
-    `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:7420/api/v1/ws`
-  );
-}
 
 // QUESTION: real (non-mock, VITE_DATA=api) session ids from the daemon are numeric
 // (protocol/SessionId.ts), but the mock adapter's Session.id is a string slug
@@ -56,7 +50,7 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
     if (!terminal || !Number.isFinite(numericId)) return;
 
     const endpoint = new URL(defaultDaemonUrl());
-    const token = localStorage.getItem("sentinal.daemonToken") ?? "";
+    const token = localStorage.getItem(DAEMON_TOKEN_KEY) ?? "";
     endpoint.searchParams.set("token", token);
     const socket = new WebSocket(endpoint);
     socket.binaryType = "arraybuffer";

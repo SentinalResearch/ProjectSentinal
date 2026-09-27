@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { needsAttention, slugifyProject } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
+import { dataAdapter, isMockData } from "../../data";
 import styles from "./Sidebar.module.css";
 
 interface ActiveStyle {
@@ -51,6 +52,15 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
   const projectMatch = location.pathname.match(/^\/app\/projects\/(.+)$/);
   const activeProjectId = projectMatch ? projectMatch[1] : null;
 
+  async function newSession() {
+    if (isMockData) {
+      navigate("/app/recipes");
+      return;
+    }
+    const session = await dataAdapter.createSession();
+    navigate(`/app/sessions/${session.id}`);
+  }
+
   return (
     <aside className={styles.aside} style={{ width: expanded ? "264px" : "57px" }}>
       <div className={styles.top}>
@@ -74,7 +84,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
       </div>
 
       <div className={styles.actions}>
-        <button type="button" className={styles.newSession} onClick={() => navigate("/app/recipes")}>
+        <button type="button" className={styles.newSession} onClick={() => void newSession()}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ flex: "none" }}>
             <path d="M8 3v10M3 8h10" />
           </svg>

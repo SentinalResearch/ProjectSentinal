@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useAuth } from "../../context/AuthContext";
 import { config } from "../../data/config";
+import { isMockData } from "../../data";
 import { AuthLayout } from "./AuthLayout";
 import { AuthMark } from "./AuthMark";
 import styles from "./LoginPage.module.css";
@@ -91,7 +92,7 @@ export function LoginPage() {
 
         <div className={styles.field}>
           <span className={styles.fieldHead}>
-            <label htmlFor="login-password">Password</label>
+            <label htmlFor="login-password">{isMockData ? "Password" : "Daemon token"}</label>
             <button type="button" className={styles.showToggle} onClick={() => setShow((s) => !s)}>
               {show ? "Hide" : "Show"}
             </button>
@@ -124,8 +125,9 @@ export function LoginPage() {
           </span>
           {mode === "wrong" && (
             <span className={styles.errorText}>
-              Incorrect password. {attemptsLeft} {attemptsLeft === 1 ? "attempt" : "attempts"} left before a
-              5-minute lock.
+              {isMockData
+                ? `Incorrect password. ${attemptsLeft} ${attemptsLeft === 1 ? "attempt" : "attempts"} left before a 5-minute lock.`
+                : "The daemon rejected that token or could not be reached."}
             </span>
           )}
         </div>
