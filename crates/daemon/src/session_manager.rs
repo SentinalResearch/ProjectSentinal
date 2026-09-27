@@ -1,5 +1,7 @@
 //! Ownership and lifecycle management for persistent terminal sessions.
 
+mod tasks;
+
 use crate::{
     audit::{AuditLog, AuditRecord},
     pty::{PtyBackend, PtyError, PtySpawnRequest, SpawnedPty},
@@ -9,13 +11,13 @@ use protocol::{MachineId, ProtocolError, Session, SessionId, SessionState, Times
 use std::{
     collections::HashMap,
     fs::{self, OpenOptions},
-    io::{Read, Write},
+    io::Write,
     path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Mutex, RwLock,
     },
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::broadcast;
 
@@ -112,6 +114,7 @@ pub enum SessionManagerError {
 }
 
 struct SessionHandle {
+    id: SessionId,
     session: Mutex<Session>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     resize: Arc<dyn Fn(u16, u16) -> Result<(), PtyError> + Send + Sync>,
@@ -215,6 +218,7 @@ impl SessionManager {
             try_wait,
         } = spawned;
         let handle = Arc::new(SessionHandle {
+            id,
             session: Mutex::new(session.clone()),
             writer,
             resize,
@@ -232,8 +236,8 @@ impl SessionManager {
             })?
             .insert(id, handle.clone());
 
-        spawn_reader(id, reader, parser, scrollback, output, log_path, log_file);
-        spawn_exit_monitor(id, handle, try_wait, self.inner.config.clock.clone());
+        tasks::spawn_reader(id, reader, parser, scrollback, output, log_path, log_file);
+        tasks::spawn_exit_monitor(id, handle, try_wait, self.inner.config.clock.clone());
         Ok(session)
     }
 
@@ -383,107 +387,13 @@ fn validate_size(cols: u16, rows: u16) -> Result<(), SessionManagerError> {
 fn lock_session(
     handle: &SessionHandle,
 ) -> Result<std::sync::MutexGuard<'_, Session>, SessionManagerError> {
-    let session_id = handle
-        .session
-        .lock()
-        .map_err(|_| SessionManagerError::Lock {
-            resource: "session",
-            session_id: SessionId(0),
-        })?
-        .id;
     handle
         .session
         .lock()
         .map_err(|_| SessionManagerError::Lock {
             resource: "session",
-            session_id,
+            session_id: handle.id,
         })
-}
-
-fn spawn_reader(
-    session_id: SessionId,
-    mut reader: Box<dyn Read + Send>,
-    parser: Arc<Mutex<vt100::Parser>>,
-    scrollback: Arc<Mutex<Scrollback>>,
-    output: broadcast::Sender<Vec<u8>>,
-    log_path: PathBuf,
-    log_file: std::fs::File,
-) {
-    tokio::task::spawn_blocking(move || {
-        let mut encoder = match zstd::stream::write::Encoder::new(log_file, 0) {
-            Ok(encoder) => encoder.auto_finish(),
-            Err(error) => {
-                tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to start compressed session log");
-                return;
-            }
-        };
-        let mut buffer = [0_u8; 8192];
-        loop {
-            let count = match reader.read(&mut buffer) {
-                Ok(0) => return,
-                Ok(count) => count,
-                Err(error) => {
-                    tracing::warn!(session = session_id.0, %error, "failed to read PTY output");
-                    return;
-                }
-            };
-            let bytes = &buffer[..count];
-            if let Err(error) = encoder.write_all(bytes).and_then(|()| encoder.flush()) {
-                tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append session log");
-            }
-            match parser.lock() {
-                Ok(mut parser) => parser.process(bytes),
-                Err(_) => {
-                    tracing::error!(session = session_id.0, "screen lock poisoned");
-                    return;
-                }
-            }
-            match scrollback.lock() {
-                Ok(mut scrollback) => scrollback.push(bytes),
-                Err(_) => {
-                    tracing::error!(session = session_id.0, "scrollback lock poisoned");
-                    return;
-                }
-            }
-            let _ = output.send(bytes.to_vec());
-        }
-    });
-}
-
-fn spawn_exit_monitor(
-    session_id: SessionId,
-    handle: Arc<SessionHandle>,
-    try_wait: Arc<dyn Fn() -> Result<Option<i32>, PtyError> + Send + Sync>,
-    clock: Clock,
-) {
-    tokio::spawn(async move {
-        loop {
-            match try_wait() {
-                Ok(Some(code)) => {
-                    let target = if code == 0 {
-                        SessionState::Completed
-                    } else {
-                        SessionState::Failed
-                    };
-                    match handle.session.lock() {
-                        Ok(mut session) if !session.state.is_finished() => {
-                            if let Err(error) = session.transition(target, clock()) {
-                                tracing::error!(session = session_id.0, %error, "failed to record child exit");
-                            }
-                        }
-                        Ok(_) => {}
-                        Err(_) => tracing::error!(session = session_id.0, "session lock poisoned"),
-                    }
-                    return;
-                }
-                Ok(None) => tokio::time::sleep(Duration::from_millis(10)).await,
-                Err(error) => {
-                    tracing::error!(session = session_id.0, %error, "failed to poll child");
-                    return;
-                }
-            }
-        }
-    });
 }
 
 fn system_timestamp() -> Timestamp {
