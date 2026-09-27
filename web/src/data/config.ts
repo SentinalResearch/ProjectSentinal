@@ -8,7 +8,7 @@ export const config = {
   pairCommand: "sentinal-agent pair <TOKEN>",
   tokenMask: "sa_••••xxxx",
   pairTokenTtlMs: 10 * 60 * 1000,
-  loginMaxAttempts: 3,
+  loginMaxAttempts: 5,
   loginLockMs: 5 * 60 * 1000,
   setupMinPasswordLength: 12,
   historyRelativeDates: ["Today", "Yesterday", "3 days ago"],

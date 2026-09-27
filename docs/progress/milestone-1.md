@@ -56,9 +56,9 @@ cargo run -p daemon --bin tad
 pnpm -C web dev
 ```
 
-Open `http://127.0.0.1:5173`, then enter the token from
-`~/.config/terminal-agent/token`. For a CLI persistence demo, create a long job and
-start a Session:
+Open `http://127.0.0.1:5173`. On first run, enter the machine token from
+`~/.config/terminal-agent/token` on the setup screen and choose the single
+owner password. For a CLI persistence demo, create a long job and start a Session:
 
 ```sh
 printf 'import time\nprint("ready", flush=True)\ntime.sleep(10)\nprint("done", flush=True)\n' > /tmp/long_job.py

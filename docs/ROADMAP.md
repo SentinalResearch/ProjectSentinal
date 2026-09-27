@@ -38,6 +38,17 @@ demo you can actually use.
 
 **Demo:** start `python long_job.py`, close everything, reattach from your phone.
 
+## Milestone 1.1 — Single-user authentication
+- [x] Persist one Argon2id password hash; bootstrap setup with the machine token
+- [x] Issue 24-hour browser session tokens; enforce expiry, logout, and password-change revocation
+- [x] Lock password login for five minutes after five failed attempts per client IP
+- [x] Keep machine-token authentication for the local CLI
+- [x] Wire setup, login, logout, expiry, and password changes through the web adapter
+- [x] Protect the authentication HTTP contract with fixtures, daemon tests, Vitest, and Playwright
+
+**Demo:** bootstrap one owner password, sign in from a browser, and use the same
+persistent Sessions without exposing the machine token again.
+
 ## Milestone 2 — Command tracking + metrics (v0.2)
 - [ ] Shell hooks (zsh, bash, fish) emitting OSC 133
 - [ ] Command start/end/exit code parsed from the PTY stream

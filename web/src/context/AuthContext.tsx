@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { dataAdapter } from "../data";
+import { AUTH_EXPIRED_EVENT } from "../data/api";
 import type { AuthState } from "../data/types";
 
 interface AuthContextValue extends AuthState {
   loading: boolean;
   login: (password: string) => Promise<AuthState>;
-  setup: (password: string) => Promise<AuthState>;
+  setup: (bootstrapToken: string, password: string) => Promise<AuthState>;
   logout: () => Promise<void>;
   /** Session-expired is a server-driven transition (token TTL); exposed for the route guard to trigger. */
   markExpired: () => void;
@@ -25,15 +26,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    dataAdapter.auth.getState().then((next) => {
-      if (!cancelled) {
-        setState(next);
-        setLoading(false);
-      }
-    });
+    dataAdapter.auth
+      .getState()
+      .then((next) => {
+        if (!cancelled) setState(next);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setState({ status: "signedOut", attempts: 0, lockUntil: null, message: "Could not reach the daemon." });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const expire = () => setState({ status: "expired", attempts: 0, lockUntil: null });
+    window.addEventListener(AUTH_EXPIRED_EVENT, expire);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, expire);
   }, []);
 
   // On success, the promise resolves immediately (so the caller can start the
@@ -49,8 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return next;
   }, []);
 
-  const setup = useCallback(async (password: string) => {
-    const next = await dataAdapter.auth.setup(password);
+  const setup = useCallback(async (bootstrapToken: string, password: string) => {
+    const next = await dataAdapter.auth.setup(bootstrapToken, password);
     if (next.status === "signedIn") {
       setTimeout(() => setState(next), SUCCESS_ANIMATION_MS);
     } else {

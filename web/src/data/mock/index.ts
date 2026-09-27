@@ -177,7 +177,7 @@ export const mockAdapter: DataAdapter = {
       return { ...store.auth };
     },
 
-    async setup(password: string): Promise<AuthState> {
+    async setup(_bootstrapToken: string, password: string): Promise<AuthState> {
       await delay(undefined, 400, 800);
       if (password.length < config.setupMinPasswordLength) {
         throw new Error(`password must be at least ${config.setupMinPasswordLength} characters`);

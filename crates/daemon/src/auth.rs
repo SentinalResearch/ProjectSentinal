@@ -1,10 +1,16 @@
-//! Bearer token creation and comparison.
+//! Machine-token and single-user browser authentication.
+
+mod password;
+
+pub use password::{AuthManager, CredentialKind};
 
 use std::{
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
 };
+
+use protocol::Timestamp;
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -30,6 +36,63 @@ pub enum AuthError {
     /// Secure random bytes could not be read.
     #[error("failed to read secure random bytes from /dev/urandom: {0}")]
     Random(std::io::Error),
+    /// The bootstrap machine token was missing or wrong.
+    #[error("invalid bootstrap machine token")]
+    InvalidBootstrap,
+    /// The password does not meet the daemon's validation rules.
+    #[error("invalid password: {reason}")]
+    InvalidPassword {
+        /// Validation detail safe to show to the owner.
+        reason: String,
+    },
+    /// Login was attempted before the owner configured a password.
+    #[error("owner password setup is required")]
+    SetupRequired,
+    /// Setup was attempted after a password was already configured.
+    #[error("owner password is already configured")]
+    AlreadyConfigured,
+    /// The supplied password was incorrect.
+    #[error("invalid owner password; {attempts_remaining} attempts remaining")]
+    InvalidCredentials {
+        /// Attempts left before this client is locked.
+        attempts_remaining: u32,
+    },
+    /// This client made too many failed login attempts.
+    #[error("password login is locked until {retry_at:?}")]
+    Locked {
+        /// Lockout end in Unix milliseconds.
+        retry_at: Timestamp,
+    },
+    /// A browser session token was missing, invalid, or expired.
+    #[error("invalid or expired browser session")]
+    InvalidSession,
+    /// A password-file operation failed.
+    #[error("failed to {operation} password file '{}': {source}", path.display())]
+    PasswordFile {
+        /// Operation that failed.
+        operation: &'static str,
+        /// Password file path.
+        path: PathBuf,
+        /// Filesystem error.
+        source: std::io::Error,
+    },
+    /// Stored password data was malformed.
+    #[error("invalid password file '{}': {message}", path.display())]
+    PasswordData {
+        /// Password file path.
+        path: PathBuf,
+        /// Parse or hash detail.
+        message: String,
+    },
+    /// Argon2 could not hash or verify a password.
+    #[error("password hashing failed: {0}")]
+    PasswordHash(String),
+    /// A password hashing worker could not complete.
+    #[error("password hashing worker failed: {0}")]
+    HashTask(String),
+    /// Shared authentication state could not be accessed.
+    #[error("authentication state lock is poisoned")]
+    StatePoisoned,
 }
 
 /// Load an existing token or create a new 256-bit token with mode 0600.
@@ -63,14 +126,7 @@ fn create_token(path: &Path) -> Result<String, AuthError> {
         })?;
     }
 
-    let mut random = [0_u8; TOKEN_BYTES];
-    File::open("/dev/urandom")
-        .and_then(|mut file| file.read_exact(&mut random))
-        .map_err(AuthError::Random)?;
-    let token = random
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
+    let token = random_hex_token()?;
 
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
@@ -96,6 +152,21 @@ fn create_token(path: &Path) -> Result<String, AuthError> {
         }
     }
     Ok(token)
+}
+
+pub(crate) fn secure_random<const N: usize>() -> Result<[u8; N], AuthError> {
+    let mut random = [0_u8; N];
+    File::open("/dev/urandom")
+        .and_then(|mut file| file.read_exact(&mut random))
+        .map_err(AuthError::Random)?;
+    Ok(random)
+}
+
+pub(crate) fn random_hex_token() -> Result<String, AuthError> {
+    Ok(secure_random::<TOKEN_BYTES>()?
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
 }
 
 /// Compare bearer tokens without returning early on mismatched bytes or lengths.

@@ -10,17 +10,31 @@ use axum::{
 use daemon::{
     api::{router, AppState, WsAction},
     audit::AuditLog,
+    auth::AuthManager,
     pty::FakePty,
     session_manager::{SessionManager, SessionManagerConfig},
 };
 use protocol::{
-    ClientRequest, DaemonMessage, Envelope, Machine, MachineId, MachineStatus, Os, Timestamp,
+    AuthFailure, AuthFailureCode, AuthSession, AuthSessionInfo, AuthStatus, ClientRequest,
+    DaemonMessage, Envelope, Machine, MachineId, MachineStatus, Os, Timestamp,
 };
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 use tower::ServiceExt;
 
+static NEXT_STATE: AtomicU64 = AtomicU64::new(1);
+
 fn state() -> AppState {
-    let data_dir = PathBuf::from("/tmp/terminal-agent-api-test");
+    let data_dir = std::env::temp_dir().join(format!(
+        "terminal-agent-api-test-{}-{}",
+        std::process::id(),
+        NEXT_STATE.fetch_add(1, Ordering::Relaxed)
+    ));
     let manager = SessionManager::new(
         Arc::new(FakePty::new()),
         SessionManagerConfig {
@@ -44,7 +58,7 @@ fn state() -> AppState {
             status: MachineStatus::Online,
             last_seen: Timestamp(1_790_000_000_000),
         },
-        "correct-token".into(),
+        AuthManager::load(&data_dir.join("auth.json"), "correct-token".into()).unwrap(),
     )
 }
 
@@ -149,6 +163,261 @@ async fn bearer_token_authorizes_sessions() {
         envelope.payload,
         DaemonMessage::Sessions { sessions } if sessions.is_empty()
     ));
+}
+
+#[tokio::test]
+async fn password_setup_login_logout_and_browser_authorization_work() {
+    let client: SocketAddr = "100.64.0.2:5000".parse().unwrap();
+    let app = router(state()).layer(MockConnectInfo(client));
+
+    let status = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/auth/status")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(status.status(), StatusCode::OK);
+    let body = to_bytes(status.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(
+        serde_json::from_slice::<AuthStatus>(&body).unwrap(),
+        AuthStatus {
+            setup_required: true
+        }
+    );
+
+    let setup = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/setup")
+                .header(AUTHORIZATION, "Bearer correct-token")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"password":"correct horse battery staple"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(setup.status(), StatusCode::OK);
+    let body = to_bytes(setup.into_body(), usize::MAX).await.unwrap();
+    let setup_session: AuthSession = serde_json::from_slice(&body).unwrap();
+
+    let session_info = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/auth/session")
+                .header(AUTHORIZATION, format!("Bearer {}", setup_session.token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(session_info.status(), StatusCode::OK);
+    let body = to_bytes(session_info.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::from_slice::<AuthSessionInfo>(&body)
+            .unwrap()
+            .expires_at,
+        setup_session.expires_at
+    );
+
+    let browser_access = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/sessions")
+                .header(AUTHORIZATION, format!("Bearer {}", setup_session.token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(browser_access.status(), StatusCode::OK);
+
+    let logout = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/logout")
+                .header(AUTHORIZATION, format!("Bearer {}", setup_session.token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logout.status(), StatusCode::NO_CONTENT);
+
+    let logged_out = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/sessions")
+                .header(AUTHORIZATION, format!("Bearer {}", setup_session.token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logged_out.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn login_failure_is_structured_and_connection_can_retry() {
+    let client: SocketAddr = "100.64.0.3:5000".parse().unwrap();
+    let app = router(state()).layer(MockConnectInfo(client));
+    let setup = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/setup")
+                .header(AUTHORIZATION, "Bearer correct-token")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"password":"correct horse battery staple"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(setup.status(), StatusCode::OK);
+
+    let wrong = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/login")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"password":"wrong password"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(wrong.status(), StatusCode::UNAUTHORIZED);
+    let body = to_bytes(wrong.into_body(), usize::MAX).await.unwrap();
+    let failure: AuthFailure = serde_json::from_slice(&body).unwrap();
+    assert_eq!(failure.code, AuthFailureCode::InvalidCredentials);
+    assert_eq!(failure.attempts_remaining, Some(4));
+
+    let correct = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/login")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"password":"correct horse battery staple"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(correct.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn setup_rejects_the_wrong_bootstrap_token() {
+    let response = router(state())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/setup")
+                .header(AUTHORIZATION, "Bearer wrong-token")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"password":"correct horse battery staple"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let failure: AuthFailure = serde_json::from_slice(&body).unwrap();
+    assert_eq!(failure.code, AuthFailureCode::InvalidBootstrap);
+}
+
+#[tokio::test]
+async fn changing_password_revokes_the_previous_browser_session() {
+    let client: SocketAddr = "100.64.0.4:5000".parse().unwrap();
+    let app = router(state()).layer(MockConnectInfo(client));
+    let setup = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/setup")
+                .header(AUTHORIZATION, "Bearer correct-token")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"password":"correct horse battery staple"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = to_bytes(setup.into_body(), usize::MAX).await.unwrap();
+    let old: AuthSession = serde_json::from_slice(&body).unwrap();
+
+    let changed = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/password")
+                .header(AUTHORIZATION, format!("Bearer {}", old.token))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "current_password":"correct horse battery staple",
+                        "new_password":"a different secure passphrase"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(changed.status(), StatusCode::OK);
+    let body = to_bytes(changed.into_body(), usize::MAX).await.unwrap();
+    let new: AuthSession = serde_json::from_slice(&body).unwrap();
+
+    let old_access = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/sessions")
+                .header(AUTHORIZATION, format!("Bearer {}", old.token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let new_access = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/sessions")
+                .header(AUTHORIZATION, format!("Bearer {}", new.token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(old_access.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(new_access.status(), StatusCode::OK);
 }
 
 #[tokio::test]

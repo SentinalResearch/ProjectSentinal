@@ -15,7 +15,9 @@
 //! - [`process`]  — OS processes and aggregate resource use
 //! - [`metric`]   — machine and session resource measurements
 //! - [`message`]  — what travels over the WebSocket, wrapped in an [`Envelope`]
+//! - [`auth`]     — single-user password authentication over HTTP
 
+pub mod auth;
 pub mod command;
 pub mod error;
 pub mod event;
@@ -28,6 +30,10 @@ pub mod recipe;
 pub mod session;
 pub mod time;
 
+pub use auth::{
+    AuthChangePasswordRequest, AuthFailure, AuthFailureCode, AuthLoginRequest, AuthSession,
+    AuthSessionInfo, AuthSetupRequest, AuthStatus,
+};
 pub use command::{Command, CommandClass, CommandStatus};
 pub use error::ProtocolError;
 pub use event::{Event, EventKind, Resource, Severity};

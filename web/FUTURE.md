@@ -17,7 +17,7 @@ for when the underlying daemon features are expected to land.
 | Recipe editor / New recipe | Recipes | disabled | Not designed yet (brief: "currently disabled in the design") |
 | Pairing flow (name → token → connect) | Settings | mock | Daemon: pairing/enrollment endpoint, `sentinal-agent pair` CLI |
 | Rotate / revoke token | Settings | mock | Daemon: token management API |
-| Auth (setup / login / lock / expire) | Auth | partial | `VITE_DATA=api` verifies and stores the daemon bearer token; password setup, lockout, and expiry remain mock-only |
+| Auth (setup / login / lock / expire) | Auth | real (M1.1) | One Argon2id-backed owner account issues 24-hour browser sessions; setup, per-IP lockout, logout, expiry, and password rotation are daemon-enforced |
 | Notification rules matrix | Settings | mock | Daemon: notification rule storage |
 | Push notifications | Settings, phone | mock (placeholder UI, flag-gated) | Web Push subscription + daemon-side sender |
 | "What happened while I was gone?" journal | — | mock (placeholder UI, flag-gated) | Depends on Event engine (M3) |

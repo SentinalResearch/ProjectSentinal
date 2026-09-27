@@ -8,17 +8,18 @@ Marked `// QUESTION:` at the point in the code where a judgment call was made.
 1. **Assumptions in `fixtures.json → _assumptions`** were invented by the designer
    and need product confirmation (kept in `src/data/config.ts`, not hard-coded):
    pair command `sentinal-agent pair <TOKEN>`, token mask `sa_••••xxxx`, pairing
-   TTL 10 min, login lock 3 attempts → 5 min, setup password ≥ 12 chars,
+   TTL 10 min, setup password ≥ 12 chars,
    `cargo build` on MacBook, relative history dates (Today / Yesterday / 3 days ago).
-2. **Session-expired trigger — now wired, still not a real trigger.**
+2. **Session-expired trigger — now wired to real authentication.**
    `SentinalSettings.dc.html`'s own Account tab has the answer: a
    "PROTOTYPE: Simulate session expiry" dev button (`expire` handler), not a
    real timer or daemon signal. `AccountTab.tsx` ports this literally — the
    button calls `AuthContext.markExpired()`, which flips `status` away from
    `signedIn` and lets `RequireAuth` redirect to `/login` where the `expired`
-   banner renders. There is still no *real* trigger (token TTL, idle timeout)
-   behind it — that depends on how the daemon issues/expires session tokens,
-   which doesn't exist yet.
+   banner renders. In API mode, the daemon now issues 24-hour browser sessions,
+   rejects expired HTTP access, and revalidates active WebSockets; a failed
+   session check returns the UI to this expired state. The prototype button is
+   retained only as a quick visual test.
 3. **Ctrl-C vs. Kill.** The design only shows a Ctrl-C confirm dialog
    (`sendSignal(id, "SIGINT")`). `sendSignal` also accepts `"KILL"` for the
    destructive-entry-point pattern described in Settings/Session actions, but no

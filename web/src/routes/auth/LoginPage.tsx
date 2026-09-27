@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useAuth } from "../../context/AuthContext";
 import { config } from "../../data/config";
-import { isMockData } from "../../data";
 import { AuthLayout } from "./AuthLayout";
 import { AuthMark } from "./AuthMark";
 import styles from "./LoginPage.module.css";
@@ -23,7 +22,7 @@ function formatClock(ms: number): string {
 const FOOT = "Signed-in browsers stay signed in until you sign out or the session expires.";
 
 export function LoginPage() {
-  const { status, attempts, lockUntil, login, clearLock } = useAuth();
+  const { status, attempts, lockUntil, message, login, clearLock } = useAuth();
   const mode = modeFromStatus(status);
 
   const [pw, setPw] = useState("");
@@ -92,7 +91,7 @@ export function LoginPage() {
 
         <div className={styles.field}>
           <span className={styles.fieldHead}>
-            <label htmlFor="login-password">{isMockData ? "Password" : "Daemon token"}</label>
+            <label htmlFor="login-password">Password</label>
             <button type="button" className={styles.showToggle} onClick={() => setShow((s) => !s)}>
               {show ? "Hide" : "Show"}
             </button>
@@ -125,9 +124,8 @@ export function LoginPage() {
           </span>
           {mode === "wrong" && (
             <span className={styles.errorText}>
-              {isMockData
-                ? `Incorrect password. ${attemptsLeft} ${attemptsLeft === 1 ? "attempt" : "attempts"} left before a 5-minute lock.`
-                : "The daemon rejected that token or could not be reached."}
+              {message ??
+                `Incorrect password. ${attemptsLeft} ${attemptsLeft === 1 ? "attempt" : "attempts"} left before a 5-minute lock.`}
             </span>
           )}
         </div>

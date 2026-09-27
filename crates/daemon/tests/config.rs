@@ -19,6 +19,10 @@ fn defaults_bind_only_to_loopback() {
         config.token_file,
         Path::new("/home/tester/.config/terminal-agent/token")
     );
+    assert_eq!(
+        config.auth_file,
+        Path::new("/home/tester/.config/terminal-agent/auth.json")
+    );
 }
 
 #[test]
@@ -28,6 +32,7 @@ bind = "127.0.0.1:9000"
 data_dir = "/var/tmp/terminal-agent"
 scrollback_lines = 25
 token_file = "/var/tmp/terminal-agent.token"
+auth_file = "/var/tmp/terminal-agent-auth.json"
 "#;
 
     let config = DaemonConfig::from_toml(text, Path::new("/unused")).unwrap();
@@ -35,6 +40,10 @@ token_file = "/var/tmp/terminal-agent.token"
     assert_eq!(config.bind.to_string(), "127.0.0.1:9000");
     assert_eq!(config.scrollback_lines, 25);
     assert_eq!(config.data_dir, Path::new("/var/tmp/terminal-agent"));
+    assert_eq!(
+        config.auth_file,
+        Path::new("/var/tmp/terminal-agent-auth.json")
+    );
 }
 
 #[test]

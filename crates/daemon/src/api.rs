@@ -1,17 +1,19 @@
 //! Axum HTTP and WebSocket API for daemon clients.
 
+mod auth_routes;
+
 use crate::{
-    auth::constant_time_eq,
+    auth::AuthManager,
     framing::{decode_terminal_frame, encode_terminal_frame},
     session_manager::{Attachment, CreateSession, SessionManager},
 };
 use axum::{
     extract::{
         connect_info::ConnectInfo,
-        ws::{Message, WebSocket, WebSocketUpgrade},
-        Request, State,
+        ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade},
+        Extension, Request, State,
     },
-    http::{header::AUTHORIZATION, StatusCode},
+    http::StatusCode,
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{any, get},
@@ -29,16 +31,16 @@ pub struct AppState {
     pub sessions: SessionManager,
     /// Description returned by the machine endpoint.
     pub machine: Machine,
-    token: String,
+    auth: AuthManager,
 }
 
 impl AppState {
-    /// Build API state with one bearer token.
-    pub fn new(sessions: SessionManager, machine: Machine, token: String) -> Self {
+    /// Build API state with persistent single-user authentication.
+    pub fn new(sessions: SessionManager, machine: Machine, auth: AuthManager) -> Self {
         AppState {
             sessions,
             machine,
-            token,
+            auth,
         }
     }
 
@@ -125,6 +127,9 @@ struct Health {
     version: u32,
 }
 
+#[derive(Clone)]
+struct AuthorizedToken(String);
+
 /// Build the complete versioned HTTP and WebSocket router.
 pub fn router(state: AppState) -> Router {
     let protected = Router::new()
@@ -135,6 +140,7 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .route("/api/v1/health", get(health))
+        .merge(auth_routes::routes())
         .merge(protected)
         .with_state(state)
 }
@@ -164,23 +170,31 @@ async fn sessions(State(state): State<AppState>) -> Json<Envelope<DaemonMessage>
 
 async fn authorize(
     State(state): State<AppState>,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let header_token = request
-        .headers()
-        .get(AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "));
+    let header_token = auth_routes::bearer_from_headers(request.headers());
     let query_token = (request.uri().path() == "/api/v1/ws")
         .then(|| request.uri().query())
         .flatten()
         .and_then(token_from_query);
-    let supplied = header_token.or(query_token);
-    if supplied.is_some_and(|token| constant_time_eq(token, &state.token)) {
-        Ok(next.run(request).await)
-    } else {
-        Err(StatusCode::UNAUTHORIZED)
+    let supplied = header_token.or(query_token).map(str::to_string);
+    match supplied
+        .as_deref()
+        .map(|token| state.auth.authorize(token))
+        .transpose()
+    {
+        Ok(Some(Some(_))) => {
+            if let Some(token) = supplied {
+                request.extensions_mut().insert(AuthorizedToken(token));
+            }
+            Ok(next.run(request).await)
+        }
+        Ok(_) => Err(StatusCode::UNAUTHORIZED),
+        Err(error) => {
+            tracing::error!(%error, "authentication state failed");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
@@ -194,20 +208,25 @@ async fn websocket(
     upgrade: WebSocketUpgrade,
     State(state): State<AppState>,
     ConnectInfo(address): ConnectInfo<SocketAddr>,
+    Extension(token): Extension<AuthorizedToken>,
 ) -> Response {
     let client_addr = address.to_string();
     upgrade
-        .on_upgrade(move |socket| handle_socket(socket, state, client_addr))
+        .on_upgrade(move |socket| handle_socket(socket, state, client_addr, token.0))
         .into_response()
 }
 
-async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: String) {
+async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: String, token: String) {
     let (output_tx, mut output_rx) = mpsc::channel::<Vec<u8>>(256);
     let mut attachments: HashMap<SessionId, JoinHandle<()>> = HashMap::new();
 
     loop {
         tokio::select! {
             incoming = socket.recv() => {
+                if !connection_authorized(&state, &token) {
+                    close_expired(&mut socket).await;
+                    break;
+                }
                 let Some(incoming) = incoming else { break; };
                 let message = match incoming {
                     Ok(message) => message,
@@ -228,6 +247,10 @@ async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: Stri
                 }
             }
             outgoing = output_rx.recv() => {
+                if !connection_authorized(&state, &token) {
+                    close_expired(&mut socket).await;
+                    break;
+                }
                 let Some(frame) = outgoing else { break; };
                 if socket.send(Message::Binary(frame.into())).await.is_err() {
                     break;
@@ -238,6 +261,26 @@ async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: Stri
 
     for (_, task) in attachments {
         task.abort();
+    }
+}
+
+async fn close_expired(socket: &mut WebSocket) {
+    let _ = socket
+        .send(Message::Close(Some(CloseFrame {
+            code: 4_001,
+            reason: "browser session expired".into(),
+        })))
+        .await;
+}
+
+fn connection_authorized(state: &AppState, token: &str) -> bool {
+    match state.auth.authorize(token) {
+        Ok(Some(_)) => true,
+        Ok(None) => false,
+        Err(error) => {
+            tracing::error!(%error, "failed to revalidate websocket authentication");
+            false
+        }
     }
 }
 

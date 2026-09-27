@@ -32,6 +32,7 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `tokio-tungstenite` | 1 | WebSocket client transport for `ta` |
 | `futures-util` | 1 | Async WebSocket stream and sink handling for `ta` |
 | `tower` (dev) | 1 | Exercise Axum routes in-process without network sockets |
+| `argon2` | 1.1 | Hash and verify the single owner's password with Argon2id |
 
 ## Web (Milestone 1+)
 `vite`, `typescript`, `react`, `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-webgl`,

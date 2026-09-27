@@ -1,7 +1,7 @@
 import type { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { DAEMON_TOKEN_KEY, defaultDaemonUrl } from "../data/api";
+import { SESSION_TOKEN_KEY, defaultDaemonUrl } from "../data/api";
 import { decodeTerminalFrame, encodeTerminalFrame } from "../frame";
 import type { ClientRequest } from "../protocol/ClientRequest";
 import type { DaemonMessage } from "../protocol/DaemonMessage";
@@ -50,7 +50,7 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
     if (!terminal || !Number.isFinite(numericId)) return;
 
     const endpoint = new URL(defaultDaemonUrl());
-    const token = localStorage.getItem(DAEMON_TOKEN_KEY) ?? "";
+    const token = localStorage.getItem(SESSION_TOKEN_KEY) ?? "";
     endpoint.searchParams.set("token", token);
     const socket = new WebSocket(endpoint);
     socket.binaryType = "arraybuffer";

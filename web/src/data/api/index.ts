@@ -5,19 +5,26 @@ import type { Envelope } from "../../protocol/Envelope";
 import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { Session as WireSession } from "../../protocol/Session";
 import { NotImplemented, type DataAdapter, type LiveEvent } from "../adapter";
-import type { AuthState, Machine, Session } from "../types";
+import type { Machine, Session } from "../types";
+import {
+  AUTH_EXPIRED_EVENT,
+  createAuthApi,
+  defaultDaemonHttpUrl,
+  SESSION_TOKEN_KEY,
+  type TokenStorage,
+} from "./auth";
+
+export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
 
 const PROTOCOL_VERSION = 1;
 const SOCKET_OPEN = 1;
 const POLL_INTERVAL_MS = 2_000;
 const encoder = new TextEncoder();
 
-export const DAEMON_TOKEN_KEY = "sentinal.daemonToken";
-
 export function defaultDaemonUrl(): string {
   return (
     import.meta.env.VITE_DAEMON_URL ??
-    `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:7420/api/v1/ws`
+    `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/v1/ws`
   );
 }
 
@@ -32,12 +39,6 @@ export interface ApiSocket {
   close(): void;
 }
 
-interface TokenStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
-
 interface PendingReply {
   accepts: (message: DaemonMessage) => boolean;
   resolve: (message: DaemonMessage) => void;
@@ -46,8 +47,10 @@ interface PendingReply {
 
 export interface ApiAdapterOptions {
   daemonUrl?: string;
+  daemonHttpUrl?: string;
   storage?: TokenStorage;
   socketFactory?: (url: string) => ApiSocket;
+  fetcher?: typeof fetch;
 }
 
 function daemonError(message: string): Error {
@@ -149,8 +152,8 @@ class DaemonTransport {
   private connect(): Promise<ApiSocket> {
     if (this.socket?.readyState === SOCKET_OPEN) return Promise.resolve(this.socket);
     if (this.connecting !== null) return this.connecting;
-    const token = this.storage.getItem(DAEMON_TOKEN_KEY);
-    if (!token) return Promise.reject(daemonError("missing daemon token"));
+    const token = this.storage.getItem(SESSION_TOKEN_KEY);
+    if (!token) return Promise.reject(daemonError("missing browser session"));
 
     const endpoint = new URL(this.url);
     endpoint.searchParams.set("token", token);
@@ -170,10 +173,14 @@ class DaemonTransport {
           reject(daemonError("authentication or connection error"));
         }
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (this.socket === socket) this.socket = null;
         this.connecting = null;
         this.rejectPending(daemonError("connection closed"));
+        if (event.code === 4_001) {
+          this.storage.removeItem(SESSION_TOKEN_KEY);
+          window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+        }
       };
       socket.onmessage = (event) => this.handleMessage(event);
     });
@@ -217,7 +224,7 @@ class DaemonTransport {
   }
 
   private async pollSessions() {
-    if (!this.storage.getItem(DAEMON_TOKEN_KEY)) return;
+    if (!this.storage.getItem(SESSION_TOKEN_KEY)) return;
     try {
       const message = await this.request({ type: "LIST_SESSIONS" }, (reply) => reply.type === "SESSIONS");
       if (message.type !== "SESSIONS") return;
@@ -237,6 +244,8 @@ function unsupported(method: string): Promise<never> {
 export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   const storage = options.storage ?? window.localStorage;
   const socketFactory = options.socketFactory ?? ((url: string) => new WebSocket(url));
+  const fetcher = options.fetcher ?? window.fetch.bind(window);
+  const authBaseUrl = options.daemonHttpUrl ?? defaultDaemonHttpUrl();
   const transport = new DaemonTransport(options.daemonUrl ?? defaultDaemonUrl(), storage, socketFactory);
 
   const getMachines = async (): Promise<Machine[]> => {
@@ -249,18 +258,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     return message.type === "SESSIONS" ? message.sessions.map(mapSession) : [];
   };
 
-  const login = async (token: string): Promise<AuthState> => {
-    storage.setItem(DAEMON_TOKEN_KEY, token);
-    transport.reset();
-    try {
-      await getMachines();
-      return { status: "signedIn", attempts: 0, lockUntil: null };
-    } catch {
-      storage.removeItem(DAEMON_TOKEN_KEY);
-      transport.reset();
-      return { status: "wrong", attempts: 1, lockUntil: null };
-    }
-  };
+  const auth = createAuthApi({ baseUrl: authBaseUrl, fetcher, storage, resetTransport: () => transport.reset() });
 
   return {
     getMachines,
@@ -292,28 +290,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     rotateToken: () => unsupported("rotateToken"),
     revokeToken: () => unsupported("revokeToken"),
     getMachineTokens: () => unsupported("getMachineTokens"),
-    auth: {
-      async getState(): Promise<AuthState> {
-        if (!storage.getItem(DAEMON_TOKEN_KEY)) {
-          return { status: "signedOut", attempts: 0, lockUntil: null };
-        }
-        try {
-          await getMachines();
-          return { status: "signedIn", attempts: 0, lockUntil: null };
-        } catch {
-          storage.removeItem(DAEMON_TOKEN_KEY);
-          transport.reset();
-          return { status: "signedOut", attempts: 0, lockUntil: null };
-        }
-      },
-      login,
-      setup: login,
-      changePassword: () => unsupported("auth.changePassword"),
-      async logout() {
-        storage.removeItem(DAEMON_TOKEN_KEY);
-        transport.reset();
-      },
-    },
+    auth,
     notifications: {
       getRules: () => unsupported("notifications.getRules"),
       setRule: () => unsupported("notifications.setRule"),

@@ -1,0 +1,6 @@
+{
+  "code": "LOCKED",
+  "message": "password login is locked until 1790000300000",
+  "attempts_remaining": 0,
+  "retry_at": 1790000300000
+}

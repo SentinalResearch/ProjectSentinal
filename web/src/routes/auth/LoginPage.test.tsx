@@ -23,7 +23,7 @@ function renderLogin() {
 describe("LoginPage", () => {
   beforeAll(async () => {
     // First-run: give the mock store a real password so login() has something to check against.
-    await dataAdapter.auth.setup("a-very-long-admin-password");
+    await dataAdapter.auth.setup("mock-bootstrap", "a-very-long-admin-password");
     await dataAdapter.auth.logout();
   });
 
@@ -39,6 +39,6 @@ describe("LoginPage", () => {
       () => expect(screen.getByText(/incorrect password/i)).toBeInTheDocument(),
       { timeout: 3000 },
     );
-    expect(screen.getByText(/2 attempts left/i)).toBeInTheDocument();
+    expect(screen.getByText(/4 attempts left/i)).toBeInTheDocument();
   });
 });

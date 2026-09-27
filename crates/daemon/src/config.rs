@@ -21,6 +21,8 @@ pub struct DaemonConfig {
     pub scrollback_lines: usize,
     /// File containing the bearer token.
     pub token_file: PathBuf,
+    /// File containing the single owner's password hash.
+    pub auth_file: PathBuf,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -29,6 +31,7 @@ struct RawConfig {
     data_dir: Option<PathBuf>,
     scrollback_lines: Option<usize>,
     token_file: Option<PathBuf>,
+    auth_file: Option<PathBuf>,
 }
 
 /// Errors produced while loading daemon configuration.
@@ -97,6 +100,9 @@ impl DaemonConfig {
             token_file: raw
                 .token_file
                 .unwrap_or_else(|| home.join(".config/terminal-agent/token")),
+            auth_file: raw
+                .auth_file
+                .unwrap_or_else(|| home.join(".config/terminal-agent/auth.json")),
         })
     }
 }

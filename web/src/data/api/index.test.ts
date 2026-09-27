@@ -49,9 +49,65 @@ class MemoryStorage {
   }
 }
 
-class FakeSocket implements ApiSocket {
-  static readonly OPEN = 1;
+class FakeAuthServer {
+  password: string | null;
+  readonly tokens = new Set<string>();
+  private nextToken = 1;
 
+  constructor(password: string | null) {
+    this.password = password;
+  }
+
+  fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = new URL(String(input), "http://daemon.test");
+    const request = init ?? {};
+    if (url.pathname === "/api/v1/auth/status") {
+      return json({ setup_required: this.password === null });
+    }
+    if (url.pathname === "/api/v1/auth/setup") {
+      if (new Headers(request.headers).get("authorization") !== "Bearer bootstrap-token") {
+        return failure("INVALID_BOOTSTRAP", "invalid bootstrap machine token", 401);
+      }
+      this.password = body(request).password as string;
+      return json(this.issue());
+    }
+    if (url.pathname === "/api/v1/auth/login") {
+      if (body(request).password !== this.password) {
+        return failure("INVALID_CREDENTIALS", "invalid owner password", 401, 4);
+      }
+      return json(this.issue());
+    }
+    const token = bearer(request);
+    if (!token || !this.tokens.has(token)) {
+      return failure("INVALID_SESSION", "invalid or expired browser session", 401);
+    }
+    if (url.pathname === "/api/v1/auth/session") {
+      return json({ expires_at: 1_790_086_400_000 });
+    }
+    if (url.pathname === "/api/v1/auth/logout") {
+      this.tokens.delete(token);
+      return new Response(null, { status: 204 });
+    }
+    if (url.pathname === "/api/v1/auth/password") {
+      const values = body(request);
+      if (values.current_password !== this.password) {
+        return failure("INVALID_CREDENTIALS", "invalid owner password", 401, 0);
+      }
+      this.password = values.new_password as string;
+      this.tokens.clear();
+      return json(this.issue());
+    }
+    return new Response(null, { status: 404 });
+  };
+
+  private issue() {
+    const token = `session-token-${this.nextToken++}`;
+    this.tokens.add(token);
+    return { token, expires_at: 1_790_086_400_000 };
+  }
+}
+
+class FakeSocket implements ApiSocket {
   readonly url: string;
   readyState = 0;
   binaryType = "blob";
@@ -61,14 +117,15 @@ class FakeSocket implements ApiSocket {
   onmessage: ((event: MessageEvent<string | ArrayBuffer | Blob>) => void) | null = null;
   readonly binaryFrames: Uint8Array[] = [];
 
-  constructor(url: string) {
+  constructor(url: string, server: FakeAuthServer) {
     this.url = url;
     queueMicrotask(() => {
-      if (new URL(url).searchParams.get("token") !== "test-token") {
+      const token = new URL(url).searchParams.get("token");
+      if (!token || !server.tokens.has(token)) {
         this.onerror?.(new Event("error"));
         return;
       }
-      this.readyState = FakeSocket.OPEN;
+      this.readyState = WebSocket.OPEN;
       this.onopen?.(new Event("open"));
     });
   }
@@ -79,7 +136,6 @@ class FakeSocket implements ApiSocket {
       this.binaryFrames.push(bytes);
       return;
     }
-
     const request = (JSON.parse(data) as Envelope<ClientRequest>).payload;
     let payload: DaemonMessage;
     if (request.type === "GET_MACHINE") payload = { type: "MACHINE", machine };
@@ -98,40 +154,98 @@ class FakeSocket implements ApiSocket {
   }
 
   close() {
-    this.readyState = 3;
+    this.readyState = WebSocket.CLOSED;
     this.onclose?.(new CloseEvent("close"));
+  }
+
+  expire() {
+    this.readyState = WebSocket.CLOSED;
+    this.onclose?.(new CloseEvent("close", { code: 4_001, reason: "browser session expired" }));
   }
 }
 
-function setup() {
+function body(request: RequestInit): Record<string, unknown> {
+  return JSON.parse(String(request.body ?? "{}")) as Record<string, unknown>;
+}
+
+function bearer(request: RequestInit): string | null {
+  return new Headers(request.headers).get("authorization")?.replace(/^Bearer /, "") ?? null;
+}
+
+function json(value: unknown, status = 200): Response {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function failure(code: string, message: string, status: number, attemptsRemaining: number | null = null) {
+  return json({ code, message, attempts_remaining: attemptsRemaining, retry_at: null }, status);
+}
+
+function setup(password: string | null = "correct horse battery staple") {
   const storage = new MemoryStorage();
+  const server = new FakeAuthServer(password);
   const sockets: FakeSocket[] = [];
   const adapter = createApiAdapter({
-    daemonUrl: "ws://127.0.0.1:7420/api/v1/ws",
+    daemonUrl: "ws://daemon.test/api/v1/ws",
+    daemonHttpUrl: "http://daemon.test/api/v1",
     storage,
+    fetcher: server.fetch,
     socketFactory: (url) => {
-      const socket = new FakeSocket(url);
+      const socket = new FakeSocket(url, server);
       sockets.push(socket);
       return socket;
     },
   });
-  return { adapter, sockets, storage };
+  return { adapter, server, sockets, storage };
 }
 
-describe("apiAdapter", () => {
-  it("authenticates with the daemon token and maps Milestone 1 state", async () => {
-    const { adapter, sockets, storage } = setup();
+describe("apiAdapter authentication", () => {
+  it("bootstraps the single owner and stores only the browser session token", async () => {
+    const { adapter, storage } = setup(null);
 
-    await expect(adapter.auth.login("test-token")).resolves.toMatchObject({ status: "signedIn" });
+    await expect(adapter.auth.getState()).resolves.toMatchObject({ status: "setup" });
+    await expect(
+      adapter.auth.setup("bootstrap-token", "correct horse battery staple"),
+    ).resolves.toMatchObject({ status: "signedIn" });
+
+    expect(storage.getItem("sentinal.sessionToken")).toBe("session-token-1");
+    expect(storage.getItem("sentinal.daemonToken")).toBeNull();
+  });
+
+  it("keeps first-run setup active when the machine token is wrong", async () => {
+    const { adapter, storage } = setup(null);
+
+    await expect(
+      adapter.auth.setup("wrong-bootstrap", "correct horse battery staple"),
+    ).resolves.toMatchObject({ status: "setup", message: "invalid bootstrap machine token" });
+    expect(storage.getItem("sentinal.sessionToken")).toBeNull();
+  });
+
+  it("logs in with a password and maps Milestone 1 state", async () => {
+    const { adapter, sockets } = setup();
+
+    await expect(adapter.auth.login("correct horse battery staple")).resolves.toMatchObject({
+      status: "signedIn",
+    });
     await expect(adapter.getMachines()).resolves.toEqual([
       expect.objectContaining({ id: "test-machine", name: "Test Machine", os: "macOS", status: "ONLINE" }),
     ]);
     await expect(adapter.getSessions()).resolves.toEqual([
       expect.objectContaining({ id: "1", machine: "test-machine", name: "Session 1", state: "IDLE" }),
     ]);
-
-    expect(storage.getItem("sentinal.daemonToken")).toBe("test-token");
     expect(sockets).toHaveLength(1);
+  });
+
+  it("returns remaining attempts for an invalid password", async () => {
+    const { adapter, storage } = setup();
+
+    await expect(adapter.auth.login("wrong password")).resolves.toMatchObject({
+      status: "wrong",
+      attempts: 1,
+    });
+    expect(storage.getItem("sentinal.sessionToken")).toBeNull();
   });
 
   it("creates sessions, emits updates, and frames remote input", async () => {
@@ -140,7 +254,7 @@ describe("apiAdapter", () => {
     const unsubscribe = adapter.subscribe((event) => {
       if (event.type === "SESSION_UPDATED") updates.push(event.session.id);
     });
-    await adapter.auth.login("test-token");
+    await adapter.auth.login("correct horse battery staple");
 
     const created = await adapter.createSession();
     await adapter.sendInput(created.id, "echo ready\n");
@@ -153,11 +267,30 @@ describe("apiAdapter", () => {
     unsubscribe();
   });
 
-  it("rejects an invalid daemon token without persisting it", async () => {
+  it("rotates the browser session on password change and revokes it on logout", async () => {
     const { adapter, storage } = setup();
+    await adapter.auth.login("correct horse battery staple");
 
-    await expect(adapter.auth.login("wrong-token")).resolves.toMatchObject({ status: "wrong" });
+    await adapter.auth.changePassword("correct horse battery staple", "a different secure passphrase");
+    expect(storage.getItem("sentinal.sessionToken")).toBe("session-token-2");
+    await adapter.auth.logout();
 
-    expect(storage.getItem("sentinal.daemonToken")).toBeNull();
+    expect(storage.getItem("sentinal.sessionToken")).toBeNull();
+    await expect(adapter.auth.getState()).resolves.toMatchObject({ status: "signedOut" });
+  });
+
+  it("clears the session and announces daemon-enforced expiry", async () => {
+    const { adapter, sockets, storage } = setup();
+    let expired = false;
+    window.addEventListener("terminal-agent-auth-expired", () => {
+      expired = true;
+    }, { once: true });
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getMachines();
+
+    sockets[0].expire();
+
+    expect(storage.getItem("sentinal.sessionToken")).toBeNull();
+    expect(expired).toBe(true);
   });
 });

@@ -11,8 +11,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use protocol::{
-    ClientRequest, Command, DaemonMessage, Envelope, Event, Machine, MachineMetrics, Process,
-    Recipe, Session, SessionMetrics,
+    AuthChangePasswordRequest, AuthFailure, AuthLoginRequest, AuthSession, AuthSessionInfo,
+    AuthSetupRequest, AuthStatus, ClientRequest, Command, DaemonMessage, Envelope, Event, Machine,
+    MachineMetrics, Process, Recipe, Session, SessionMetrics,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
@@ -88,6 +89,26 @@ fn machine_metrics_contract() {
 #[test]
 fn session_metrics_contract() {
     assert_round_trip::<SessionMetrics>(&load("session_metrics.json"), "session_metrics.json");
+}
+
+#[test]
+fn authentication_contract() {
+    assert_round_trip::<AuthStatus>(&load("auth_status.json"), "auth_status.json");
+    assert_round_trip::<AuthSetupRequest>(
+        &load("auth_setup_request.json"),
+        "auth_setup_request.json",
+    );
+    assert_round_trip::<AuthLoginRequest>(
+        &load("auth_login_request.json"),
+        "auth_login_request.json",
+    );
+    assert_round_trip::<AuthChangePasswordRequest>(
+        &load("auth_change_password_request.json"),
+        "auth_change_password_request.json",
+    );
+    assert_round_trip::<AuthSession>(&load("auth_session.json"), "auth_session.json");
+    assert_round_trip::<AuthSessionInfo>(&load("auth_session_info.json"), "auth_session_info.json");
+    assert_round_trip::<AuthFailure>(&load("auth_failure.json"), "auth_failure.json");
 }
 
 #[test]

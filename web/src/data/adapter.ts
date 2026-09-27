@@ -60,7 +60,7 @@ export interface DataAdapter {
   auth: {
     getState(): Promise<AuthState>;
     login(password: string): Promise<AuthState>;
-    setup(password: string): Promise<AuthState>;
+    setup(bootstrapToken: string, password: string): Promise<AuthState>;
     changePassword(current: string, next: string): Promise<void>;
     logout(): Promise<void>;
   };

@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-test("signs in to a fake daemon, creates a session, and attaches", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByLabel("Daemon token").fill("test-token");
-  await page.getByRole("button", { name: "Sign in" }).click();
+test("sets the owner password, creates a session, and attaches", async ({ page }) => {
+  await page.goto("/setup");
+  await page.getByLabel("Machine token").fill("test-token");
+  await page.getByLabel("New password").fill("test-password-for-playwright");
+  await page.getByLabel("Confirm password").fill("test-password-for-playwright");
+  await page.getByRole("button", { name: "Create password and continue" }).click();
 
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await page.getByRole("button", { name: "New session" }).click();

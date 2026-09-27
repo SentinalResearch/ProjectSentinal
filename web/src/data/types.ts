@@ -122,6 +122,7 @@ export interface AuthState {
   status: AuthStatus;
   attempts: number;
   lockUntil: number | null;
+  message?: string;
 }
 
 export interface PairingToken {

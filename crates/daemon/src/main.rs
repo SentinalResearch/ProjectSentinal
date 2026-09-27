@@ -3,7 +3,7 @@
 use daemon::{
     api::{router, AppState},
     audit::AuditLog,
-    auth::{load_or_create_token, AuthError},
+    auth::{load_or_create_token, AuthError, AuthManager},
     config::{ConfigError, DaemonConfig},
     pty::{FakePty, PtyBackend, RealPty},
     session_manager::{SessionManager, SessionManagerConfig},
@@ -53,6 +53,10 @@ async fn main() -> Result<(), MainError> {
         .unwrap_or_else(|| home.join(".config/terminal-agent/daemon.toml"));
     let config = DaemonConfig::load(&config_path, &home)?;
     let token = load_or_create_token(&config.token_file)?;
+    let auth_file = std::env::var_os("TA_AUTH_FILE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| config.auth_file.clone());
+    let auth = AuthManager::load(&auth_file, token)?;
     let machine = machine_description();
     let backend: Arc<dyn PtyBackend> = if std::env::var_os("TA_FAKE_PTY").is_some() {
         tracing::warn!("using fake PTY backend");
@@ -69,7 +73,7 @@ async fn main() -> Result<(), MainError> {
         ),
         AuditLog::new(&config.data_dir),
     );
-    let state = AppState::new(sessions, machine, token);
+    let state = AppState::new(sessions, machine, auth);
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .map_err(|source| MainError::Bind {

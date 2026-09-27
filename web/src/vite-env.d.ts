@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_DAEMON_URL?: string;
+  readonly VITE_DAEMON_HTTP_URL?: string;
   readonly VITE_DATA?: "mock" | "api";
 }
 
