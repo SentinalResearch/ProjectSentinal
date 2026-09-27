@@ -1,5 +1,7 @@
 //! Configuration behaviour tests.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use daemon::config::{ConfigError, DaemonConfig};
 use std::path::Path;
 

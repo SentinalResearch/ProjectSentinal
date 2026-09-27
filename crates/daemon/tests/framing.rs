@@ -1,5 +1,7 @@
 //! Terminal frame behaviour tests.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use daemon::framing::{decode_terminal_frame, encode_terminal_frame, FrameError};
 use protocol::SessionId;
 

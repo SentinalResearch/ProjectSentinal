@@ -1,5 +1,7 @@
 //! Authentication and remote-input audit behaviour tests.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use daemon::{
     audit::{AuditLog, AuditRecord},
     auth::{constant_time_eq, load_or_create_token},
