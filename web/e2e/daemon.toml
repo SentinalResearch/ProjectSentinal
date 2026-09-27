@@ -1,0 +1,4 @@
+bind = "127.0.0.1:7421"
+data_dir = "web/.test-data"
+scrollback_lines = 100
+token_file = "web/e2e/token"

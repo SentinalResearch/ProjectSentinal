@@ -49,7 +49,16 @@ check:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace
     just gen-ts --check
+    pnpm -C web check
 
 # Slow tests that need a real shell / PTY
 test-integration:
     cargo test --workspace -- --ignored
+
+# Type-check and run the fast web tests
+web-check:
+    pnpm -C web check
+
+# Run the browser smoke test against a daemon with the fake PTY backend
+test-e2e:
+    pnpm -C web test:e2e

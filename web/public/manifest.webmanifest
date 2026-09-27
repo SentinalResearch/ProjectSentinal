@@ -1,0 +1,8 @@
+{
+  "name": "terminal-agent",
+  "short_name": "terminal-agent",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080c10",
+  "theme_color": "#080c10"
+}
