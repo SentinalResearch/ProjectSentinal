@@ -56,22 +56,17 @@ fn ipv6_unspecified_bind_is_refused() {
 
 #[test]
 fn private_lan_bind_is_refused() {
-    let error = DaemonConfig::from_toml(
-        "bind = \"192.168.1.20:7420\"",
-        Path::new("/home/tester"),
-    )
-    .unwrap_err();
+    let error = DaemonConfig::from_toml("bind = \"192.168.1.20:7420\"", Path::new("/home/tester"))
+        .unwrap_err();
 
     assert!(matches!(error, ConfigError::UnsafeBind(address) if address == "192.168.1.20:7420"));
 }
 
 #[test]
 fn tailscale_ipv4_bind_is_allowed() {
-    let config = DaemonConfig::from_toml(
-        "bind = \"100.100.10.20:7420\"",
-        Path::new("/home/tester"),
-    )
-    .unwrap();
+    let config =
+        DaemonConfig::from_toml("bind = \"100.100.10.20:7420\"", Path::new("/home/tester"))
+            .unwrap();
 
     assert_eq!(config.bind.to_string(), "100.100.10.20:7420");
 }
