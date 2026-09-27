@@ -6,7 +6,10 @@ use crate::{
 };
 use futures_util::{SinkExt, StreamExt};
 use protocol::{ClientRequest, DaemonMessage, Envelope, ProtocolError, SessionId};
-use std::{path::PathBuf, process::Command};
+use std::{
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_tungstenite::{
     connect_async,
@@ -217,6 +220,7 @@ impl RawTerminal {
     fn enable() -> Result<Self, ClientError> {
         let output = Command::new("stty")
             .arg("-g")
+            .stdin(Stdio::inherit())
             .output()
             .map_err(|error| terminal_error("read mode", error))?;
         if !output.status.success() {
@@ -247,7 +251,11 @@ impl Drop for RawTerminal {
 }
 
 fn terminal_size() -> Option<(u16, u16)> {
-    let output = Command::new("stty").arg("size").output().ok()?;
+    let output = Command::new("stty")
+        .arg("size")
+        .stdin(Stdio::inherit())
+        .output()
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -262,5 +270,23 @@ fn terminal_error(operation: &'static str, error: std::io::Error) -> ClientError
     ClientError::Terminal {
         operation,
         message: error.to_string(),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::RawTerminal;
+    use std::io::IsTerminal;
+
+    #[test]
+    #[ignore = "requires a real controlling terminal"]
+    fn raw_terminal_integration() {
+        if !std::io::stdin().is_terminal() {
+            eprintln!("raw_terminal_integration requires a controlling terminal");
+            return;
+        }
+        let terminal = RawTerminal::enable().unwrap();
+        drop(terminal);
     }
 }
