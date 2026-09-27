@@ -1,0 +1,266 @@
+//! WebSocket client transport and interactive terminal attachment.
+
+use crate::{
+    detach::DetachDetector,
+    frame::{decode_terminal_frame, encode_terminal_frame},
+};
+use futures_util::{SinkExt, StreamExt};
+use protocol::{ClientRequest, DaemonMessage, Envelope, ProtocolError, SessionId};
+use std::{path::PathBuf, process::Command};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        client::IntoClientRequest,
+        http::{header::AUTHORIZATION, HeaderValue},
+        Error as WebSocketError, Message,
+    },
+    MaybeTlsStream, WebSocketStream,
+};
+
+type Socket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+
+/// Errors returned by the CLI transport or local terminal setup.
+#[derive(Debug, thiserror::Error)]
+pub enum ClientError {
+    /// A token could not be read.
+    #[error("failed to read token file '{}': {source}", path.display())]
+    TokenFile {
+        /// Token path.
+        path: PathBuf,
+        /// Filesystem error.
+        source: std::io::Error,
+    },
+    /// A WebSocket request could not be constructed.
+    #[error("invalid daemon WebSocket URL '{url}': {message}")]
+    Url {
+        /// Invalid URL.
+        url: String,
+        /// Parser error.
+        message: String,
+    },
+    /// The bearer token was not a valid HTTP header value.
+    #[error("invalid bearer token from '{}': {message}", path.display())]
+    TokenHeader {
+        /// Token path.
+        path: PathBuf,
+        /// Header parser error.
+        message: String,
+    },
+    /// A WebSocket operation failed.
+    #[error("daemon WebSocket failed: {0}")]
+    WebSocket(#[from] WebSocketError),
+    /// A protocol message could not be encoded or decoded.
+    #[error(transparent)]
+    Protocol(#[from] ProtocolError),
+    /// The daemon returned an application error.
+    #[error("daemon rejected request: {0}")]
+    Daemon(String),
+    /// The daemon disconnected before replying.
+    #[error("daemon disconnected before replying")]
+    Disconnected,
+    /// A local terminal operation failed.
+    #[error("failed to {operation} local terminal: {message}")]
+    Terminal {
+        /// Operation that failed.
+        operation: &'static str,
+        /// Error details.
+        message: String,
+    },
+    /// Local standard input or output failed.
+    #[error("failed to {operation} terminal bytes: {source}")]
+    Io {
+        /// Operation that failed.
+        operation: &'static str,
+        /// I/O error.
+        source: std::io::Error,
+    },
+}
+
+/// One authenticated WebSocket connection to a daemon.
+pub struct DaemonClient {
+    socket: Socket,
+}
+
+impl DaemonClient {
+    /// Connect using the bearer token stored at `token_path`.
+    pub async fn connect(url: &str, token_path: &std::path::Path) -> Result<Self, ClientError> {
+        let token = std::fs::read_to_string(token_path)
+            .map_err(|source| ClientError::TokenFile {
+                path: token_path.to_path_buf(),
+                source,
+            })?
+            .trim()
+            .to_string();
+        let mut request = url
+            .into_client_request()
+            .map_err(|error| ClientError::Url {
+                url: url.to_string(),
+                message: error.to_string(),
+            })?;
+        let header = HeaderValue::from_str(&format!("Bearer {token}")).map_err(|error| {
+            ClientError::TokenHeader {
+                path: token_path.to_path_buf(),
+                message: error.to_string(),
+            }
+        })?;
+        request.headers_mut().insert(AUTHORIZATION, header);
+        let (socket, _) = connect_async(request).await?;
+        Ok(DaemonClient { socket })
+    }
+
+    /// Send one request and wait for the next structured daemon response.
+    pub async fn request(&mut self, request: ClientRequest) -> Result<DaemonMessage, ClientError> {
+        self.send_control(request).await?;
+        while let Some(message) = self.socket.next().await {
+            match message? {
+                Message::Text(text) => {
+                    return Ok(Envelope::<DaemonMessage>::decode(text.as_str())?.payload);
+                }
+                Message::Close(_) => return Err(ClientError::Disconnected),
+                _ => {}
+            }
+        }
+        Err(ClientError::Disconnected)
+    }
+
+    /// Attach this process's terminal until `Ctrl-\ d` is entered.
+    pub async fn attach(mut self, session_id: SessionId) -> Result<(), ClientError> {
+        self.send_control(ClientRequest::Attach { session_id })
+            .await?;
+        if let Some((cols, rows)) = terminal_size() {
+            self.send_control(ClientRequest::Resize {
+                session_id,
+                cols,
+                rows,
+            })
+            .await?;
+        }
+        let _raw = RawTerminal::enable()?;
+        let mut stdin = tokio::io::stdin();
+        let mut stdout = tokio::io::stdout();
+        let mut input = [0_u8; 4096];
+        let mut detector = DetachDetector::new();
+
+        loop {
+            tokio::select! {
+                count = stdin.read(&mut input) => {
+                    let count = count.map_err(|source| ClientError::Io {
+                        operation: "read",
+                        source,
+                    })?;
+                    if count == 0 {
+                        let trailing = detector.finish();
+                        if !trailing.is_empty() {
+                            self.socket.send(Message::Binary(
+                                encode_terminal_frame(session_id, &trailing).into()
+                            )).await?;
+                        }
+                        return Ok(());
+                    }
+                    let result = detector.push(&input[..count]);
+                    if !result.bytes.is_empty() {
+                        self.socket.send(Message::Binary(
+                            encode_terminal_frame(session_id, &result.bytes).into()
+                        )).await?;
+                    }
+                    if result.detach {
+                        self.send_control(ClientRequest::Detach { session_id }).await?;
+                        return Ok(());
+                    }
+                }
+                message = self.socket.next() => {
+                    let Some(message) = message else {
+                        return Err(ClientError::Disconnected);
+                    };
+                    match message? {
+                        Message::Binary(frame) => {
+                            let (frame_session, bytes) = decode_terminal_frame(&frame)
+                                .map_err(|error| ClientError::Daemon(error.to_string()))?;
+                            if frame_session == session_id {
+                                stdout.write_all(bytes).await.map_err(|source| ClientError::Io {
+                                    operation: "write",
+                                    source,
+                                })?;
+                                stdout.flush().await.map_err(|source| ClientError::Io {
+                                    operation: "flush",
+                                    source,
+                                })?;
+                            }
+                        }
+                        Message::Text(text) => {
+                            let message = Envelope::<DaemonMessage>::decode(text.as_str())?.payload;
+                            if let DaemonMessage::Error { message } = message {
+                                return Err(ClientError::Daemon(message));
+                            }
+                        }
+                        Message::Close(_) => return Err(ClientError::Disconnected),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    async fn send_control(&mut self, request: ClientRequest) -> Result<(), ClientError> {
+        let text = Envelope::new(request).encode()?;
+        self.socket.send(Message::Text(text.into())).await?;
+        Ok(())
+    }
+}
+
+struct RawTerminal {
+    previous: String,
+}
+
+impl RawTerminal {
+    fn enable() -> Result<Self, ClientError> {
+        let output = Command::new("stty")
+            .arg("-g")
+            .output()
+            .map_err(|error| terminal_error("read mode", error))?;
+        if !output.status.success() {
+            return Err(ClientError::Terminal {
+                operation: "read mode",
+                message: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+            });
+        }
+        let previous = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let status = Command::new("stty")
+            .args(["raw", "-echo"])
+            .status()
+            .map_err(|error| terminal_error("enable raw mode", error))?;
+        if !status.success() {
+            return Err(ClientError::Terminal {
+                operation: "enable raw mode",
+                message: format!("stty exited with {status}"),
+            });
+        }
+        Ok(RawTerminal { previous })
+    }
+}
+
+impl Drop for RawTerminal {
+    fn drop(&mut self) {
+        let _ = Command::new("stty").arg(&self.previous).status();
+    }
+}
+
+fn terminal_size() -> Option<(u16, u16)> {
+    let output = Command::new("stty").arg("size").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut values = text.split_whitespace();
+    let rows = values.next()?.parse().ok()?;
+    let cols = values.next()?.parse().ok()?;
+    Some((cols, rows))
+}
+
+fn terminal_error(operation: &'static str, error: std::io::Error) -> ClientError {
+    ClientError::Terminal {
+        operation,
+        message: error.to_string(),
+    }
+}
