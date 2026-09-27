@@ -3,7 +3,7 @@
 use serde::Deserialize;
 use std::{
     fs,
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
 };
 
@@ -84,7 +84,7 @@ impl DaemonConfig {
                 value: bind_text.clone(),
                 source,
             })?;
-        if bind.ip().is_unspecified() {
+        if !is_safe_bind_ip(bind.ip()) {
             return Err(ConfigError::UnsafeBind(bind_text));
         }
 
@@ -99,4 +99,20 @@ impl DaemonConfig {
                 .unwrap_or_else(|| home.join(".config/terminal-agent/token")),
         })
     }
+}
+
+fn is_safe_bind_ip(ip: IpAddr) -> bool {
+    if ip.is_loopback() {
+        return true;
+    }
+    match ip {
+        IpAddr::V4(address) => is_tailscale_ipv4(address),
+        IpAddr::V6(address) => address.segments()[..3] == [0xfd7a, 0x115c, 0xa1e0],
+    }
+}
+
+fn is_tailscale_ipv4(address: Ipv4Addr) -> bool {
+    const CGNAT_PREFIX: u32 = 0x6440_0000;
+    const CGNAT_MASK: u32 = 0xffc0_0000;
+    u32::from(address) & CGNAT_MASK == CGNAT_PREFIX
 }
