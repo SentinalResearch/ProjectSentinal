@@ -1,0 +1,12 @@
+[Unit]
+Description=terminal-agent persistent session daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/tad
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

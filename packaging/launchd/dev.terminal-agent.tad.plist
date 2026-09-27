@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.terminal-agent.tad</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/tad</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/terminal-agent-tad.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/terminal-agent-tad.error.log</string>
+</dict>
+</plist>
