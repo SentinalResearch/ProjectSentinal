@@ -1,0 +1,101 @@
+.section {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 96px 24px;
+  text-align: center;
+}
+
+.overline {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  opacity: 0;
+  transform: translateY(60px);
+  transition:
+    opacity 0.9s ease,
+    transform 1s var(--ease-out);
+}
+.seen .overline {
+  opacity: 1;
+  transform: none;
+}
+
+.pct {
+  font-size: clamp(120px, 22vw, 300px);
+  line-height: 0.82;
+  font-weight: 800;
+  letter-spacing: -0.07em;
+  opacity: 0;
+  transform: translateY(60px);
+  transition:
+    opacity 0.9s ease 0.1s,
+    transform 1s var(--ease-out) 0.1s;
+}
+.seen .pct {
+  opacity: 1;
+  transform: none;
+}
+.pctSign {
+  font-size: 0.38em;
+  letter-spacing: -0.02em;
+}
+
+.bar {
+  width: min(720px, 90%);
+  height: 8px;
+  background: var(--bg-2);
+  opacity: 0;
+  transition: opacity 0.9s ease 0.2s;
+}
+.seen .bar {
+  opacity: 1;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--s-running-fg);
+}
+
+.stats {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 17px;
+  color: var(--text-2);
+  opacity: 0;
+  transform: translateY(30px);
+  transition:
+    opacity 0.9s ease 0.3s,
+    transform 1s var(--ease-out) 0.3s;
+}
+.seen2 .stats {
+  opacity: 1;
+  transform: none;
+}
+
+.stats b {
+  color: var(--text-1);
+}
+
+.desc {
+  max-width: 560px;
+  font-size: 19px;
+  line-height: 28px;
+  color: var(--text-2);
+  text-wrap: pretty;
+  opacity: 0;
+  transform: translateY(30px);
+  transition:
+    opacity 0.9s ease 0.45s,
+    transform 1s var(--ease-out) 0.45s;
+}
+.seen2 .desc {
+  opacity: 1;
+  transform: none;
+}

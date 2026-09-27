@@ -1,0 +1,72 @@
+import type {
+  AuthState,
+  HistoryEntry,
+  JournalNotification,
+  Machine,
+  MachineToken,
+  NotificationRuleSet,
+  NotificationRules,
+  PairingToken,
+  Recipe,
+  Session,
+  SessionEvent,
+} from "./types";
+
+export interface HistoryFilters {
+  machine?: string;
+  project?: string;
+  result?: "ok" | "failed" | "running";
+  query?: string;
+}
+
+export type LiveEvent =
+  | { type: "SESSION_UPDATED"; session: Session }
+  | { type: "EVENT_APPENDED"; sessionId: string; event: SessionEvent }
+  | { type: "MACHINE_UPDATED"; machine: Machine }
+  | { type: "NOTIFICATION"; notification: JournalNotification };
+
+export class NotImplemented extends Error {
+  constructor(method: string) {
+    super(`${method} is not implemented by the real data adapter yet`);
+    this.name = "NotImplemented";
+  }
+}
+
+/**
+ * The single seam between UI components and data. `src/data/mock` implements this
+ * against `fixtures.json`; `src/data/api` will implement it against the daemon's
+ * real HTTP/WebSocket API. Select which one loads via `VITE_DATA=mock|api`.
+ */
+export interface DataAdapter {
+  getMachines(): Promise<Machine[]>;
+  getSessions(): Promise<Session[]>;
+  getRecipes(): Promise<Recipe[]>;
+  getHistory(filters?: HistoryFilters): Promise<HistoryEntry[]>;
+
+  /** Subscribe to live updates (epoch ticks, event appends, state transitions). Returns an unsubscribe function. */
+  subscribe(listener: (event: LiveEvent) => void): () => void;
+
+  sendInput(sessionId: string, data: string): Promise<void>;
+  sendSignal(sessionId: string, signal: "SIGINT" | "KILL"): Promise<void>;
+
+  runRecipe(recipeId: string, params: Record<string, string>, machineId: string): Promise<{ sessionId: string }>;
+
+  pairMachine(machineName: string): Promise<PairingToken>;
+  rotateToken(machineId: string): Promise<MachineToken>;
+  revokeToken(machineId: string): Promise<void>;
+  getMachineTokens(): Promise<MachineToken[]>;
+
+  auth: {
+    getState(): Promise<AuthState>;
+    login(password: string): Promise<AuthState>;
+    setup(password: string): Promise<AuthState>;
+    changePassword(current: string, next: string): Promise<void>;
+    logout(): Promise<void>;
+  };
+
+  notifications: {
+    getRules(): Promise<NotificationRules>;
+    setRule(sessionId: string, rules: NotificationRuleSet): Promise<void>;
+    getJournal(): Promise<JournalNotification[]>;
+  };
+}

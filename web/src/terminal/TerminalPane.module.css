@@ -1,0 +1,55 @@
+.host {
+  overflow: auto;
+  background: var(--term-bg);
+  cursor: text;
+}
+
+.hostFill {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.host :global(.xterm) {
+  height: 100%;
+  padding: 10px 12px;
+}
+
+.keyBar {
+  display: flex;
+  gap: 2px;
+  background: var(--line);
+  border-top: 2px solid var(--line);
+}
+
+.key {
+  flex: 1;
+  height: 36px;
+  border: 0;
+  background: var(--bg-1);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.key:hover {
+  background: var(--bg-2);
+}
+
+.ctrlC {
+  flex: 1.3;
+  background: var(--s-failed);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.ctrlC:hover {
+  background: var(--s-failed);
+}
+
+@media (max-width: 640px) {
+  .key {
+    height: 48px;
+    font-size: 13px;
+  }
+}

@@ -1,0 +1,343 @@
+.page {
+  height: 100%;
+  min-height: 560px;
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+}
+
+.loading,
+.empty {
+  padding: 48px;
+  color: var(--text-3);
+}
+
+.aside {
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 40px 0 24px;
+  overflow-y: auto;
+}
+
+.asideHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 24px 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.count {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.categoryLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  padding: 8px 24px;
+  border-top: 2px solid var(--text-1);
+}
+
+.recipeItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 24px;
+  border: 0;
+  color: var(--text-1);
+  text-align: left;
+}
+
+.recipeName {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.recipeMeta {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.newRecipeWrap {
+  padding: 0 24px;
+}
+
+.newRecipe {
+  width: 100%;
+  height: 36px;
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: not-allowed;
+}
+
+.form {
+  overflow: auto;
+  padding: 40px clamp(20px, 4vw, 48px) 64px;
+}
+
+.formInner {
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.formHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 2px solid var(--text-1);
+  padding-bottom: 18px;
+}
+
+.overlineRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overline {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.recipeTitle {
+  margin: 0;
+  font-size: 40px;
+  line-height: 42px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.template {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.formBody {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionLabel {
+  font-size: 15px;
+  font-weight: 800;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.paramRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.paramKeyCol {
+  flex: 0 0 130px;
+  display: flex;
+  flex-direction: column;
+}
+
+.paramKey {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.paramDefault {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.paramInputCol {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.paramInput {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 14px;
+}
+
+.paramError {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--s-failed-fg);
+}
+
+.paramWarning {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--s-waiting-fg);
+}
+
+.resetBtn {
+  flex: none;
+  width: 56px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.resetBtn:disabled {
+  cursor: default;
+}
+
+.machineGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.machineOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 14px 16px;
+  border: 0;
+  text-align: left;
+}
+
+.machineOptionTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.radio {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radioDot {
+  width: 6px;
+  height: 6px;
+}
+
+.machineName {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.machineMeta {
+  font-size: 12px;
+  color: var(--text-3);
+  padding-left: 22px;
+}
+
+.previewSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.previewBlock {
+  background: var(--term-bg);
+  color: var(--term-fg);
+  padding: 16px 18px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.previewPrompt {
+  color: #8a8a86;
+}
+
+.runRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.runHint {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* The 280px fixed-width aside + form grid has no fallback at all below ~640px —
+   fixed without this, the form column would be crushed to ~100px. Stack instead. */
+@media (max-width: 640px) {
+  .page {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+  }
+
+  .aside {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    max-height: 260px;
+    padding: 20px 0 16px;
+  }
+
+  .form {
+    padding: 24px 16px 48px;
+  }
+
+  .recipeTitle {
+    font-size: 32px;
+    line-height: 34px;
+  }
+
+  .paramKeyCol,
+  .paramInputCol {
+    flex-basis: 100%;
+  }
+
+  .machineGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .machineOption {
+    padding: 14px 16px;
+  }
+}

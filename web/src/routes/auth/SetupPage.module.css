@@ -1,0 +1,28 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.rule {
+  display: flex;
+  gap: 8px;
+}
+
+.ruleGlyph {
+  width: 14px;
+}
+
+.submit {
+  height: 48px;
+  border: 0;
+  font-size: 15px;
+  font-weight: 700;
+}

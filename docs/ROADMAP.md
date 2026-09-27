@@ -3,6 +3,15 @@
 Work top to bottom. Tick boxes as they land. Each milestone ends with a
 demo you can actually use.
 
+> **Deliberate exception (2026-09-27):** the full `web/` UI — every screen in
+> `design_handoff_sentinal/design/`, spanning what would otherwise be Milestones
+> 2-4 plus the public landing page — was built up front against a mock data
+> adapter (`src/data/mock`, `VITE_DATA=mock`), ahead of the milestones below
+> actually landing. This was an explicit, user-approved call so the design
+> system and UI shell exist before the backend does; it does not change the
+> order daemon/backend work happens in. See `web/FUTURE.md` for what's mock vs.
+> real per feature, and `web/QUESTIONS.md` for open questions from the build.
+
 ## Milestone 0 — Protocol (the contract)
 - [x] Workspace, rules, CI, testing guide
 - [x] `Machine`, `Session` + `SessionState` state machine

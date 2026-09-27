@@ -1,0 +1,21 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  white-space: nowrap;
+  line-height: 1;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.icon {
+  flex: none;
+  overflow: visible;
+}
+
+.pulse {
+  transform-origin: 7px 7px;
+  animation: tg-pulse 2s ease-out infinite;
+}

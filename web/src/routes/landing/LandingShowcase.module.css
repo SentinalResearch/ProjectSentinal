@@ -1,0 +1,373 @@
+.section {
+  height: 420vh;
+  position: relative;
+}
+
+.sticky {
+  position: sticky;
+  top: 60px;
+  height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  padding: 24px;
+  perspective: 1600px;
+  overflow: hidden;
+}
+
+.steps {
+  position: relative;
+  height: 112px;
+  width: 100%;
+  max-width: 900px;
+  text-align: center;
+}
+
+.step {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transition:
+    opacity 0.5s ease,
+    transform 0.6s var(--ease-out);
+}
+
+.stepN {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-fg);
+}
+
+.stepQ {
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.stepA {
+  font-size: 16px;
+  color: var(--text-2);
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  height: 4px;
+  transition:
+    width 0.4s var(--ease-out),
+    background 0.3s;
+}
+
+.mockFrame {
+  width: 100%;
+  max-width: 1080px;
+  aspect-ratio: 16 / 9.4;
+  max-height: 62vh;
+  transform-origin: 50% 0%;
+  will-change: transform;
+  transition:
+    transform 0.15s linear,
+    opacity 0.15s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mockFrame {
+    transition: none;
+  }
+}
+
+.mockInner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  background: var(--bg-0);
+  border: 1px solid var(--line-strong);
+  box-shadow:
+    0 60px 120px -40px rgba(0, 0, 0, 0.55),
+    0 0 0 8px color-mix(in srgb, var(--text-1) 4%, transparent);
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.mockSidebar {
+  width: 20%;
+  flex: none;
+  background: var(--bg-1);
+  border-right: 1px solid var(--line);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mockBrand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+.mockBrand span {
+  font-weight: 800;
+}
+
+.mockNavActive {
+  padding: 6px 8px;
+  background: var(--bg-2);
+  font-weight: 700;
+}
+.mockNav {
+  padding: 6px 8px;
+  color: var(--text-2);
+}
+
+.mockMachinesLabel {
+  padding: 14px 8px 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.mockMachine {
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.mockMachine.offline {
+  color: var(--text-3);
+}
+
+.mockDotOnline {
+  width: 6px;
+  height: 6px;
+  background: var(--s-running);
+}
+.mockDotOffline {
+  width: 6px;
+  height: 6px;
+  box-shadow: inset 0 0 0 1.2px var(--s-disconnected-fg);
+}
+
+.mockMain {
+  flex: 1;
+  min-width: 0;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mockTitle {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.mockBody {
+  display: flex;
+  gap: 18px;
+  min-height: 0;
+  flex: 1;
+}
+
+.mockList {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mockListHead {
+  border-bottom: 1.5px solid var(--text-1);
+  padding-bottom: 5px;
+  font-weight: 800;
+}
+.mockListHead span {
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.mockRow {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.mockRowTag,
+.mockRowFact {
+  transition: opacity 0.45s;
+}
+
+.mockRowName {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  transition: opacity 0.45s;
+}
+.mockRowName span:first-child {
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.mockRowName span:last-child {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mockRowFact {
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mockAside {
+  width: 34%;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mockWaiting {
+  background: var(--bg-1);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: inset 0 2px 0 var(--s-waiting);
+  transition:
+    opacity 0.45s,
+    transform 0.6s var(--ease-out);
+}
+
+.mockWaitingLabel {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--s-waiting-fg);
+}
+
+.mockWaitingPrompt {
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.mockWaitingKeys {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 2px;
+}
+.mockWaitingKeys span {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.mockKeyY,
+.mockKeyN {
+  background: var(--text-1);
+  color: var(--bg-0);
+  font-family: var(--font-mono);
+}
+.mockKeyOpen {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.mockTerm {
+  flex: 1;
+  min-height: 0;
+  background: var(--term-bg);
+  color: var(--term-fg);
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  transition: opacity 0.45s;
+}
+
+.mockHistory {
+  display: flex;
+  flex-direction: column;
+  transition:
+    opacity 0.45s,
+    transform 0.6s var(--ease-out);
+}
+
+.mockHistoryHead {
+  font-weight: 800;
+  padding-bottom: 4px;
+  border-bottom: 1.5px solid var(--text-1);
+}
+
+.mockHistoryRow {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.mockHistoryRow span:first-child {
+  font-weight: 800;
+}
+.mockHistoryRow span:nth-child(2) {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mockHistoryRow span:last-child {
+  font-weight: 600;
+}
+
+/* The mini-browser mockup mimics the whole app shell (sidebar + list + aside) at
+   fixed px font sizes inside a frame that scales fluidly by width alone — below
+   ~640px there isn't room for all three columns to stay legible. Drop the
+   sidebar and aside so the session list (the actual point of this section) stays
+   readable, rather than shrinking everything to illegible sizes. */
+@media (max-width: 640px) {
+  .sticky {
+    padding: 16px;
+    gap: 24px;
+  }
+
+  .mockSidebar,
+  .mockAside {
+    display: none;
+  }
+
+  .mockMain {
+    padding: 14px 16px;
+  }
+
+  .mockRow {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .mockRow > span:last-child {
+    display: none;
+  }
+}

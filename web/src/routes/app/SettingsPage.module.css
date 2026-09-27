@@ -1,0 +1,453 @@
+.page {
+  height: 100%;
+  min-height: 560px;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.aside {
+  border-right: 1px solid var(--line);
+  padding: 40px 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.asideTitle {
+  margin: 0 24px 16px;
+  font-size: 28px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.asideDivider {
+  height: 2px;
+  background: var(--text-1);
+  margin: 0 24px 8px;
+}
+
+.tabBtn {
+  height: 40px;
+  padding: 0 24px;
+  border: 0;
+  font-size: 14px;
+  text-align: left;
+}
+
+.tabBtn:hover {
+  color: var(--text-1);
+}
+
+.main {
+  overflow: auto;
+  padding: 40px 48px 64px;
+}
+
+.mainInner {
+  max-width: 960px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.tabLoading {
+  color: var(--text-3);
+  font-size: 14px;
+}
+
+.tabHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 2px solid var(--text-1);
+  padding-bottom: 16px;
+}
+
+.tabHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tabTitle {
+  margin: 0;
+  font-size: 32px;
+  line-height: 34px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.tabSubtitle {
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.primaryBtn {
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 700;
+  flex: none;
+}
+
+.overline {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+/* Machines & tokens table */
+
+.tableScroll {
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+}
+
+.machineHeadRow {
+  min-width: 840px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 150px 170px 170px;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.machineRow {
+  min-width: 840px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 150px 170px 170px;
+  gap: 16px;
+  align-items: center;
+  min-height: 60px;
+  border-bottom: 1px solid var(--line);
+}
+
+.machineNameCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.machineName {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.machineOs {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.machineHw {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.machineStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+}
+
+.machineToken {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.machineActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.revokeConfirmLabel {
+  font-size: 12px;
+  font-weight: 600;
+  align-self: center;
+  color: var(--s-failed-fg);
+}
+
+.revokeBtn {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  background: var(--s-failed);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.keepBtn,
+.rotateBtn {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.revokeEntry {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--s-failed-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Notifications matrix */
+
+.notifHeadRow {
+  min-width: 660px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(5, 88px);
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+
+.notifHeadCell {
+  text-align: center;
+}
+
+.notifRow {
+  min-width: 660px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(5, 88px);
+  gap: 8px;
+  align-items: center;
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+}
+
+.notifNameCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.notifCell {
+  justify-self: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notifMark {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bg-0);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.previewWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.previewCard {
+  background: var(--bg-1);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.previewSender {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.previewText {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* Account */
+
+.pwForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+}
+
+.formLabel {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.pwField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pwInput {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 15px;
+}
+
+.pwMessage {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pwSubmit {
+  align-self: flex-start;
+  height: 40px;
+  padding: 0 18px;
+  border: 1.5px solid var(--text-1);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionHeading {
+  font-size: 15px;
+  font-weight: 800;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.browserRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-height: 56px;
+  border-bottom: 1px solid var(--line);
+}
+
+.browserCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.smallBtn {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.prototypeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong);
+}
+
+.prototypeLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+
+/* Same fixed-240px-aside issue as Recipes — stack on phone. */
+@media (max-width: 640px) {
+  .page {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+  }
+
+  .aside {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 20px 0 8px;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 4px;
+  }
+
+  .asideTitle,
+  .asideDivider {
+    display: none;
+  }
+
+  .tabBtn {
+    height: 44px;
+    padding: 0 16px;
+    white-space: nowrap;
+  }
+
+  .main {
+    padding: 24px 16px 48px;
+  }
+
+  .tabTitle {
+    font-size: 26px;
+    line-height: 28px;
+  }
+
+  .revokeBtn,
+  .keepBtn,
+  .rotateBtn,
+  .revokeEntry {
+    height: 36px;
+  }
+
+  .smallBtn {
+    height: 36px;
+  }
+}

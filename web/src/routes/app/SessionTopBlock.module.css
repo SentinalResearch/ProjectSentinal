@@ -1,0 +1,288 @@
+.training {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 32px;
+  align-items: flex-end;
+}
+
+.percentCol {
+  flex: 1.4 1 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.percentRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.percentValue {
+  font-size: 88px;
+  line-height: 72px;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+}
+
+.percentSign {
+  font-size: 36px;
+  letter-spacing: -0.02em;
+}
+
+.percentCaption {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-2);
+  padding-bottom: 4px;
+}
+
+.progressTrack {
+  position: relative;
+  height: 8px;
+  background: var(--bg-2);
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--s-running-fg);
+}
+
+.progressTicks {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--bg-0) calc(10% - 1px) 10%);
+}
+
+.metricCol {
+  flex: 1 1 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.metricLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.metricValue {
+  font-size: 26px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.metricUnit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.metricCaption {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.meterTrack {
+  position: relative;
+  height: 4px;
+  background: var(--bg-2);
+}
+
+.meterFill {
+  height: 100%;
+  background: var(--text-1);
+}
+
+.meterTick {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 12px;
+  background: var(--text-3);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--bg-1);
+  padding: 20px 24px;
+}
+
+.failed {
+  box-shadow: inset 0 3px 0 var(--s-failed);
+}
+
+.waiting {
+  box-shadow: inset 0 3px 0 var(--s-waiting);
+  flex-direction: row;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.stalled {
+  box-shadow: inset 0 3px 0 var(--s-stalled);
+  flex-direction: row;
+  align-items: baseline;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.interrupted {
+  box-shadow: inset 0 3px 0 var(--s-interrupted);
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.panelOverline {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.failedNums {
+  display: flex;
+  align-items: baseline;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.failedBig {
+  font-size: 56px;
+  line-height: 52px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--s-failed-fg);
+}
+
+.failedSub {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.failedSummary {
+  font-size: 16px;
+  line-height: 23px;
+}
+
+.failedActions {
+  display: flex;
+  gap: 8px;
+}
+
+.waitingLeft {
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.waitingPrompt {
+  font-family: var(--font-mono);
+  font-size: 40px;
+  line-height: 48px;
+  font-weight: 500;
+}
+
+.waitingCaption {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.yn {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.ynKey {
+  width: 88px;
+  height: 72px;
+  border: 0;
+  background: var(--text-1);
+  color: var(--bg-0);
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stalledLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stalledBig {
+  font-size: 56px;
+  line-height: 52px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.stalledSub {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.server {
+  display: flex;
+  align-items: baseline;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.serverPort {
+  font-family: var(--font-mono);
+  font-size: 56px;
+  line-height: 56px;
+  font-weight: 500;
+}
+
+.serverCaption {
+  font-size: 17px;
+  color: var(--text-2);
+}
+
+.interruptedText {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 16px 16px 18px;
+  }
+
+  .training {
+    gap: 20px 24px;
+  }
+
+  .percentValue {
+    font-size: 72px;
+    line-height: 60px;
+  }
+
+  .ynKey {
+    width: 72px;
+    height: 64px;
+    font-size: 24px;
+  }
+
+  .failedBig,
+  .stalledBig {
+    font-size: 44px;
+    line-height: 42px;
+  }
+}

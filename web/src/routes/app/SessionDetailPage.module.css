@@ -1,0 +1,228 @@
+.page {
+  max-width: 1320px;
+  padding: 28px 48px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.breadcrumbMachine {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.breadcrumbMachine:hover {
+  color: var(--text-1);
+}
+
+.breadcrumbName {
+  color: var(--text-1);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--text-1);
+  padding-bottom: 20px;
+}
+
+.headerText {
+  flex: 1;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 40px;
+  line-height: 42px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.healthOutline {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.command {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.splitButton {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.splitButton:hover {
+  border-color: var(--text-1);
+}
+
+.ctrlCButton {
+  height: 36px;
+  padding: 0 14px;
+  border: 1.5px solid var(--s-failed-fg);
+  background: transparent;
+  color: var(--s-failed-fg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ctrlCButton:hover {
+  background: color-mix(in srgb, var(--s-failed-fg) 12%, transparent);
+}
+
+.body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.terminalSection {
+  flex: 2 1 520px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.terminalHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--bg-2);
+}
+
+.terminalLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.terminalPath {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.attachedIndicator {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+  flex: none;
+}
+
+.attachedDot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+}
+
+.side {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.notFound {
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 16px 16px 40px;
+    gap: 20px;
+  }
+
+  .title {
+    font-size: 32px;
+    line-height: 34px;
+    letter-spacing: -0.03em;
+  }
+
+  .header {
+    padding-bottom: 16px;
+  }
+
+  .actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .splitButton,
+  .ctrlCButton {
+    height: 44px;
+    flex: 1 1 auto;
+  }
+
+  .body {
+    gap: 24px;
+  }
+
+  .terminalSection {
+    flex-basis: 100%;
+  }
+
+  .side {
+    flex-basis: 100%;
+  }
+}

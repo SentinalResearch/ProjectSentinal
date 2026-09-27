@@ -1,0 +1,88 @@
+.scroller {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-0);
+  color: var(--text-1);
+  scroll-behavior: smooth;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 max(24px, calc((100% - 1200px) / 2));
+  background: color-mix(in srgb, var(--bg-0) 78%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s;
+}
+
+.header.scrolled {
+  border-bottom-color: var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wordmark {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.themeBtn {
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.themeBtn:hover {
+  color: var(--text-1);
+}
+
+.signInBtn {
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  background: var(--text-1);
+  color: var(--bg-0);
+  font-size: 13px;
+  font-weight: 700;
+}
+.signInBtn:hover {
+  opacity: 0.85;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px max(24px, calc((100% - 1200px) / 2)) 32px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.footerBrand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

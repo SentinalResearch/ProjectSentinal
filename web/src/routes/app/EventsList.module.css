@@ -1,0 +1,80 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--text-1);
+}
+
+.headTitle {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.headCount {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 40px 10px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--text-3);
+}
+
+.square {
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.typeRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.type {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 700;
+}
+
+.who {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.detail {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 17px;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--text-3);
+}

@@ -1,0 +1,131 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.expiredBanner {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-1);
+  font-size: 13px;
+}
+.expiredBanner span:first-child {
+  color: var(--text-2);
+}
+.expiredBanner span:last-child {
+  font-weight: 700;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.showToggle {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inputWrap {
+  position: relative;
+  display: flex;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 14px;
+  top: 16px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.passwordInput {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0 14px 0 40px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+}
+
+.passwordInput.error {
+  border-color: var(--s-failed-fg);
+}
+
+.passwordInput:disabled {
+  background: var(--bg-1);
+  color: var(--text-3);
+}
+
+.errorText {
+  font-size: 13px;
+  color: var(--s-failed-fg);
+  font-weight: 600;
+}
+
+.lockRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.lockLabel {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.lockClock {
+  font-size: 32px;
+  line-height: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.submit {
+  height: 48px;
+  padding: 0 16px;
+  border: 0;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.submit:disabled {
+  background: var(--bg-2);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+.submit.checking {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.enterGlyph {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  opacity: 0.75;
+}

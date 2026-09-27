@@ -1,0 +1,226 @@
+.page {
+  max-width: 1200px;
+  padding: 40px 48px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  animation: tg-page-in 0.25s var(--ease-out);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 2px solid var(--text-1);
+  padding-bottom: 20px;
+}
+
+.overlineRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overline {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.title {
+  margin: 0;
+  font-size: 56px;
+  line-height: 56px;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+.metaRow {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.path {
+  font-size: 13px;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  min-width: 0;
+}
+
+.section,
+.journal {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--text-1);
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.sectionHint {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.searchAll {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent-fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sessionRow {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-height: 60px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.sessionRow:hover {
+  background: var(--bg-1);
+}
+
+.sessionMain {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sessionName {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sessionCommand {
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionAside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.sessionFact {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sessionMachine {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.historyRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+}
+
+.historyCommand {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyMachine {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.historyDuration {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 64px;
+  text-align: right;
+}
+
+.emptyHint {
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.notFound {
+  padding: 80px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent-fg);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 20px 16px 48px;
+    gap: 28px;
+  }
+
+  .title {
+    font-size: 36px;
+    line-height: 38px;
+  }
+
+  .notFound {
+    padding: 48px 16px;
+  }
+}

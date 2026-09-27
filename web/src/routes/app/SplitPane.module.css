@@ -1,0 +1,88 @@
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--term-bg);
+  cursor: default;
+}
+
+.head {
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 10px;
+  background: var(--bg-1);
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: none;
+}
+
+.fact {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.detailsBtn {
+  margin-left: auto;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  flex: none;
+}
+.detailsBtn:hover {
+  color: var(--text-1);
+  background: var(--bg-2);
+}
+
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1;
+  flex: none;
+}
+.closeBtn:hover {
+  color: var(--text-1);
+  background: var(--bg-2);
+}
+
+.terminalWrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  .head {
+    height: 44px;
+  }
+
+  .detailsBtn,
+  .closeBtn {
+    height: 36px;
+  }
+
+  .closeBtn {
+    width: 36px;
+  }
+}

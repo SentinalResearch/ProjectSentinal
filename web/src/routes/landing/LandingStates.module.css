@@ -1,0 +1,57 @@
+.section {
+  padding: 140px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  text-align: center;
+}
+
+.heading {
+  font-size: clamp(34px, 4.4vw, 60px);
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  max-width: 880px;
+  opacity: 0;
+  transform: translateY(40px);
+  transition:
+    opacity 0.9s ease,
+    transform 1s var(--ease-out);
+}
+.seen .heading {
+  opacity: 1;
+  transform: none;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 760px;
+}
+
+.tagWrap {
+  opacity: 0;
+  transform: translateY(24px) scale(0.8);
+  transition:
+    opacity 0.6s ease,
+    transform 0.7s var(--ease-pop);
+}
+.seen .tagWrap {
+  opacity: 1;
+  transform: none;
+}
+
+.desc {
+  font-size: 17px;
+  color: var(--text-2);
+  max-width: 520px;
+  text-wrap: pretty;
+  opacity: 0;
+  transition: opacity 0.9s ease 0.6s;
+}
+.seen .desc {
+  opacity: 1;
+}

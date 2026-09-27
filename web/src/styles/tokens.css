@@ -1,0 +1,40 @@
+/* Sentinal design tokens — paste into :root. Dark is default. */
+:root {
+  --font-ui: 'Archivo', system-ui, sans-serif;          /* 400 500 600 700 800 */
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace; /* 400 500 700 */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+  --radius: 0;            /* every component is square; only device frames are rounded */
+  --rule-heavy: 2px;      /* section / table start, color --text-1 */
+  --rule: 1px;            /* row dividers, color --line */
+  --ease-out: cubic-bezier(.2,.7,.2,1);
+  --ease-pop: cubic-bezier(.3,1.6,.5,1);
+}
+:root, [data-theme="dark"] {
+  --bg-0: #0A0A0A; --bg-1: #111111; --bg-2: #1C1C1C;
+  --text-1: #F2F2F0; --text-2: #A6A6A2; --text-3: #8A8A86;
+  --line: #262626; --line-strong: #6B6B67;
+  --accent: #3D5AFE; --accent-fg: #8C9EFF; --on-accent: #FFFFFF; --ink: #0A0A0A;
+  --scrim: rgba(0,0,0,0.7);
+  /* state FILL — solid tag background; glyph + label on top are always --ink */
+  --s-created: #B9A8FF; --s-idle: #9C9C98; --s-running: #29D35F; --s-waiting: #FFD000;
+  --s-stalled: #FF8A00; --s-completed: #36C5E8; --s-failed: #FF3B2F; --s-interrupted: #FF5CA8;
+  --s-disconnected: transparent; /* outlined with --s-disconnected-fg */
+  /* state FG — dots, bars, text drawn directly on a surface */
+  --s-created-fg: #B9A8FF; --s-idle-fg: #9C9C98; --s-running-fg: #29D35F; --s-waiting-fg: #FFD000;
+  --s-stalled-fg: #FF8A00; --s-completed-fg: #36C5E8; --s-failed-fg: #FF3B2F; --s-interrupted-fg: #FF5CA8;
+  --s-disconnected-fg: #8A8A86;
+  --sev-info: var(--accent-fg); --sev-warning: var(--s-waiting-fg); --sev-error: var(--s-failed-fg);
+  --term-bg: #0C0C0C; --term-fg: #D4D4D0; /* identical in both themes */
+}
+[data-theme="light"] {
+  --bg-0: #F7F6F2; --bg-1: #EFEEE9; --bg-2: #E4E3DD;
+  --text-1: #0A0A0A; --text-2: #4A4A46; --text-3: #5E5E5A;
+  --line: #D9D8D2; --line-strong: #8A8984;
+  --accent: #2A44E0; --accent-fg: #2A44E0; --on-accent: #FFFFFF; --ink: #0A0A0A;
+  --scrim: rgba(10,10,10,0.4);
+  /* fills are the same as dark */
+  --s-created-fg: #5B45C9; --s-idle-fg: #5E5E5A; --s-running-fg: #0A7030; --s-waiting-fg: #7D5B00;
+  --s-stalled-fg: #9A4B00; --s-completed-fg: #0A6680; --s-failed-fg: #C4210F; --s-interrupted-fg: #B01F6A;
+  --s-disconnected-fg: #62625E;
+}

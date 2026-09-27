@@ -1,0 +1,295 @@
+.aside {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1);
+  border-right: 1px solid var(--line);
+  transition: width 0.18s ease;
+  overflow: hidden;
+}
+
+.top {
+  height: 60px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 0 16px;
+}
+
+.markButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  padding: 0 0 0 2px;
+}
+
+.wordmark {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+}
+.iconButton:hover {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 12px 12px;
+}
+
+.newSession {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.newSession:hover {
+  border-color: var(--text-1);
+}
+
+.searchHistory {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 0;
+  background: var(--bg-2);
+  color: var(--text-3);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.searchHistory:hover {
+  color: var(--text-1);
+}
+.searchHistoryLabel {
+  flex: 1;
+  text-align: left;
+}
+.kbdHint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 12px;
+  gap: 1px;
+}
+
+.navItem {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  text-align: left;
+}
+.navItem:hover {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.glyph {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.navLabel {
+  flex: 1;
+}
+
+.badge {
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--s-waiting);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  padding: 20px 10px 6px;
+}
+
+.machineRow,
+.projectRow {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  text-align: left;
+}
+.machineRow:hover,
+.projectRow:hover {
+  background: var(--bg-2);
+}
+
+.machineDot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  margin: 0 4px;
+}
+
+.rowLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowMeta {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.projectHash {
+  width: 16px;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.bottom {
+  flex: none;
+  border-top: 1px solid var(--line);
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 10px;
+  margin-top: 4px;
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--text-1);
+  color: var(--bg-0);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.accountName {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.signOut {
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+.signOut:hover {
+  color: var(--text-1);
+}
+
+/* Phone: the sidebar keeps the same collapsed-rail / expanded-drawer behavior as
+   desktop (auto-collapses under 1200px, same as everywhere else), but every row
+   that's a tap target on a touch device must be >=44x44 here specifically. */
+@media (max-width: 640px) {
+  .top {
+    height: 52px;
+  }
+
+  .markButton {
+    min-height: 44px;
+  }
+
+  .iconButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .newSession,
+  .searchHistory,
+  .navItem {
+    height: 44px;
+  }
+
+  .machineRow,
+  .projectRow {
+    height: 44px;
+  }
+
+  .account {
+    height: 48px;
+  }
+
+  .signOut {
+    height: 36px;
+    padding: 0 10px;
+  }
+}

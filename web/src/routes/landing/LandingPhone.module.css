@@ -1,0 +1,409 @@
+.section {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 24px;
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding: 80px 16px;
+  }
+}
+
+.inner {
+  width: 100%;
+  max-width: 1080px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 64px;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy {
+  flex: 1 1 340px;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  opacity: 0;
+  transform: translateY(40px);
+  transition:
+    opacity 0.9s ease,
+    transform 1s var(--ease-out);
+}
+.seen .copy {
+  opacity: 1;
+  transform: none;
+}
+
+.overline {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-fg);
+}
+
+.heading {
+  font-size: clamp(36px, 4.6vw, 64px);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+.desc {
+  font-size: 18px;
+  line-height: 27px;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.feats {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.feat {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.7s var(--ease-out);
+}
+.seen .feat {
+  opacity: 1;
+  transform: none;
+}
+
+.featN {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-3);
+  padding-top: 2px;
+}
+
+.featBody {
+  font-size: 15px;
+  line-height: 22px;
+}
+.featBody b {
+  font-weight: 700;
+}
+.featBody span {
+  color: var(--text-2);
+}
+
+.deviceWrap {
+  flex: 0 0 auto;
+  position: relative;
+  opacity: 0;
+  transform: translateY(120px) rotate(-4deg);
+  transition:
+    opacity 1s ease 0.15s,
+    transform 1.3s var(--ease-out) 0.15s;
+}
+.seen .deviceWrap {
+  opacity: 1;
+  transform: none;
+}
+
+.glow {
+  position: absolute;
+  inset: -80px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  pointer-events: none;
+}
+
+.device {
+  /* Fixed 320x668 overflows any viewport narrower than ~368px (320px device +
+     .section's 24px*2 padding) since .deviceWrap is flex:0 0 auto. min() keeps
+     the authored 320px size everywhere it fits and only shrinks (proportionally,
+     via aspect-ratio) below that, so the frame's own device stays visible. */
+  position: relative;
+  width: min(320px, 82vw);
+  aspect-ratio: 320 / 668;
+  height: auto;
+  border-radius: 48px;
+  padding: 10px;
+  background: #1a1a1a;
+  box-shadow:
+    0 0 0 1.5px #3a3a3a,
+    0 50px 100px -30px rgba(0, 0, 0, 0.6);
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 38px;
+  overflow: hidden;
+  background: var(--bg-0);
+  display: flex;
+  flex-direction: column;
+}
+
+.notch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 28px;
+  border-radius: 14px;
+  background: #000;
+  z-index: 3;
+}
+
+.notification {
+  position: absolute;
+  top: 46px;
+  left: 10px;
+  right: 10px;
+  z-index: 4;
+  padding: 11px 13px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-2) 88%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  transform: translateY(-140%);
+  opacity: 0;
+  transition:
+    transform 0.7s var(--ease-pop),
+    opacity 0.4s ease;
+}
+.notification.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.notifIcon {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 8px;
+  background: #0a0a0a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notifBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.notifTitleRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+}
+.notifTitleRow span:last-child {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.notifText {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.screenBody {
+  padding: 52px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.screenHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.screenHead span {
+  font-size: 28px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.machineRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 2px solid var(--text-1);
+  font-size: 11px;
+}
+.machineCell {
+  display: flex;
+  flex-direction: column;
+  padding: 7px 6px 8px 0;
+}
+.machineCell:not(:first-child) {
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+.machineCell b {
+  font-size: 12.5px;
+}
+.machineCell span {
+  color: var(--text-2);
+}
+.machineCell.offline {
+  color: var(--text-3);
+}
+
+.list {
+  flex: 1;
+  padding: 6px 16px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.listHead {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0 6px;
+  border-bottom: 2px solid var(--text-1);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.npmCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.5s;
+}
+.npmTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.npmTop b {
+  flex: 1;
+  font-size: 14px;
+}
+.npmTop span {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.npmKeys {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
+  gap: 2px;
+}
+.npmPrompt {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--bg-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.npmKey {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--text-1);
+  color: var(--bg-0);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.itemTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.itemTop b {
+  flex: 1;
+  font-size: 14px;
+}
+.itemTop span {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.itemFact {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.trainItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+}
+.trainTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trainTop b {
+  flex: 1;
+  font-size: 14px;
+}
+.trainStat {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.trainPct {
+  font-size: 36px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+.trainFact {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.trainBar {
+  height: 4px;
+  background: var(--bg-2);
+}
+.trainBarFill {
+  width: 68%;
+  height: 100%;
+  background: var(--s-running-fg);
+}
+
+.homeIndicator {
+  height: 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.homeIndicator span {
+  width: 110px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--text-1);
+  opacity: 0.5;
+}

@@ -1,0 +1,77 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .btn {
+    height: 44px;
+  }
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, #ffffff);
+}
+.primary:active:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 78%, #000000);
+}
+
+.secondary {
+  border: 1.5px solid var(--text-1);
+  background: transparent;
+  color: var(--text-1);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--bg-2);
+}
+.secondary:active:not(:disabled) {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+
+.destructive {
+  background: var(--s-failed);
+  color: var(--ink);
+}
+.destructive:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--s-failed) 85%, #ffffff);
+}
+.destructive:active:not(:disabled) {
+  background: color-mix(in srgb, var(--s-failed) 80%, #000000);
+}
+
+.btn:disabled {
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+  color: var(--text-3);
+}
+
+.secondary.loading {
+  color: var(--text-2);
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: tg-spin 0.8s linear infinite;
+}

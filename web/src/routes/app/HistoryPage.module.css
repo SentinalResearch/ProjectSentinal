@@ -1,0 +1,231 @@
+.page {
+  max-width: 1200px;
+  padding: 40px 48px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  animation: tg-page-in 0.25s var(--ease-out);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: 36px;
+  line-height: 38px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.subtitle {
+  flex-basis: 100%;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 16px;
+  border: 1.5px solid var(--text-1);
+}
+
+.searchIcon {
+  flex: none;
+  color: var(--text-2);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 16px;
+}
+.searchInput::placeholder {
+  color: var(--text-3);
+}
+
+.clearQ {
+  flex: none;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+.clearQ:hover {
+  color: var(--text-1);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px 24px;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.filterOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  height: 30px;
+  padding: 0 10px;
+  border-style: solid;
+  border-width: 1px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.tableWrap {
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+}
+
+.tableScroll {
+  min-width: 820px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tableHead,
+.row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 110px 150px 130px 80px;
+  gap: 16px;
+  align-items: center;
+}
+
+.tableHead {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--text-1);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.timeHead {
+  text-align: right;
+}
+
+.row {
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+}
+.row:hover {
+  background: var(--bg-1);
+}
+
+.tagCell {
+  padding-left: 4px;
+}
+
+.command {
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.machineCell {
+  font-size: 13px;
+}
+
+.projectCell {
+  font-size: 13px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.startedCell {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.durationCell {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.empty {
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.emptyTitle {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.resetBtn {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+.resetBtn:hover {
+  border-color: var(--text-1);
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 20px 16px 48px;
+    gap: 20px;
+  }
+
+  .title {
+    font-size: 28px;
+    line-height: 30px;
+  }
+
+  .searchBar {
+    height: 48px;
+  }
+
+  .chip {
+    height: 34px;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+}
