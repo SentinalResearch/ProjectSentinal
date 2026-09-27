@@ -34,7 +34,7 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `tower` (dev) | 1 | Exercise Axum routes in-process without network sockets |
 
 ## Web (Milestone 1+)
-`vite`, `typescript`, `react`, `@xterm/xterm`, `@xterm/addon-fit`,
+`vite`, `typescript`, `react`, `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-webgl`,
 `@tanstack/react-query`, `vitest`, Testing Library, Playwright
 
 ## Intelligence (V2)

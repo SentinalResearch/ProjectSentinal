@@ -1,4 +1,5 @@
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,7 +16,6 @@ const DEFAULT_URL =
   import.meta.env.VITE_DAEMON_URL ??
   `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:7420/api/v1/ws`;
 const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 
 function upsertSession(sessions: Session[], next: Session): Session[] {
   const existing = sessions.findIndex((session) => session.id === next.id);
@@ -73,6 +73,13 @@ export default function App() {
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(host);
+    try {
+      const webgl = new WebglAddon();
+      webgl.onContextLoss(() => webgl.dispose());
+      terminal.loadAddon(webgl);
+    } catch (error) {
+      console.warn("WebGL terminal renderer is unavailable", error);
+    }
     fit.fit();
     const input = terminal.onData((data) => sendTerminalBytes(encoder.encode(data)));
     terminalRef.current = terminal;
@@ -151,7 +158,7 @@ export default function App() {
       try {
         const frame = decodeTerminalFrame(new Uint8Array(data));
         if (frame.sessionId === activeSessionRef.current) {
-          terminalRef.current?.write(decoder.decode(frame.payload));
+          terminalRef.current?.write(frame.payload);
         }
       } catch (frameError) {
         setError(frameError instanceof Error ? frameError.message : "Invalid terminal frame");
