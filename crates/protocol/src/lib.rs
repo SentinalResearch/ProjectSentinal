@@ -10,6 +10,7 @@
 //! - [`machine`]  — a computer running the daemon
 //! - [`session`]  — a persistent terminal and its state machine
 //! - [`command`]  — one command typed into a session
+//! - [`session_log`] — log metadata for adopted processes
 //! - [`command_line`] — rendering structured Watch argv as quoted shell input
 //! - [`event`]    — structured things that happened (the system's common language)
 //! - [`recipe`]   — reusable command templates
@@ -32,6 +33,7 @@ pub mod metric;
 pub mod process;
 pub mod recipe;
 pub mod session;
+pub mod session_log;
 pub mod time;
 
 pub use auth::{
@@ -52,4 +54,5 @@ pub use metric::{GpuMetrics, MachineMetrics, SessionMetrics};
 pub use process::{tree_totals, Process, ProcessState, ProcessTotals};
 pub use recipe::{Recipe, RecipeParam};
 pub use session::{CaptureCapabilities, CaptureLevel, Session, SessionOrigin, SessionState};
+pub use session_log::{LogSource, SessionLog};
 pub use time::{DurationMs, Timestamp};

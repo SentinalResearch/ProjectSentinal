@@ -26,7 +26,7 @@
 //! - `INTERRUPTED`  — the session was killed (by the user or a signal)
 //! - `DISCONNECTED` — state unknown because the daemon is unreachable
 
-use crate::{CommandId, MachineId, ProjectId, ProtocolError, SessionId, Timestamp};
+use crate::{CommandId, MachineId, ProjectId, ProtocolError, SessionId, SessionLog, Timestamp};
 use serde::{Deserialize, Serialize};
 
 /// How a Session entered Sentinal.
@@ -270,6 +270,9 @@ pub struct Session {
     /// Known shell exit code; absent means running or outcome unknown.
     #[serde(default)]
     pub exit_code: Option<i32>,
+    /// Log file of an adopted process, if one is known (not yet tailed in 1b.C).
+    #[serde(default)]
+    pub log: Option<SessionLog>,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -299,6 +302,7 @@ impl Session {
             pid: None,
             process_started_at: None,
             exit_code: None,
+            log: None,
             created_at: at,
             updated_at: at,
         }
@@ -326,6 +330,16 @@ impl Session {
         }
         if self.pid.is_none() && self.process_started_at.is_some() {
             return Err(ProtocolError::ProcessStartedWithoutPid);
+        }
+        if let Some(log) = &self.log {
+            if self.origin != SessionOrigin::Adopted {
+                return Err(ProtocolError::LogWithoutAdoption {
+                    origin: self.origin,
+                });
+            }
+            if !log.path.starts_with('/') {
+                return Err(ProtocolError::RelativeLogPath(log.path.clone()));
+            }
         }
         if let Some(exit_code) = self.exit_code {
             let valid_exit = matches!(
@@ -597,5 +611,33 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("process_started_at"));
+    }
+
+    #[test]
+    fn log_metadata_is_only_valid_on_adopted_sessions_with_absolute_paths() {
+        let mut session = test_session();
+        session.log = Some(SessionLog {
+            path: "/work/train.log".into(),
+            source: crate::LogSource::Stdout,
+        });
+        assert!(session
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("ADOPTED"));
+
+        session.origin = SessionOrigin::Adopted;
+        session.capture = CaptureLevel::Process;
+        assert_eq!(session.validate(), Ok(()));
+
+        session.log = Some(SessionLog {
+            path: "train.log".into(),
+            source: crate::LogSource::Explicit,
+        });
+        assert!(session
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("absolute"));
     }
 }

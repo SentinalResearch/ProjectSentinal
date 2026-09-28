@@ -259,3 +259,22 @@ fn recipe_fixture_renders() {
         "vllm serve Qwen/Qwen3-8B --port 8000 --max-model-len 32768"
     );
 }
+
+#[test]
+fn every_log_source_has_a_fixture_and_legacy_sessions_have_no_log() {
+    let sessions = load("sessions_1b.json");
+    let sources: Vec<&str> = sessions
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|session| session["log"]["source"].as_str())
+        .collect();
+    for source in ["EXPLICIT", "STDOUT", "STDERR", "STDOUT_AND_STDERR"] {
+        assert!(
+            sources.contains(&source),
+            "sessions_1b.json has no {source} log"
+        );
+    }
+    let legacy: Session = serde_json::from_value(load("session_v1_legacy.json")).unwrap();
+    assert_eq!(legacy.log, None);
+}

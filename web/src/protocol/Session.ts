@@ -4,6 +4,7 @@ import type { CommandId } from "./CommandId";
 import type { MachineId } from "./MachineId";
 import type { ProjectId } from "./ProjectId";
 import type { SessionId } from "./SessionId";
+import type { SessionLog } from "./SessionLog";
 import type { SessionOrigin } from "./SessionOrigin";
 import type { SessionState } from "./SessionState";
 import type { Timestamp } from "./Timestamp";
@@ -64,6 +65,10 @@ export type Session = {
    * Known shell exit code; absent means running or outcome unknown.
    */
   exit_code: number | null;
+  /**
+   * Log file of an adopted process, if one is known (not yet tailed in 1b.C).
+   */
+  log: SessionLog | null;
   /**
    * When the session was created.
    */

@@ -12,6 +12,7 @@
   "pid": 4242,
   "process_started_at": 1790000000000,
   "exit_code": null,
+  "log": null,
   "created_at": 1790000000000,
   "updated_at": 1790000120000
 }

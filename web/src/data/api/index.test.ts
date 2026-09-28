@@ -35,6 +35,7 @@ const session: WireSession = {
   pid: 4242,
   process_started_at: null,
   exit_code: null,
+  log: null,
   created_at: 1_700_000_000_000,
   updated_at: 1_700_000_000_000,
 };

@@ -133,6 +133,16 @@ pub enum ProtocolError {
         exit_code: i32,
     },
 
+    /// Only adopted Sessions may carry log metadata.
+    #[error("log metadata is only valid for ADOPTED Sessions, not {origin}")]
+    LogWithoutAdoption {
+        /// Session origin.
+        origin: SessionOrigin,
+    },
+    /// A Session log path must be absolute.
+    #[error("log path '{0}' must be absolute")]
+    RelativeLogPath(String),
+
     /// The JSON could not be parsed into the expected type.
     #[error("invalid JSON: {0}")]
     Json(String),
