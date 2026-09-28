@@ -10,6 +10,7 @@
 //! - [`machine`]  — a computer running the daemon
 //! - [`session`]  — a persistent terminal and its state machine
 //! - [`command`]  — one command typed into a session
+//! - [`command_line`] — rendering structured Watch argv as quoted shell input
 //! - [`event`]    — structured things that happened (the system's common language)
 //! - [`recipe`]   — reusable command templates
 //! - [`process`]  — OS processes and aggregate resource use
@@ -19,6 +20,7 @@
 
 pub mod auth;
 pub mod command;
+pub mod command_line;
 pub mod error;
 pub mod event;
 pub mod ids;
@@ -35,6 +37,7 @@ pub use auth::{
     AuthSessionInfo, AuthSetupRequest, AuthStatus,
 };
 pub use command::{Command, CommandClass, CommandStatus};
+pub use command_line::{render_command_line, ShellDialect, MAX_RENDERED_COMMAND_BYTES};
 pub use error::ProtocolError;
 pub use event::{Event, EventKind, Resource, Severity};
 pub use ids::{CommandId, EventId, MachineId, ProjectId, SessionId};

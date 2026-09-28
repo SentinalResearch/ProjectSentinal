@@ -350,7 +350,7 @@ fn validate_local_identity(
     Ok(())
 }
 
-fn validate_argv(argv: &[String]) -> Result<(), ProtocolError> {
+pub(crate) fn validate_argv(argv: &[String]) -> Result<(), ProtocolError> {
     let Some(executable) = argv.first() else {
         return Err(ProtocolError::EmptyCommandArgv);
     };
