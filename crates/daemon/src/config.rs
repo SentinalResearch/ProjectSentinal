@@ -111,7 +111,7 @@ impl DaemonConfig {
 
         let data_dir = raw
             .data_dir
-            .unwrap_or_else(|| home.join(".local/share/terminal-agent"));
+            .unwrap_or_else(|| home.join(protocol::local::DEFAULT_DATA_DIR));
         let local_socket = crate::local_socket::default_socket_path(
             &data_dir,
             raw.local_socket.as_deref(),

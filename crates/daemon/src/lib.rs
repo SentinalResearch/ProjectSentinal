@@ -9,6 +9,7 @@ pub mod framing;
 pub mod local_socket;
 pub mod metrics;
 pub mod osc;
+pub mod process_probe;
 pub mod pty;
 pub mod scrollback;
 pub mod session_manager;

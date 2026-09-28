@@ -2,12 +2,14 @@
 
 mod capture;
 mod error;
+mod external;
 mod lifecycle;
 mod structured;
 mod tasks;
 
 use crate::{
     audit::{AuditLog, AuditRecord},
+    process_probe::ProcessProbe,
     pty::{PtyBackend, PtyError},
     scrollback::Scrollback,
     tracker::{CommandTracker, TrackerIds},
@@ -98,6 +100,8 @@ struct SessionHandle {
     tracker: Mutex<CommandTracker>,
     /// Rendered Watch initial Command, taken and typed at the first prompt.
     initial_command: Mutex<Option<Vec<u8>>>,
+    /// Sequence bookkeeping for Commands reported by an external shell hook.
+    shell_reports: Mutex<external::ShellReports>,
 }
 
 struct SessionManagerInner {
@@ -108,6 +112,9 @@ struct SessionManagerInner {
     next_id: AtomicU64,
     tracker_ids: TrackerIds,
     store: Option<Arc<Store>>,
+    probe: ProcessProbe,
+    /// Serializes external shell registration so concurrent reports create one Session.
+    registration: Mutex<()>,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -165,6 +172,8 @@ impl SessionManager {
                 next_id: AtomicU64::new(next_session),
                 tracker_ids: TrackerIds::starting_at(next_command, next_event),
                 store,
+                probe: ProcessProbe::unavailable(),
+                registration: Mutex::new(()),
             }),
         }
     }

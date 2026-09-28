@@ -323,3 +323,26 @@ fn invalid_persisted_origin_capture_is_rejected_after_deserialization() {
     drop(store);
     std::fs::remove_file(path).unwrap();
 }
+
+#[test]
+fn restart_interrupts_only_daemon_owned_sessions_and_lists_the_rest_as_live() {
+    let store = Store::open_in_memory().unwrap();
+    let full = session(1, SessionState::Idle);
+    let mut hooked = session(2, SessionState::Idle);
+    hooked.origin = protocol::SessionOrigin::ShellHook;
+    hooked.capture = protocol::CaptureLevel::Commands;
+    hooked.pid = Some(4242);
+    hooked.process_started_at = Some(Timestamp(50));
+    store.insert_session(&full).unwrap();
+    store.insert_session(&hooked).unwrap();
+
+    let events = store.interrupt_orphaned_sessions(Timestamp(200)).unwrap();
+
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].session_id, SessionId(1));
+    assert_eq!(
+        store.session(SessionId(1)).unwrap().unwrap().state,
+        SessionState::Interrupted
+    );
+    assert_eq!(store.live_sessions().unwrap(), vec![hooked]);
+}

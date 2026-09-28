@@ -3,7 +3,9 @@
 mod metrics;
 mod records;
 
-use protocol::{Event, EventId, EventKind, Machine, Session, SessionId, SessionState, Timestamp};
+use protocol::{
+    CaptureLevel, Event, EventId, EventKind, Machine, Session, SessionId, SessionState, Timestamp,
+};
 use rusqlite::{Connection, OptionalExtension};
 use std::{
     path::Path,
@@ -192,6 +194,11 @@ impl Store {
         let mut events = Vec::with_capacity(json_values.len());
         for json in json_values {
             let mut session = decode_session(&json)?;
+            // Only daemon-owned PTYs die with the daemon; reduced-capture
+            // Sessions are verified by the daemon's external recovery instead.
+            if session.capture != CaptureLevel::Full {
+                continue;
+            }
             let command_id = session.current_command;
             session.transition(SessionState::Interrupted, at)?;
             let event = Event {
@@ -219,6 +226,18 @@ impl Store {
         }
         transaction.commit()?;
         Ok(events)
+    }
+
+    /// Return every Session that has not reached an end state, ordered by ID.
+    pub fn live_sessions(&self) -> Result<Vec<Session>, StoreError> {
+        let connection = self.lock()?;
+        let mut statement = connection.prepare(
+            "SELECT json FROM sessions WHERE state NOT IN ('COMPLETED','FAILED','INTERRUPTED') ORDER BY id",
+        )?;
+        let values = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        values.iter().map(|json| decode_session(json)).collect()
     }
 
     /// Return the first unused Session ID.

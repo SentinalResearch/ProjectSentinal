@@ -112,6 +112,12 @@ impl CommandTracker {
         Ok(TrackerUpdate::default())
     }
 
+    /// Forget the running Command without finishing it (its end was never reported).
+    pub fn abandon(&mut self) -> Option<Command> {
+        self.command_text.clear();
+        self.current.take()
+    }
+
     fn start(
         &mut self,
         session: &mut Session,

@@ -4,6 +4,7 @@ use super::{Clock, SessionHandle};
 use crate::{
     osc::{OscParser, ShellSignal},
     pty::PtyError,
+    tracker::TrackerUpdate,
 };
 use protocol::{DaemonMessage, SessionId, SessionState};
 use std::{
@@ -91,7 +92,7 @@ pub(super) fn spawn_reader(
             let mut prompt_ready = false;
             for signal in parsed.signals {
                 prompt_ready |= signal == ShellSignal::PromptStart;
-                apply_signal(session_id, &handle, store.as_deref(), signal, clock());
+                let _ = apply_signal(session_id, &handle, store.as_deref(), signal, clock());
             }
             if prompt_ready {
                 type_initial_command(session_id, &handle);
@@ -122,24 +123,25 @@ fn type_initial_command(session_id: SessionId, handle: &SessionHandle) {
     }
 }
 
-fn apply_signal(
+/// Apply one signal, persist and broadcast the result, and return it.
+pub(super) fn apply_signal(
     session_id: SessionId,
     handle: &SessionHandle,
     store: Option<&Store>,
     signal: crate::osc::ShellSignal,
     at: protocol::Timestamp,
-) {
+) -> Option<TrackerUpdate> {
     let update = match (handle.tracker.lock(), handle.session.lock()) {
         (Ok(mut tracker), Ok(mut session)) => match tracker.handle(&mut session, signal, at) {
             Ok(update) => (update, session.clone()),
             Err(error) => {
                 tracing::warn!(session = session_id.0, %error, "failed to apply shell signal");
-                return;
+                return None;
             }
         },
         _ => {
             tracing::error!(session = session_id.0, "command tracking lock poisoned");
-            return;
+            return None;
         }
     };
     let (update, session) = update;
@@ -170,19 +172,22 @@ fn apply_signal(
             tracing::error!(session = session_id.0, %error, "failed to persist shell signal");
         }
     }
-    if let Some(command) = update.command {
-        let _ = handle
-            .structured
-            .send(DaemonMessage::CommandUpdated { command });
+    if let Some(command) = &update.command {
+        let _ = handle.structured.send(DaemonMessage::CommandUpdated {
+            command: command.clone(),
+        });
     }
-    if let Some(event) = update.event {
-        let _ = handle.structured.send(DaemonMessage::Event { event });
+    if let Some(event) = &update.event {
+        let _ = handle.structured.send(DaemonMessage::Event {
+            event: event.clone(),
+        });
     }
     if update.session_changed {
         let _ = handle
             .structured
             .send(DaemonMessage::SessionUpdated { session });
     }
+    Some(update)
 }
 
 pub(super) fn spawn_exit_monitor(

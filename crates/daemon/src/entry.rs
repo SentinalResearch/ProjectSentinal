@@ -5,8 +5,9 @@ use crate::{
     audit::AuditLog,
     auth::{load_or_create_token, AuthError, AuthManager},
     config::{ConfigError, DaemonConfig},
-    local_socket::{LocalSocketError, SecurityAudit, UnixSocketServer},
+    local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{MetricsSampler, ResourceDebouncer},
+    process_probe::ProcessProbe,
     pty::{FakePty, PtyBackend, RealPty},
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
 };
@@ -74,7 +75,7 @@ pub async fn run() -> Result<(), DaemonError> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "tad=info".into()),
+                .unwrap_or_else(|_| "daemon=info,sentinald=info,tad=info".into()),
         )
         .try_init()
         .map_err(|error| DaemonError::Tracing(error.to_string()))?;
@@ -122,13 +123,20 @@ pub async fn run() -> Result<(), DaemonError> {
         ),
         AuditLog::new(&config.data_dir),
         store.clone(),
-    )?;
+    )?
+    .with_process_probe(ProcessProbe::system(current_uid(&config.local_socket)?));
+    // FULL Sessions were interrupted above; reduced-capture ones are resumed
+    // only when their root process identity still matches.
+    sessions.recover_external_sessions(store.live_sessions()?)?;
     spawn_metric_sampler(sessions.clone(), store);
-    let state = AppState::new(sessions, machine, auth);
+    spawn_external_monitor(sessions.clone());
     let local_socket =
         UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
+    let handler_sessions = sessions.clone();
+    let handler: LocalHandler = Arc::new(move |request| handler_sessions.handle_local(request));
+    let state = AppState::new(sessions, machine, auth);
     let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
-    let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx));
+    let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx, handler));
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .map_err(|source| DaemonError::Bind {
@@ -169,6 +177,24 @@ async fn shutdown_signal() {
         }
         () = terminate => {}
     }
+}
+
+/// End external Sessions whose root process exited, checking every 2 seconds.
+fn spawn_external_monitor(sessions: SessionManager) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(2));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            match sessions.check_external_processes() {
+                Ok(ended) if !ended.is_empty() => {
+                    tracing::info!(count = ended.len(), "external shell Sessions ended");
+                }
+                Ok(_) => {}
+                Err(error) => tracing::warn!(%error, "failed to check external Sessions"),
+            }
+        }
+    });
 }
 
 fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {

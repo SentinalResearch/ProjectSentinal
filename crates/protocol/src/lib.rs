@@ -16,6 +16,7 @@
 //! - [`process`]  — OS processes and aggregate resource use
 //! - [`metric`]   — machine and session resource measurements
 //! - [`message`]  — what travels over the WebSocket, wrapped in an [`Envelope`]
+//! - [`local`]    — private local socket location
 //! - [`auth`]     — single-user password authentication over HTTP
 
 pub mod auth;
@@ -24,6 +25,7 @@ pub mod command_line;
 pub mod error;
 pub mod event;
 pub mod ids;
+pub mod local;
 pub mod machine;
 pub mod message;
 pub mod metric;

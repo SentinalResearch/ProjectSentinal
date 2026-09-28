@@ -14,15 +14,10 @@ pub fn default_socket_path(
     xdg_runtime_dir: Option<&Path>,
     target_is_macos: bool,
 ) -> PathBuf {
-    if let Some(explicit) = explicit {
-        return explicit.to_path_buf();
+    match explicit {
+        Some(explicit) => explicit.to_path_buf(),
+        None => protocol::local::local_socket_path(data_dir, xdg_runtime_dir, target_is_macos),
     }
-    if !target_is_macos {
-        if let Some(runtime) = xdg_runtime_dir.filter(|path| path.is_absolute()) {
-            return runtime.join("sentinal/sentinald.sock");
-        }
-    }
-    data_dir.join("run/sentinald.sock")
 }
 
 pub(super) fn validate_socket_length(path: &Path) -> Result<(), LocalSocketError> {

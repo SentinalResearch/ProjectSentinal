@@ -123,8 +123,13 @@ impl UnixSocketServer {
         })
     }
 
-    /// Accept same-user clients until shutdown is requested.
-    pub async fn serve(self, mut shutdown: watch::Receiver<bool>) -> Result<(), LocalSocketError> {
+    /// Accept same-user clients until shutdown is requested, answering each
+    /// valid request with `handler`.
+    pub async fn serve(
+        self,
+        mut shutdown: watch::Receiver<bool>,
+        handler: LocalHandler,
+    ) -> Result<(), LocalSocketError> {
         loop {
             tokio::select! {
                 changed = shutdown.changed() => {
@@ -145,6 +150,7 @@ impl UnixSocketServer {
                     let audit = self.audit.clone();
                     let path = self.path.clone();
                     let expected_uid = self.expected_uid;
+                    let handler = handler.clone();
                     tokio::spawn(async move {
                         if let Err(error) = handle_connection(
                             stream,
@@ -152,6 +158,7 @@ impl UnixSocketServer {
                             peer_uid,
                             audit,
                             &path,
+                            &*handler,
                         ).await {
                             tracing::warn!(path = %path.display(), %error, "local ingress connection failed");
                         }
@@ -210,6 +217,19 @@ pub fn peer_uid(stream: &UnixStream, path: &Path) -> Option<u32> {
     }
 }
 
+/// Answers one validated local request; never attaches, resizes, or sends input.
+pub type LocalHandler = std::sync::Arc<dyn Fn(LocalRequest) -> LocalResponse + Send + Sync>;
+
+/// A handler for listeners with no request support (every request is `UNAVAILABLE`).
+pub fn unavailable_handler() -> LocalHandler {
+    std::sync::Arc::new(|_| {
+        local_error(
+            LocalErrorCode::Unavailable,
+            "this local operation is not available",
+        )
+    })
+}
+
 /// Process one framed request after applying the injected OS peer identity.
 pub async fn handle_connection(
     mut stream: UnixStream,
@@ -217,6 +237,7 @@ pub async fn handle_connection(
     peer_uid: Option<u32>,
     audit: SecurityAudit,
     socket_path: &Path,
+    handler: &(dyn Fn(LocalRequest) -> LocalResponse + Send + Sync),
 ) -> Result<(), LocalSocketError> {
     if peer_uid != Some(expected_uid) {
         let reason = match peer_uid {
@@ -266,10 +287,10 @@ pub async fn handle_connection(
     let response = match std::str::from_utf8(&body) {
         Ok(json) => match Envelope::<LocalRequest>::decode(json) {
             Ok(envelope) => match envelope.payload.validate() {
-                Ok(()) => local_error(
-                    LocalErrorCode::Unavailable,
-                    "local operation is reserved for a later Milestone 1b stage",
-                ),
+                Ok(()) => match handler(envelope.payload) {
+                    LocalResponse::Error { code, message } => local_error(code, message),
+                    response => response,
+                },
                 Err(error) => local_error(LocalErrorCode::InvalidRequest, error.to_string()),
             },
             Err(error) => local_error(LocalErrorCode::InvalidRequest, error.to_string()),

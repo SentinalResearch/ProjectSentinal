@@ -3,8 +3,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use daemon::local_socket::{
-    current_uid, handle_connection, path::inspect_existing_socket, SecurityAudit, UnixSocketServer,
-    MAX_ERROR_MESSAGE_BYTES,
+    current_uid, handle_connection, path::inspect_existing_socket, unavailable_handler,
+    SecurityAudit, UnixSocketServer, MAX_ERROR_MESSAGE_BYTES,
 };
 use protocol::{Envelope, LocalErrorCode, LocalRequest, LocalResponse, MAX_LOCAL_FRAME_BYTES};
 use std::{
@@ -36,7 +36,15 @@ async fn exchange(
 ) -> Envelope<LocalResponse> {
     let (mut client, server) = tokio::net::UnixStream::pair().unwrap();
     let task = tokio::spawn(async move {
-        handle_connection(server, expected_uid, peer_uid, audit, &socket_path).await
+        handle_connection(
+            server,
+            expected_uid,
+            peer_uid,
+            audit,
+            &socket_path,
+            &*unavailable_handler(),
+        )
+        .await
     });
     client
         .write_all(&u32::try_from(declared_length).unwrap().to_be_bytes())
@@ -288,7 +296,7 @@ async fn local_socket_integration() {
     let socket_path = data_dir.join("run/sentinald.sock");
     let server = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap();
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
-    let task = tokio::spawn(server.serve(shutdown_rx));
+    let task = tokio::spawn(server.serve(shutdown_rx, unavailable_handler()));
 
     let mut bad = tokio::net::UnixStream::connect(&socket_path).await.unwrap();
     bad.write_all(&4_u32.to_be_bytes()).await.unwrap();

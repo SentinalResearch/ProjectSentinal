@@ -83,4 +83,37 @@ pub enum SessionManagerError {
     /// Shell hooks could not be installed, so readiness would never be reported.
     #[error("an initial Command needs Sentinal shell hooks, which failed to install: {0}")]
     InitialCommandHooks(String),
+    /// No process with this PID exists.
+    #[error("no process with pid {0} is running")]
+    ProcessNotFound(u32),
+    /// The process belongs to another user.
+    #[error("process {pid} is owned by uid {uid}, not the daemon user")]
+    ProcessNotOwned {
+        /// Reported process.
+        pid: u32,
+        /// Owning user ID.
+        uid: u32,
+    },
+    /// This daemon cannot verify process identity, so it refuses registration.
+    #[error("process identity is unavailable on this daemon")]
+    ProcessProbeUnavailable,
+    /// A shell report named a Session that is not a live SHELL_HOOK Session.
+    #[error("Session {0} is not a live SHELL_HOOK Session")]
+    NotShellHook(SessionId),
+    /// A shell report came from a different PID than the Session root.
+    #[error("Session {session_id} is rooted at another process, not pid {pid}")]
+    ShellPidMismatch {
+        /// Target Session.
+        session_id: SessionId,
+        /// Reported PID.
+        pid: u32,
+    },
+    /// A Command sequence was already reported or is out of order.
+    #[error("Session {session_id} already handled Command sequence {sequence}")]
+    SequenceConflict {
+        /// Target Session.
+        session_id: SessionId,
+        /// Reported sequence.
+        sequence: u64,
+    },
 }

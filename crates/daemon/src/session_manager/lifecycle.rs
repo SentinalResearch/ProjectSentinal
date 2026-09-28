@@ -133,6 +133,7 @@ impl SessionManager {
                 self.inner.tracker_ids.clone(),
             )),
             initial_command: Mutex::new(initial_command),
+            shell_reports: Mutex::default(),
         });
         self.inner
             .sessions
