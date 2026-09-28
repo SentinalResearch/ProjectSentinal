@@ -19,6 +19,8 @@ export interface SessionProgress {
 
 export interface SessionMetrics {
   loss?: { from: number; to: number };
+  cpuPct?: number;
+  ramGB?: number;
   gpuPct?: number;
   vramGB?: number;
   vramTotalGB?: number;
@@ -79,6 +81,8 @@ export interface HistoryEntry {
   /** Machine id (matches `Machine.id` / `Session.machine`), not a display name. */
   machine?: string;
   project?: string;
+  /** Working directory reported when the command started. */
+  cwd?: string;
   /** Relative display label, e.g. "Today" / "Yesterday" / "3 days ago" — see config.historyRelativeDates. */
   date?: string;
   /** Days since the command started, for the History screen's Today/7 days/30 days/All time filter (SentinalHistory.dc.html's own `dateMax` buckets). */

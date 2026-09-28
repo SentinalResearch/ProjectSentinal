@@ -104,7 +104,7 @@ Marked `// QUESTION:` at the point in the code where a judgment call was made.
     Neither exists in jsdom; without them `TerminalPane` crashed every test that
     rendered it. Added minimal no-op polyfills to `src/test-setup.ts` — real
     browsers already have both, so this only affects the test environment.
-15. **History's `store.history` had no machine/project/id.** `fixtures.json`'s
+15. **History's original mock `store.history` had no machine/project/id.** `fixtures.json`'s
     `history` array is just `{ok, command, duration}` — nothing for the
     Machine/Project filter chips to key off. `SentinalHistory.dc.html`'s own
     working prototype (not just the static fixture) has a richer 6-row dataset
@@ -113,7 +113,9 @@ Marked `// QUESTION:` at the point in the code where a judgment call was made.
     all — mirrored in `src/data/mock/store.ts`'s `buildHistory()` rather than
     inventing new values. These synthetic running/waiting rows aren't kept in
     sync if a session's state changes later (e.g. `qwen` finishing wouldn't
-    update its history row) — acceptable for a mock, but worth knowing.
+    update its history row) — acceptable for a mock, but worth knowing. API
+    mode now maps real protocol `Command` records, including Machine, Session,
+    cwd, timestamps, and outcome, and delegates text queries to SQLite FTS5.
 16. **History's date filter uses day-count buckets, not the relative-date
     labels.** `config.historyRelativeDates` (Today/Yesterday/3 days ago) is a
     flagged *display* assumption (#1). The **filter itself** mirrors

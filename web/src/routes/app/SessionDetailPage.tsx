@@ -17,6 +17,7 @@ import { TerminalPane } from "../../terminal/TerminalPane";
 import { EventsList } from "./EventsList";
 import { HealthCard } from "./HealthCard";
 import { SessionTopBlock } from "./SessionTopBlock";
+import { ResourceBars } from "./ResourceBars";
 import styles from "./SessionDetailPage.module.css";
 
 const INTERRUPTIBLE = new Set(["RUNNING", "WAITING", "STALLED"]);
@@ -133,6 +134,7 @@ export function SessionDetailPage() {
           /* the terminal is always visible below; nothing to scroll to on this layout */
         }}
       />
+      <ResourceBars metrics={session.metrics} />
 
       <div className={styles.body}>
         <section className={styles.terminalSection}>

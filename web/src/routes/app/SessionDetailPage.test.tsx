@@ -35,6 +35,7 @@ describe("SessionDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Qwen Training" })).toBeInTheDocument();
     expect(screen.getByText("epoch 68/100")).toBeInTheDocument();
     expect(screen.getByText("LOSS")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Live resources" })).toBeInTheDocument();
     expect(screen.getByTestId("terminal-host")).toBeInTheDocument();
   });
 

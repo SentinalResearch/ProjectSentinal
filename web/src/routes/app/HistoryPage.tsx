@@ -208,7 +208,7 @@ export function HistoryPage() {
             <span />
             <span>COMMAND · {visible.length} {visible.length === 1 ? "RESULT" : "RESULTS"}</span>
             <span>MACHINE</span>
-            <span>PROJECT</span>
+            <span>CWD</span>
             <span>STARTED</span>
             <span className={styles.timeHead}>TIME</span>
           </div>
@@ -234,7 +234,7 @@ export function HistoryPage() {
                 <span className={styles.machineCell} style={{ color: machine?.status === "OFFLINE" ? "var(--text-3)" : "var(--text-2)" }}>
                   {machine?.name ?? "—"}
                 </span>
-                <span className={styles.projectCell}>{entry.project ?? "—"}</span>
+                <span className={`${styles.projectCell} mono`}>{entry.cwd ?? entry.project ?? "—"}</span>
                 <span className={styles.startedCell}>{entry.date ?? "—"}</span>
                 <span className={styles.durationCell} style={{ color: durationColor }}>
                   {entry.duration}

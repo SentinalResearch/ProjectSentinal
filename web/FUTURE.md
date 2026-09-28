@@ -11,8 +11,8 @@ for when the underlying daemon features are expected to land.
 | Terminal attach (input/output) | Session detail | real (M1) | `TerminalPane` mounts xterm.js and `useRealTerminalSession` attaches over the authenticated binary WebSocket; the Playwright smoke test covers the fake-daemon path |
 | Health card (progress/activity/resources/stability/errors) | Session detail | mock | Daemon: watcher + Event engine (Roadmap M3) |
 | Event journal | Session detail, Project | mock | Daemon: Event engine (M3) |
-| Command history + search | History | mock | Daemon: `store` crate, SQLite + FTS5 (M2) |
-| Resource metrics (GPU/VRAM/loss) | Session detail | mock | Daemon: per-session process/GPU metrics (M2) |
+| Command history + search | History | real (M2) | API mode reads persisted Commands from SQLite and sends search terms through FTS5 |
+| Resource metrics (CPU/RAM/GPU/VRAM) | Session detail | real (M2) | API mode streams per-Session process-tree totals; NVIDIA utilization/VRAM requires the daemon's `nvidia` feature, while watcher-derived loss remains M3 |
 | Recipes (list + run) | Recipes | mock | Daemon: recipe files + launch API (M4) |
 | Recipe editor / New recipe | Recipes | disabled | Not designed yet (brief: "currently disabled in the design") |
 | Pairing flow (name → token → connect) | Settings | mock | Daemon: pairing/enrollment endpoint, `sentinal-agent pair` CLI |

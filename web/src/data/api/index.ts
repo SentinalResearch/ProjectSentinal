@@ -4,8 +4,9 @@ import type { DaemonMessage } from "../../protocol/DaemonMessage";
 import type { Envelope } from "../../protocol/Envelope";
 import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { Session as WireSession } from "../../protocol/Session";
+import type { Command } from "../../protocol/Command";
 import { NotImplemented, type DataAdapter, type LiveEvent } from "../adapter";
-import type { Machine, Session } from "../types";
+import type { HistoryEntry, Machine, Session } from "../types";
 import {
   AUTH_EXPIRED_EVENT,
   createAuthApi,
@@ -83,7 +84,7 @@ function mapMachine(machine: WireMachine): Machine {
   };
 }
 
-function mapSession(session: WireSession): Session {
+export function mapSession(session: WireSession): Session {
   return {
     id: String(session.id),
     machine: session.machine_id,
@@ -94,6 +95,27 @@ function mapSession(session: WireSession): Session {
     runningFor: formatDuration(Date.now() - session.created_at),
     details: session.shell,
     events: [],
+  };
+}
+
+function relativeDate(startedAt: number): { date: string; daysAgo: number } {
+  const daysAgo = Math.max(0, Math.floor((Date.now() - startedAt) / 86_400_000));
+  if (daysAgo === 0) return { date: "Today", daysAgo };
+  if (daysAgo === 1) return { date: "Yesterday", daysAgo };
+  return { date: `${daysAgo} days ago`, daysAgo };
+}
+
+function mapCommand(command: Command): HistoryEntry {
+  const elapsed = (command.finished_at ?? Date.now()) - command.started_at;
+  return {
+    id: String(command.id),
+    ok: command.exit_code === null ? null : command.exit_code === 0,
+    command: command.text,
+    duration: command.exit_code === null ? "running" : formatDuration(elapsed),
+    machine: command.machine_id,
+    cwd: command.cwd,
+    ...relativeDate(command.started_at),
+    sessionId: String(command.session_id),
   };
 }
 
@@ -272,7 +294,26 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       return mapSession(message.session);
     },
     getRecipes: () => unsupported("getRecipes"),
-    getHistory: () => unsupported("getHistory"),
+    async getHistory(filters = {}) {
+      const request: ClientRequest = filters.query?.trim()
+        ? { type: "SEARCH_COMMANDS", query: filters.query.trim(), limit: 500 }
+        : { type: "GET_HISTORY", session_id: null, limit: 500 };
+      const message = await transport.request(request, (reply) => reply.type === "HISTORY");
+      if (message.type !== "HISTORY") return [];
+      const sessionsById = new Map((await getSessions()).map((session) => [session.id, session]));
+      return message.commands
+        .map((command) => {
+          const entry = mapCommand(command);
+          return { ...entry, project: sessionsById.get(entry.sessionId ?? "")?.project };
+        })
+        .filter((entry) => !filters.machine || entry.machine === filters.machine)
+        .filter((entry) => !filters.project || entry.project === filters.project)
+        .filter((entry) => {
+          if (!filters.result) return true;
+          if (filters.result === "running") return entry.ok === null;
+          return filters.result === "ok" ? entry.ok === true : entry.ok === false;
+        });
+    },
     subscribe: (listener) => transport.subscribe(listener),
     sendInput: (sessionId, data) => transport.sendBytes(sessionId, encoder.encode(data)),
     async sendSignal(sessionId, signal) {

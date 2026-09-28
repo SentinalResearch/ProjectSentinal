@@ -6,6 +6,7 @@ import type { DaemonMessage } from "../../protocol/DaemonMessage";
 import type { Envelope } from "../../protocol/Envelope";
 import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { Session as WireSession } from "../../protocol/Session";
+import type { Command } from "../../protocol/Command";
 import { createApiAdapter, type ApiSocket } from ".";
 
 const machine: WireMachine = {
@@ -31,6 +32,18 @@ const session: WireSession = {
   current_command: null,
   created_at: 1_700_000_000_000,
   updated_at: 1_700_000_000_000,
+};
+
+const command: Command = {
+  id: 9,
+  session_id: 1,
+  machine_id: "test-machine",
+  text: "python train.py",
+  cwd: "/work/model",
+  started_at: 1_700_000_000_000,
+  finished_at: 1_700_000_031_000,
+  exit_code: 0,
+  class: "ML_TRAINING",
 };
 
 class MemoryStorage {
@@ -116,6 +129,7 @@ class FakeSocket implements ApiSocket {
   onerror: ((event: Event) => unknown) | null = null;
   onmessage: ((event: MessageEvent<string | ArrayBuffer | Blob>) => void) | null = null;
   readonly binaryFrames: Uint8Array[] = [];
+  readonly requests: ClientRequest[] = [];
 
   constructor(url: string, server: FakeAuthServer) {
     this.url = url;
@@ -137,12 +151,15 @@ class FakeSocket implements ApiSocket {
       return;
     }
     const request = (JSON.parse(data) as Envelope<ClientRequest>).payload;
+    this.requests.push(request);
     let payload: DaemonMessage;
     if (request.type === "GET_MACHINE") payload = { type: "MACHINE", machine };
     else if (request.type === "LIST_SESSIONS") payload = { type: "SESSIONS", sessions: [session] };
     else if (request.type === "CREATE_SESSION") payload = { type: "SESSION_UPDATED", session };
     else if (request.type === "KILL") {
       payload = { type: "SESSION_UPDATED", session: { ...session, state: "INTERRUPTED" } };
+    } else if (request.type === "GET_HISTORY" || request.type === "SEARCH_COMMANDS") {
+      payload = { type: "HISTORY", commands: [command] };
     } else {
       payload = { type: "ERROR", message: `unsupported test request ${request.type}` };
     }
@@ -265,6 +282,22 @@ describe("apiAdapter authentication", () => {
     expect(frame.sessionId).toBe(1);
     expect(new TextDecoder().decode(frame.payload)).toBe("echo ready\n");
     unsubscribe();
+  });
+
+  it("uses daemon history and FTS search and maps duration and cwd", async () => {
+    const { adapter, sockets } = setup();
+    await adapter.auth.login("correct horse battery staple");
+
+    await expect(adapter.getHistory({ query: "train" })).resolves.toEqual([
+      expect.objectContaining({
+        command: "python train.py",
+        cwd: "/work/model",
+        duration: "31s",
+        ok: true,
+        sessionId: "1",
+      }),
+    ]);
+    expect(sockets[0].requests).toContainEqual({ type: "SEARCH_COMMANDS", query: "train", limit: 500 });
   });
 
   it("rotates the browser session on password change and revokes it on logout", async () => {

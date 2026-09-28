@@ -9,6 +9,7 @@ import type { Envelope } from "../protocol/Envelope";
 
 const PROTOCOL_VERSION = 1;
 const encoder = new TextEncoder();
+export const DAEMON_MESSAGE_EVENT = "terminal-agent-daemon-message";
 
 // QUESTION: real (non-mock, VITE_DATA=api) session ids from the daemon are numeric
 // (protocol/SessionId.ts), but the mock adapter's Session.id is a string slug
@@ -72,6 +73,7 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       if (typeof event.data === "string") {
         try {
           const envelope = JSON.parse(event.data) as Envelope<DaemonMessage>;
+          window.dispatchEvent(new CustomEvent(DAEMON_MESSAGE_EVENT, { detail: envelope.payload }));
           if (envelope.payload.type === "ERROR") {
             terminal.write(`\r\n\x1b[38;2;255;59;47m[error] ${envelope.payload.message}\x1b[0m\r\n`);
           }
