@@ -184,6 +184,7 @@ fn operation_error(
 
 #[derive(Debug)]
 struct FakeControl {
+    request: PtySpawnRequest,
     output: Option<mpsc::Sender<Vec<u8>>>,
     input: Arc<Mutex<Vec<u8>>>,
     size: Arc<Mutex<(u16, u16)>>,
@@ -257,6 +258,21 @@ impl FakePty {
         Ok(bytes)
     }
 
+    /// Return the spawn request used to start a fake child.
+    pub fn spawn_request(&self, session_id: SessionId) -> Result<PtySpawnRequest, PtyError> {
+        let sessions = self.sessions.lock().map_err(|_| {
+            operation_error(
+                session_id,
+                "lock fake backend for spawn request on",
+                "lock poisoned",
+            )
+        })?;
+        sessions
+            .get(&session_id)
+            .map(|control| control.request.clone())
+            .ok_or(PtyError::UnknownSession(session_id))
+    }
+
     /// Return the last terminal size requested for a fake child.
     pub fn size(&self, session_id: SessionId) -> Result<(u16, u16), PtyError> {
         let sessions = self.sessions.lock().map_err(|_| {
@@ -289,6 +305,7 @@ impl PtyBackend for FakePty {
             .insert(
                 session_id,
                 FakeControl {
+                    request: request.clone(),
                     output: Some(sender),
                     input: input.clone(),
                     size: size.clone(),

@@ -1,7 +1,10 @@
 //! Background PTY reader and child-exit tasks.
 
 use super::{Clock, SessionHandle};
-use crate::{osc::OscParser, pty::PtyError};
+use crate::{
+    osc::{OscParser, ShellSignal},
+    pty::PtyError,
+};
 use protocol::{DaemonMessage, SessionId, SessionState};
 use std::{
     io::{Read, Write},
@@ -85,11 +88,38 @@ pub(super) fn spawn_reader(
                 }
             }
             let _ = handle.output.send(bytes.to_vec());
+            let mut prompt_ready = false;
             for signal in parsed.signals {
+                prompt_ready |= signal == ShellSignal::PromptStart;
                 apply_signal(session_id, &handle, store.as_deref(), signal, clock());
+            }
+            if prompt_ready {
+                type_initial_command(session_id, &handle);
             }
         }
     });
+}
+
+/// Type the Watch initial Command at most once, after the first prompt.
+fn type_initial_command(session_id: SessionId, handle: &SessionHandle) {
+    let pending = match handle.initial_command.lock() {
+        Ok(mut pending) => pending.take(),
+        Err(_) => {
+            tracing::error!(session = session_id.0, "initial command lock poisoned");
+            return;
+        }
+    };
+    let Some(line) = pending else {
+        return;
+    };
+    match handle.writer.lock() {
+        Ok(mut writer) => {
+            if let Err(error) = writer.write_all(&line).and_then(|()| writer.flush()) {
+                tracing::error!(session = session_id.0, %error, "failed to type initial command");
+            }
+        }
+        Err(_) => tracing::error!(session = session_id.0, "PTY writer lock poisoned"),
+    }
 }
 
 fn apply_signal(

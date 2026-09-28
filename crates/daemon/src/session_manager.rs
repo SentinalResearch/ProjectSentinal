@@ -1,6 +1,7 @@
 //! Ownership and lifecycle management for persistent terminal sessions.
 
 mod capture;
+mod error;
 mod lifecycle;
 mod structured;
 mod tasks;
@@ -12,9 +13,9 @@ use crate::{
     tracker::{CommandTracker, TrackerIds},
 };
 use capture::{require_capture, CaptureOperation};
+pub use error::SessionManagerError;
 use protocol::{
-    CaptureLevel, DaemonMessage, MachineId, ProtocolError, Session, SessionId, SessionOrigin,
-    SessionState, Timestamp,
+    DaemonMessage, MachineId, Session, SessionId, SessionOrigin, SessionState, Timestamp,
 };
 use std::{
     collections::HashMap,
@@ -23,7 +24,7 @@ use std::{
     sync::{atomic::AtomicU64, Arc, Mutex, RwLock},
     time::{SystemTime, UNIX_EPOCH},
 };
-use store::{Store, StoreError};
+use store::Store;
 use tokio::sync::broadcast;
 
 /// Function used to timestamp session and audit state.
@@ -69,7 +70,7 @@ pub struct CreateSession {
     pub origin: SessionOrigin,
     /// Optional user-visible title.
     pub title: Option<String>,
-    /// Optional initial argv, executed only by the Watch implementation in 1b.A.
+    /// Optional initial argv for WATCH Sessions, typed once after shell readiness.
     pub command: Option<Vec<String>>,
 }
 
@@ -81,71 +82,6 @@ pub struct Attachment {
     pub output: broadcast::Receiver<Vec<u8>>,
     /// Structured command, event, Session, and metric updates.
     pub structured: broadcast::Receiver<DaemonMessage>,
-}
-
-/// Errors produced while managing sessions.
-#[derive(Debug, thiserror::Error)]
-pub enum SessionManagerError {
-    /// A session ID is not owned by this daemon.
-    #[error("unknown session {0}")]
-    UnknownSession(SessionId),
-    /// A terminal dimension was zero.
-    #[error("terminal size must be at least 1x1, got {cols}x{rows}")]
-    InvalidTerminalSize {
-        /// Requested columns.
-        cols: u16,
-        /// Requested rows.
-        rows: u16,
-    },
-    /// A PTY operation failed.
-    #[error(transparent)]
-    Pty(#[from] PtyError),
-    /// A session state transition failed.
-    #[error(transparent)]
-    Protocol(#[from] ProtocolError),
-    /// A session data file operation failed.
-    #[error("failed to {operation} session data '{}': {source}", path.display())]
-    File {
-        /// Operation that failed.
-        operation: &'static str,
-        /// Data path.
-        path: PathBuf,
-        /// Filesystem error.
-        source: std::io::Error,
-    },
-    /// Shared session state was poisoned by a panic.
-    #[error("failed to lock {resource} for session {session_id}: lock poisoned")]
-    Lock {
-        /// Resource being accessed.
-        resource: &'static str,
-        /// Session being accessed.
-        session_id: SessionId,
-    },
-    /// A remote input audit record could not be written.
-    #[error(transparent)]
-    Audit(#[from] crate::audit::AuditError),
-    /// Structured state could not be persisted.
-    #[error(transparent)]
-    Store(#[from] StoreError),
-    /// This manager was constructed without persistent storage.
-    #[error("persistent command history is unavailable")]
-    StoreUnavailable,
-    /// A capture level does not permit a PTY operation.
-    #[error("capture level {capture} cannot {operation}")]
-    CaptureDenied {
-        /// Capture level of the target Session.
-        capture: CaptureLevel,
-        /// Requested operation.
-        operation: &'static str,
-    },
-    /// A future 1b origin or initial Command reached the stage-0 daemon.
-    #[error(
-        "Session origin {origin} with an initial Command is unavailable before Milestone 1b.A"
-    )]
-    WatchUnavailable {
-        /// Requested Session origin.
-        origin: SessionOrigin,
-    },
 }
 
 struct SessionHandle {
@@ -160,6 +96,8 @@ struct SessionHandle {
     output: broadcast::Sender<Vec<u8>>,
     structured: broadcast::Sender<DaemonMessage>,
     tracker: Mutex<CommandTracker>,
+    /// Rendered Watch initial Command, taken and typed at the first prompt.
+    initial_command: Mutex<Option<Vec<u8>>>,
 }
 
 struct SessionManagerInner {

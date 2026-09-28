@@ -9,7 +9,10 @@ use crate::{
     shell::{install_hooks, launch, ShellLaunch},
     tracker::CommandTracker,
 };
-use protocol::{Session, SessionId, SessionState};
+use protocol::{
+    render_command_line, CaptureLevel, Session, SessionId, SessionOrigin, SessionState,
+    ShellDialect,
+};
 use std::{
     fs::{self, OpenOptions},
     path::PathBuf,
@@ -21,16 +24,16 @@ impl SessionManager {
     /// Spawn a shell and return its session in the idle state.
     pub async fn create(&self, request: CreateSession) -> Result<Session, SessionManagerError> {
         validate_size(request.cols, request.rows)?;
-        if request.origin != protocol::SessionOrigin::Ui || request.command.is_some() {
-            return Err(SessionManagerError::WatchUnavailable {
+        if !matches!(request.origin, SessionOrigin::Ui | SessionOrigin::Watch) {
+            return Err(SessionManagerError::OriginUnavailable {
                 origin: request.origin,
             });
         }
-        let id = SessionId(self.inner.next_id.fetch_add(1, Ordering::Relaxed));
         let shell = request
             .shell
             .or_else(|| std::env::var("SHELL").ok())
             .unwrap_or_else(|| "/bin/sh".into());
+        let initial_command = initial_command(request.origin, &shell, request.command.as_deref())?;
         let cwd = request
             .cwd
             .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
@@ -38,13 +41,23 @@ impl SessionManager {
         let home = std::env::var_os("HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| cwd.clone());
-        let shell_launch = match install_hooks(&self.inner.config.data_dir, &home) {
+        let mut shell_launch = match install_hooks(&self.inner.config.data_dir, &home) {
             Ok(hook_dir) => launch(PathBuf::from(&shell).as_path(), &hook_dir),
+            // Without hooks no prompt is ever reported, so an initial Command could never run.
+            Err(error) if initial_command.is_some() => {
+                return Err(SessionManagerError::InitialCommandHooks(error.to_string()));
+            }
             Err(error) => {
                 tracing::warn!(%error, "shell hooks unavailable; starting Session without command tracking");
                 ShellLaunch::default()
             }
         };
+        let id = SessionId(self.inner.next_id.fetch_add(1, Ordering::Relaxed));
+        // Every FULL Session identifies itself before user shell configuration
+        // loads, so Watch and external hooks can refuse to nest inside it.
+        shell_launch
+            .env
+            .push(("SENTINEL_SESSION_ID".into(), id.0.to_string()));
         let log_dir = self.inner.config.data_dir.join("sessions");
         fs::create_dir_all(&log_dir).map_err(|source| SessionManagerError::File {
             operation: "create directory for",
@@ -79,7 +92,7 @@ impl SessionManager {
             (self.inner.config.clock)(),
         );
         session.origin = request.origin;
-        session.capture = protocol::CaptureLevel::Full;
+        session.capture = CaptureLevel::Full;
         session.title = request.title;
         session.pid = spawned.root_pid;
         session.validate()?;
@@ -119,6 +132,7 @@ impl SessionManager {
                 cwd.to_string_lossy(),
                 self.inner.tracker_ids.clone(),
             )),
+            initial_command: Mutex::new(initial_command),
         });
         self.inner
             .sessions
@@ -151,4 +165,26 @@ impl SessionManager {
         );
         Ok(session)
     }
+}
+
+/// Render a Watch initial Command, or reject it before anything is spawned.
+fn initial_command(
+    origin: SessionOrigin,
+    shell: &str,
+    argv: Option<&[String]>,
+) -> Result<Option<Vec<u8>>, SessionManagerError> {
+    let Some(argv) = argv else {
+        return Ok(None);
+    };
+    if origin != SessionOrigin::Watch {
+        return Err(SessionManagerError::InitialCommandRequiresWatch { origin });
+    }
+    let dialect = ShellDialect::from_shell_path(shell).ok_or_else(|| {
+        SessionManagerError::InitialCommandShell {
+            shell: shell.to_string(),
+        }
+    })?;
+    let mut line = render_command_line(argv, dialect)?.into_bytes();
+    line.push(b'\r');
+    Ok(Some(line))
 }
