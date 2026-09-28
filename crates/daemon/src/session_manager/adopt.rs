@@ -77,6 +77,9 @@ impl SessionManager {
             store.insert_session(&session)?;
         }
         self.insert_external(session.clone())?;
+        self.observe_reduced(DaemonMessage::SessionUpdated {
+            session: session.clone(),
+        });
         if session.log.is_none() {
             self.spawn_log_discovery(id, pid);
         }
@@ -117,6 +120,9 @@ impl SessionManager {
         if let Some(store) = &self.inner.store {
             store.update_session(&session)?;
         }
+        self.observe_reduced(DaemonMessage::SessionUpdated {
+            session: session.clone(),
+        });
         let _ = handle
             .structured
             .send(DaemonMessage::SessionUpdated { session });

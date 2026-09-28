@@ -236,9 +236,29 @@ async fn websocket(
 async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: String, token: String) {
     let (output_tx, mut output_rx) = mpsc::channel::<AttachedOutput>(256);
     let mut attachments: HashMap<SessionId, JoinHandle<()>> = HashMap::new();
+    let mut observations = state.sessions.observe();
 
     loop {
         tokio::select! {
+            observed = observations.recv() => {
+                match observed {
+                    Ok(message) => {
+                        if !connection_authorized(&state, &token) {
+                            close_expired(&mut socket).await;
+                            break;
+                        }
+                        if !send_daemon_message(&mut socket, message).await {
+                            break;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(%client_addr, skipped, "observation client lagged");
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        observations = state.sessions.observe();
+                    }
+                }
+            }
             incoming = socket.recv() => {
                 if !connection_authorized(&state, &token) {
                     close_expired(&mut socket).await;

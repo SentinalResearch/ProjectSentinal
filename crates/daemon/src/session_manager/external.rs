@@ -15,8 +15,8 @@ use crate::{
     tracker::CommandTracker,
 };
 use protocol::{
-    CaptureLevel, Command, LocalErrorCode, LocalRequest, LocalResponse, Session, SessionId,
-    SessionOrigin, SessionState, Timestamp,
+    CaptureLevel, Command, DaemonMessage, LocalErrorCode, LocalRequest, LocalResponse, Session,
+    SessionId, SessionOrigin, SessionState, Timestamp,
 };
 use std::{
     collections::BTreeMap,
@@ -119,6 +119,9 @@ impl SessionManager {
             store.insert_session(&session)?;
         }
         self.insert_external(session.clone())?;
+        self.observe_reduced(DaemonMessage::SessionUpdated {
+            session: session.clone(),
+        });
         Ok(session)
     }
 

@@ -123,6 +123,9 @@ struct SessionManagerInner {
     tracker_ids: TrackerIds,
     store: Option<Arc<Store>>,
     probe: ProcessProbe,
+    /// Metrics and state of reduced-capture Sessions, for every connected
+    /// client (they cannot attach, which is how FULL Sessions deliver them).
+    observations: broadcast::Sender<DaemonMessage>,
     /// Serializes external shell registration so concurrent reports create one Session.
     registration: Mutex<()>,
 }
@@ -183,6 +186,7 @@ impl SessionManager {
                 tracker_ids: TrackerIds::starting_at(next_command, next_event),
                 store,
                 probe: ProcessProbe::unavailable(),
+                observations: broadcast::channel(256).0,
                 registration: Mutex::new(()),
             }),
         }

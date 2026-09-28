@@ -2,10 +2,11 @@
 
 use super::{lock_session, SessionManager, SessionManagerError};
 use protocol::{
-    Command, DaemonMessage, Event, EventKind, MachineMetrics, Resource, SessionId, SessionMetrics,
-    Timestamp,
+    CaptureLevel, Command, DaemonMessage, Event, EventKind, MachineMetrics, Resource, SessionId,
+    SessionMetrics, Timestamp,
 };
 use store::{RawMetricSample, Store};
+use tokio::sync::broadcast;
 
 impl SessionManager {
     /// Return recent persisted command history.
@@ -64,10 +65,25 @@ impl SessionManager {
                 vram_total_bytes: None,
             })?;
         }
-        let _ = handle
-            .structured
-            .send(DaemonMessage::SessionMetrics { metrics });
+        let reduced = lock_session(&handle)?.capture != CaptureLevel::Full;
+        let message = DaemonMessage::SessionMetrics { metrics };
+        if reduced {
+            self.observe_reduced(message.clone());
+        }
+        let _ = handle.structured.send(message);
         Ok(())
+    }
+
+    /// Subscribe to Metrics and state changes of reduced-capture Sessions.
+    ///
+    /// Every WebSocket client receives these without attaching: reading
+    /// Metrics is observation, allowed for every capture level.
+    pub fn observe(&self) -> broadcast::Receiver<DaemonMessage> {
+        self.inner.observations.subscribe()
+    }
+
+    pub(super) fn observe_reduced(&self, message: DaemonMessage) {
+        let _ = self.inner.observations.send(message);
     }
 
     /// Persist machine metrics and broadcast them to all attached clients.

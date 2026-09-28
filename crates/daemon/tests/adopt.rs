@@ -445,3 +445,41 @@ async fn restart_keeps_a_verified_adopted_process_running() {
     assert_eq!(recovered.origin, SessionOrigin::Adopted);
     let _ = SessionId(0);
 }
+
+// ---- live observation without attaching --------------------------------------
+
+#[tokio::test]
+async fn reduced_capture_metrics_and_endings_reach_unattached_observers() {
+    let h = harness();
+    let mut observer = h.manager.observe();
+    let session = h.manager.adopt_process(TARGET, None, None).unwrap();
+
+    h.manager
+        .publish_metrics(protocol::SessionMetrics {
+            session_id: session.id,
+            at: Timestamp(2),
+            totals: protocol::ProcessTotals {
+                cpu_percent: 42.0,
+                rss_bytes: 1024,
+                gpu_mem_bytes: 0,
+            },
+        })
+        .unwrap();
+    h.table.lock().unwrap().remove(&TARGET);
+    h.manager.check_external_processes().unwrap();
+
+    let mut saw_metrics = false;
+    let mut saw_end = false;
+    while let Ok(message) = observer.try_recv() {
+        match message {
+            DaemonMessage::SessionMetrics { metrics } if metrics.session_id == session.id => {
+                saw_metrics = metrics.totals.cpu_percent == 42.0;
+            }
+            DaemonMessage::SessionUpdated { session: updated } if updated.id == session.id => {
+                saw_end |= updated.state == SessionState::Completed && updated.exit_code.is_none();
+            }
+            _ => {}
+        }
+    }
+    assert!(saw_metrics && saw_end);
+}

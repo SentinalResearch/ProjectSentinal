@@ -88,6 +88,9 @@ impl SessionManager {
             store.insert_event(&event)?;
         }
         let _ = handle.structured.send(DaemonMessage::Event { event });
+        self.observe_reduced(DaemonMessage::SessionUpdated {
+            session: session.clone(),
+        });
         let _ = handle
             .structured
             .send(DaemonMessage::SessionUpdated { session });
