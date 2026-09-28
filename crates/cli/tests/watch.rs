@@ -198,6 +198,7 @@ fn empty_executable_and_non_terminal_are_rejected_before_contact() {
 enum Reply {
     Create,
     Reject,
+    ObserveThenCreate,
 }
 
 struct FakeDaemon {
@@ -227,7 +228,10 @@ async fn fake_daemon(reply: Reply) -> FakeDaemon {
                         .payload;
                     log.lock().unwrap().push(request.clone());
                     let message = match (reply, request) {
-                        (Reply::Create, ClientRequest::CreateSession { cwd, title, .. }) => {
+                        (
+                            Reply::Create | Reply::ObserveThenCreate,
+                            ClientRequest::CreateSession { cwd, title, .. },
+                        ) => {
                             let mut session = Session::new(
                                 SessionId(7),
                                 MachineId("fake".into()),
@@ -243,6 +247,31 @@ async fn fake_daemon(reply: Reply) -> FakeDaemon {
                             message: "unknown shell '/nope'".into(),
                         },
                     };
+                    if matches!(reply, Reply::ObserveThenCreate) {
+                        // An unsolicited observation of an adopted process arrives first.
+                        let mut adopted = Session::new(
+                            SessionId(77),
+                            MachineId("fake".into()),
+                            "",
+                            "/",
+                            Timestamp(1),
+                        );
+                        adopted.origin = SessionOrigin::Adopted;
+                        adopted.capture = protocol::CaptureLevel::Process;
+                        for observation in [
+                            DaemonMessage::SessionUpdated { session: adopted },
+                            DaemonMessage::SessionMetrics {
+                                metrics: protocol::SessionMetrics {
+                                    session_id: SessionId(77),
+                                    at: Timestamp(1),
+                                    totals: protocol::ProcessTotals::default(),
+                                },
+                            },
+                        ] {
+                            let text = Envelope::new(observation).encode().unwrap();
+                            socket.send(Message::Text(text.into())).await.unwrap();
+                        }
+                    }
                     let text = Envelope::new(message).encode().unwrap();
                     socket.send(Message::Text(text.into())).await.unwrap();
                 }
@@ -279,6 +308,44 @@ async fn created_watch_session_is_returned_with_the_exact_request() {
     assert_eq!(session.id, SessionId(7));
     assert_eq!(session.origin, SessionOrigin::Watch);
     assert_eq!(*daemon.requests.lock().unwrap(), vec![request]);
+}
+
+#[tokio::test]
+async fn unsolicited_observations_are_never_taken_as_the_reply() {
+    let daemon = fake_daemon(Reply::ObserveThenCreate).await;
+    let (_client, session) = create_session(
+        || connect(&daemon.url, &daemon.token_file),
+        create_request(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(session.id, SessionId(7));
+}
+
+#[test]
+fn observations_are_classified_by_type_and_capture() {
+    use cli::client::is_observation;
+    let mut full = Session::new(
+        SessionId(1),
+        MachineId("m".into()),
+        "/bin/zsh",
+        "/",
+        Timestamp(1),
+    );
+    assert!(!is_observation(&DaemonMessage::SessionUpdated {
+        session: full.clone()
+    }));
+    full.origin = SessionOrigin::ShellHook;
+    full.capture = protocol::CaptureLevel::Commands;
+    assert!(is_observation(&DaemonMessage::SessionUpdated {
+        session: full
+    }));
+    assert!(!is_observation(&DaemonMessage::Error {
+        message: "x".into()
+    }));
+    assert!(!is_observation(&DaemonMessage::Sessions {
+        sessions: vec![]
+    }));
 }
 
 #[tokio::test]

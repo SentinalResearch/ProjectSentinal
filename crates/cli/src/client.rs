@@ -10,7 +10,7 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{
@@ -80,6 +80,22 @@ pub enum ClientError {
     },
 }
 
+/// Whether `message` is an unsolicited observation (Metrics, Events,
+/// Command updates, or a reduced-capture Session update) rather than a
+/// reply. Replies to requests are never any of these.
+pub fn is_observation(message: &DaemonMessage) -> bool {
+    match message {
+        DaemonMessage::SessionMetrics { .. }
+        | DaemonMessage::MachineMetrics { .. }
+        | DaemonMessage::Event { .. }
+        | DaemonMessage::CommandUpdated { .. } => true,
+        DaemonMessage::SessionUpdated { session } => {
+            session.capture != protocol::CaptureLevel::Full
+        }
+        _ => false,
+    }
+}
+
 /// Why an interactive attachment ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttachEnd {
@@ -138,7 +154,10 @@ impl DaemonClient {
         while let Some(message) = self.socket.next().await {
             match message? {
                 Message::Text(text) => {
-                    return Ok(Envelope::<DaemonMessage>::decode(text.as_str())?.payload);
+                    let message = Envelope::<DaemonMessage>::decode(text.as_str())?.payload;
+                    if !is_observation(&message) {
+                        return Ok(message);
+                    }
                 }
                 Message::Close(_) => return Err(ClientError::Disconnected),
                 _ => {}
@@ -160,18 +179,24 @@ impl DaemonClient {
             .await?;
         }
         let _raw = RawTerminal::enable()?;
-        let mut stdin = tokio::io::stdin();
+        let mut stdin = spawn_stdin_reader();
         let mut stdout = tokio::io::stdout();
-        let mut input = [0_u8; 4096];
         let mut detector = DetachDetector::new();
 
         loop {
             tokio::select! {
-                count = stdin.read(&mut input) => {
-                    let count = count.map_err(|source| ClientError::Io {
-                        operation: "read",
-                        source,
-                    })?;
+                chunk = stdin.recv() => {
+                    let input = match chunk {
+                        Some(Ok(bytes)) => bytes,
+                        Some(Err(source)) => {
+                            return Err(ClientError::Io {
+                                operation: "read",
+                                source,
+                            });
+                        }
+                        None => Vec::new(),
+                    };
+                    let count = input.len();
                     if count == 0 {
                         let trailing = detector.finish();
                         if !trailing.is_empty() {
@@ -181,7 +206,7 @@ impl DaemonClient {
                         }
                         return Ok(AttachEnd::Detached);
                     }
-                    let result = detector.push(&input[..count]);
+                    let result = detector.push(&input);
                     if !result.bytes.is_empty() {
                         self.socket.send(Message::Binary(
                             encode_terminal_frame(session_id, &result.bytes).into()
@@ -239,6 +264,26 @@ impl DaemonClient {
         self.socket.send(Message::Text(text.into())).await?;
         Ok(())
     }
+}
+
+/// Read terminal input on a plain thread. Unlike `tokio::io::stdin`, a read
+/// still pending when the shell ends does not keep the process alive: std
+/// threads do not block process exit, while Tokio's blocking pool does.
+fn spawn_stdin_reader() -> tokio::sync::mpsc::Receiver<std::io::Result<Vec<u8>>> {
+    let (sender, receiver) = tokio::sync::mpsc::channel(16);
+    std::thread::spawn(move || {
+        let mut stdin = std::io::stdin();
+        let mut buffer = [0_u8; 4096];
+        loop {
+            let result =
+                std::io::Read::read(&mut stdin, &mut buffer).map(|count| buffer[..count].to_vec());
+            let finished = !matches!(&result, Ok(bytes) if !bytes.is_empty());
+            if sender.blocking_send(result).is_err() || finished {
+                return;
+            }
+        }
+    });
+    receiver
 }
 
 struct RawTerminal {

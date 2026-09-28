@@ -54,6 +54,19 @@ export interface ApiAdapterOptions {
   fetcher?: typeof fetch;
 }
 
+/**
+ * Replies to CREATE_SESSION / KILL are SESSION_UPDATED for a FULL Session;
+ * the daemon also pushes unsolicited SESSION_UPDATED observations for
+ * reduced-capture Sessions, which must never be taken as a reply.
+ */
+function isFullSessionUpdate(reply: DaemonMessage, id?: number): boolean {
+  return (
+    reply.type === "SESSION_UPDATED" &&
+    reply.session.capture === "FULL" &&
+    (id === undefined || reply.session.id === id)
+  );
+}
+
 function daemonError(message: string): Error {
   return new Error(`daemon request failed: ${message}`);
 }
@@ -301,7 +314,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
           title: null,
           command: null,
         },
-        (reply) => reply.type === "SESSION_UPDATED",
+        (reply) => isFullSessionUpdate(reply),
       );
       if (message.type !== "SESSION_UPDATED") throw daemonError("missing created session");
       return mapSession(message.session);
@@ -336,7 +349,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       }
       await transport.request(
         { type: "KILL", session_id: Number(sessionId) },
-        (reply) => reply.type === "SESSION_UPDATED",
+        (reply) => isFullSessionUpdate(reply, Number(sessionId)),
       );
     },
     runRecipe: () => unsupported("runRecipe"),

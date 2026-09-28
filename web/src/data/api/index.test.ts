@@ -136,6 +136,8 @@ class FakeSocket implements ApiSocket {
   onmessage: ((event: MessageEvent<string | ArrayBuffer | Blob>) => void) | null = null;
   readonly binaryFrames: Uint8Array[] = [];
   readonly requests: ClientRequest[] = [];
+  /** Push an unsolicited observation of an adopted process before each reply. */
+  observeFirst = false;
 
   constructor(url: string, server: FakeAuthServer) {
     this.url = url;
@@ -168,6 +170,17 @@ class FakeSocket implements ApiSocket {
       payload = { type: "HISTORY", commands: [command] };
     } else {
       payload = { type: "ERROR", message: `unsupported test request ${request.type}` };
+    }
+    if (this.observeFirst) {
+      const observed: DaemonMessage = {
+        type: "SESSION_UPDATED",
+        session: { ...session, id: 77, origin: "ADOPTED", capture: "PROCESS", state: "RUNNING" },
+      };
+      this.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify({ version: 1, payload: observed } satisfies Envelope<DaemonMessage>),
+        }),
+      );
     }
     this.onmessage?.(
       new MessageEvent("message", {
@@ -288,6 +301,18 @@ describe("apiAdapter authentication", () => {
     expect(frame.sessionId).toBe(1);
     expect(new TextDecoder().decode(frame.payload)).toBe("echo ready\n");
     unsubscribe();
+  });
+
+  it("never mistakes an unsolicited observation for a create or kill reply", async () => {
+    const { adapter, sockets } = setup();
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getSessions();
+    sockets[0].observeFirst = true;
+
+    const created = await adapter.createSession();
+    expect(created.id).toBe("1");
+    await adapter.sendSignal(created.id, "KILL");
+    expect(sockets[0].requests.at(-1)).toEqual({ type: "KILL", session_id: 1 });
   });
 
   it("uses daemon history and FTS search and maps duration and cwd", async () => {
