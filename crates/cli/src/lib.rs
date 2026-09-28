@@ -1,7 +1,10 @@
 //! Reusable command dispatch, parsing, and terminal framing for `sentinal`.
 
+pub mod adopt_command;
 pub mod app;
 pub mod args;
+pub mod auto_command;
+pub mod auto_wrap;
 pub mod client;
 pub mod detach;
 pub mod frame;

@@ -128,3 +128,59 @@ impl ReplaceBytes for Vec<u8> {
         out
     }
 }
+
+// ---- the auto block shares the same editor -----------------------------------
+
+use cli::rc_file::{find_block, install_block, uninstall_block, BlockLines, Markers, Placement};
+
+const AUTO_BODY: &str =
+    "# Managed by `sentinal auto on`.\n[ -x /bin/sentinal ] && /bin/sentinal auto enter\n";
+
+#[test]
+fn the_auto_block_goes_first_and_is_removed_exactly() {
+    let original = b"export PATH=/x\n# no final newline";
+    let installed = install_block(original, AUTO_BODY, Markers::AUTO, Placement::Start).unwrap();
+    assert!(installed.starts_with(Markers::AUTO.begin().as_bytes()));
+    assert!(installed.ends_with(original));
+    assert_eq!(
+        uninstall_block(&installed, Markers::AUTO).unwrap(),
+        original
+    );
+    assert_eq!(
+        install_block(&installed, AUTO_BODY, Markers::AUTO, Placement::Start).unwrap(),
+        installed
+    );
+}
+
+#[test]
+fn hook_and_auto_blocks_coexist_and_are_removed_independently() {
+    let original = b"alias g=git\n";
+    let with_hook = install(original, BODY).unwrap();
+    let both = install_block(&with_hook, AUTO_BODY, Markers::AUTO, Placement::Start).unwrap();
+
+    assert_eq!(
+        find_block(&both, Markers::AUTO).unwrap(),
+        Some(BlockLines { first: 1, last: 4 })
+    );
+    assert!(find_block(&both, Markers::HOOK).unwrap().is_some());
+
+    let without_auto = uninstall_block(&both, Markers::AUTO).unwrap();
+    assert_eq!(without_auto, with_hook);
+    assert_eq!(uninstall(&without_auto).unwrap(), original);
+    let without_hook = uninstall(&both).unwrap();
+    assert_eq!(
+        uninstall_block(&without_hook, Markers::AUTO).unwrap(),
+        original
+    );
+}
+
+#[test]
+fn a_malformed_auto_block_is_reported_without_touching_the_hook_block() {
+    let text = format!("{}\nhalf\n{}", Markers::AUTO.begin(), block(BEGIN));
+    let error =
+        install_block(text.as_bytes(), AUTO_BODY, Markers::AUTO, Placement::Start).unwrap_err();
+    assert!(matches!(error, RcError::Malformed(reason) if reason.contains("never ends")));
+    assert!(find_block(text.as_bytes(), Markers::HOOK)
+        .unwrap()
+        .is_some());
+}

@@ -54,11 +54,75 @@ pub enum Command {
         #[arg(last = true, num_args = 1.., value_name = "COMMAND")]
         command: Option<Vec<String>>,
     },
+    /// Put new interactive terminals into FULL Sessions automatically (opt-in).
+    Auto {
+        /// Auto-wrap operation.
+        #[command(subcommand)]
+        action: AutoAction,
+    },
+    /// Observe an existing same-user process read-only (ADOPTED / PROCESS).
+    ///
+    /// Sentinal samples the process tree's Metrics and notices when it ends.
+    /// It never signals, traces, or writes to the process; the exit code of an
+    /// adopted process is always unknown.
+    #[command(group(clap::ArgGroup::new("target").required(true).args(["pid", "pick"])))]
+    Adopt {
+        /// Process ID to adopt.
+        pid: Option<u32>,
+        /// Choose from your running processes instead of naming a PID.
+        #[arg(long)]
+        pick: bool,
+        /// Log file the process writes (recorded now; tailing arrives later).
+        #[arg(long, value_name = "PATH")]
+        log: Option<PathBuf>,
+        /// Session title shown in `ls` and the web UI.
+        #[arg(short = 't', long)]
+        title: Option<String>,
+    },
     /// Report Commands from ordinary zsh, bash, or fish terminals (COMMANDS capture).
     Hook {
         /// Hook operation.
         #[command(subcommand)]
         action: HookAction,
+    },
+}
+
+/// `sentinal auto` operations.
+#[derive(Debug, Subcommand)]
+pub enum AutoAction {
+    /// Add the auto-wrap block to your shell's rc file (off by default).
+    On {
+        /// Shell to configure; defaults to $SHELL.
+        shell: Option<HookShell>,
+        /// Edit this rc file instead of the default for the shell.
+        #[arg(long, value_name = "PATH")]
+        rc: Option<PathBuf>,
+    },
+    /// Remove exactly the auto-wrap block from your shell's rc file.
+    Off {
+        /// Shell to configure; defaults to $SHELL.
+        shell: Option<HookShell>,
+        /// Edit this rc file instead of the default for the shell.
+        #[arg(long, value_name = "PATH")]
+        rc: Option<PathBuf>,
+    },
+    /// Show where auto-wrap is configured and whether it applies to this terminal.
+    Status {
+        /// Shell to inspect; defaults to $SHELL.
+        shell: Option<HookShell>,
+        /// Inspect this rc file instead of the default for the shell.
+        #[arg(long, value_name = "PATH")]
+        rc: Option<PathBuf>,
+    },
+    /// Internal: enter an AUTO_WRAP Session from the rc block, or exit 75.
+    #[command(hide = true)]
+    Enter {
+        /// Shell being started.
+        #[arg(long)]
+        shell: String,
+        /// Executable path of that shell.
+        #[arg(long)]
+        shell_path: String,
     },
 }
 

@@ -45,7 +45,8 @@ pub async fn run(action: HookAction, out: &mut dyn Write, err: &mut dyn Write) -
     }
 }
 
-fn binary() -> Result<PathBuf, String> {
+/// The `sentinal` binary path to write into rc files.
+pub(crate) fn binary() -> Result<PathBuf, String> {
     let current = env::current_exe().map_err(|error| format!("cannot locate sentinal: {error}"))?;
     Ok(resolve_binary(&current, env::var_os("PATH").as_deref()))
 }
@@ -62,18 +63,9 @@ fn install(
     installing: bool,
     out: &mut dyn Write,
 ) -> Result<(), String> {
-    let home = env::var_os("HOME")
-        .map(PathBuf::from)
-        .ok_or("HOME is not set; pass --rc PATH")?;
-    let rc_env = RcEnv {
-        home: home.clone(),
-        shell: env::var("SHELL").ok(),
-        zdotdir: env::var_os("ZDOTDIR").map(PathBuf::from),
-        xdg_config_home: env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
-        macos: cfg!(target_os = "macos"),
-    };
+    let (rc_env, home) = rc_env()?;
     let (shell, path) = select_rc(shell, rc, &rc_env).map_err(|error| error.to_string())?;
-    let shown = display(&path, &home);
+    let file = shown(&path, &home);
     let applied = if installing {
         let binary = binary()?;
         ensure_not_world_writable(&binary).map_err(|error| error.to_string())?;
@@ -88,19 +80,34 @@ fn install(
     let name = shell.name();
     let message = match (installing, applied) {
         (true, Applied::Unchanged) => {
-            format!("The Sentinal {name} hook is already installed in {shown}; nothing changed.")
+            format!("The Sentinal {name} hook is already installed in {file}; nothing changed.")
         }
         (true, Applied::Written { backup }) => format!(
-            "Installed the Sentinal {name} hook in {shown}{}. New {name} terminals report Commands to sentinald.",
+            "Installed the Sentinal {name} hook in {file}{}. New {name} terminals report Commands to sentinald.",
             backup_note(backup.as_deref(), &home)
         ),
-        (false, Applied::Unchanged) => format!("No Sentinal hook in {shown}; nothing changed."),
+        (false, Applied::Unchanged) => format!("No Sentinal hook in {file}; nothing changed."),
         (false, Applied::Written { backup }) => format!(
-            "Removed the Sentinal hook from {shown}{}. Open a new terminal to stop reporting.",
+            "Removed the Sentinal hook from {file}{}. Open a new terminal to stop reporting.",
             backup_note(backup.as_deref(), &home)
         ),
     };
     writeln!(out, "{message}").map_err(|error| error.to_string())
+}
+
+/// rc-selection facts from this process's environment, plus `$HOME`.
+pub(crate) fn rc_env() -> Result<(RcEnv, PathBuf), String> {
+    let home = env::var_os("HOME")
+        .map(PathBuf::from)
+        .ok_or("HOME is not set; pass --rc PATH")?;
+    let rc_env = RcEnv {
+        home: home.clone(),
+        shell: env::var("SHELL").ok(),
+        zdotdir: env::var_os("ZDOTDIR").map(PathBuf::from),
+        xdg_config_home: env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
+        macos: cfg!(target_os = "macos"),
+    };
+    Ok((rc_env, home))
 }
 
 async fn report(kind: ReportKind, pid: u32, shell: String, seq: u64, exit: i32, at: &str) {
@@ -146,7 +153,8 @@ async fn report(kind: ReportKind, pid: u32, shell: String, seq: u64, exit: i32, 
     let _ = hook_report::send(&socket, &report, REPORT_DEADLINE).await;
 }
 
-fn display(path: &Path, home: &Path) -> String {
+/// `path` shown relative to `~` when inside `home`.
+pub(crate) fn shown(path: &Path, home: &Path) -> String {
     match path.strip_prefix(home) {
         Ok(rest) => format!("~/{}", rest.display()),
         Err(_) => path.display().to_string(),
@@ -155,6 +163,6 @@ fn display(path: &Path, home: &Path) -> String {
 
 fn backup_note(backup: Option<&Path>, home: &Path) -> String {
     backup.map_or_else(String::new, |backup| {
-        format!(" (backup: {})", display(backup, home))
+        format!(" (backup: {})", shown(backup, home))
     })
 }

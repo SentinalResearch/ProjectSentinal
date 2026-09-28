@@ -45,9 +45,24 @@ async fn dispatch(
     err: &mut dyn Write,
 ) -> Result<ExitCode, AppError> {
     // Hook commands never use the WebSocket API and need no token.
-    if let Command::Hook { action } = cli.command {
-        return Ok(crate::hook_command::run(action, out, err).await);
-    }
+    let cli = match cli.command {
+        Command::Hook { action } => return Ok(crate::hook_command::run(action, out, err).await),
+        Command::Auto { action } => {
+            return Ok(crate::auto_command::run(action, &cli.url, cli.token_file, out, err).await);
+        }
+        Command::Adopt {
+            pid,
+            pick,
+            log,
+            title,
+        } => {
+            let mut input = std::io::stdin().lock();
+            return Ok(
+                crate::adopt_command::run(pid, pick, log, title, &mut input, out, err).await,
+            );
+        }
+        command => Cli { command, ..cli },
+    };
     let token_file = match cli.token_file {
         Some(path) => path,
         None => default_token_file()?,
@@ -104,7 +119,10 @@ async fn dispatch(
                 message => print_unexpected(err, message),
             }
         }
-        Command::Watch { .. } | Command::Hook { .. } => {}
+        Command::Watch { .. }
+        | Command::Hook { .. }
+        | Command::Auto { .. }
+        | Command::Adopt { .. } => {}
     }
     Ok(ExitCode::SUCCESS)
 }
