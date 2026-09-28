@@ -57,7 +57,7 @@ impl SessionManager {
         // loads, so Watch and external hooks can refuse to nest inside it.
         shell_launch
             .env
-            .push(("SENTINEL_SESSION_ID".into(), id.0.to_string()));
+            .push(("SENTINAL_SESSION_ID".into(), id.0.to_string()));
         let log_dir = self.inner.config.data_dir.join("sessions");
         fs::create_dir_all(&log_dir).map_err(|source| SessionManagerError::File {
             operation: "create directory for",

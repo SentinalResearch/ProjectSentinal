@@ -1,4 +1,4 @@
-# Milestone 1b progress — Any terminal into Sentinel
+# Milestone 1b progress — Any terminal into Sentinal
 
 Status: Milestone 1b.A complete 2026-09-28; awaiting human review before 1b.B.
 
@@ -11,7 +11,7 @@ Status: Milestone 1b.A complete 2026-09-28; awaiting human review before 1b.B.
   `crates/daemon/tests/local_socket.rs` plus `local_socket_integration`
 - [x] 1b.0 capture enforcement — SessionManager and in-process API behavior tests
 - [x] 1b.0 legacy persistence/privacy — `crates/store/tests/store.rs` and audit assertions
-- [x] Sentinel Watch and no-nesting behavior — CLI unit tests, fake daemon behavior tests, real PTY integration
+- [x] Sentinal Watch and no-nesting behavior — CLI unit tests, fake daemon behavior tests, real PTY integration
 - [ ] External hook generation/install/uninstall — script tests against a fake socket and byte-exact rc fixtures
 - [ ] Hook performance/fail-open behavior — injected transport tests plus recorded Linux/macOS benchmark
 - [ ] Auto-wrap guards and 300 ms fallback — table-driven unit tests and manual IDE/SSH smoke matrix
@@ -41,18 +41,18 @@ Status: Milestone 1b.A complete 2026-09-28; awaiting human review before 1b.B.
   tests. New: 7 protocol rendering unit tests, 2 quoting contract tests,
   6 daemon Watch tests, 14 CLI Watch tests, 1 Playwright test.
 - `cargo test --workspace -- --ignored` passes all 9, including
-  `watch_integration` (real `sentineld`, `sentinel watch` in a PTY, client
+  `watch_integration` (real `sentinald`, `sentinal watch` in a PTY, client
   killed, same shell PID reattached from a second PTY, Command stored once)
   and `shell_quoting_integration` (bash and zsh; fish not installed here).
 - `pnpm -C web test:e2e`: 2 passed, including a WATCH/FULL Session that
   appears by title and attaches.
-- Manual demo on a real daemon: `sentinel watch -t "Web demo job" -- sh -c
+- Manual demo on a real daemon: `sentinal watch -t "Web demo job" -- sh -c
   '…ticks…'`, detach (exit 0 with reattach hint), then the web UI showed the
   Session RUNNING and attached with ticks still advancing.
 - Found and fixed: a 0x0 terminal size (some PTYs report it) made Watch and
   attach fail; it now means "unknown" and falls back to 80x24.
 - Not yet covered: Linux run of the ignored suite; fish on a host with fish.
-- Observed, out of scope: when `sentineld` stops, Session processes are not
+- Observed, out of scope: when `sentinald` stops, Session processes are not
   terminated (existing behavior); under a parent that ignores SIGHUP they
   keep running unobserved. Worth deciding before auto-wrap (1b.C).
 
@@ -71,7 +71,7 @@ next stage automatically.
 ## Execution prompts
 
 - `prompts/03a-milestone-1b0-contract-local-ingress.md`
-- `prompts/03b-milestone-1ba-sentinel-watch.md`
+- `prompts/03b-milestone-1ba-sentinal-watch.md`
 - `prompts/03c-milestone-1bb-external-shell-hook.md`
 - `prompts/03d-milestone-1bc-auto-wrap-adopt.md`
 - `prompts/04-milestone-3-events-watchers.md`
@@ -89,7 +89,7 @@ next stage automatically.
   never be decoded or dispatched by the remote WebSocket API.
 - Local messages use a 4-byte big-endian length followed by at most 65,536
   bytes of versioned JSON.
-- Linux prefers `$XDG_RUNTIME_DIR/sentinel/sentineld.sock`; macOS and the
-  validated Linux fallback use `<data_dir>/run/sentineld.sock`.
+- Linux prefers `$XDG_RUNTIME_DIR/sentinal/sentinald.sock`; macOS and the
+  validated Linux fallback use `<data_dir>/run/sentinald.sock`.
 - `ta`/`tad` compatibility aliases remain through the 1b migration; the
-  installed Sentinel names land in 1b.A.
+  installed Sentinal names land in 1b.A.

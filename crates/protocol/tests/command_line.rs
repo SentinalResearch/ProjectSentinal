@@ -8,7 +8,7 @@ fn hostile() -> Vec<String> {
     [
         "printf",
         "%s|",
-        "$(touch /tmp/sentinel-pwned)",
+        "$(touch /tmp/sentinal-pwned)",
         "`id`",
         "a; rm -rf ~",
         "line one\nline two",
@@ -196,7 +196,7 @@ fn shell_quoting_integration() {
             output.stdout, expected,
             "{shell} decoded {line} differently"
         );
-        assert!(!std::path::Path::new("/tmp/sentinel-pwned").exists());
+        assert!(!std::path::Path::new("/tmp/sentinal-pwned").exists());
         eprintln!("{shell}: ok");
     }
 }

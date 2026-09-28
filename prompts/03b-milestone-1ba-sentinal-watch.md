@@ -1,9 +1,9 @@
-# MILESTONE 1b.A — Sentinel Watch
+# MILESTONE 1b.A — Sentinal Watch
 
 Goal: from any ordinary terminal, run
 
 ```console
-sentinel watch -- python long_job.py
+sentinal watch -- python long_job.py
 ```
 
 then close the window and reattach to the same process and screen from another
@@ -14,10 +14,10 @@ and `docs/CAPTURE_MODES.md`; do not redesign them in this stage.
 
 ## 1. Product binary names and compatibility
 
-- Add installed user-facing binaries `sentinel` and `sentineld`.
+- Add installed user-facing binaries `sentinal` and `sentinald`.
 - Keep `ta` and `tad` as compatibility aliases for the window approved in
   Milestone 1b.0; do not silently remove service compatibility.
-- Help, errors, and new documentation use Sentinel names.
+- Help, errors, and new documentation use Sentinal names.
 - Preserve current `ls`, `new`, `attach`, and `kill` behavior.
 
 ## 2. Watch CLI
@@ -25,13 +25,13 @@ and `docs/CAPTURE_MODES.md`; do not redesign them in this stage.
 Implement:
 
 ```console
-sentinel watch
-sentinel watch -- COMMAND [ARG...]
-sentinel watch -t TITLE -- COMMAND [ARG...]
+sentinal watch
+sentinal watch -- COMMAND [ARG...]
+sentinal watch -t TITLE -- COMMAND [ARG...]
 ```
 
 - Use the current directory and current terminal dimensions.
-- Ask `sentineld` to create a `WATCH` / `FULL` Session and immediately attach
+- Ask `sentinald` to create a `WATCH` / `FULL` Session and immediately attach
   the current terminal with the existing detach sequence (`Ctrl-\`, then `d`).
 - With no Command, start the user's normal interactive shell.
 - With a Command, preserve the approved structured representation exactly,
@@ -39,13 +39,13 @@ sentinel watch -t TITLE -- COMMAND [ARG...]
 - Render any shell text only from the approved structured arguments using the
   protocol shell-quoting helper. Never concatenate unquoted arguments and
   never execute text derived from terminal output.
-- Set `SENTINEL_SESSION_ID` inside the daemon-owned Session before user shell
+- Set `SENTINAL_SESSION_ID` inside the daemon-owned Session before user shell
   configuration loads.
-- If `SENTINEL_SESSION_ID` is already set in the calling environment, create
+- If `SENTINAL_SESSION_ID` is already set in the calling environment, create
   no Session and execute no supplied Command. Report that the terminal is
   already watched and return the documented success/error code.
 - If the daemon is unavailable or rejects creation, print one clear error,
-  return non-zero, and never execute the supplied Command outside Sentinel.
+  return non-zero, and never execute the supplied Command outside Sentinal.
 - EOF, client crash, or window close detaches only. It must not kill the shell
   or child process.
 
@@ -68,7 +68,7 @@ sentinel watch -t TITLE -- COMMAND [ARG...]
 - Quoting/injection: an argv containing `$(...)`, semicolons, newlines, single
   quotes, and empty arguments reaches the fake PTY as data and executes only
   the intended program/arguments.
-- No nesting: set `SENTINEL_SESSION_ID`; assert zero create requests and zero
+- No nesting: set `SENTINAL_SESSION_ID`; assert zero create requests and zero
   Command execution.
 - Daemon unavailable/rejected: clear error, non-zero status, supplied Command
   never runs.

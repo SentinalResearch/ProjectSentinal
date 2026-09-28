@@ -1,17 +1,17 @@
 # Capture modes
 
-This is the normative product specification for bringing work into Sentinel.
+This is the normative product specification for bringing work into Sentinal.
 It describes target Milestone 1b behavior; fields and requests explicitly
 marked “planned” do not exist in protocol version 1 yet.
 
 ## Session origin and capture
 
-Every Session records how it entered Sentinel and what the daemon can see.
+Every Session records how it entered Sentinal and what the daemon can see.
 
 | Origin | Default capture | Meaning |
 |---|---|---|
 | `UI` | `FULL` | Created through the web/API/ordinary new-Session flow |
-| `WATCH` | `FULL` | Created by `sentinel watch` from an ordinary terminal |
+| `WATCH` | `FULL` | Created by `sentinal watch` from an ordinary terminal |
 | `SHELL_HOOK` | `COMMANDS` | Ordinary shell reporting structured Command boundaries |
 | `AUTO_WRAP` | `FULL` | Interactive shell automatically moved into a persistent PTY |
 | `ADOPTED` | `PROCESS` or `PROCESS_LOG` | Existing same-user process observed read-only |
@@ -38,9 +38,9 @@ Notification evidence is capture-dependent:
 ## Mode 1 — Watch
 
 ```console
-$ sentinel watch
-$ sentinel watch -- python train.py
-$ sentinel watch -t "Qwen Training" -- python train.py
+$ sentinal watch
+$ sentinal watch -- python train.py
+$ sentinal watch -t "Qwen Training" -- python train.py
 ```
 
 The CLI asks the daemon for a `WATCH` / `FULL` Session in the caller's cwd,
@@ -52,11 +52,11 @@ Session. `Session.pid` is the shell (process-tree root) and feeds process
 Metrics; the initial Command is captured by the ordinary OSC tracker and is
 stored once, like any typed Command.
 
-`SENTINEL_SESSION_ID` is set inside every daemon-owned FULL Session (UI and
+`SENTINAL_SESSION_ID` is set inside every daemon-owned FULL Session (UI and
 Watch) before user shell configuration loads. Invoking Watch when it is
 already set creates no Session: a bare Watch exits 0, and a Watch with a
 Command exits 1 without running it. If the daemon is unavailable or rejects
-creation, Watch exits 1 and never runs the supplied command outside Sentinel.
+creation, Watch exits 1 and never runs the supplied command outside Sentinal.
 
 Wire representation (approved in 1b.0): `CREATE_SESSION.command` is a
 structured `Vec<String>` argv. Initial Commands are accepted only for
@@ -66,7 +66,7 @@ when the rendered line is at most 1,000 bytes. See `docs/CLI.md`.
 ## Mode 2 — external shell hook
 
 ```console
-$ sentinel hook install
+$ sentinal hook install
 ```
 
 Install adds one marker-delimited integration block to zsh, bash, or fish
@@ -76,7 +76,7 @@ duration, exit code, and shell PID through the private local socket.
 
 Reporting is asynchronous, silent when the daemon is unavailable, and uses a
 50 ms transport deadline. It must add less than 5 ms p95 overhead at the
-prompt. When `SENTINEL_SESSION_ID` is set, the external socket path is
+prompt. When `SENTINAL_SESSION_ID` is set, the external socket path is
 suppressed because daemon-owned PTYs already report OSC signals.
 
 The shell PID is observed for lifecycle only. Closing the ordinary terminal
@@ -85,32 +85,32 @@ ends the Session; output and remote input are unavailable.
 ## Mode 3 — auto-wrap
 
 ```console
-$ sentinel auto on
-$ sentinel auto off
-$ sentinel auto status
+$ sentinal auto on
+$ sentinal auto off
+$ sentinal auto status
 ```
 
 Auto-wrap is off by default. When enabled, a new interactive terminal enters
 an `AUTO_WRAP` / `FULL` watched Session. It skips nested Sessions, IDE task
 runners, scp/rsync, non-interactive SSH, and any environment with
-`SENTINEL_DISABLE=1`.
+`SENTINAL_DISABLE=1`.
 
 Auto-wrap is fail-open: if the daemon does not answer, the original shell is
-started normally within 300 ms with no Sentinel output injected into the
+started normally within 300 ms with no Sentinal output injected into the
 prompt.
 
 ## Mode 4 — adopt
 
 ```console
-$ sentinel adopt 4242
-$ sentinel adopt 4242 --log ~/Projects/TIM/train.log
-$ sentinel adopt 4242 -t "Qwen Training"
-$ sentinel adopt --pick
+$ sentinal adopt 4242
+$ sentinal adopt 4242 --log ~/Projects/TIM/train.log
+$ sentinal adopt 4242 -t "Qwen Training"
+$ sentinal adopt --pick
 ```
 
 Adopt registers an existing same-user PID as `ADOPTED` / `PROCESS`. The daemon
 samples the process tree and determines whether it remains alive. Because
-Sentinel is not the parent, completion is displayed as “Ended · exit code
+Sentinal is not the parent, completion is displayed as “Ended · exit code
 unknown.” It must not manufacture success or failure.
 
 An explicit or safely detected log path upgrades capture to `PROCESS_LOG`.
@@ -138,7 +138,7 @@ the remote HTTP/WebSocket listener. The socket:
 
 ## Privacy and AI boundary
 
-- Sentinel stores terminal output for FULL Sessions and explicit log content
+- Sentinal stores terminal output for FULL Sessions and explicit log content
   for PROCESS_LOG Sessions; it does not separately record raw keystrokes.
 - Hidden password prompts do not echo and therefore are absent from terminal
   output logs.

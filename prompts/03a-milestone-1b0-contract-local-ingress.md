@@ -1,8 +1,8 @@
 # MILESTONE 1b.0 — Capture contract and private local ingress
 
 Goal: establish the security and protocol foundation for bringing ordinary
-terminals and existing processes into Sentinel. This stage does **not** add
-`sentinel watch`, edit shell rc files, auto-wrap shells, or adopt a process.
+terminals and existing processes into Sentinal. This stage does **not** add
+`sentinal watch`, edit shell rc files, auto-wrap shells, or adopt a process.
 
 Read `docs/PLAN.md`, `docs/CAPTURE_MODES.md`, `docs/SECURITY.md`,
 `docs/CLI.md`, `docs/SHELL_HOOKS.md`, and

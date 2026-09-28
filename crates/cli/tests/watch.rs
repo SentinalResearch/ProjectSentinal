@@ -1,4 +1,4 @@
-//! `sentinel watch` parsing, planning, and fake-daemon behavior.
+//! `sentinal watch` parsing, planning, and fake-daemon behavior.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -27,7 +27,7 @@ static NEXT_TEMP: AtomicU64 = AtomicU64::new(1);
 
 fn temp_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
-        "sentinel-cli-watch-{}-{}",
+        "sentinal-cli-watch-{}-{}",
         std::process::id(),
         NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
     ));
@@ -54,7 +54,7 @@ fn context() -> WatchContext {
 #[test]
 fn bare_watch_has_no_title_or_command() {
     assert!(matches!(
-        parse(&["sentinel", "watch"]),
+        parse(&["sentinal", "watch"]),
         Command::Watch {
             title: None,
             command: None
@@ -62,7 +62,7 @@ fn bare_watch_has_no_title_or_command() {
     ));
     // A trailing separator with nothing after it is still a bare Watch.
     assert!(matches!(
-        parse(&["sentinel", "watch", "--"]),
+        parse(&["sentinal", "watch", "--"]),
         Command::Watch { command: None, .. }
     ));
 }
@@ -70,7 +70,7 @@ fn bare_watch_has_no_title_or_command() {
 #[test]
 fn title_and_command_after_separator_are_preserved_exactly() {
     let args = [
-        "sentinel",
+        "sentinal",
         "watch",
         "-t",
         "Qwen Training",
@@ -96,12 +96,12 @@ fn title_and_command_after_separator_are_preserved_exactly() {
 
 #[test]
 fn command_without_separator_is_rejected() {
-    assert!(Cli::try_parse_from(["sentinel", "watch", "python", "train.py"]).is_err());
+    assert!(Cli::try_parse_from(["sentinal", "watch", "python", "train.py"]).is_err());
 }
 
 #[test]
-fn existing_commands_still_parse_under_the_sentinel_name() {
-    assert!(matches!(parse(&["sentinel", "ls"]), Command::List));
+fn existing_commands_still_parse_under_the_sentinal_name() {
+    assert!(matches!(parse(&["sentinal", "ls"]), Command::List));
     assert!(matches!(
         parse(&["ta", "attach", "7"]),
         Command::Attach { id: 7 }
@@ -293,7 +293,7 @@ async fn rejected_creation_is_a_clear_error() {
     assert!(matches!(&error, WatchError::Rejected(message) if message.contains("/nope")));
     assert!(error
         .to_string()
-        .starts_with("sentineld rejected the Watch Session"));
+        .starts_with("sentinald rejected the Watch Session"));
 }
 
 #[tokio::test]
@@ -312,13 +312,13 @@ async fn unavailable_daemon_is_a_clear_error() {
         .await
         .unwrap_err();
     assert!(matches!(error, WatchError::Unavailable(_)));
-    assert!(error.to_string().starts_with("cannot reach sentineld"));
+    assert!(error.to_string().starts_with("cannot reach sentinald"));
 }
 
 // ---- real binary without a terminal ----------------------------------------
 
 fn run_binary(daemon: &FakeDaemon, env: &[(&str, &str)], marker: &Path) -> std::process::Output {
-    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_sentinel"));
+    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_sentinal"));
     command
         .args(["--url", &daemon.url, "--token-file"])
         .arg(&daemon.token_file)
@@ -355,7 +355,7 @@ async fn watch_without_a_terminal_fails_before_contact_and_never_runs_the_comman
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("interactive terminal"), "{stderr}");
-    assert!(stderr.contains("not run outside Sentinel"), "{stderr}");
+    assert!(stderr.contains("not run outside Sentinal"), "{stderr}");
     assert_eq!(daemon.connections.load(Ordering::SeqCst), 0);
     assert!(!marker.exists());
 }

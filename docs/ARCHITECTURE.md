@@ -2,18 +2,18 @@
 
 ## Shape
 
-One Rust binary per machine (`sentineld`, currently built as `tad`), a
-TypeScript web app, the `sentinel` CLI (currently `ta`), and an
+One Rust binary per machine (`sentinald`, currently built as `tad`), a
+TypeScript web app, the `sentinal` CLI (currently `ta`), and an
 optional Python **intelligence** service. They all speak one protocol,
 defined once in `crates/protocol`.
 
 ```
- Phone / Desktop browser       sentinel CLI        ordinary shells/processes
+ Phone / Desktop browser       sentinal CLI        ordinary shells/processes
           │                         │                         │
           │             WebSocket + local socket              │
           └─────────────────────────┼─────────────────────────┘
                                     │
-   ┌────────────────────── sentineld (per machine) ────────────────┐
+   ┌────────────────────── sentinald (per machine) ────────────────┐
    │ ingress → sessions (PTY/external/adopted) → metrics → store   │
    │                  │                         │                   │
    │            command tracking             watcher → Events      │
@@ -27,7 +27,7 @@ defined once in `crates/protocol`.
 Crates are added **only when their milestone starts** (see `ROADMAP.md`).
 
 ```
-sentinel/
+sentinal/
 ├── AGENTS.md            rules for humans and AI agents
 ├── Cargo.toml           Rust workspace
 ├── justfile             common commands
@@ -50,7 +50,7 @@ sentinel/
 |---|---|---|
 | Daemon language | Rust | Always-on, small, reliable |
 | Session persistence | Own PTY (`portable-pty`) + VT parser | Structured state is the product |
-| Capture ingress | Watch, shell hook, auto-wrap, or read-only adopt | Work can enter Sentinel without opening Sentinel first |
+| Capture ingress | Watch, shell hook, auto-wrap, or read-only adopt | Work can enter Sentinal without opening Sentinal first |
 | Local transport | Private per-user Unix socket, mode `0600`, peer UID checked | Shell hooks stay fast and never expose control publicly |
 | Command boundaries | Shell hooks emitting OSC 133 | Exact, no output guessing |
 | Storage | SQLite (WAL, FTS5) | Local-first, zero ops |

@@ -1,29 +1,29 @@
-# Sentinel development plan
+# Sentinal development plan
 
 ## Product
 
-Sentinel is a local-first terminal orchestration and intelligence system. It
+Sentinal is a local-first terminal orchestration and intelligence system. It
 is not another terminal emulator: it is the layer that makes terminal work on
 several machines persistent, observable, searchable, and remotely reachable.
 
 User-facing names:
 
-- Product: **Sentinel**
-- CLI: `sentinel` (currently `ta` until the Milestone 1b migration)
-- Daemon: `sentineld` (currently `tad` until the Milestone 1b migration)
+- Product: **Sentinal**
+- CLI: `sentinal` (currently `ta` until the Milestone 1b migration)
+- Daemon: `sentinald` (currently `tad` until the Milestone 1b migration)
 
-Sentinel answers five everyday questions:
+Sentinal answers five everyday questions:
 
 1. What am I running?
 2. How is it going?
 3. Can I reach and control it remotely?
 4. How did I run this last time?
-5. Can I bring this ordinary terminal or existing process into Sentinel now?
+5. Can I bring this ordinary terminal or existing process into Sentinal now?
 
-The fifth question is served by Sentinel Watch and reduced-capture modes:
+The fifth question is served by Sentinal Watch and reduced-capture modes:
 
 ```console
-$ sentinel watch -- python train.py --config moe.yaml
+$ sentinal watch -- python train.py --config moe.yaml
 ```
 
 The central engineering rule is **structured state first, intelligence
@@ -35,7 +35,7 @@ model.
 The stable vocabulary is Machine, Project, Session, Command, Event, Recipe,
 Process, and Metric.
 
-- A **Machine** is one computer running `sentineld`, including its resources,
+- A **Machine** is one computer running `sentinald`, including its resources,
   capabilities, online state, and Sessions.
 - A **Project** groups repository metadata, Sessions, Commands, Events, and
   later agent context.
@@ -63,7 +63,7 @@ wire representation and fixtures are the first Milestone 1b task.
 
 ## Architecture
 
-Sentinel has four layers:
+Sentinal has four layers:
 
 1. **Interfaces** — web/PWA, CLI, and later terminal UI.
 2. **Control plane** — Machines, Projects, Sessions, Commands, Recipes,
@@ -100,9 +100,9 @@ Auto-source OSC shell hooks in daemon-owned PTYs, track exact Commands and
 cwd, persist SQLite history and FTS5, recover orphaned Sessions, sample
 process trees and resources, and stream live Metrics to the web UI.
 
-### Phase 1b — any terminal into Sentinel (next priority)
+### Phase 1b — any terminal into Sentinal (next priority)
 
-Bring ordinary terminals and already-running processes into Sentinel through
+Bring ordinary terminals and already-running processes into Sentinal through
 four explicit modes:
 
 1. **Watch** — on-demand FULL capture with a daemon-owned persistent PTY.
@@ -145,7 +145,7 @@ basic watcher, web/mobile dashboard, remote attach, and Recipes. It does not
 contain autonomous execution or sophisticated AI.
 
 When V1 is complete, the owner can open a phone, see every Machine and
-Session—including work started outside Sentinel—inspect Commands, progress,
+Session—including work started outside Sentinal—inspect Commands, progress,
 and resources, attach where capture is FULL, and launch a saved Recipe.
 
 ## Implementation order
@@ -155,7 +155,7 @@ protocol/data model (complete)
   → PTY persistence and attach (complete)
   → Command tracking, SQLite, Metrics (complete)
   → Milestone 1b contract + private local ingress
-  → Sentinel Watch
+  → Sentinal Watch
   → external shell hook
   → auto-wrap + read-only adopt
   → Event engine + generic watcher
@@ -174,8 +174,8 @@ not require flattening its crates:
 ```text
 crates/protocol    shared contract
 crates/store       SQLite persistence
-crates/daemon      sentineld implementation
-crates/cli         sentinel implementation
+crates/daemon      sentinald implementation
+crates/cli         sentinal implementation
 crates/watcher     deterministic output → Events (Phase 3)
 shell/             zsh/bash/fish integrations
 web/               React PWA

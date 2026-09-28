@@ -1,4 +1,4 @@
-//! Command dispatch shared by the `sentinel` binary and its `ta` alias.
+//! Command dispatch shared by the `sentinal` binary and its `ta` alias.
 
 use crate::{
     args::{Cli, Command},
@@ -17,7 +17,7 @@ pub async fn run(cli: Cli, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode
     match dispatch(cli, out, err).await {
         Ok(code) => code,
         Err(error) => {
-            let _ = writeln!(err, "sentinel: {error}");
+            let _ = writeln!(err, "sentinal: {error}");
             ExitCode::FAILURE
         }
     }
@@ -31,10 +31,10 @@ enum AppError {
     Cwd(std::io::Error),
     #[error(transparent)]
     Client(#[from] ClientError),
-    #[error("{0}; the command was not run outside Sentinel")]
+    #[error("{0}; the command was not run outside Sentinal")]
     Watch(#[from] WatchError),
     #[error(
-        "created Session {id} but could not attach: {source}; reattach with `sentinel attach {id}`"
+        "created Session {id} but could not attach: {source}; reattach with `sentinal attach {id}`"
     )]
     WatchAttach { id: u64, source: ClientError },
 }
@@ -124,7 +124,7 @@ async fn watch(
         } => {
             let _ = writeln!(
                 err,
-                "sentinel: this terminal is already watched by Session {session}; not starting a nested Session"
+                "sentinal: this terminal is already watched by Session {session}; not starting a nested Session"
             );
             Ok(ExitCode::SUCCESS)
         }
@@ -134,7 +134,7 @@ async fn watch(
         } => {
             let _ = writeln!(
                 err,
-                "sentinel: this terminal is already watched by Session {session}; not starting a nested Session and the command was not run (run it directly here)"
+                "sentinal: this terminal is already watched by Session {session}; not starting a nested Session and the command was not run (run it directly here)"
             );
             Ok(ExitCode::FAILURE)
         }
@@ -148,7 +148,7 @@ async fn watch(
                 .map_err(|source| AppError::WatchAttach { id, source })?;
             let _ = writeln!(
                 err,
-                "sentinel: detached from Session {id}; it keeps running. Reattach with `sentinel attach {id}`"
+                "sentinal: detached from Session {id}; it keeps running. Reattach with `sentinal attach {id}`"
             );
             Ok(ExitCode::SUCCESS)
         }
@@ -164,7 +164,7 @@ fn default_token_file() -> Result<PathBuf, AppError> {
 
 fn print_unexpected(err: &mut dyn Write, message: DaemonMessage) {
     let _ = match message {
-        DaemonMessage::Error { message } => writeln!(err, "sentinel: error: {message}"),
-        other => writeln!(err, "sentinel: unexpected daemon response: {other:?}"),
+        DaemonMessage::Error { message } => writeln!(err, "sentinal: error: {message}"),
+        other => writeln!(err, "sentinal: unexpected daemon response: {other:?}"),
     };
 }

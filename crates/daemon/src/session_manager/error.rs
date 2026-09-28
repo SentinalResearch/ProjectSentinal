@@ -74,13 +74,13 @@ pub enum SessionManagerError {
     },
     /// The shell cannot report readiness, so an initial Command cannot run safely.
     #[error(
-        "an initial Command needs zsh, bash, or fish with Sentinel hooks; shell '{shell}' is unsupported"
+        "an initial Command needs zsh, bash, or fish with Sentinal hooks; shell '{shell}' is unsupported"
     )]
     InitialCommandShell {
         /// Requested shell executable.
         shell: String,
     },
     /// Shell hooks could not be installed, so readiness would never be reported.
-    #[error("an initial Command needs Sentinel shell hooks, which failed to install: {0}")]
+    #[error("an initial Command needs Sentinal shell hooks, which failed to install: {0}")]
     InitialCommandHooks(String),
 }

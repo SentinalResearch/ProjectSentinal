@@ -1,11 +1,11 @@
-//! Command-line arguments for `sentinel` (also installed as `ta`).
+//! Command-line arguments for `sentinal` (also installed as `ta`).
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-/// Sentinel: persistent, observable terminal Sessions.
+/// Sentinal: persistent, observable terminal Sessions.
 #[derive(Debug, Parser)]
-#[command(name = "sentinel", version, about)]
+#[command(name = "sentinal", version, about)]
 pub struct Cli {
     /// Daemon WebSocket URL.
     #[arg(long, default_value = "ws://127.0.0.1:7420/api/v1/ws")]
@@ -18,7 +18,7 @@ pub struct Cli {
     pub command: Command,
 }
 
-/// Commands supported by `sentinel`.
+/// Commands supported by `sentinal`.
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// List sessions on the daemon.
@@ -40,7 +40,7 @@ pub enum Command {
         /// Session ID.
         id: u64,
     },
-    /// Run this terminal inside a persistent Sentinel Session and attach.
+    /// Run this terminal inside a persistent Sentinal Session and attach.
     ///
     /// With `-- COMMAND [ARG...]`, the Command runs once in the Session's
     /// shell and the shell stays open afterwards. Detach with Ctrl-\ then d;

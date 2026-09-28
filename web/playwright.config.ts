@@ -13,7 +13,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        `TA_CONFIG=web/e2e/daemon.toml TA_AUTH_FILE=${authFile} TA_FAKE_PTY=1 cargo run -p daemon --bin sentineld`,
+        `TA_CONFIG=web/e2e/daemon.toml TA_AUTH_FILE=${authFile} TA_FAKE_PTY=1 cargo run -p daemon --bin sentinald`,
       cwd: "..",
       url: "http://127.0.0.1:7421/api/v1/health",
       reuseExistingServer: false,

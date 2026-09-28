@@ -64,7 +64,7 @@ async fn wrong_uid_is_rejected_before_malformed_json_is_decoded_and_audited_with
         b"password=hunter2{not-json",
         25,
         audit,
-        data_dir.join("run/sentineld.sock"),
+        data_dir.join("run/sentinald.sock"),
     )
     .await;
 
@@ -93,7 +93,7 @@ async fn valid_peer_gets_bounded_errors_for_malformed_and_oversized_frames() {
         b"{bad",
         4,
         audit.clone(),
-        data_dir.join("run/sentineld.sock"),
+        data_dir.join("run/sentinald.sock"),
     )
     .await;
     let oversized = exchange(
@@ -102,7 +102,7 @@ async fn valid_peer_gets_bounded_errors_for_malformed_and_oversized_frames() {
         &[],
         MAX_LOCAL_FRAME_BYTES + 1,
         audit,
-        data_dir.join("run/sentineld.sock"),
+        data_dir.join("run/sentinald.sock"),
     )
     .await;
 
@@ -134,7 +134,7 @@ async fn valid_but_unimplemented_local_operation_cannot_send_pty_input() {
         request.as_bytes(),
         request.len(),
         SecurityAudit::new(&data_dir),
-        data_dir.join("run/sentineld.sock"),
+        data_dir.join("run/sentinald.sock"),
     )
     .await;
 
@@ -152,7 +152,7 @@ async fn valid_but_unimplemented_local_operation_cannot_send_pty_input() {
 async fn listener_creates_private_parent_and_socket_and_removes_only_its_instance() {
     let data_dir = temp_dir("modes");
     fs::create_dir_all(&data_dir).unwrap();
-    let socket_path = data_dir.join("run/sentineld.sock");
+    let socket_path = data_dir.join("run/sentinald.sock");
     let server = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap();
 
     let parent_mode = fs::metadata(socket_path.parent().unwrap())
@@ -174,7 +174,7 @@ async fn listener_creates_private_parent_and_socket_and_removes_only_its_instanc
 async fn listener_removes_safe_stale_socket_but_refuses_symlink() {
     let data_dir = temp_dir("stale");
     fs::create_dir_all(data_dir.join("run")).unwrap();
-    let socket_path = data_dir.join("run/sentineld.sock");
+    let socket_path = data_dir.join("run/sentinald.sock");
     let stale = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();
     drop(stale);
 
@@ -203,7 +203,7 @@ async fn current_uid_matches_the_owner_of_files_this_process_creates() {
 async fn listener_refuses_parent_owned_by_another_uid() {
     let data_dir = temp_dir("fp");
     fs::create_dir_all(data_dir.join("run")).unwrap();
-    let socket_path = data_dir.join("run/sentineld.sock");
+    let socket_path = data_dir.join("run/sentinald.sock");
     let other_uid = current_uid(&data_dir).unwrap().wrapping_add(1);
 
     let error =
@@ -218,7 +218,7 @@ async fn listener_refuses_parent_owned_by_another_uid() {
 async fn stale_socket_owned_by_another_uid_is_refused_and_kept() {
     let data_dir = temp_dir("fs");
     fs::create_dir_all(data_dir.join("run")).unwrap();
-    let socket_path = data_dir.join("run/sentineld.sock");
+    let socket_path = data_dir.join("run/sentinald.sock");
     drop(std::os::unix::net::UnixListener::bind(&socket_path).unwrap());
     let other_uid = current_uid(&data_dir).unwrap().wrapping_add(1);
 
@@ -235,7 +235,7 @@ async fn stale_socket_owned_by_another_uid_is_refused_and_kept() {
 async fn listener_refuses_live_socket_regular_file_and_symlinked_parent() {
     let data_dir = temp_dir("rf");
     fs::create_dir_all(data_dir.join("run")).unwrap();
-    let socket_path = data_dir.join("run/sentineld.sock");
+    let socket_path = data_dir.join("run/sentinald.sock");
 
     let live = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();
     let error = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap_err();
@@ -252,12 +252,12 @@ async fn listener_refuses_live_socket_regular_file_and_symlinked_parent() {
     fs::create_dir_all(&real).unwrap();
     std::os::unix::fs::symlink(&real, data_dir.join("linked")).unwrap();
     let error = UnixSocketServer::bind(
-        &data_dir.join("linked/sentineld.sock"),
+        &data_dir.join("linked/sentinald.sock"),
         SecurityAudit::new(&data_dir),
     )
     .unwrap_err();
     assert!(error.to_string().contains("symlink"), "{error}");
-    assert!(!real.join("sentineld.sock").exists());
+    assert!(!real.join("sentinald.sock").exists());
     fs::remove_dir_all(data_dir).unwrap();
 }
 
@@ -265,7 +265,7 @@ async fn listener_refuses_live_socket_regular_file_and_symlinked_parent() {
 async fn shutdown_does_not_remove_a_socket_that_replaced_ours() {
     let data_dir = temp_dir("rp");
     fs::create_dir_all(&data_dir).unwrap();
-    let socket_path = data_dir.join("run/sentineld.sock");
+    let socket_path = data_dir.join("run/sentinald.sock");
     let server = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap();
 
     fs::remove_file(&socket_path).unwrap();
@@ -285,7 +285,7 @@ async fn shutdown_does_not_remove_a_socket_that_replaced_ours() {
 async fn local_socket_integration() {
     let data_dir = temp_dir("it");
     fs::create_dir_all(&data_dir).unwrap();
-    let socket_path = data_dir.join("run/sentineld.sock");
+    let socket_path = data_dir.join("run/sentinald.sock");
     let server = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap();
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
     let task = tokio::spawn(server.serve(shutdown_rx));

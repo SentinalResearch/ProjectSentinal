@@ -13,19 +13,19 @@ or duplicate the daemon-owned OSC path.
 Implement:
 
 ```console
-sentinel hook zsh|bash|fish
-sentinel hook install [zsh|bash|fish]
-sentinel hook uninstall [zsh|bash|fish]
+sentinal hook zsh|bash|fish
+sentinal hook install [zsh|bash|fish]
+sentinal hook uninstall [zsh|bash|fish]
 ```
 
 - `hook <shell>` prints the external integration to stdout without editing a
   file.
 - `install` selects only an unambiguous supported shell/config path or uses
   the explicit shell argument.
-- Add one stable marker-delimited Sentinel block. A second install is
+- Add one stable marker-delimited Sentinal block. A second install is
   byte-for-byte idempotent.
 - Before the first change, create a timestamped owner-only backup.
-- `uninstall` removes only the exact Sentinel block and restores all other
+- `uninstall` removes only the exact Sentinal block and restores all other
   bytes, encoding, final newline state, permissions, and unrelated edits.
 - Malformed/nested/partial markers produce a clear error and no file change.
 - Use atomic same-directory replacement with preserved permissions.
@@ -42,7 +42,7 @@ sentinel hook uninstall [zsh|bash|fish]
 - Reporting runs in the background/off the prompt path with a 50 ms transport
   deadline. Socket missing, daemon down, timeout, or bad reply is completely
   silent in the terminal.
-- If `SENTINEL_SESSION_ID` or `SENTINEL_DISABLE=1` is set, make no external
+- If `SENTINAL_SESSION_ID` or `SENTINAL_DISABLE=1` is set, make no external
   registration or Command socket calls.
 - Do not send terminal output, stdin, environment contents, or raw keystrokes.
 - Keep existing daemon-owned zsh/bash/fish OSC hooks working unchanged.
@@ -55,7 +55,7 @@ sentinel hook uninstall [zsh|bash|fish]
   reuse for the original shell. Use the termination representation approved
   in 1b.0.
 - A COMMANDS Session cannot attach, accept input, resize, or be killed through
-  Sentinel. The web UI may list it but capability enforcement remains daemon
+  Sentinal. The web UI may list it but capability enforcement remains daemon
   side.
 - Daemon restart may recover a still-live registered shell only if identity
   can be verified safely; otherwise mark it with the approved disconnected or
@@ -77,7 +77,7 @@ sentinel hook uninstall [zsh|bash|fish]
   uninstall, malformed markers, permissions, and failed atomic replacement.
 - Script tests run each hook against a fake socket server and assert register,
   start, finish, cwd, duration, exit code, and preservation of `$?`/`$status`.
-- Suppression tests for `SENTINEL_SESSION_ID` and `SENTINEL_DISABLE=1` assert
+- Suppression tests for `SENTINAL_SESSION_ID` and `SENTINAL_DISABLE=1` assert
   zero socket messages.
 - Daemon-down, timeout, and malformed-reply tests assert no stdout/stderr and
   an unaffected prompt/exit code.

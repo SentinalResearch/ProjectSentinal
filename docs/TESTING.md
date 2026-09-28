@@ -49,7 +49,7 @@ Good test names read like a sentence:
    timestamps in explicitly.
 6. **Fast.** The whole `cargo test` should stay under a few seconds.
 
-## Sentinel Watch and capture-mode tests
+## Sentinal Watch and capture-mode tests
 
 Milestone 1b is safety-sensitive and receives a wider test matrix than an
 ordinary feature. Each stage needs all applicable layers below before its

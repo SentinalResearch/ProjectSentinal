@@ -29,7 +29,7 @@
 use crate::{CommandId, MachineId, ProjectId, ProtocolError, SessionId, Timestamp};
 use serde::{Deserialize, Serialize};
 
-/// How a Session entered Sentinel.
+/// How a Session entered Sentinal.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
@@ -38,7 +38,7 @@ pub enum SessionOrigin {
     /// Created through the ordinary UI/API flow.
     #[default]
     Ui,
-    /// Created explicitly by `sentinel watch`.
+    /// Created explicitly by `sentinal watch`.
     Watch,
     /// Registered by an ordinary shell integration.
     ShellHook,
@@ -60,7 +60,7 @@ impl std::fmt::Display for SessionOrigin {
     }
 }
 
-/// How much structured and byte-stream state Sentinel can observe for a Session.
+/// How much structured and byte-stream state Sentinal can observe for a Session.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
@@ -255,7 +255,7 @@ pub struct Session {
     pub state: SessionState,
     /// The command running right now, if any.
     pub current_command: Option<CommandId>,
-    /// How this Session entered Sentinel.
+    /// How this Session entered Sentinal.
     #[serde(default)]
     pub origin: SessionOrigin,
     /// Observation and control capability for this Session.

@@ -1,6 +1,6 @@
-//! Real `sentineld` + `sentinel watch` in a pseudo-terminal, then reattach.
+//! Real `sentinald` + `sentinal watch` in a pseudo-terminal, then reattach.
 //!
-//! Run with: `cargo build -p daemon --bin sentineld && cargo test -p cli --test
+//! Run with: `cargo build -p daemon --bin sentinald && cargo test -p cli --test
 //! watch_integration -- --ignored --nocapture`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -39,7 +39,7 @@ impl Terminal {
         for (key, value) in env {
             command.env(key, value);
         }
-        command.env_remove("SENTINEL_SESSION_ID");
+        command.env_remove("SENTINAL_SESSION_ID");
         let child = pair.slave.spawn_command(command).unwrap();
         drop(pair.slave);
         let mut reader = pair.master.try_clone_reader().unwrap();
@@ -116,13 +116,13 @@ fn last_tick(text: &str) -> u32 {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "starts a real sentineld, shell, and pseudo-terminals"]
+#[ignore = "starts a real sentinald, shell, and pseudo-terminals"]
 async fn watch_integration() {
-    let sentinel = PathBuf::from(env!("CARGO_BIN_EXE_sentinel"));
-    let sentineld = sentinel.with_file_name("sentineld");
+    let sentinal = PathBuf::from(env!("CARGO_BIN_EXE_sentinal"));
+    let sentinald = sentinal.with_file_name("sentinald");
     assert!(
-        sentineld.exists(),
-        "build the daemon first: cargo build -p daemon --bin sentineld"
+        sentinald.exists(),
+        "build the daemon first: cargo build -p daemon --bin sentinald"
     );
     let shell = ["/bin/zsh", "/bin/bash", "/usr/bin/zsh", "/usr/bin/bash"]
         .into_iter()
@@ -146,16 +146,16 @@ async fn watch_integration() {
         ),
     )
     .unwrap();
-    let mut daemon = Command::new(&sentineld)
+    let mut daemon = Command::new(&sentinald)
         .env("TA_CONFIG", &config)
         .env("HOME", &home)
         .env("SHELL", shell)
-        .env_remove("SENTINEL_SESSION_ID")
+        .env_remove("SENTINAL_SESSION_ID")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    wait_until("sentineld to listen", || {
+    wait_until("sentinald to listen", || {
         token.exists() && std::net::TcpStream::connect(("127.0.0.1", port)).is_ok()
     });
 
@@ -180,7 +180,7 @@ async fn watch_integration() {
             .iter()
             .map(|arg| (*arg).to_string()),
     );
-    let mut first = Terminal::spawn(&sentinel, &watch_args, &env);
+    let mut first = Terminal::spawn(&sentinal, &watch_args, &env);
     first.wait_for("tick-5");
 
     let listed = sessions(&url, &token).await;
@@ -208,7 +208,7 @@ async fn watch_integration() {
     // 4. Reattach from a second terminal and see the same, still-running screen.
     let mut attach_args = common.clone();
     attach_args.extend(["attach".to_string(), session.id.0.to_string()]);
-    let mut second = Terminal::spawn(&sentinel, &attach_args, &env);
+    let mut second = Terminal::spawn(&sentinal, &attach_args, &env);
     second.wait_for("tick-");
     let next = before_close + 5;
     second.wait_for(&format!("tick-{next}"));

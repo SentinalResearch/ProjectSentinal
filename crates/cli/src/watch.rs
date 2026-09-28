@@ -1,11 +1,11 @@
-//! `sentinel watch`: create a WATCH / FULL Session and attach this terminal.
+//! `sentinal watch`: create a WATCH / FULL Session and attach this terminal.
 
 use crate::client::{ClientError, DaemonClient};
 use protocol::{ClientRequest, DaemonMessage, ProtocolError, Session, SessionOrigin};
 use std::{future::Future, path::PathBuf};
 
 /// Environment variable set inside every daemon-owned FULL Session.
-pub const SESSION_ENV: &str = "SENTINEL_SESSION_ID";
+pub const SESSION_ENV: &str = "SENTINAL_SESSION_ID";
 
 /// Local facts the Watch command depends on, gathered by the caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,16 +16,16 @@ pub struct WatchContext {
     pub size: Option<(u16, u16)>,
     /// Caller's `$SHELL`, used as the Session's interactive shell.
     pub shell: Option<String>,
-    /// Value of `SENTINEL_SESSION_ID` in the caller's environment.
+    /// Value of `SENTINAL_SESSION_ID` in the caller's environment.
     pub existing_session: Option<String>,
     /// Whether stdin and stdout are an interactive terminal.
     pub interactive: bool,
 }
 
-/// What `sentinel watch` should do, decided before contacting the daemon.
+/// What `sentinal watch` should do, decided before contacting the daemon.
 #[derive(Debug, Clone, PartialEq)]
 pub enum WatchPlan {
-    /// This terminal is already inside a Sentinel Session; create nothing.
+    /// This terminal is already inside a Sentinal Session; create nothing.
     AlreadyWatched {
         /// The enclosing Session ID from the environment.
         session: String,
@@ -43,16 +43,16 @@ pub enum WatchError {
     #[error("current directory '{}' is not valid UTF-8", .0.display())]
     NonUtf8Cwd(PathBuf),
     /// Watch needs a terminal to attach to.
-    #[error("sentinel watch needs an interactive terminal on stdin and stdout")]
+    #[error("sentinal watch needs an interactive terminal on stdin and stdout")]
     NotATerminal,
     /// The request failed protocol validation.
     #[error("invalid watch request: {0}")]
     Invalid(#[from] ProtocolError),
     /// The daemon could not be reached.
-    #[error("cannot reach sentineld: {0}")]
+    #[error("cannot reach sentinald: {0}")]
     Unavailable(ClientError),
     /// The daemon refused or failed the request.
-    #[error("sentineld rejected the Watch Session: {0}")]
+    #[error("sentinald rejected the Watch Session: {0}")]
     Rejected(String),
 }
 

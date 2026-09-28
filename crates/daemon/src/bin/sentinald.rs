@@ -1,4 +1,4 @@
-//! `sentineld`: the Sentinel daemon.
+//! `sentinald`: the Sentinal daemon.
 
 #[tokio::main]
 async fn main() -> Result<(), daemon::entry::DaemonError> {

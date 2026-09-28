@@ -1,4 +1,4 @@
-//! `ta`: compatibility alias for `sentinel`, kept through the Milestone 1b migration.
+//! `ta`: compatibility alias for `sentinal`, kept through the Milestone 1b migration.
 
 use clap::Parser;
 

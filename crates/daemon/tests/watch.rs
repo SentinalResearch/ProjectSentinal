@@ -34,13 +34,13 @@ struct Harness {
 
 fn harness() -> Harness {
     let data_dir = std::env::temp_dir().join(format!(
-        "sentinel-watch-{}-{}",
+        "sentinal-watch-{}-{}",
         std::process::id(),
         NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
     ));
     fs::create_dir_all(&data_dir).unwrap();
     let fake = Arc::new(FakePty::new());
-    let store = Arc::new(Store::open(&data_dir.join("sentinel.sqlite3")).unwrap());
+    let store = Arc::new(Store::open(&data_dir.join("sentinal.sqlite3")).unwrap());
     let manager = SessionManager::with_store(
         fake.clone(),
         SessionManagerConfig {
@@ -145,7 +145,7 @@ async fn watch_session_records_origin_capture_title_cwd_pid_and_session_env() {
     assert_eq!((spawn.cols, spawn.rows), (132, 43));
     assert!(spawn
         .env
-        .contains(&("SENTINEL_SESSION_ID".into(), session.id.0.to_string())));
+        .contains(&("SENTINAL_SESSION_ID".into(), session.id.0.to_string())));
     // A bare Watch never types anything into the shell.
     h.fake.output(session.id, PROMPT).unwrap();
     sync(&h, session.id).await;
@@ -164,7 +164,7 @@ async fn ordinary_ui_sessions_also_identify_themselves_to_prevent_nesting() {
     let spawn = h.fake.spawn_request(session.id).unwrap();
     assert!(spawn
         .env
-        .contains(&("SENTINEL_SESSION_ID".into(), session.id.0.to_string())));
+        .contains(&("SENTINAL_SESSION_ID".into(), session.id.0.to_string())));
     assert_eq!(session.origin, SessionOrigin::Ui);
     cleanup(h, session.id);
 }
@@ -239,7 +239,7 @@ async fn initial_command_is_tracked_once_persisted_and_shell_returns_idle() {
     );
 
     // Reopen SQLite as a restarted daemon would.
-    let reopened = Store::open(&h.data_dir.join("sentinel.sqlite3")).unwrap();
+    let reopened = Store::open(&h.data_dir.join("sentinal.sqlite3")).unwrap();
     let history = reopened.history(Some(session.id), 10).unwrap();
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].text, text);

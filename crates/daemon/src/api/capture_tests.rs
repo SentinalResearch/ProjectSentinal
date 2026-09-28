@@ -31,7 +31,7 @@ const REDUCED: [(SessionOrigin, CaptureLevel); 3] = [
 
 fn state() -> (AppState, Arc<FakePty>, PathBuf) {
     let data_dir = std::env::temp_dir().join(format!(
-        "sentinel-api-capture-{}-{}",
+        "sentinal-api-capture-{}-{}",
         std::process::id(),
         NEXT_DIR.fetch_add(1, Ordering::Relaxed)
     ));

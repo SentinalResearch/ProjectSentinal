@@ -1,4 +1,4 @@
-//! Reusable command dispatch, parsing, and terminal framing for `sentinel`.
+//! Reusable command dispatch, parsing, and terminal framing for `sentinal`.
 
 pub mod app;
 pub mod args;

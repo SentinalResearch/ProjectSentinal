@@ -1,6 +1,6 @@
 [package]
 name = "cli"
-description = "Sentinel command-line client (sentinel)."
+description = "Sentinal command-line client (sentinal)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -20,8 +20,8 @@ tokio-tungstenite.workspace = true
 portable-pty.workspace = true
 
 [[bin]]
-name = "sentinel"
-path = "src/bin/sentinel.rs"
+name = "sentinal"
+path = "src/bin/sentinal.rs"
 
 # Compatibility alias through the Milestone 1b migration.
 [[bin]]

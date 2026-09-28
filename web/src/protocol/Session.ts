@@ -45,7 +45,7 @@ export type Session = {
    */
   current_command: CommandId | null;
   /**
-   * How this Session entered Sentinel.
+   * How this Session entered Sentinal.
    */
   origin: SessionOrigin;
   /**

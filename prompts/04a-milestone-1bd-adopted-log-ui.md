@@ -2,7 +2,7 @@
 
 Goal: an adopted process with a log becomes `PROCESS_LOG`, its lines flow
 through the deterministic watcher pipeline, and every Session surface clearly
-shows what Sentinel can and cannot do.
+shows what Sentinal can and cannot do.
 
 Depends on completed Milestone 1b.C and Milestone 3 Event engine/watchers.
 Do not duplicate watcher parsing in the daemon or web app.
@@ -56,7 +56,7 @@ Do not duplicate watcher parsing in the daemon or web app.
   remain authoritative.
 - For reduced capture, replace an empty terminal with the appropriate Command
   view, read-only watched-log/events view, or Metrics view.
-- Show “Watch fully next time” with a copyable `sentinel watch ...` hint when
+- Show “Watch fully next time” with a copyable `sentinal watch ...` hint when
   enough safe metadata exists. Do not synthesize an unsafe shell command from
   arbitrary output.
 - Ensure phone layouts expose the badge and limitation without opening a

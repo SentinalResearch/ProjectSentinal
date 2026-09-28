@@ -23,7 +23,7 @@ test("a Watch-created FULL session appears and attaches", async ({ page }) => {
   await page.getByRole("button", { name: /Sign in/ }).click();
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
 
-  // The same CREATE_SESSION request `sentinel watch` sends, with its machine token.
+  // The same CREATE_SESSION request `sentinal watch` sends, with its machine token.
   const session = await page.evaluate(
     () =>
       new Promise<{ id: number; origin: string; capture: string; title: string | null }>(

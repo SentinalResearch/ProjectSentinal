@@ -19,10 +19,10 @@ pub fn default_socket_path(
     }
     if !target_is_macos {
         if let Some(runtime) = xdg_runtime_dir.filter(|path| path.is_absolute()) {
-            return runtime.join("sentinel/sentineld.sock");
+            return runtime.join("sentinal/sentinald.sock");
         }
     }
-    data_dir.join("run/sentineld.sock")
+    data_dir.join("run/sentinald.sock")
 }
 
 pub(super) fn validate_socket_length(path: &Path) -> Result<(), LocalSocketError> {

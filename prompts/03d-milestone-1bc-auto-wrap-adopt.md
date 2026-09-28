@@ -13,9 +13,9 @@ tailing lands in 1b.D after Milestone 3.
 Implement:
 
 ```console
-sentinel auto on
-sentinel auto off
-sentinel auto status
+sentinal auto on
+sentinal auto off
+sentinal auto status
 ```
 
 - Off by default. `status` reports the exact config file/block and whether it
@@ -24,8 +24,8 @@ sentinel auto status
   a second competing rc editor.
 - Eligible new interactive shells enter an `AUTO_WRAP` / `FULL` Session using
   the Watch path.
-- Skip when any of these applies: `SENTINEL_DISABLE=1`,
-  `SENTINEL_SESSION_ID` is set, shell is non-interactive, non-interactive SSH,
+- Skip when any of these applies: `SENTINAL_DISABLE=1`,
+  `SENTINAL_SESSION_ID` is set, shell is non-interactive, non-interactive SSH,
   scp/rsync transport, configured IDE task-runner environment, unsupported
   shell, or recursion guard is active.
 - Put skip rules in one table-driven pure function. Document exact environment
@@ -41,8 +41,8 @@ sentinel auto status
 Implement:
 
 ```console
-sentinel adopt PID [--log PATH] [-t TITLE]
-sentinel adopt --pick
+sentinal adopt PID [--log PATH] [-t TITLE]
+sentinal adopt --pick
 ```
 
 - Resolve the target before mutation: PID must be non-zero, currently alive,

@@ -3,8 +3,8 @@
 Work top to bottom. Tick boxes as they land. Each milestone ends with a
 demo you can actually use.
 
-The product name is **Sentinel**. The target user-facing binaries are
-`sentinel` and `sentineld`; the existing `ta` and `tad` names remain in place
+The product name is **Sentinal**. The target user-facing binaries are
+`sentinal` and `sentinald`; the existing `ta` and `tad` names remain in place
 until the Milestone 1b migration is implemented and tested.
 
 > **Deliberate exception (2026-09-27):** the full `web/` UI — every screen in
@@ -70,7 +70,7 @@ persistent Sessions without exposing the machine token again.
 
 **Demo:** history view with ✓/✗, durations, and live resource usage.
 
-## Milestone 1b — Any terminal into Sentinel (priority, v0.2.x)
+## Milestone 1b — Any terminal into Sentinal (priority, v0.2.x)
 
 This is the next product priority. It is delivered in reviewable stages so
 the safety-sensitive shell integration does not land as one large change.
@@ -84,16 +84,16 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 - [x] Reject input/resize/kill for capture levels that do not own a PTY
 - [x] Add `docs/SECURITY.md`, `docs/CLI.md`, and `docs/SHELL_HOOKS.md`
 
-### 1b.A — Sentinel Watch
-- [x] `sentinel watch`, `watch -- <command>`, and `watch -t <title> -- <command>`
+### 1b.A — Sentinal Watch
+- [x] `sentinal watch`, `watch -- <command>`, and `watch -t <title> -- <command>`
 - [x] Start in the caller's cwd, set origin `WATCH`, capture `FULL`, and attach immediately
 - [x] Preserve structured argv without evaluating terminal output or concatenating shell text
-- [x] Set and enforce `SENTINEL_SESSION_ID` so Watch cannot nest
+- [x] Set and enforce `SENTINAL_SESSION_ID` so Watch cannot nest
 - [x] A closed client only detaches; the Session and process survive
 - [x] Daemon unavailable returns a clear non-zero error and never runs the command unwatched
 
 ### 1b.B — External shell hook
-- [ ] `sentinel hook zsh|bash|fish`, plus idempotent install and exact uninstall
+- [ ] `sentinal hook zsh|bash|fish`, plus idempotent install and exact uninstall
 - [ ] Register ordinary shells as `SHELL_HOOK` / `COMMANDS` Sessions
 - [ ] Report Command start, finish, cwd, duration, and exit code through the local socket
 - [ ] Inside a FULL Session, continue using OSC and never double-count through the socket
@@ -101,10 +101,10 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 - [ ] Shell PID liveness ends the reduced-capture Session
 
 ### 1b.C — Auto-wrap and Adopt
-- [ ] `sentinel auto on|off|status`, off by default
-- [ ] Skip IDE task runners, scp/rsync, non-interactive SSH, nested Sessions, and `SENTINEL_DISABLE=1`
+- [ ] `sentinal auto on|off|status`, off by default
+- [ ] Skip IDE task runners, scp/rsync, non-interactive SSH, nested Sessions, and `SENTINAL_DISABLE=1`
 - [ ] If the daemon does not answer, auto-wrap falls through to a normal shell within 300 ms
-- [ ] `sentinel adopt <pid> [--log <path>] [-t <title>]` and `adopt --pick`
+- [ ] `sentinal adopt <pid> [--log <path>] [-t <title>]` and `adopt --pick`
 - [ ] Permit same-user processes only; adoption is read-only
 - [ ] Detect process exit as “Ended · exit code unknown” and never infer an exit code
 - [ ] Detect redirected stdout/stderr off the prompt hot path where the OS supports it
@@ -125,7 +125,7 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 - [ ] Manual Watch demo survives terminal close and reattaches through CLI and phone
 - [ ] Privacy audit confirms no raw keystroke payload is stored on disk
 
-**Demo:** from an ordinary terminal, run `sentinel watch -- python long_job.py`,
+**Demo:** from an ordinary terminal, run `sentinal watch -- python long_job.py`,
 close the window, then attach to the same process and screen from another
 terminal or phone.
 

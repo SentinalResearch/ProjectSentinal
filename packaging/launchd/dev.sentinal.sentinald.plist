@@ -4,18 +4,18 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>dev.sentinel.sentineld</string>
+  <string>dev.sentinal.sentinald</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/sentineld</string>
+    <string>/usr/local/bin/sentinald</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/sentineld.log</string>
+  <string>/tmp/sentinald.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/sentineld.error.log</string>
+  <string>/tmp/sentinald.error.log</string>
 </dict>
 </plist>

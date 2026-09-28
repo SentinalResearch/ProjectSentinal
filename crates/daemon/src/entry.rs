@@ -1,4 +1,4 @@
-//! Startup and serving for the `sentineld` daemon (and its `tad` alias).
+//! Startup and serving for the `sentinald` daemon (and its `tad` alias).
 
 use crate::{
     api::{router, AppState},

@@ -19,7 +19,7 @@ model) to build the whole system, one milestone at a time.
 | 1 | `02-milestone-1-persistent-sessions.md` | Detach/reattach from phone (v0.1) |
 | 2 | `03-milestone-2-commands-store-metrics.md` | History, search, live resources (v0.2) |
 | 1b.0 | `03a-milestone-1b0-contract-local-ingress.md` | Capture contract, capabilities, private local socket |
-| 1b.A | `03b-milestone-1ba-sentinel-watch.md` | `sentinel watch`, durable full capture from any terminal |
+| 1b.A | `03b-milestone-1ba-sentinal-watch.md` | `sentinal watch`, durable full capture from any terminal |
 | 1b.B | `03c-milestone-1bb-external-shell-hook.md` | Command/Metrics capture from ordinary shells |
 | 1b.C | `03d-milestone-1bc-auto-wrap-adopt.md` | Fail-open auto-wrap and read-only process adoption |
 | 3 | `04-milestone-3-events-watchers.md` | Progress, health, events without AI (v0.3) |

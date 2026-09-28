@@ -1,4 +1,4 @@
-//! `sentinel`: the Sentinel command-line client.
+//! `sentinal`: the Sentinal command-line client.
 
 use clap::Parser;
 

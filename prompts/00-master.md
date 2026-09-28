@@ -1,6 +1,6 @@
 # MASTER PROMPT — paste this first, once per session
 
-You are the lead engineer building **Sentinel**, a local-first control
+You are the lead engineer building **Sentinal**, a local-first control
 plane for terminal sessions across several machines. You work autonomously
 inside this repository with a shell, but you build **one milestone at a
 time** and stop for human review at the end of each one.
@@ -19,9 +19,9 @@ Nothing below the intelligence layer may require an AI model.**
 
 It answers five questions: *What am I running? How is it going? Can I reach
 it remotely? How did I run this last time? Can I bring this ordinary terminal
-or existing process into Sentinel now?*
+or existing process into Sentinal now?*
 
-The target user-facing CLI is `sentinel`; the daemon is `sentineld`. Existing
+The target user-facing CLI is `sentinal`; the daemon is `sentinald`. Existing
 `ta`/`tad` names remain compatibility aliases until their migration milestone
 explicitly removes them.
 
@@ -64,8 +64,8 @@ and listed under "New dependencies" in your report.
 crates/protocol   shared types (exists)
 crates/store      SQLite layer
 crates/watcher    output/observations → Events
-crates/daemon     `sentineld` (`tad` compatibility): sessions, API, metrics
-crates/cli        `sentinel` (`ta` compatibility): watch, attach, list, recipes
+crates/daemon     `sentinald` (`tad` compatibility): sessions, API, metrics
+crates/cli        `sentinal` (`ta` compatibility): watch, attach, list, recipes
 shell/            ta.zsh, ta.bash, ta.fish hook scripts
 web/              Vite React PWA
 recipes/          built-in recipe TOML files

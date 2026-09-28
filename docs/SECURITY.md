@@ -20,7 +20,7 @@ and roadmap checkbox are complete.
 - PTY output is retained in compressed Session logs. Terminal output is
   untrusted and is never executed.
 
-## Data Sentinel records
+## Data Sentinal records
 
 | Data | Stored | Notes |
 |---|---:|---|
@@ -52,9 +52,9 @@ socket. The implementation must:
 
 Implemented in 1b.0 (`crates/daemon/src/local_socket.rs`):
 
-- Location: Linux `$XDG_RUNTIME_DIR/sentinel/sentineld.sock` when that
+- Location: Linux `$XDG_RUNTIME_DIR/sentinal/sentinald.sock` when that
   variable is an absolute path; macOS, and Linux without it,
-  `<data_dir>/run/sentineld.sock`. `local_socket = "..."` in `daemon.toml`
+  `<data_dir>/run/sentinald.sock`. `local_socket = "..."` in `daemon.toml`
   overrides both. Paths over 100 bytes are refused (portable `sun_path`).
 - The expected UID is the daemon's own effective UID, read from a
   socketpair's OS peer credentials (no `unsafe`, no new dependency).
@@ -68,10 +68,10 @@ Implemented in 1b.0 (`crates/daemon/src/local_socket.rs`):
 Inspect a running daemon (default macOS path shown):
 
 ```sh
-stat -f '%Sp %Su %N' ~/.local/share/terminal-agent/run ~/.local/share/terminal-agent/run/sentineld.sock   # macOS
-stat -c '%A %U %n' "$XDG_RUNTIME_DIR/sentinel" "$XDG_RUNTIME_DIR/sentinel/sentineld.sock"                  # Linux
-lsof -a -U -p "$(pgrep -x tad)" | grep sentineld   # the daemon holds the listener
-ss -xlp | grep sentineld                           # Linux alternative
+stat -f '%Sp %Su %N' ~/.local/share/terminal-agent/run ~/.local/share/terminal-agent/run/sentinald.sock   # macOS
+stat -c '%A %U %n' "$XDG_RUNTIME_DIR/sentinal" "$XDG_RUNTIME_DIR/sentinal/sentinald.sock"                  # Linux
+lsof -a -U -p "$(pgrep -x tad)" | grep sentinald   # the daemon holds the listener
+ss -xlp | grep sentinald                           # Linux alternative
 ```
 
 Expected: directory `drwx------`, socket `srw-------`, both owned by you.
@@ -83,7 +83,7 @@ nothing, and auto-wrap starts the original shell within 300 ms.
 
 ## Watch initial Command (1b.A)
 
-`sentinel watch -- COMMAND [ARG...]` sends a structured argv. The daemon, not
+`sentinal watch -- COMMAND [ARG...]` sends a structured argv. The daemon, not
 the CLI, turns it into shell input, and only through
 `protocol::render_command_line`:
 
@@ -99,7 +99,7 @@ the CLI, turns it into shell input, and only through
   input limit on macOS, so an early write can never be truncated into a
   different command;
 - it is typed exactly once, after the first `OSC 133;A` prompt report, and
-  only for `WATCH` Sessions whose shell has Sentinel hooks. Terminal output
+  only for `WATCH` Sessions whose shell has Sentinal hooks. Terminal output
   never contributes to what is typed.
 
 The CLI never executes the Command itself; every failure path (nested,
@@ -121,7 +121,7 @@ The daemon—not the UI—maps capture levels to allowed operations:
 | Signal adopted process | no adoption | no | no | no |
 
 Adoption is same-user and read-only. It does not signal, write to, debug,
-reparent, or claim an exit code for a process Sentinel did not start.
+reparent, or claim an exit code for a process Sentinal did not start.
 
 ## Intelligence permissions
 

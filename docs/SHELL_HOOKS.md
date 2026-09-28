@@ -1,6 +1,6 @@
 # Shell hooks
 
-Sentinel has two shell-integration paths. They share Command semantics but
+Sentinal has two shell-integration paths. They share Command semantics but
 serve different capture modes and must never report the same Command twice.
 
 ## Daemon-owned PTY path (current)
@@ -27,15 +27,15 @@ not edit the owner's rc files.
 
 ## Ordinary-shell socket path (Milestone 1b, planned)
 
-`sentinel hook install` adds a small loader to the user's rc file. It
+`sentinal hook install` adds a small loader to the user's rc file. It
 registers the shell and reports Command start/finish, cwd, duration, exit
 code, and shell PID to the private local Unix socket. It does not send output
 or keystrokes.
 
-If `SENTINEL_SESSION_ID` is set, the socket reporter is disabled and the
+If `SENTINAL_SESSION_ID` is set, the socket reporter is disabled and the
 existing OSC path remains active. This is the no-double-counting rule.
 
-If `SENTINEL_DISABLE=1` is set, all external reporting and auto-wrap are
+If `SENTINAL_DISABLE=1` is set, all external reporting and auto-wrap are
 disabled. The daemon-owned OSC wrapper may still track the FULL Session that
 the user explicitly entered.
 
@@ -43,7 +43,7 @@ the user explicitly entered.
 
 - Detect zsh, bash, or fish explicitly; do not guess when ambiguous.
 - Create a timestamped backup before the first edit.
-- Add exactly one marker-delimited Sentinel block.
+- Add exactly one marker-delimited Sentinal block.
 - Installing twice produces an identical file after the first install.
 - Uninstall removes only that block and restores the original surrounding
   bytes exactly, including final newline behavior.
@@ -63,12 +63,12 @@ the user explicitly entered.
 
 ## Troubleshooting (target behavior)
 
-1. Run `sentinel auto status` and `sentinel hook install --help` to identify
+1. Run `sentinal auto status` and `sentinal hook install --help` to identify
    the configured integration.
-2. Set `SENTINEL_DISABLE=1` to bypass external reporting and auto-wrap.
+2. Set `SENTINAL_DISABLE=1` to bypass external reporting and auto-wrap.
 3. Confirm the per-user local socket exists and is owned by the current UID.
-4. Run `sentinel hook <shell>` to inspect the expected loader.
-5. Re-run `sentinel hook install <shell>`; it must not duplicate the block.
+4. Run `sentinal hook <shell>` to inspect the expected loader.
+5. Re-run `sentinal hook install <shell>`; it must not duplicate the block.
 
 The hook must never prevent a shell from starting. A broken or unavailable
-Sentinel installation degrades to a normal shell.
+Sentinal installation degrades to a normal shell.
