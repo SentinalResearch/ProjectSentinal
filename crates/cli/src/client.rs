@@ -80,6 +80,18 @@ pub enum ClientError {
     },
 }
 
+/// Why an interactive attachment ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttachEnd {
+    /// The user detached (Ctrl-\\ d) or input reached EOF; the Session keeps running.
+    Detached,
+    /// The Session's shell exited.
+    Ended {
+        /// Shell exit code, when known.
+        exit_code: Option<i32>,
+    },
+}
+
 /// One authenticated WebSocket connection to a daemon.
 pub struct DaemonClient {
     socket: Socket,
@@ -135,8 +147,8 @@ impl DaemonClient {
         Err(ClientError::Disconnected)
     }
 
-    /// Attach this process's terminal until `Ctrl-\ d` is entered.
-    pub async fn attach(mut self, session_id: SessionId) -> Result<(), ClientError> {
+    /// Attach this process's terminal until `Ctrl-\ d`, EOF, or the shell exits.
+    pub async fn attach(mut self, session_id: SessionId) -> Result<AttachEnd, ClientError> {
         self.send_control(ClientRequest::Attach { session_id })
             .await?;
         if let Some((cols, rows)) = terminal_size() {
@@ -167,7 +179,7 @@ impl DaemonClient {
                                 encode_terminal_frame(session_id, &trailing).into()
                             )).await?;
                         }
-                        return Ok(());
+                        return Ok(AttachEnd::Detached);
                     }
                     let result = detector.push(&input[..count]);
                     if !result.bytes.is_empty() {
@@ -177,7 +189,7 @@ impl DaemonClient {
                     }
                     if result.detach {
                         self.send_control(ClientRequest::Detach { session_id }).await?;
-                        return Ok(());
+                        return Ok(AttachEnd::Detached);
                     }
                 }
                 message = self.socket.next() => {
@@ -201,8 +213,17 @@ impl DaemonClient {
                         }
                         Message::Text(text) => {
                             let message = Envelope::<DaemonMessage>::decode(text.as_str())?.payload;
-                            if let DaemonMessage::Error { message } = message {
-                                return Err(ClientError::Daemon(message));
+                            match message {
+                                DaemonMessage::Error { message } => {
+                                    return Err(ClientError::Daemon(message));
+                                }
+                                // The shell exited: there is nothing left to show.
+                                DaemonMessage::SessionUpdated { session }
+                                    if session.id == session_id && session.state.is_finished() =>
+                                {
+                                    return Ok(AttachEnd::Ended { exit_code: session.exit_code });
+                                }
+                                _ => {}
                             }
                         }
                         Message::Close(_) => return Err(ClientError::Disconnected),

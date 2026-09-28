@@ -4,7 +4,8 @@ use super::{
     external::lock_reports, lock_session, SessionHandle, SessionManager, SessionManagerError,
 };
 use protocol::{
-    CaptureLevel, DaemonMessage, Event, EventKind, Session, SessionId, SessionState, Timestamp,
+    CaptureLevel, DaemonMessage, Event, EventKind, Session, SessionId, SessionOrigin, SessionState,
+    Timestamp,
 };
 
 impl SessionManager {
@@ -37,7 +38,12 @@ impl SessionManager {
             }
             if self.same_process(&session) {
                 // A Command running across the restart cannot be finished later.
-                if session.state.is_busy() || session.state == SessionState::Disconnected {
+                let running_process = session.origin == SessionOrigin::Adopted;
+                if running_process && session.state == SessionState::Disconnected {
+                    session.transition(SessionState::Running, now)?;
+                } else if !running_process
+                    && (session.state.is_busy() || session.state == SessionState::Disconnected)
+                {
                     session.transition(SessionState::Idle, now)?;
                 }
                 if let Some(store) = &self.inner.store {

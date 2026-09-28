@@ -271,7 +271,7 @@ async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: Stri
                 let Some(frame) = outgoing else { break; };
                 let sent = match frame {
                     AttachedOutput::Binary(bytes) => socket.send(Message::Binary(bytes.into())).await.is_ok(),
-                    AttachedOutput::Structured(message) => send_daemon_message(&mut socket, message).await,
+                    AttachedOutput::Structured(message) => send_daemon_message(&mut socket, *message).await,
                 };
                 if !sent {
                     break;
@@ -381,7 +381,7 @@ async fn apply_action(
                         },
                         structured = attachment.structured.recv() => match structured {
                             Ok(message) => {
-                                if output_tx.send(AttachedOutput::Structured(message)).await.is_err() {
+                                if output_tx.send(AttachedOutput::Structured(Box::new(message))).await.is_err() {
                                     return;
                                 }
                             }
@@ -407,7 +407,7 @@ async fn apply_action(
 
 enum AttachedOutput {
     Binary(Vec<u8>),
-    Structured(DaemonMessage),
+    Structured(Box<DaemonMessage>),
 }
 
 async fn send_daemon_message(socket: &mut WebSocket, message: DaemonMessage) -> bool {

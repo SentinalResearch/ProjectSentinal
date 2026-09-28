@@ -1,5 +1,6 @@
 //! Ownership and lifecycle management for persistent terminal sessions.
 
+mod adopt;
 mod capture;
 mod error;
 mod external;
@@ -24,11 +25,17 @@ use std::{
     collections::HashMap,
     io::Write,
     path::PathBuf,
-    sync::{atomic::AtomicU64, Arc, Mutex, RwLock},
+    sync::{
+        atomic::{AtomicBool, AtomicU64},
+        Arc, Mutex, RwLock,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 use store::Store;
 use tokio::sync::broadcast;
+
+/// How long an AUTO_WRAP Session may wait for its terminal to attach.
+pub const AUTO_WRAP_ATTACH_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Function used to timestamp session and audit state.
 pub type Clock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
@@ -103,6 +110,8 @@ struct SessionHandle {
     initial_command: Mutex<Option<Vec<u8>>>,
     /// Sequence bookkeeping for Commands reported by an external shell hook.
     shell_reports: Mutex<external::ShellReports>,
+    /// Set by the first successful attach.
+    attached: AtomicBool,
 }
 
 struct SessionManagerInner {
@@ -208,6 +217,9 @@ impl SessionManager {
     pub fn attach(&self, session_id: SessionId) -> Result<Attachment, SessionManagerError> {
         let handle = self.handle(session_id)?;
         require_capture(&handle, CaptureOperation::Attach)?;
+        handle
+            .attached
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         let screen = handle
             .parser
             .lock()

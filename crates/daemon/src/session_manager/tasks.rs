@@ -211,10 +211,16 @@ pub(super) fn spawn_exit_monitor(
                             session.exit_code = Some(code);
                             if let Err(error) = session.transition(target, clock()) {
                                 tracing::error!(session = session_id.0, %error, "failed to record child exit");
-                            } else if let Some(store) = &store {
-                                if let Err(error) = store.update_session(&session) {
-                                    tracing::error!(session = session_id.0, %error, "failed to persist child exit");
+                            } else {
+                                if let Some(store) = &store {
+                                    if let Err(error) = store.update_session(&session) {
+                                        tracing::error!(session = session_id.0, %error, "failed to persist child exit");
+                                    }
                                 }
+                                // Attached clients stop waiting once the shell is gone.
+                                let _ = handle.structured.send(DaemonMessage::SessionUpdated {
+                                    session: session.clone(),
+                                });
                             }
                         }
                         Ok(_) => {}

@@ -17,13 +17,31 @@ pub struct ProcessIdentity {
     pub uid: u32,
 }
 
+/// Optional descriptive metadata; any field may be unavailable.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProcessDetails {
+    /// Short process name.
+    pub name: Option<String>,
+    /// Executable path.
+    pub exe: Option<String>,
+    /// Current working directory.
+    pub cwd: Option<String>,
+}
+
 type IdentifyFn = dyn Fn(u32) -> Option<ProcessIdentity> + Send + Sync;
+type DetailsFn = dyn Fn(u32) -> ProcessDetails + Send + Sync;
+type DiscoverFn = dyn Fn(u32) -> Option<protocol::SessionLog> + Send + Sync;
 
 /// Looks up process identities for the daemon's own user.
+///
+/// Every operation is a read. There is deliberately no signal, write, debug,
+/// priority, or kill method: adopted processes are observed, never controlled.
 #[derive(Clone)]
 pub struct ProcessProbe {
     owner_uid: Option<u32>,
     identify: Arc<IdentifyFn>,
+    details: Arc<DetailsFn>,
+    discover_log: Arc<DiscoverFn>,
 }
 
 impl std::fmt::Debug for ProcessProbe {
@@ -44,7 +62,27 @@ impl ProcessProbe {
         ProcessProbe {
             owner_uid: Some(owner_uid),
             identify: Arc::new(identify),
+            details: Arc::new(|_| ProcessDetails::default()),
+            discover_log: Arc::new(|_| None),
         }
+    }
+
+    /// Use `details` to describe processes (name, executable, cwd).
+    pub fn with_details(
+        mut self,
+        details: impl Fn(u32) -> ProcessDetails + Send + Sync + 'static,
+    ) -> Self {
+        self.details = Arc::new(details);
+        self
+    }
+
+    /// Use `discover` to find a process's redirected stdout/stderr log file.
+    pub fn with_log_discovery(
+        mut self,
+        discover: impl Fn(u32) -> Option<protocol::SessionLog> + Send + Sync + 'static,
+    ) -> Self {
+        self.discover_log = Arc::new(discover);
+        self
     }
 
     /// A probe that knows no processes, so external registration is refused.
@@ -52,12 +90,15 @@ impl ProcessProbe {
         ProcessProbe {
             owner_uid: None,
             identify: Arc::new(|_| None),
+            details: Arc::new(|_| ProcessDetails::default()),
+            discover_log: Arc::new(|_| None),
         }
     }
 
     /// A probe backed by the operating system process table.
     pub fn system(owner_uid: u32) -> Self {
-        let system = Mutex::new(System::new());
+        let system = Arc::new(Mutex::new(System::new()));
+        let for_details = system.clone();
         Self::new(owner_uid, move |pid| {
             let mut system = system.lock().ok()?;
             let pid = Pid::from_u32(pid);
@@ -73,6 +114,32 @@ impl ProcessProbe {
                 uid: **process.user_id()?,
             })
         })
+        .with_details(move |pid| {
+            let Ok(mut system) = for_details.lock() else {
+                return ProcessDetails::default();
+            };
+            let pid = Pid::from_u32(pid);
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[pid]),
+                true,
+                ProcessRefreshKind::nothing()
+                    .with_exe(UpdateKind::OnlyIfNotSet)
+                    .with_cwd(UpdateKind::Always),
+            );
+            let Some(process) = system.process(pid) else {
+                return ProcessDetails::default();
+            };
+            let path = |path: Option<&std::path::Path>| {
+                path.map(|path| path.to_string_lossy().into_owned())
+                    .filter(|path| !path.is_empty())
+            };
+            ProcessDetails {
+                name: Some(process.name().to_string_lossy().into_owned()).filter(|n| !n.is_empty()),
+                exe: path(process.exe()),
+                cwd: path(process.cwd()),
+            }
+        })
+        .with_log_discovery(crate::log_discovery::discover)
     }
 
     /// The user whose processes may be registered, if the probe is usable.
@@ -83,6 +150,17 @@ impl ProcessProbe {
     /// Current identity of `pid`, or `None` when it does not exist.
     pub fn identify(&self, pid: u32) -> Option<ProcessIdentity> {
         (self.identify)(pid)
+    }
+
+    /// Descriptive metadata for `pid`; missing fields are not errors.
+    pub fn details(&self, pid: u32) -> ProcessDetails {
+        (self.details)(pid)
+    }
+
+    /// A regular file receiving `pid`'s stdout/stderr, if one can be found.
+    /// May be slow (it can run `lsof`); never call it on a prompt or CLI path.
+    pub fn discover_log(&self, pid: u32) -> Option<protocol::SessionLog> {
+        (self.discover_log)(pid)
     }
 }
 

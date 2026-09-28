@@ -143,6 +143,10 @@ async fn watch_session_records_origin_capture_title_cwd_pid_and_session_env() {
 
     let spawn = h.fake.spawn_request(session.id).unwrap();
     assert_eq!((spawn.cols, spawn.rows), (132, 43));
+    assert!(!spawn
+        .env
+        .iter()
+        .any(|(key, _)| key == "SENTINAL_AUTO_GUARD"));
     assert!(spawn
         .env
         .contains(&("SENTINAL_SESSION_ID".into(), session.id.0.to_string())));
@@ -303,10 +307,10 @@ async fn initial_command_is_rejected_before_spawn_unless_watch_with_a_hooked_she
     let error = h.manager.create(plain_sh).await.unwrap_err();
     assert!(error.to_string().contains("/bin/sh"), "{error}");
 
-    let mut auto_wrap = watch(None);
-    auto_wrap.origin = SessionOrigin::AutoWrap;
-    let error = h.manager.create(auto_wrap).await.unwrap_err();
-    assert!(error.to_string().contains("AUTO_WRAP"), "{error}");
+    let mut adopted = watch(None);
+    adopted.origin = SessionOrigin::Adopted;
+    let error = h.manager.create(adopted).await.unwrap_err();
+    assert!(error.to_string().contains("ADOPTED"), "{error}");
 
     let long = watch(Some(argv(&["echo", &"x".repeat(2_000)])));
     let error = h.manager.create(long).await.unwrap_err();
@@ -316,5 +320,85 @@ async fn initial_command_is_rejected_before_spawn_unless_watch_with_a_hooked_she
     );
 
     assert!(h.manager.list().unwrap().is_empty());
+    fs::remove_dir_all(h.data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn attached_clients_are_told_when_the_shell_exits() {
+    let h = harness();
+    let session = h.manager.create(watch(None)).await.unwrap();
+    let mut attachment = h.manager.attach(session.id).unwrap();
+
+    h.fake.exit(session.id, 7).unwrap();
+    let ended = tokio::time::timeout(Duration::from_millis(100), async {
+        loop {
+            if let protocol::DaemonMessage::SessionUpdated { session } =
+                attachment.structured.recv().await.unwrap()
+            {
+                if session.state.is_finished() {
+                    return session;
+                }
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(ended.state, SessionState::Failed);
+    assert_eq!(ended.exit_code, Some(7));
+    fs::remove_dir_all(h.data_dir).unwrap();
+}
+
+fn auto_wrap() -> CreateSession {
+    let mut request = watch(None);
+    request.origin = SessionOrigin::AutoWrap;
+    request.title = None;
+    request
+}
+
+#[tokio::test]
+async fn an_auto_wrap_session_nobody_attaches_to_is_reaped() {
+    let h = harness();
+    let session = h.manager.create(auto_wrap()).await.unwrap();
+    assert_eq!(session.origin, SessionOrigin::AutoWrap);
+    assert_eq!(session.capture, CaptureLevel::Full);
+    assert_eq!(
+        daemon::session_manager::AUTO_WRAP_ATTACH_GRACE,
+        Duration::from_secs(5)
+    );
+
+    let spawn = h.fake.spawn_request(session.id).unwrap();
+    assert!(spawn
+        .env
+        .contains(&("SENTINAL_AUTO_GUARD".into(), "1".into())));
+
+    assert!(h.manager.reap_unattached_auto_wrap(session.id).unwrap());
+    wait_until(|| h.manager.session(session.id).unwrap().state == SessionState::Interrupted).await;
+    fs::remove_dir_all(h.data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn attached_or_non_auto_wrap_sessions_are_never_reaped() {
+    let h = harness();
+    let wrapped = h.manager.create(auto_wrap()).await.unwrap();
+    drop(h.manager.attach(wrapped.id).unwrap());
+    assert!(!h.manager.reap_unattached_auto_wrap(wrapped.id).unwrap());
+
+    let watched = h.manager.create(watch(None)).await.unwrap();
+    assert!(!h.manager.reap_unattached_auto_wrap(watched.id).unwrap());
+    assert_eq!(
+        h.manager.session(wrapped.id).unwrap().state,
+        SessionState::Idle
+    );
+    let _ = h.fake.exit(watched.id, 0);
+    cleanup(h, wrapped.id);
+}
+
+#[tokio::test]
+async fn auto_wrap_never_accepts_an_initial_command() {
+    let h = harness();
+    let mut request = auto_wrap();
+    request.command = Some(argv(&["make"]));
+    let error = h.manager.create(request).await.unwrap_err();
+    assert!(error.to_string().contains("AUTO_WRAP"), "{error}");
     fs::remove_dir_all(h.data_dir).unwrap();
 }

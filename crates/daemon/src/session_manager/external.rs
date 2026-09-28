@@ -235,6 +235,13 @@ impl SessionManager {
 
     /// Dispatch one verified local-socket request.
     pub fn handle_local(&self, request: LocalRequest) -> LocalResponse {
+        // The socket layer validates too; this keeps direct callers safe.
+        if let Err(error) = request.validate() {
+            return LocalResponse::Error {
+                code: LocalErrorCode::InvalidRequest,
+                message: error.to_string(),
+            };
+        }
         let result = match request {
             LocalRequest::RegisterShell {
                 pid,
@@ -268,12 +275,13 @@ impl SessionManager {
                         .session(session_id)
                         .map(|session| LocalResponse::Session { session }),
                 }),
-            LocalRequest::AdoptProcess { .. } => {
-                return LocalResponse::Error {
-                    code: LocalErrorCode::Unavailable,
-                    message: "process adoption arrives in Milestone 1b.C".into(),
-                };
-            }
+            LocalRequest::AdoptProcess {
+                pid,
+                title,
+                log_path,
+            } => self
+                .adopt_process(pid, title, log_path)
+                .map(|session| LocalResponse::Session { session }),
         };
         result.unwrap_or_else(|error| LocalResponse::Error {
             code: error_code(&error),
@@ -281,7 +289,7 @@ impl SessionManager {
         })
     }
 
-    fn verify_owned_process(&self, pid: u32) -> Result<Timestamp, SessionManagerError> {
+    pub(super) fn verify_owned_process(&self, pid: u32) -> Result<Timestamp, SessionManagerError> {
         let probe = &self.inner.probe;
         let owner = probe
             .owner_uid()
@@ -362,6 +370,7 @@ impl SessionManager {
             )),
             initial_command: Mutex::new(None),
             shell_reports: Mutex::default(),
+            attached: std::sync::atomic::AtomicBool::new(false),
         });
         self.inner
             .sessions
@@ -409,7 +418,11 @@ fn error_code(error: &SessionManagerError) -> LocalErrorCode {
         SessionManagerError::ProcessNotOwned { .. }
         | SessionManagerError::NotShellHook(_)
         | SessionManagerError::ShellPidMismatch { .. } => LocalErrorCode::Forbidden,
-        SessionManagerError::SequenceConflict { .. } => LocalErrorCode::Conflict,
+        SessionManagerError::SequenceConflict { .. }
+        | SessionManagerError::AlreadyAdopted { .. } => LocalErrorCode::Conflict,
+        SessionManagerError::AdoptSelf(_) | SessionManagerError::InvalidLog { .. } => {
+            LocalErrorCode::InvalidRequest
+        }
         SessionManagerError::ProcessProbeUnavailable => LocalErrorCode::Unavailable,
         SessionManagerError::Protocol(_) => LocalErrorCode::InvalidRequest,
         _ => LocalErrorCode::Internal,

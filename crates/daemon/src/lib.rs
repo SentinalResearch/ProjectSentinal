@@ -7,6 +7,7 @@ pub mod config;
 pub mod entry;
 pub mod framing;
 pub mod local_socket;
+pub mod log_discovery;
 pub mod metrics;
 pub mod osc;
 pub mod process_probe;

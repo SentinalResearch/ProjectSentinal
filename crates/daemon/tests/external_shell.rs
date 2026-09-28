@@ -520,6 +520,7 @@ async fn local_socket_requests_drive_the_session_and_store_no_output_or_input() 
             ..
         }
     ));
+    // Since 1b.C the socket also adopts; the shell's PID is adoptable read-only.
     let adopt = local(
         &h,
         LocalRequest::AdoptProcess {
@@ -531,10 +532,7 @@ async fn local_socket_requests_drive_the_session_and_store_no_output_or_input() 
     .await;
     assert!(matches!(
         adopt,
-        LocalResponse::Error {
-            code: LocalErrorCode::Unavailable,
-            ..
-        }
+        LocalResponse::Session { session } if session.origin == SessionOrigin::Adopted
     ));
 
     // COMMANDS capture keeps no terminal log, no input audit, no screen.

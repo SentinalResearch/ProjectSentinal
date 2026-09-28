@@ -116,4 +116,23 @@ pub enum SessionManagerError {
         /// Reported sequence.
         sequence: u64,
     },
+    /// The daemon never adopts itself.
+    #[error("pid {0} is sentinald itself and cannot be adopted")]
+    AdoptSelf(u32),
+    /// The process already has a live ADOPTED Session.
+    #[error("process {pid} is already adopted as Session {session_id}")]
+    AlreadyAdopted {
+        /// Requested PID.
+        pid: u32,
+        /// Existing Session.
+        session_id: SessionId,
+    },
+    /// An explicit adopted log is not a readable regular file.
+    #[error("log '{path}' {reason}")]
+    InvalidLog {
+        /// Requested path.
+        path: String,
+        /// Why it was refused.
+        reason: String,
+    },
 }

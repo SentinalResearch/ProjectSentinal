@@ -2,7 +2,7 @@
 
 use crate::{
     args::{Cli, Command},
-    client::{terminal_size, ClientError, DaemonClient},
+    client::{terminal_size, AttachEnd, ClientError, DaemonClient},
     watch::{create_session, plan_watch, WatchContext, WatchError, WatchPlan, SESSION_ENV},
 };
 use protocol::{ClientRequest, DaemonMessage, SessionId, SessionOrigin};
@@ -88,7 +88,9 @@ async fn dispatch(
                 message => print_unexpected(err, message),
             }
         }
-        Command::Attach { id } => client.attach(SessionId(id)).await?,
+        Command::Attach { id } => {
+            let _ = client.attach(SessionId(id)).await?;
+        }
         Command::Kill { id } => {
             match client
                 .request(ClientRequest::Kill {
@@ -146,14 +148,16 @@ async fn watch(
             let (client, session) =
                 create_session(|| DaemonClient::connect(url, token_file), request).await?;
             let id = session.id.0;
-            client
+            let end = client
                 .attach(session.id)
                 .await
                 .map_err(|source| AppError::WatchAttach { id, source })?;
-            let _ = writeln!(
-                err,
-                "sentinal: detached from Session {id}; it keeps running. Reattach with `sentinal attach {id}`"
-            );
+            if end == AttachEnd::Detached {
+                let _ = writeln!(
+                    err,
+                    "sentinal: detached from Session {id}; it keeps running. Reattach with `sentinal attach {id}`"
+                );
+            }
             Ok(ExitCode::SUCCESS)
         }
     }

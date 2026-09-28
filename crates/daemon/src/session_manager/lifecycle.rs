@@ -1,7 +1,8 @@
 //! Session creation and PTY task startup.
 
 use super::{
-    tasks, validate_size, CreateSession, SessionHandle, SessionManager, SessionManagerError,
+    lock_session, tasks, validate_size, CreateSession, SessionHandle, SessionManager,
+    SessionManagerError, AUTO_WRAP_ATTACH_GRACE,
 };
 use crate::{
     pty::{PtySpawnRequest, SpawnedPty},
@@ -16,7 +17,10 @@ use protocol::{
 use std::{
     fs::{self, OpenOptions},
     path::PathBuf,
-    sync::{atomic::Ordering, Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
 };
 use tokio::sync::broadcast;
 
@@ -24,7 +28,10 @@ impl SessionManager {
     /// Spawn a shell and return its session in the idle state.
     pub async fn create(&self, request: CreateSession) -> Result<Session, SessionManagerError> {
         validate_size(request.cols, request.rows)?;
-        if !matches!(request.origin, SessionOrigin::Ui | SessionOrigin::Watch) {
+        if !matches!(
+            request.origin,
+            SessionOrigin::Ui | SessionOrigin::Watch | SessionOrigin::AutoWrap
+        ) {
             return Err(SessionManagerError::OriginUnavailable {
                 origin: request.origin,
             });
@@ -58,6 +65,12 @@ impl SessionManager {
         shell_launch
             .env
             .push(("SENTINAL_SESSION_ID".into(), id.0.to_string()));
+        if request.origin == SessionOrigin::AutoWrap {
+            // Explicit recursion guard: this shell must never auto-wrap again.
+            shell_launch
+                .env
+                .push(("SENTINAL_AUTO_GUARD".into(), "1".into()));
+        }
         let log_dir = self.inner.config.data_dir.join("sessions");
         fs::create_dir_all(&log_dir).map_err(|source| SessionManagerError::File {
             operation: "create directory for",
@@ -134,6 +147,7 @@ impl SessionManager {
             )),
             initial_command: Mutex::new(initial_command),
             shell_reports: Mutex::default(),
+            attached: AtomicBool::new(false),
         });
         self.inner
             .sessions
@@ -164,7 +178,42 @@ impl SessionManager {
             self.inner.config.clock.clone(),
             self.inner.store.clone(),
         );
+        if session.origin == SessionOrigin::AutoWrap {
+            self.spawn_auto_wrap_watchdog(id);
+        }
         Ok(session)
+    }
+
+    fn spawn_auto_wrap_watchdog(&self, id: SessionId) {
+        let manager = self.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(AUTO_WRAP_ATTACH_GRACE).await;
+            if let Err(error) = manager.reap_unattached_auto_wrap(id) {
+                tracing::warn!(session = id.0, %error, "failed to reap unattached AUTO_WRAP Session");
+            }
+        });
+    }
+
+    /// Kill an AUTO_WRAP Session that no terminal ever attached to.
+    ///
+    /// A terminal that already fell back to its plain shell never attaches,
+    /// so a Session the daemon created late cannot become a second shell.
+    /// Returns whether the Session was killed.
+    pub fn reap_unattached_auto_wrap(&self, id: SessionId) -> Result<bool, SessionManagerError> {
+        let handle = self.handle(id)?;
+        let session = lock_session(&handle)?.clone();
+        if session.origin != SessionOrigin::AutoWrap
+            || session.state.is_finished()
+            || handle.attached.load(Ordering::SeqCst)
+        {
+            return Ok(false);
+        }
+        tracing::info!(
+            session = id.0,
+            "killing AUTO_WRAP Session that was never attached"
+        );
+        self.kill(id)?;
+        Ok(true)
     }
 }
 
