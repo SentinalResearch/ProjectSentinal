@@ -3,6 +3,7 @@
 mod capture;
 mod error;
 mod external;
+mod external_lifecycle;
 mod lifecycle;
 mod structured;
 mod tasks;

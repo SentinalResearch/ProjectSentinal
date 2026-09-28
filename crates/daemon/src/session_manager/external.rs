@@ -3,7 +3,8 @@
 //! These Sessions have no daemon PTY: no output, input, screen, resize, or
 //! kill. Commands arrive as start/finish reports carrying a per-shell
 //! sequence number, and the shell PID (plus its OS start time) is the
-//! Session's process-tree root. Lock order: `shell_reports`, then the
+//! Session's process-tree root. Liveness and recovery are in
+//! `external_lifecycle`. Lock order: `shell_reports`, then the
 //! tracker and Session locks taken inside `apply_signal`.
 
 use super::{
@@ -14,8 +15,8 @@ use crate::{
     tracker::CommandTracker,
 };
 use protocol::{
-    CaptureLevel, Command, DaemonMessage, Event, EventKind, LocalErrorCode, LocalRequest,
-    LocalResponse, Session, SessionId, SessionOrigin, SessionState, Timestamp,
+    CaptureLevel, Command, LocalErrorCode, LocalRequest, LocalResponse, Session, SessionId,
+    SessionOrigin, SessionState, Timestamp,
 };
 use std::{
     collections::BTreeMap,
@@ -39,6 +40,12 @@ pub(super) struct ShellReports {
 }
 
 impl ShellReports {
+    /// Drop any running or queued Command state (the shell is gone).
+    pub(super) fn forget_running(&mut self) {
+        self.running = None;
+        self.pending_finish.clear();
+    }
+
     fn remember(&mut self, sequence: u64, command: Command) {
         self.recent.insert(sequence, command);
         while self.recent.len() > MAX_TRACKED_SEQUENCES {
@@ -226,53 +233,6 @@ impl SessionManager {
         })
     }
 
-    /// End reduced-capture Sessions whose root process exited or was replaced.
-    pub fn check_external_processes(&self) -> Result<Vec<SessionId>, SessionManagerError> {
-        let mut ended = Vec::new();
-        for handle in self.handles()? {
-            let session = lock_session(&handle)?.clone();
-            if session.capture == CaptureLevel::Full || session.state.is_finished() {
-                continue;
-            }
-            if !self.same_process(&session) {
-                self.end_external(&handle)?;
-                ended.push(session.id);
-            }
-        }
-        ended.sort();
-        Ok(ended)
-    }
-
-    /// After a restart, resume verified live external Sessions and end the rest.
-    pub fn recover_external_sessions(
-        &self,
-        stored: Vec<Session>,
-    ) -> Result<(), SessionManagerError> {
-        let now = (self.inner.config.clock)();
-        for mut session in stored {
-            if session.capture == CaptureLevel::Full || session.state.is_finished() {
-                continue;
-            }
-            if self.same_process(&session) {
-                // A Command running across the restart cannot be finished later.
-                if session.state.is_busy() || session.state == SessionState::Disconnected {
-                    session.transition(SessionState::Idle, now)?;
-                }
-                if let Some(store) = &self.inner.store {
-                    store.update_session(&session)?;
-                }
-                self.insert_external(session)?;
-            } else {
-                let event = ended_event(self, &mut session, now)?;
-                if let Some(store) = &self.inner.store {
-                    store.update_session(&session)?;
-                    store.insert_event(&event)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Dispatch one verified local-socket request.
     pub fn handle_local(&self, request: LocalRequest) -> LocalResponse {
         let result = match request {
@@ -338,16 +298,6 @@ impl SessionManager {
         Ok(identity.started_at)
     }
 
-    fn same_process(&self, session: &Session) -> bool {
-        let (Some(pid), Some(started_at)) = (session.pid, session.process_started_at) else {
-            return false;
-        };
-        let owner = self.inner.probe.owner_uid();
-        self.inner.probe.identify(pid).is_some_and(|identity| {
-            Some(identity.uid) == owner && identity.started_at == started_at
-        })
-    }
-
     fn shell_handle(
         &self,
         session_id: SessionId,
@@ -384,31 +334,7 @@ impl SessionManager {
         .and_then(|update| update.command)
     }
 
-    fn end_external(&self, handle: &SessionHandle) -> Result<(), SessionManagerError> {
-        let mut reports = lock_reports(handle)?;
-        reports.running = None;
-        reports.pending_finish.clear();
-        if let Ok(mut tracker) = handle.tracker.lock() {
-            let _ = tracker.abandon();
-        }
-        let now = (self.inner.config.clock)();
-        let (session, event) = {
-            let mut session = lock_session(handle)?;
-            let event = ended_event(self, &mut session, now)?;
-            (session.clone(), event)
-        };
-        if let Some(store) = &self.inner.store {
-            store.update_session(&session)?;
-            store.insert_event(&event)?;
-        }
-        let _ = handle.structured.send(DaemonMessage::Event { event });
-        let _ = handle
-            .structured
-            .send(DaemonMessage::SessionUpdated { session });
-        Ok(())
-    }
-
-    fn insert_external(&self, session: Session) -> Result<(), SessionManagerError> {
+    pub(super) fn insert_external(&self, session: Session) -> Result<(), SessionManagerError> {
         let id = session.id;
         let cwd = session.cwd.clone();
         let (output, _) = broadcast::channel(1);
@@ -448,7 +374,7 @@ impl SessionManager {
         Ok(())
     }
 
-    fn handles(&self) -> Result<Vec<Arc<SessionHandle>>, SessionManagerError> {
+    pub(super) fn handles(&self) -> Result<Vec<Arc<SessionHandle>>, SessionManagerError> {
         Ok(self
             .inner
             .sessions
@@ -463,28 +389,7 @@ impl SessionManager {
     }
 }
 
-/// Mark an external Session ended with an unknown exit code (approved in 1b.0).
-fn ended_event(
-    manager: &SessionManager,
-    session: &mut Session,
-    at: Timestamp,
-) -> Result<Event, SessionManagerError> {
-    let command_id = session.current_command;
-    session.transition(SessionState::Completed, at)?;
-    session.exit_code = None;
-    Ok(Event {
-        id: manager.inner.tracker_ids.event(),
-        session_id: session.id,
-        command_id,
-        at,
-        kind: EventKind::ProcessExited {
-            pid: session.pid.unwrap_or_default(),
-            exit_code: None,
-        },
-    })
-}
-
-fn lock_reports(
+pub(super) fn lock_reports(
     handle: &SessionHandle,
 ) -> Result<std::sync::MutexGuard<'_, ShellReports>, SessionManagerError> {
     handle
