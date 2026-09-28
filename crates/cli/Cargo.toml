@@ -18,6 +18,8 @@ tokio-tungstenite.workspace = true
 [dev-dependencies]
 # Drives the CLI inside a real pseudo-terminal in the ignored watch_integration.
 portable-pty.workspace = true
+# Paused clock for deterministic 50 ms deadline tests (no real sleeps).
+tokio = { workspace = true, features = ["test-util"] }
 
 [[bin]]
 name = "sentinal"

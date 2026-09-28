@@ -44,6 +44,10 @@ async fn dispatch(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<ExitCode, AppError> {
+    // Hook commands never use the WebSocket API and need no token.
+    if let Command::Hook { action } = cli.command {
+        return Ok(crate::hook_command::run(action, out, err).await);
+    }
     let token_file = match cli.token_file {
         Some(path) => path,
         None => default_token_file()?,
@@ -98,7 +102,7 @@ async fn dispatch(
                 message => print_unexpected(err, message),
             }
         }
-        Command::Watch { .. } => {}
+        Command::Watch { .. } | Command::Hook { .. } => {}
     }
     Ok(ExitCode::SUCCESS)
 }

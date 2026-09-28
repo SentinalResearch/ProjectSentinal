@@ -1,5 +1,6 @@
 //! Command-line arguments for `sentinal` (also installed as `ta`).
 
+use crate::{hook_report::ReportKind, hook_script::HookShell};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -52,5 +53,59 @@ pub enum Command {
         /// Command and arguments, passed exactly as given after `--`.
         #[arg(last = true, num_args = 1.., value_name = "COMMAND")]
         command: Option<Vec<String>>,
+    },
+    /// Report Commands from ordinary zsh, bash, or fish terminals (COMMANDS capture).
+    Hook {
+        /// Hook operation.
+        #[command(subcommand)]
+        action: HookAction,
+    },
+}
+
+/// `sentinal hook` operations.
+#[derive(Debug, Subcommand)]
+pub enum HookAction {
+    /// Print the zsh integration without editing any file.
+    Zsh,
+    /// Print the bash integration without editing any file.
+    Bash,
+    /// Print the fish integration without editing any file.
+    Fish,
+    /// Add the Sentinal block to your shell's rc file (idempotent, with backup).
+    Install {
+        /// Shell to configure; defaults to $SHELL.
+        shell: Option<HookShell>,
+        /// Edit this rc file instead of the default for the shell.
+        #[arg(long, value_name = "PATH")]
+        rc: Option<PathBuf>,
+    },
+    /// Remove exactly the Sentinal block from your shell's rc file.
+    Uninstall {
+        /// Shell to configure; defaults to $SHELL.
+        shell: Option<HookShell>,
+        /// Edit this rc file instead of the default for the shell.
+        #[arg(long, value_name = "PATH")]
+        rc: Option<PathBuf>,
+    },
+    /// Internal: report one shell event to sentinald (used by the hook).
+    #[command(hide = true)]
+    Report {
+        /// Event kind.
+        kind: ReportKind,
+        /// Shell PID.
+        #[arg(long)]
+        pid: u32,
+        /// Shell name or path.
+        #[arg(long)]
+        shell: String,
+        /// Command sequence number.
+        #[arg(long, default_value_t = 0)]
+        seq: u64,
+        /// Command exit status.
+        #[arg(long, default_value_t = 0, allow_negative_numbers = true)]
+        exit: i32,
+        /// Event time as Unix seconds with an optional fraction.
+        #[arg(long, default_value = "")]
+        at: String,
     },
 }
