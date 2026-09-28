@@ -99,9 +99,18 @@ impl AppState {
                 Ok(()) => session_reply(&self.sessions, session_id),
                 Err(error) => error_action(error),
             },
-            ClientRequest::GetHistory { .. } => WsAction::Reply(DaemonMessage::Error {
-                message: "command history is available in Milestone 2".into(),
-            }),
+            ClientRequest::GetHistory { session_id, limit } => {
+                match self.sessions.history(session_id, limit.min(1_000)) {
+                    Ok(commands) => WsAction::Reply(DaemonMessage::History { commands }),
+                    Err(error) => error_action(error),
+                }
+            }
+            ClientRequest::SearchCommands { query, limit } => {
+                match self.sessions.search_commands(&query, limit.min(1_000)) {
+                    Ok(commands) => WsAction::Reply(DaemonMessage::History { commands }),
+                    Err(error) => error_action(error),
+                }
+            }
         }
     }
 }
@@ -217,7 +226,7 @@ async fn websocket(
 }
 
 async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: String, token: String) {
-    let (output_tx, mut output_rx) = mpsc::channel::<Vec<u8>>(256);
+    let (output_tx, mut output_rx) = mpsc::channel::<AttachedOutput>(256);
     let mut attachments: HashMap<SessionId, JoinHandle<()>> = HashMap::new();
 
     loop {
@@ -252,7 +261,11 @@ async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: Stri
                     break;
                 }
                 let Some(frame) = outgoing else { break; };
-                if socket.send(Message::Binary(frame.into())).await.is_err() {
+                let sent = match frame {
+                    AttachedOutput::Binary(bytes) => socket.send(Message::Binary(bytes.into())).await.is_ok(),
+                    AttachedOutput::Structured(message) => send_daemon_message(&mut socket, message).await,
+                };
+                if !sent {
                     break;
                 }
             }
@@ -288,7 +301,7 @@ async fn handle_client_message(
     socket: &mut WebSocket,
     state: &AppState,
     client_addr: &str,
-    output_tx: &mpsc::Sender<Vec<u8>>,
+    output_tx: &mpsc::Sender<AttachedOutput>,
     attachments: &mut HashMap<SessionId, JoinHandle<()>>,
     message: Message,
 ) -> bool {
@@ -319,7 +332,7 @@ async fn handle_client_message(
 
 async fn apply_action(
     socket: &mut WebSocket,
-    output_tx: &mpsc::Sender<Vec<u8>>,
+    output_tx: &mpsc::Sender<AttachedOutput>,
     attachments: &mut HashMap<SessionId, JoinHandle<()>>,
     action: WsAction,
 ) -> bool {
@@ -344,24 +357,31 @@ async fn apply_action(
             let output_tx = output_tx.clone();
             let task = tokio::spawn(async move {
                 loop {
-                    match attachment.output.recv().await {
-                        Ok(bytes) => {
-                            if output_tx
-                                .send(encode_terminal_frame(session_id, &bytes))
-                                .await
-                                .is_err()
-                            {
-                                return;
+                    tokio::select! {
+                        output = attachment.output.recv() => match output {
+                            Ok(bytes) => {
+                                if output_tx.send(AttachedOutput::Binary(
+                                    encode_terminal_frame(session_id, &bytes),
+                                )).await.is_err() {
+                                    return;
+                                }
                             }
-                        }
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                            tracing::warn!(
-                                session = session_id.0,
-                                skipped,
-                                "attached client lagged"
-                            );
-                        }
-                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                                tracing::warn!(session = session_id.0, skipped, "attached terminal client lagged");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                        },
+                        structured = attachment.structured.recv() => match structured {
+                            Ok(message) => {
+                                if output_tx.send(AttachedOutput::Structured(message)).await.is_err() {
+                                    return;
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                                tracing::warn!(session = session_id.0, skipped, "attached structured client lagged");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                        },
                     }
                 }
             });
@@ -375,6 +395,11 @@ async fn apply_action(
             true
         }
     }
+}
+
+enum AttachedOutput {
+    Binary(Vec<u8>),
+    Structured(DaemonMessage),
 }
 
 async fn send_daemon_message(socket: &mut WebSocket, message: DaemonMessage) -> bool {

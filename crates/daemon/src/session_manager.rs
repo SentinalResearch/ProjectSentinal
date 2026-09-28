@@ -1,24 +1,26 @@
 //! Ownership and lifecycle management for persistent terminal sessions.
 
+mod lifecycle;
+mod structured;
 mod tasks;
 
 use crate::{
     audit::{AuditLog, AuditRecord},
-    pty::{PtyBackend, PtyError, PtySpawnRequest, SpawnedPty},
+    pty::{PtyBackend, PtyError},
     scrollback::Scrollback,
+    tracker::{CommandTracker, TrackerIds},
 };
-use protocol::{MachineId, ProtocolError, Session, SessionId, SessionState, Timestamp};
+use protocol::{
+    DaemonMessage, MachineId, ProtocolError, Session, SessionId, SessionState, Timestamp,
+};
 use std::{
     collections::HashMap,
-    fs::{self, OpenOptions},
     io::Write,
     path::PathBuf,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex, RwLock,
-    },
+    sync::{atomic::AtomicU64, Arc, Mutex, RwLock},
     time::{SystemTime, UNIX_EPOCH},
 };
+use store::{Store, StoreError};
 use tokio::sync::broadcast;
 
 /// Function used to timestamp session and audit state.
@@ -68,6 +70,8 @@ pub struct Attachment {
     pub screen: Vec<u8>,
     /// Live output produced after attachment.
     pub output: broadcast::Receiver<Vec<u8>>,
+    /// Structured command, event, Session, and metric updates.
+    pub structured: broadcast::Receiver<DaemonMessage>,
 }
 
 /// Errors produced while managing sessions.
@@ -111,10 +115,17 @@ pub enum SessionManagerError {
     /// A remote input audit record could not be written.
     #[error(transparent)]
     Audit(#[from] crate::audit::AuditError),
+    /// Structured state could not be persisted.
+    #[error(transparent)]
+    Store(#[from] StoreError),
+    /// This manager was constructed without persistent storage.
+    #[error("persistent command history is unavailable")]
+    StoreUnavailable,
 }
 
 struct SessionHandle {
     id: SessionId,
+    root_pid: Option<u32>,
     session: Mutex<Session>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     resize: Arc<dyn Fn(u16, u16) -> Result<(), PtyError> + Send + Sync>,
@@ -122,6 +133,8 @@ struct SessionHandle {
     parser: Arc<Mutex<vt100::Parser>>,
     scrollback: Arc<Mutex<Scrollback>>,
     output: broadcast::Sender<Vec<u8>>,
+    structured: broadcast::Sender<DaemonMessage>,
+    tracker: Mutex<CommandTracker>,
 }
 
 struct SessionManagerInner {
@@ -130,6 +143,8 @@ struct SessionManagerInner {
     audit: AuditLog,
     sessions: RwLock<HashMap<SessionId, Arc<SessionHandle>>>,
     next_id: AtomicU64,
+    tracker_ids: TrackerIds,
+    store: Option<Arc<Store>>,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -145,100 +160,50 @@ impl SessionManager {
         config: SessionManagerConfig,
         audit: AuditLog,
     ) -> Self {
+        Self::build(backend, config, audit, None, 1, 1, 1)
+    }
+
+    /// Create a manager backed by persistent structured storage.
+    pub fn with_store(
+        backend: Arc<dyn PtyBackend>,
+        config: SessionManagerConfig,
+        audit: AuditLog,
+        store: Arc<Store>,
+    ) -> Result<Self, SessionManagerError> {
+        let next_session = store.next_session_id()?;
+        let next_command = store.next_command_id()?;
+        let next_event = store.next_event_id()?;
+        Ok(Self::build(
+            backend,
+            config,
+            audit,
+            Some(store),
+            next_session,
+            next_command,
+            next_event,
+        ))
+    }
+
+    fn build(
+        backend: Arc<dyn PtyBackend>,
+        config: SessionManagerConfig,
+        audit: AuditLog,
+        store: Option<Arc<Store>>,
+        next_session: u64,
+        next_command: u64,
+        next_event: u64,
+    ) -> Self {
         SessionManager {
             inner: Arc::new(SessionManagerInner {
                 backend,
                 config,
                 audit,
                 sessions: RwLock::new(HashMap::new()),
-                next_id: AtomicU64::new(1),
+                next_id: AtomicU64::new(next_session),
+                tracker_ids: TrackerIds::starting_at(next_command, next_event),
+                store,
             }),
         }
-    }
-
-    /// Spawn a shell and return its session in the idle state.
-    pub async fn create(&self, request: CreateSession) -> Result<Session, SessionManagerError> {
-        validate_size(request.cols, request.rows)?;
-        let id = SessionId(self.inner.next_id.fetch_add(1, Ordering::Relaxed));
-        let shell = request
-            .shell
-            .or_else(|| std::env::var("SHELL").ok())
-            .unwrap_or_else(|| "/bin/sh".into());
-        let cwd = request
-            .cwd
-            .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
-            .unwrap_or_else(|| PathBuf::from("/"));
-        let log_dir = self.inner.config.data_dir.join("sessions");
-        fs::create_dir_all(&log_dir).map_err(|source| SessionManagerError::File {
-            operation: "create directory for",
-            path: log_dir.clone(),
-            source,
-        })?;
-        let log_path = log_dir.join(format!("{}.log.zst", id.0));
-        let log_file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-            .map_err(|source| SessionManagerError::File {
-                operation: "open log",
-                path: log_path.clone(),
-                source,
-            })?;
-
-        let spawned = self.inner.backend.spawn(&PtySpawnRequest {
-            session_id: id,
-            shell: shell.clone(),
-            cwd: cwd.clone(),
-            cols: request.cols,
-            rows: request.rows,
-        })?;
-        let mut session = Session::new(
-            id,
-            self.inner.config.machine_id.clone(),
-            shell,
-            cwd.to_string_lossy(),
-            (self.inner.config.clock)(),
-        );
-        session.transition(SessionState::Idle, (self.inner.config.clock)())?;
-
-        let (output, _) = broadcast::channel(256);
-        let parser = Arc::new(Mutex::new(vt100::Parser::new(
-            request.rows,
-            request.cols,
-            self.inner.config.scrollback_lines,
-        )));
-        let scrollback = Arc::new(Mutex::new(Scrollback::new(
-            self.inner.config.scrollback_lines,
-        )));
-        let SpawnedPty {
-            reader,
-            writer,
-            resize,
-            kill,
-            try_wait,
-        } = spawned;
-        let handle = Arc::new(SessionHandle {
-            id,
-            session: Mutex::new(session.clone()),
-            writer,
-            resize,
-            kill,
-            parser: parser.clone(),
-            scrollback: scrollback.clone(),
-            output: output.clone(),
-        });
-        self.inner
-            .sessions
-            .write()
-            .map_err(|_| SessionManagerError::Lock {
-                resource: "session map",
-                session_id: id,
-            })?
-            .insert(id, handle.clone());
-
-        tasks::spawn_reader(id, reader, parser, scrollback, output, log_path, log_file);
-        tasks::spawn_exit_monitor(id, handle, try_wait, self.inner.config.clock.clone());
-        Ok(session)
     }
 
     /// Return all sessions ordered by ID.
@@ -281,6 +246,7 @@ impl SessionManager {
         Ok(Attachment {
             screen,
             output: handle.output.subscribe(),
+            structured: handle.structured.subscribe(),
         })
     }
 
@@ -358,6 +324,9 @@ impl SessionManager {
         let mut session = lock_session(&handle)?;
         if !session.state.is_finished() {
             session.transition(SessionState::Interrupted, (self.inner.config.clock)())?;
+            if let Some(store) = &self.inner.store {
+                store.update_session(&session)?;
+            }
         }
         Ok(())
     }

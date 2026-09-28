@@ -66,4 +66,14 @@ export type ClientRequest = { "type": "GET_MACHINE" } | {
    * Maximum number of commands to return.
    */
   limit: number;
+} | {
+  "type": "SEARCH_COMMANDS";
+  /**
+   * Full-text query entered by the user.
+   */
+  query: string;
+  /**
+   * Maximum number of commands to return.
+   */
+  limit: number;
 };

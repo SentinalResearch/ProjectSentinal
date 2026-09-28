@@ -10,6 +10,9 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `serde` | protocol | Serialize/deserialize wire types |
 | `serde_json` | protocol | JSON wire format |
 | `thiserror` | protocol | Readable error enums |
+| `rusqlite` (`bundled`) | store | Local SQLite persistence with a consistent bundled SQLite/FTS5 build |
+| `sysinfo` | daemon | Cross-platform CPU, RAM, and process-tree sampling |
+| `nvml-wrapper` (optional) | daemon | NVIDIA utilization, VRAM, temperature, and per-process GPU memory |
 
 ## Approved for later milestones
 
@@ -22,9 +25,6 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `tracing`, `tracing-subscriber` | 1 | Logging |
 | `clap` | 1 | CLI argument parsing |
 | `zstd` | 1 | Compress scrollback logs |
-| `rusqlite` or `sqlx` | 2 | SQLite storage |
-| `sysinfo` | 2 | CPU / RAM / processes |
-| `nvml-wrapper` | 2 | NVIDIA GPU metrics |
 | `regex` | 3 | Watcher adapters |
 | `insta` (dev) | 3 | Snapshot tests for watcher output |
 | `ts-rs` | 0 | Generate TypeScript types from protocol |

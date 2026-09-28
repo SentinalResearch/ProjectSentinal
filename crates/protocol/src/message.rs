@@ -108,6 +108,13 @@ pub enum ClientRequest {
         /// Maximum number of commands to return.
         limit: u32,
     },
+    /// Search command text using the daemon's full-text index.
+    SearchCommands {
+        /// Full-text query entered by the user.
+        query: String,
+        /// Maximum number of commands to return.
+        limit: u32,
+    },
 }
 
 impl ClientRequest {
@@ -168,6 +175,11 @@ pub enum DaemonMessage {
     SessionMetrics {
         /// The session measurements.
         metrics: SessionMetrics,
+    },
+    /// Stored commands ordered from newest to oldest.
+    History {
+        /// Commands matching the history request.
+        commands: Vec<Command>,
     },
     /// A request failed.
     Error {

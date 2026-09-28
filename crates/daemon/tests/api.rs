@@ -15,8 +15,9 @@ use daemon::{
     session_manager::{SessionManager, SessionManagerConfig},
 };
 use protocol::{
-    AuthFailure, AuthFailureCode, AuthSession, AuthSessionInfo, AuthStatus, ClientRequest,
-    DaemonMessage, Envelope, Machine, MachineId, MachineStatus, Os, Timestamp,
+    AuthFailure, AuthFailureCode, AuthSession, AuthSessionInfo, AuthStatus, ClientRequest, Command,
+    CommandId, DaemonMessage, Envelope, Machine, MachineId, MachineStatus, Os, SessionId,
+    Timestamp,
 };
 use std::{
     net::SocketAddr,
@@ -25,17 +26,23 @@ use std::{
         Arc,
     },
 };
+use store::Store;
 use tower::ServiceExt;
 
 static NEXT_STATE: AtomicU64 = AtomicU64::new(1);
 
 fn state() -> AppState {
+    state_with_store().0
+}
+
+fn state_with_store() -> (AppState, Arc<Store>) {
     let data_dir = std::env::temp_dir().join(format!(
         "terminal-agent-api-test-{}-{}",
         std::process::id(),
         NEXT_STATE.fetch_add(1, Ordering::Relaxed)
     ));
-    let manager = SessionManager::new(
+    let store = Arc::new(Store::open_in_memory().unwrap());
+    let manager = SessionManager::with_store(
         Arc::new(FakePty::new()),
         SessionManagerConfig {
             machine_id: MachineId("test-machine".into()),
@@ -44,8 +51,10 @@ fn state() -> AppState {
             clock: Arc::new(|| Timestamp(1_790_000_000_000)),
         },
         AuditLog::new(&data_dir),
-    );
-    AppState::new(
+        store.clone(),
+    )
+    .unwrap();
+    let state = AppState::new(
         manager,
         Machine {
             id: MachineId("test-machine".into()),
@@ -59,7 +68,61 @@ fn state() -> AppState {
             last_seen: Timestamp(1_790_000_000_000),
         },
         AuthManager::load(&data_dir.join("auth.json"), "correct-token".into()).unwrap(),
-    )
+    );
+    (state, store)
+}
+
+#[tokio::test]
+async fn history_and_full_text_search_return_stored_commands() {
+    let (state, store) = state_with_store();
+    store
+        .insert_command(&Command::start(
+            CommandId(1),
+            SessionId(7),
+            MachineId("test-machine".into()),
+            "python train.py",
+            "/work",
+            Timestamp(100),
+        ))
+        .unwrap();
+    store
+        .insert_command(&Command::start(
+            CommandId(2),
+            SessionId(8),
+            MachineId("test-machine".into()),
+            "cargo build",
+            "/work",
+            Timestamp(200),
+        ))
+        .unwrap();
+
+    let history = state
+        .dispatch_text(
+            &Envelope::new(ClientRequest::GetHistory {
+                session_id: None,
+                limit: 10,
+            })
+            .encode()
+            .unwrap(),
+        )
+        .await;
+    assert!(
+        matches!(history, WsAction::Reply(DaemonMessage::History { commands }) if commands.len() == 2)
+    );
+
+    let search = state
+        .dispatch_text(
+            &Envelope::new(ClientRequest::SearchCommands {
+                query: "train".into(),
+                limit: 10,
+            })
+            .encode()
+            .unwrap(),
+        )
+        .await;
+    assert!(
+        matches!(search, WsAction::Reply(DaemonMessage::History { commands }) if commands.len() == 1 && commands[0].text == "python train.py")
+    );
 }
 
 #[tokio::test]

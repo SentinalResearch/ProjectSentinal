@@ -15,6 +15,10 @@ pub struct PtySpawnRequest {
     pub session_id: SessionId,
     /// Shell executable.
     pub shell: String,
+    /// Additional arguments used to load shell hooks.
+    pub args: Vec<String>,
+    /// Additional environment entries used to load shell hooks.
+    pub env: Vec<(String, String)>,
     /// Initial working directory.
     pub cwd: PathBuf,
     /// Initial terminal width.
@@ -29,6 +33,7 @@ type TryWaitFn = dyn Fn() -> Result<Option<i32>, PtyError> + Send + Sync;
 
 /// The I/O and control capabilities of one spawned PTY.
 pub struct SpawnedPty {
+    pub(crate) root_pid: Option<u32>,
     pub(crate) reader: Box<dyn Read + Send>,
     pub(crate) writer: Arc<Mutex<Box<dyn Write + Send>>>,
     pub(crate) resize: Arc<ResizeFn>,
@@ -86,11 +91,16 @@ impl PtyBackend for RealPty {
             .map_err(|error| operation_error(request.session_id, "take writer for", error))?;
 
         let mut command = CommandBuilder::new(&request.shell);
+        command.args(&request.args);
+        for (key, value) in &request.env {
+            command.env(key, value);
+        }
         command.cwd(&request.cwd);
         let child = pair
             .slave
             .spawn_command(command)
             .map_err(|error| operation_error(request.session_id, "spawn shell in", error))?;
+        let root_pid = child.process_id();
         let killer = child.clone_killer();
         let child = Arc::new(Mutex::new(child));
         let killer = Arc::new(Mutex::new(killer));
@@ -150,6 +160,7 @@ impl PtyBackend for RealPty {
         });
 
         Ok(SpawnedPty {
+            root_pid,
             reader,
             writer: Arc::new(Mutex::new(writer)),
             resize,
@@ -327,6 +338,9 @@ impl PtyBackend for FakePty {
         });
 
         Ok(SpawnedPty {
+            root_pid: u32::try_from(session_id.0)
+                .ok()
+                .and_then(|id| 10_000_u32.checked_add(id)),
             reader: Box::new(FakeReader {
                 receiver,
                 current: Cursor::new(Vec::new()),

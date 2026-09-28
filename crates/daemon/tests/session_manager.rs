@@ -7,7 +7,10 @@ use daemon::{
     pty::FakePty,
     session_manager::{CreateSession, SessionManager, SessionManagerConfig, SessionManagerError},
 };
-use protocol::{MachineId, SessionId, SessionState, Timestamp};
+use protocol::{
+    DaemonMessage, MachineId, ProcessTotals, Resource, SessionId, SessionMetrics, SessionState,
+    Timestamp,
+};
 use std::{
     fs::{self, File},
     path::PathBuf,
@@ -17,6 +20,7 @@ use std::{
     },
     time::Duration,
 };
+use store::Store;
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(1);
 
@@ -39,6 +43,26 @@ fn manager(name: &str) -> (SessionManager, Arc<FakePty>, PathBuf) {
     };
     let manager = SessionManager::new(backend.clone(), config, AuditLog::new(&data_dir));
     (manager, backend, data_dir)
+}
+
+fn stored_manager(name: &str) -> (SessionManager, Arc<FakePty>, Arc<Store>, PathBuf) {
+    let data_dir = temp_dir(name);
+    let backend = Arc::new(FakePty::new());
+    let store = Arc::new(Store::open_in_memory().unwrap());
+    let config = SessionManagerConfig {
+        machine_id: MachineId("test-machine".into()),
+        data_dir: data_dir.clone(),
+        scrollback_lines: 3,
+        clock: Arc::new(|| Timestamp(1_790_000_000_000)),
+    };
+    let manager = SessionManager::with_store(
+        backend.clone(),
+        config,
+        AuditLog::new(&data_dir),
+        store.clone(),
+    )
+    .unwrap();
+    (manager, backend, store, data_dir)
 }
 
 fn request() -> CreateSession {
@@ -84,6 +108,20 @@ async fn wait_for_scrollback(manager: &SessionManager, id: SessionId, expected: 
 #[tokio::test]
 async fn created_session_becomes_idle() {
     let (manager, fake, data_dir) = manager("create");
+
+    let session = manager.create(request()).await.unwrap();
+
+    assert_eq!(session.state, SessionState::Idle);
+    fake.exit(session.id, 0).unwrap();
+    wait_for_state(&manager, session.id, SessionState::Completed).await;
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn session_starts_when_shell_hook_installation_fails() {
+    let (manager, fake, data_dir) = manager("hook-failure");
+    fs::create_dir_all(&data_dir).unwrap();
+    fs::write(data_dir.join("shell"), b"not a directory").unwrap();
 
     let session = manager.create(request()).await.unwrap();
 
@@ -262,6 +300,82 @@ async fn raw_output_is_appended_to_a_compressed_session_log() {
     .unwrap();
 
     assert_eq!(decoded, b"training output\r\n");
+    wait_for_state(&manager, session.id, SessionState::Completed).await;
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn shell_signals_persist_even_a_command_without_output() {
+    let (manager, fake, store, data_dir) = stored_manager("command-track");
+    let session = manager.create(request()).await.unwrap();
+
+    fake.output(
+        session.id,
+        b"\x1b]7;file://test-host/tmp\x07\x1b]7420;cmd=Y2QgL3RtcA==\x07\x1b]133;B\x07\x1b]133;D;0\x07",
+    )
+    .unwrap();
+
+    let commands = tokio::time::timeout(Duration::from_millis(100), async {
+        loop {
+            let commands = store.history(Some(session.id), 10).unwrap();
+            if commands.first().and_then(|command| command.exit_code) == Some(0) {
+                return commands;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(commands[0].text, "cd /tmp");
+    assert_eq!(commands[0].cwd, "/tmp");
+    assert_eq!(
+        manager.session(session.id).unwrap().state,
+        SessionState::Idle
+    );
+    assert_eq!(store.events_since(protocol::EventId(0)).unwrap().len(), 2);
+
+    fake.exit(session.id, 0).unwrap();
+    wait_for_state(&manager, session.id, SessionState::Completed).await;
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn attached_client_receives_metrics_and_resource_events() {
+    let (manager, fake, store, data_dir) = stored_manager("metric-stream");
+    let session = manager.create(request()).await.unwrap();
+    let mut attachment = manager.attach(session.id).unwrap();
+    let metrics = SessionMetrics {
+        session_id: session.id,
+        at: Timestamp(1_790_000_000_100),
+        totals: ProcessTotals {
+            cpu_percent: 96.0,
+            rss_bytes: 512,
+            gpu_mem_bytes: 256,
+        },
+    };
+
+    manager.publish_metrics(metrics.clone()).unwrap();
+    assert!(matches!(
+        attachment.structured.recv().await.unwrap(),
+        DaemonMessage::SessionMetrics { metrics: received } if received == metrics
+    ));
+
+    manager
+        .publish_resource_high(
+            session.id,
+            Resource::Cpu,
+            96.0,
+            Timestamp(1_790_000_000_100),
+        )
+        .unwrap();
+    assert!(matches!(
+        attachment.structured.recv().await.unwrap(),
+        DaemonMessage::Event { event }
+            if matches!(event.kind, protocol::EventKind::ResourceHigh { resource: Resource::Cpu, percent: 96.0 })
+    ));
+    assert_eq!(store.events_since(protocol::EventId(0)).unwrap().len(), 1);
+
+    fake.exit(session.id, 0).unwrap();
     wait_for_state(&manager, session.id, SessionState::Completed).await;
     fs::remove_dir_all(data_dir).unwrap();
 }

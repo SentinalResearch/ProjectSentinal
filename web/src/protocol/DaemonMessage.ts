@@ -52,6 +52,12 @@ export type DaemonMessage = {
    */
   metrics: SessionMetrics;
 } | {
+  "type": "HISTORY";
+  /**
+   * Commands matching the history request.
+   */
+  commands: Array<Command>;
+} | {
   "type": "ERROR";
   /**
    * Human-readable reason.

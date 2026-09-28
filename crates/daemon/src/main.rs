@@ -5,16 +5,20 @@ use daemon::{
     audit::AuditLog,
     auth::{load_or_create_token, AuthError, AuthManager},
     config::{ConfigError, DaemonConfig},
+    metrics::{MetricsSampler, ResourceDebouncer},
     pty::{FakePty, PtyBackend, RealPty},
-    session_manager::{SessionManager, SessionManagerConfig},
+    session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
 };
-use protocol::{Machine, MachineId, MachineStatus, Os, Timestamp};
+use protocol::{Machine, MachineId, MachineStatus, Os, Resource, Timestamp};
 use std::{
+    collections::HashMap,
+    fs,
     net::SocketAddr,
     path::{Path, PathBuf},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
+use store::{Store, StoreError};
 
 #[derive(Debug, thiserror::Error)]
 enum MainError {
@@ -24,6 +28,15 @@ enum MainError {
     Config(#[from] ConfigError),
     #[error(transparent)]
     Auth(#[from] AuthError),
+    #[error(transparent)]
+    Store(#[from] StoreError),
+    #[error(transparent)]
+    Session(#[from] SessionManagerError),
+    #[error("failed to create daemon data directory '{}': {source}", path.display())]
+    DataDirectory {
+        path: PathBuf,
+        source: std::io::Error,
+    },
     #[error("failed to initialize tracing: {0}")]
     Tracing(String),
     #[error("failed to bind daemon to {address}: {source}")]
@@ -58,13 +71,28 @@ async fn main() -> Result<(), MainError> {
         .unwrap_or_else(|| config.auth_file.clone());
     let auth = AuthManager::load(&auth_file, token)?;
     let machine = machine_description();
+    fs::create_dir_all(&config.data_dir).map_err(|source| MainError::DataDirectory {
+        path: config.data_dir.clone(),
+        source,
+    })?;
+    let store = Arc::new(Store::open(
+        &config.data_dir.join("terminal-agent.sqlite3"),
+    )?);
+    store.upsert_machine(&machine)?;
+    let interrupted = store.interrupt_orphaned_sessions(now())?;
+    if !interrupted.is_empty() {
+        tracing::info!(
+            count = interrupted.len(),
+            "marked restart-orphaned sessions interrupted"
+        );
+    }
     let backend: Arc<dyn PtyBackend> = if std::env::var_os("TA_FAKE_PTY").is_some() {
         tracing::warn!("using fake PTY backend");
         Arc::new(FakePty::new())
     } else {
         Arc::new(RealPty)
     };
-    let sessions = SessionManager::new(
+    let sessions = SessionManager::with_store(
         backend,
         SessionManagerConfig::system(
             machine.id.clone(),
@@ -72,7 +100,9 @@ async fn main() -> Result<(), MainError> {
             config.scrollback_lines,
         ),
         AuditLog::new(&config.data_dir),
-    );
+        store.clone(),
+    )?;
+    spawn_metric_sampler(sessions.clone(), store);
     let state = AppState::new(sessions, machine, auth);
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
@@ -87,6 +117,81 @@ async fn main() -> Result<(), MainError> {
     )
     .await
     .map_err(MainError::Serve)
+}
+
+fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {
+    tokio::spawn(async move {
+        let mut sampler = MetricsSampler::new();
+        let mut debouncers = HashMap::<protocol::SessionId, ResourceDebouncer>::new();
+        let mut interval = tokio::time::interval(Duration::from_secs(2));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let roots = match sessions.process_roots() {
+                Ok(roots) => roots,
+                Err(error) => {
+                    tracing::warn!(%error, "failed to list Session process roots");
+                    continue;
+                }
+            };
+            let at = now();
+            let snapshot = sampler.sample(at, &roots);
+            let ram_total = snapshot.machine.ram_total_bytes;
+            let gpu_percent = snapshot
+                .machine
+                .gpus
+                .iter()
+                .map(|gpu| gpu.util_percent)
+                .reduce(f32::max);
+            let vram_total = snapshot.machine.gpus.iter().fold(0_u64, |total, gpu| {
+                total.saturating_add(gpu.vram_total_bytes)
+            });
+            if let Err(error) = sessions.publish_machine_metrics(snapshot.machine) {
+                tracing::warn!(%error, "failed to publish Machine metrics");
+            }
+            for metrics in snapshot.sessions {
+                let mut values = vec![(Resource::Cpu, metrics.totals.cpu_percent)];
+                if ram_total > 0 {
+                    values.push((
+                        Resource::Ram,
+                        (metrics.totals.rss_bytes as f64 / ram_total as f64 * 100.0) as f32,
+                    ));
+                }
+                if metrics.totals.gpu_mem_bytes > 0 {
+                    if let Some(percent) = gpu_percent {
+                        values.push((Resource::Gpu, percent));
+                    }
+                    if vram_total > 0 {
+                        values.push((
+                            Resource::Vram,
+                            (metrics.totals.gpu_mem_bytes as f64 / vram_total as f64 * 100.0)
+                                as f32,
+                        ));
+                    }
+                }
+                let crossings = debouncers
+                    .entry(metrics.session_id)
+                    .or_default()
+                    .observe(&values);
+                for crossing in crossings {
+                    if let Err(error) = sessions.publish_resource_high(
+                        metrics.session_id,
+                        crossing.resource,
+                        crossing.percent,
+                        at,
+                    ) {
+                        tracing::warn!(session = metrics.session_id.0, %error, "failed to publish resource event");
+                    }
+                }
+                if let Err(error) = sessions.publish_metrics(metrics) {
+                    tracing::warn!(%error, "failed to publish Session metrics");
+                }
+            }
+            if let Err(error) = store.downsample_metrics(at) {
+                tracing::warn!(%error, "failed to downsample raw metrics");
+            }
+        }
+    });
 }
 
 fn machine_description() -> Machine {

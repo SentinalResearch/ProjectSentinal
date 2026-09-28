@@ -1,24 +1,24 @@
 //! Background PTY reader and child-exit tasks.
 
 use super::{Clock, SessionHandle};
-use crate::{pty::PtyError, scrollback::Scrollback};
-use protocol::{SessionId, SessionState};
+use crate::{osc::OscParser, pty::PtyError};
+use protocol::{DaemonMessage, SessionId, SessionState};
 use std::{
     io::{Read, Write},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::Duration,
 };
-use tokio::sync::broadcast;
+use store::Store;
 
 pub(super) fn spawn_reader(
     session_id: SessionId,
     mut reader: Box<dyn Read + Send>,
-    parser: Arc<Mutex<vt100::Parser>>,
-    scrollback: Arc<Mutex<Scrollback>>,
-    output: broadcast::Sender<Vec<u8>>,
+    handle: Arc<SessionHandle>,
     log_path: PathBuf,
     log_file: std::fs::File,
+    store: Option<Arc<Store>>,
+    clock: Clock,
 ) {
     tokio::task::spawn_blocking(move || {
         let mut encoder = match zstd::stream::write::Encoder::new(log_file, 0) {
@@ -29,36 +29,130 @@ pub(super) fn spawn_reader(
             }
         };
         let mut buffer = [0_u8; 8192];
+        let mut osc = OscParser::new();
         loop {
             let count = match reader.read(&mut buffer) {
-                Ok(0) => return,
+                Ok(0) => {
+                    let trailing = osc.finish();
+                    if !trailing.is_empty() {
+                        if let Err(error) =
+                            encoder.write_all(&trailing).and_then(|()| encoder.flush())
+                        {
+                            tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append trailing session log");
+                        }
+                        match handle.parser.lock() {
+                            Ok(mut parser) => parser.process(&trailing),
+                            Err(_) => {
+                                tracing::error!(session = session_id.0, "screen lock poisoned");
+                            }
+                        }
+                        match handle.scrollback.lock() {
+                            Ok(mut scrollback) => scrollback.push(&trailing),
+                            Err(_) => {
+                                tracing::error!(session = session_id.0, "scrollback lock poisoned");
+                            }
+                        }
+                        let _ = handle.output.send(trailing);
+                    }
+                    return;
+                }
                 Ok(count) => count,
                 Err(error) => {
                     tracing::warn!(session = session_id.0, %error, "failed to read PTY output");
                     return;
                 }
             };
-            let bytes = &buffer[..count];
+            let parsed = osc.push(&buffer[..count]);
+            let bytes = parsed.output.as_slice();
+            if bytes.is_empty() {
+                continue;
+            }
             if let Err(error) = encoder.write_all(bytes).and_then(|()| encoder.flush()) {
                 tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append session log");
             }
-            match parser.lock() {
+            match handle.parser.lock() {
                 Ok(mut parser) => parser.process(bytes),
                 Err(_) => {
                     tracing::error!(session = session_id.0, "screen lock poisoned");
                     return;
                 }
             }
-            match scrollback.lock() {
+            match handle.scrollback.lock() {
                 Ok(mut scrollback) => scrollback.push(bytes),
                 Err(_) => {
                     tracing::error!(session = session_id.0, "scrollback lock poisoned");
                     return;
                 }
             }
-            let _ = output.send(bytes.to_vec());
+            let _ = handle.output.send(bytes.to_vec());
+            for signal in parsed.signals {
+                apply_signal(session_id, &handle, store.as_deref(), signal, clock());
+            }
         }
     });
+}
+
+fn apply_signal(
+    session_id: SessionId,
+    handle: &SessionHandle,
+    store: Option<&Store>,
+    signal: crate::osc::ShellSignal,
+    at: protocol::Timestamp,
+) {
+    let update = match (handle.tracker.lock(), handle.session.lock()) {
+        (Ok(mut tracker), Ok(mut session)) => match tracker.handle(&mut session, signal, at) {
+            Ok(update) => (update, session.clone()),
+            Err(error) => {
+                tracing::warn!(session = session_id.0, %error, "failed to apply shell signal");
+                return;
+            }
+        },
+        _ => {
+            tracing::error!(session = session_id.0, "command tracking lock poisoned");
+            return;
+        }
+    };
+    let (update, session) = update;
+    if let Some(store) = store {
+        let result = if let Some(command) = &update.command {
+            if command.finished_at.is_some() {
+                store.finish_command(command)
+            } else {
+                store.insert_command(command)
+            }
+        } else {
+            Ok(())
+        }
+        .and_then(|()| {
+            update
+                .event
+                .as_ref()
+                .map_or(Ok(()), |event| store.insert_event(event))
+        })
+        .and_then(|()| {
+            if update.session_changed {
+                store.update_session(&session)
+            } else {
+                Ok(())
+            }
+        });
+        if let Err(error) = result {
+            tracing::error!(session = session_id.0, %error, "failed to persist shell signal");
+        }
+    }
+    if let Some(command) = update.command {
+        let _ = handle
+            .structured
+            .send(DaemonMessage::CommandUpdated { command });
+    }
+    if let Some(event) = update.event {
+        let _ = handle.structured.send(DaemonMessage::Event { event });
+    }
+    if update.session_changed {
+        let _ = handle
+            .structured
+            .send(DaemonMessage::SessionUpdated { session });
+    }
 }
 
 pub(super) fn spawn_exit_monitor(
@@ -66,6 +160,7 @@ pub(super) fn spawn_exit_monitor(
     handle: Arc<SessionHandle>,
     try_wait: Arc<dyn Fn() -> Result<Option<i32>, PtyError> + Send + Sync>,
     clock: Clock,
+    store: Option<Arc<Store>>,
 ) {
     tokio::spawn(async move {
         loop {
@@ -80,6 +175,10 @@ pub(super) fn spawn_exit_monitor(
                         Ok(mut session) if !session.state.is_finished() => {
                             if let Err(error) = session.transition(target, clock()) {
                                 tracing::error!(session = session_id.0, %error, "failed to record child exit");
+                            } else if let Some(store) = &store {
+                                if let Err(error) = store.update_session(&session) {
+                                    tracing::error!(session = session_id.0, %error, "failed to persist child exit");
+                                }
                             }
                         }
                         Ok(_) => {}

@@ -26,5 +26,10 @@
       "session_id": 128, "at": 1790000600000,
       "totals": { "cpu_percent": 187.5, "rss_bytes": 8589934592,
         "gpu_mem_bytes": 12884901888 } } } },
+  { "version": 1, "payload": { "type": "HISTORY", "commands": [{
+      "id": 8192, "session_id": 128, "machine_id": "rtx-pc",
+      "text": "python train.py --config moe.yaml", "cwd": "~/Projects/TIM",
+      "started_at": 1790000120000, "finished_at": 1790000151000, "exit_code": 0,
+      "class": "ML_TRAINING" }] } },
   { "version": 1, "payload": { "type": "ERROR", "message": "unknown session #999" } }
 ]

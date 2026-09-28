@@ -6,11 +6,16 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+nvidia = ["dep:nvml-wrapper"]
+
 [dependencies]
 argon2.workspace = true
 axum.workspace = true
 portable-pty.workspace = true
 protocol = { path = "../protocol" }
+store = { path = "../store" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -20,6 +25,8 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 vt100.workspace = true
 zstd.workspace = true
+sysinfo.workspace = true
+nvml-wrapper = { workspace = true, optional = true }
 
 [dev-dependencies]
 tower.workspace = true

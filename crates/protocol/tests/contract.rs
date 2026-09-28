@@ -162,6 +162,7 @@ fn every_client_request_has_a_fixture() {
         "RESIZE",
         "KILL",
         "GET_HISTORY",
+        "SEARCH_COMMANDS",
     ];
     let requests = load("client_requests.json");
     let present: Vec<&str> = requests
@@ -189,6 +190,7 @@ fn every_daemon_message_has_a_fixture() {
         "EVENT",
         "MACHINE_METRICS",
         "SESSION_METRICS",
+        "HISTORY",
         "ERROR",
     ];
     let messages = load("daemon_messages.json");
