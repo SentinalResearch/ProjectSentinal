@@ -86,3 +86,11 @@
     width: 36px;
   }
 }
+
+.unavailable {
+  margin: 0;
+  padding: 20px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}

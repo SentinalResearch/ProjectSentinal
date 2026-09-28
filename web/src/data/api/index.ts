@@ -95,6 +95,10 @@ export function mapSession(session: WireSession): Session {
     runningFor: formatDuration(Date.now() - session.created_at),
     details: session.shell,
     events: [],
+    origin: session.origin,
+    capture: session.capture,
+    exitCode: session.exit_code,
+    log: session.log ?? undefined,
   };
 }
 

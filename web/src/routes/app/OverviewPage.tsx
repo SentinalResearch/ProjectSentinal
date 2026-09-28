@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
+import { exitUnknown } from "../../data/capture";
 import { dataAdapter } from "../../data";
 import { formatSessionDuration, formatSessionFact, needsAttention } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
@@ -100,7 +101,7 @@ export function OverviewPage() {
                   onKeyDown={onActivateKey(() => open(session.id))}
                 >
                   <div className={styles.needsCardTop}>
-                    <StateTag state={session.state} size="sm" />
+                    <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
                     <span className={styles.needsMachine}>{machine?.name ?? session.machine}</span>
                   </div>
                   <div className={styles.needsBody}>
@@ -156,7 +157,7 @@ export function OverviewPage() {
             {rows.map((session) => (
               <button key={session.id} type="button" className={styles.row} onClick={() => open(session.id)}>
                 <span className={styles.rowTagCell}>
-                  <StateTag state={session.state} size="sm" />
+                  <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
                 </span>
                 <span className={styles.rowName}>
                   <span className={styles.rowNameText}>{session.name}</span>

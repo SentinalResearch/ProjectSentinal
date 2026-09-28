@@ -2,6 +2,7 @@ import type { MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { StateTag } from "../../components/StateTag";
+import { captureCapabilities, captureExplanation, captureOf, exitUnknown } from "../../data/capture";
 import { formatSessionFact } from "../../data/format";
 import type { Machine, Session } from "../../data/types";
 import { TerminalPane } from "../../terminal/TerminalPane";
@@ -37,7 +38,7 @@ export function SplitPane({ session, machine, active, gridRow, onFocus, onClose 
       onClick={onFocus}
     >
       <div className={styles.head}>
-        <StateTag state={session.state} size="sm" />
+        <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
         <span className={styles.name}>{session.name}</span>
         <span className={styles.fact}>
           {machine?.name ?? session.machine} · {formatSessionFact(session)}
@@ -49,13 +50,19 @@ export function SplitPane({ session, machine, active, gridRow, onFocus, onClose 
           ×
         </button>
       </div>
-      <TerminalPane
-        sessionId={session.id}
-        session={session}
-        height="fill"
-        showKeyBar={false}
-        className={styles.terminalWrap}
-      />
+      {captureCapabilities(captureOf(session)).canAttach ? (
+        <TerminalPane
+          sessionId={session.id}
+          session={session}
+          height="fill"
+          showKeyBar={false}
+          className={styles.terminalWrap}
+        />
+      ) : (
+        <p className={styles.unavailable} role="note">
+          {captureExplanation(captureOf(session))}
+        </p>
+      )}
     </section>
   );
 }

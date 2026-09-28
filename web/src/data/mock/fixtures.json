@@ -141,6 +141,47 @@
       "command": "npm install",
       "state": "WAITING",
       "prompt": "Continue? [y/N]"
+    },
+    {
+      "id": "adopted-train",
+      "machine": "rtx",
+      "name": "Existing training run",
+      "command": "python train.py --resume",
+      "cwd": "~/Projects/TIM",
+      "state": "RUNNING",
+      "runningFor": "3h12m",
+      "origin": "ADOPTED",
+      "capture": "PROCESS",
+      "exitCode": null,
+      "log": {
+        "path": "/home/me/Projects/TIM/train.log",
+        "source": "STDOUT_AND_STDERR"
+      },
+      "metrics": {
+        "gpuPct": 91,
+        "vramGB": 18.2,
+        "vramTotalGB": 24
+      },
+      "events": [
+        [
+          "09:10",
+          "PROCESS_STARTED",
+          "python train.py --resume"
+        ]
+      ]
+    },
+    {
+      "id": "adopted-ended",
+      "machine": "rtx",
+      "name": "Old export job",
+      "command": "python export.py",
+      "cwd": "~/Projects/TIM",
+      "state": "COMPLETED",
+      "runningFor": "41m",
+      "origin": "ADOPTED",
+      "capture": "PROCESS",
+      "exitCode": null,
+      "events": []
     }
   ],
   "history": [

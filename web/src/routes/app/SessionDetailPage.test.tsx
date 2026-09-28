@@ -68,4 +68,30 @@ describe("SessionDetailPage", () => {
     expect(await screen.findByText("WAITING FOR INPUT")).toBeInTheDocument();
     expect(screen.getByText("Continue? [y/N]")).toBeInTheDocument();
   });
+
+  it("shows an adopted PROCESS session read-only with metrics and a log-detected hint", async () => {
+    renderSession("/app/sessions/adopted-train");
+
+    expect(await screen.findByRole("heading", { name: "Existing training run" })).toBeInTheDocument();
+    expect(screen.getByLabelText("PROCESS capture")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Live resources" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Log detected: /home/me/Projects/TIM/train.log (stdout and stderr) — tailing not enabled yet.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("no output, input, resize, or kill");
+    expect(screen.queryByTestId("terminal-host")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ctrl‑C…" })).not.toBeInTheDocument();
+    expect(screen.queryByText("PROCESS_LOG")).not.toBeInTheDocument();
+  });
+
+  it("shows an ended adopted process as exit code unknown, never as success", async () => {
+    renderSession("/app/sessions/adopted-ended");
+
+    expect(await screen.findByRole("heading", { name: "Old export job" })).toBeInTheDocument();
+    expect(screen.getByText(/Ended · exit code unknown/)).toBeInTheDocument();
+    expect(screen.getAllByText("ENDED").length).toBeGreaterThan(0);
+    expect(screen.queryByText("COMPLETED")).not.toBeInTheDocument();
+  });
 });

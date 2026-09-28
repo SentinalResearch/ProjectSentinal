@@ -1,3 +1,6 @@
+import type { CaptureLevel } from "../protocol/CaptureLevel";
+import type { SessionLog } from "../protocol/SessionLog";
+import type { SessionOrigin } from "../protocol/SessionOrigin";
 import type { SessionState } from "../protocol/SessionState";
 
 export type MachineStatus = "ONLINE" | "OFFLINE";
@@ -71,6 +74,14 @@ export interface Session {
   prompt?: string;
   health?: SessionHealth;
   events?: SessionEvent[];
+  /** How the Session entered Sentinal; absent means UI. */
+  origin?: SessionOrigin;
+  /** What Sentinal can observe; absent means FULL. Authorization is enforced by the daemon. */
+  capture?: CaptureLevel;
+  /** Shell exit code; `null` on an ended Session means the exit code is unknown. */
+  exitCode?: number | null;
+  /** Adopted process log, recorded but not tailed before 1b.D. */
+  log?: SessionLog;
 }
 
 export interface HistoryEntry {

@@ -12,6 +12,11 @@ export interface StateTagProps {
   label?: string;
   /** Hide the text label; the glyph alone carries the state (pair with an adjacent label column). */
   iconOnly?: boolean;
+  /**
+   * An ended external process whose exit status is unknown: a COMPLETED state
+   * is shown as a neutral "ENDED" instead of a success check.
+   */
+  exitUnknown?: boolean;
 }
 
 const GLYPHS: Record<TagState, ReactNode> = {
@@ -42,8 +47,16 @@ const GLYPHS: Record<TagState, ReactNode> = {
 };
 
 /** State is never color-only: solid fill (or line/outline) + glyph + uppercase label. */
-export function StateTag({ state, size = "md", variant = "solid", label, iconOnly = false }: StateTagProps) {
-  const s = state.toLowerCase();
+export function StateTag({
+  state,
+  size = "md",
+  variant = "solid",
+  label,
+  iconOnly = false,
+  exitUnknown = false,
+}: StateTagProps) {
+  const unknownEnd = exitUnknown && state === "COMPLETED";
+  const s = unknownEnd ? "idle" : state.toLowerCase();
   const isDisconnected = state === "DISCONNECTED";
   const solid = variant === "solid" && !isDisconnected;
   const sm = size === "sm";
@@ -74,9 +87,9 @@ export function StateTag({ state, size = "md", variant = "solid", label, iconOnl
         className={styles.icon}
         aria-hidden="true"
       >
-        {GLYPHS[state]}
+        {unknownEnd ? GLYPHS.IDLE : GLYPHS[state]}
       </svg>
-      {!iconOnly && <span>{label ?? state}</span>}
+      {!iconOnly && <span>{label ?? (unknownEnd ? "ENDED" : state)}</span>}
     </span>
   );
 }

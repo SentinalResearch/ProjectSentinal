@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { CaptureBadge } from "../../components/CaptureBadge";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
+import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../data/capture";
 import {
   confirmConsequence,
   formatSessionDuration,
@@ -49,11 +51,23 @@ export function SessionDetailPage() {
 
   const kind = sessionKind(session);
   const interrupted = session.state === "INTERRUPTED";
-  const canInterrupt = INTERRUPTIBLE.has(session.state);
+  const capture = captureOf(session);
+  const capabilities = captureCapabilities(capture);
+  const unknownExit = exitUnknown(session);
+  const hint = logHint(session);
+  // Ctrl-C is terminal input: only offered when the daemon allows input.
+  const canInterrupt = capabilities.canSendInput && INTERRUPTIBLE.has(session.state);
   const hasHealth = Boolean(session.health);
   const healthLabel = interrupted ? "INTERRUPTED" : (session.health?.overall ?? "");
   const healthSlug = interrupted ? "interrupted" : healthColorSlug(session.health?.overall ?? "");
-  const meta = [session.project, machineName, formatSessionDuration(session)].filter(Boolean).join(" · ");
+  const meta = [
+    session.project,
+    machineName,
+    formatSessionDuration(session),
+    unknownExit ? "Ended · exit code unknown" : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   function askCtrlC() {
     if (canInterrupt) setConfirmOpen(true);
@@ -93,7 +107,8 @@ export function SessionDetailPage() {
         <div className={styles.headerText}>
           <div className={styles.titleRow}>
             <h1 className={styles.title}>{session.name}</h1>
-            <StateTag state={session.state} />
+            <StateTag state={session.state} exitUnknown={unknownExit} />
+            <CaptureBadge capture={capture} />
             {hasHealth && (
               <span
                 className={styles.healthOutline}
@@ -106,6 +121,7 @@ export function SessionDetailPage() {
           </div>
           {session.command && <span className={styles.command}>{session.command}</span>}
           <span className={styles.meta}>{meta}</span>
+          {hint && <span className={styles.logHint}>{hint}</span>}
         </div>
         <div className={styles.actions}>
           <button
@@ -143,20 +159,28 @@ export function SessionDetailPage() {
             <span className={`${styles.terminalPath} mono`}>
               {machineName} · {session.cwd ?? "~"}
             </span>
-            <span className={styles.attachedIndicator}>
-              <span
-                className={styles.attachedDot}
-                style={{ background: attached ? "var(--s-running)" : "var(--s-disconnected-fg)" }}
-              />
-              {attached ? "attached" : "connecting…"}
-            </span>
+            {capabilities.canAttach && (
+              <span className={styles.attachedIndicator}>
+                <span
+                  className={styles.attachedDot}
+                  style={{ background: attached ? "var(--s-running)" : "var(--s-disconnected-fg)" }}
+                />
+                {attached ? "attached" : "connecting…"}
+              </span>
+            )}
           </div>
-          <TerminalPane
-            sessionId={session.id}
-            session={session}
-            onAttachedChange={setAttached}
-            onRequestInterrupt={askCtrlC}
-          />
+          {capabilities.canAttach ? (
+            <TerminalPane
+              sessionId={session.id}
+              session={session}
+              onAttachedChange={setAttached}
+              onRequestInterrupt={askCtrlC}
+            />
+          ) : (
+            <p className={styles.terminalUnavailable} role="note">
+              {captureExplanation(capture)}
+            </p>
+          )}
         </section>
 
         <aside className={styles.side}>
