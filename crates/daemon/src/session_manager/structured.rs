@@ -86,7 +86,7 @@ impl SessionManager {
         let _ = self.inner.observations.send(message);
     }
 
-    /// Persist machine metrics and broadcast them to all attached clients.
+    /// Persist machine metrics and broadcast them to every connected client.
     pub fn publish_machine_metrics(
         &self,
         metrics: MachineMetrics,
@@ -117,19 +117,10 @@ impl SessionManager {
                 }),
             })?;
         }
-        let sessions = self
+        let _ = self
             .inner
-            .sessions
-            .read()
-            .map_err(|_| SessionManagerError::Lock {
-                resource: "session map",
-                session_id: SessionId(0),
-            })?;
-        for handle in sessions.values() {
-            let _ = handle.structured.send(DaemonMessage::MachineMetrics {
-                metrics: metrics.clone(),
-            });
-        }
+            .observations
+            .send(DaemonMessage::MachineMetrics { metrics });
         Ok(())
     }
 
@@ -142,7 +133,8 @@ impl SessionManager {
         at: Timestamp,
     ) -> Result<Event, SessionManagerError> {
         let handle = self.handle(session_id)?;
-        let command_id = lock_session(&handle)?.current_command;
+        let session = lock_session(&handle)?.clone();
+        let command_id = session.current_command;
         let event = Event {
             id: self.inner.tracker_ids.event(),
             session_id,
@@ -153,9 +145,13 @@ impl SessionManager {
         if let Some(store) = &self.inner.store {
             store.insert_event(&event)?;
         }
-        let _ = handle.structured.send(DaemonMessage::Event {
+        let message = DaemonMessage::Event {
             event: event.clone(),
-        });
+        };
+        let _ = handle.structured.send(message.clone());
+        if session.capture != CaptureLevel::Full {
+            self.observe_reduced(message);
+        }
         Ok(event)
     }
 

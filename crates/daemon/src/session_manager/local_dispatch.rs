@@ -30,8 +30,13 @@ impl SessionManager {
                 cwd,
                 started_at,
             } => self
-                .shell_command_started(session_id, pid, sequence, &text, &cwd, started_at)
-                .map(|command| LocalResponse::Command { command }),
+                .report_shell_command_started(session_id, pid, sequence, &text, &cwd, started_at)
+                .and_then(|started| match started {
+                    Some(command) => Ok(LocalResponse::Command { command }),
+                    None => self
+                        .session(session_id)
+                        .map(|session| LocalResponse::Session { session }),
+                }),
             LocalRequest::ShellCommandFinished {
                 session_id,
                 pid,

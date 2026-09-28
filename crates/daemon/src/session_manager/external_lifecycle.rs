@@ -49,7 +49,12 @@ impl SessionManager {
                 if let Some(store) = &self.inner.store {
                     store.update_session(&session)?;
                 }
+                let session_id = session.id;
+                let shell_hook = session.origin == SessionOrigin::ShellHook;
                 self.insert_external(session)?;
+                if shell_hook {
+                    self.allow_initial_shell_sequence_gap(session_id)?;
+                }
             } else {
                 let event = ended_event(self, &mut session, now)?;
                 if let Some(store) = &self.inner.store {
@@ -87,7 +92,9 @@ impl SessionManager {
             store.update_session(&session)?;
             store.insert_event(&event)?;
         }
-        let _ = handle.structured.send(DaemonMessage::Event { event });
+        let event_message = DaemonMessage::Event { event };
+        let _ = handle.structured.send(event_message.clone());
+        self.observe_reduced(event_message);
         self.observe_reduced(DaemonMessage::SessionUpdated {
             session: session.clone(),
         });

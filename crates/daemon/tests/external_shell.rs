@@ -10,8 +10,8 @@ use daemon::{
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
 };
 use protocol::{
-    CaptureLevel, CommandStatus, Envelope, EventKind, LocalErrorCode, LocalRequest, LocalResponse,
-    MachineId, SessionId, SessionOrigin, SessionState, Timestamp,
+    CaptureLevel, CommandStatus, DaemonMessage, Envelope, EventKind, LocalErrorCode, LocalRequest,
+    LocalResponse, MachineId, SessionId, SessionOrigin, SessionState, Timestamp,
 };
 use std::{
     collections::HashMap,
@@ -221,6 +221,40 @@ fn commands_are_stored_once_with_exact_text_cwd_exit_and_duration() {
 }
 
 #[test]
+fn command_lifecycle_reaches_unattached_reduced_capture_observers() {
+    let h = harness();
+    let session = register(&h);
+    let mut observer = h.manager.observe();
+
+    start(&h, session.id, 1, "python train.py", 1_790_000_001_000);
+    finish(&h, session.id, 1, 0, 1_790_000_001_250).unwrap();
+
+    let mut command_updates = 0;
+    let mut command_events = 0;
+    let mut saw_running = false;
+    let mut saw_idle = false;
+    while let Ok(message) = observer.try_recv() {
+        match message {
+            DaemonMessage::CommandUpdated { command } if command.session_id == session.id => {
+                command_updates += 1;
+            }
+            DaemonMessage::Event { event } if event.session_id == session.id => {
+                command_events += 1;
+            }
+            DaemonMessage::SessionUpdated { session: updated } if updated.id == session.id => {
+                saw_running |= updated.state == SessionState::Running;
+                saw_idle |= updated.state == SessionState::Idle;
+            }
+            _ => {}
+        }
+    }
+
+    assert_eq!(command_updates, 2);
+    assert_eq!(command_events, 2);
+    assert!(saw_running && saw_idle);
+}
+
+#[test]
 fn finish_that_arrives_before_its_start_is_applied_when_the_start_arrives() {
     let h = harness();
     let session = register(&h);
@@ -232,6 +266,53 @@ fn finish_that_arrives_before_its_start_is_applied_when_the_start_arrives() {
     assert_eq!(
         h.manager.session(session.id).unwrap().state,
         SessionState::Idle
+    );
+}
+
+#[test]
+fn starts_and_finishes_arriving_out_of_order_preserve_every_command() {
+    let h = harness();
+    let session = register(&h);
+
+    let second = h.manager.handle_local(LocalRequest::ShellCommandStarted {
+        session_id: session.id,
+        pid: SHELL_PID,
+        sequence: 2,
+        text: "second".into(),
+        cwd: "/work/two".into(),
+        started_at: Timestamp(1_790_000_002_000),
+    });
+    assert!(matches!(second, LocalResponse::Session { .. }));
+    let first = h.manager.handle_local(LocalRequest::ShellCommandStarted {
+        session_id: session.id,
+        pid: SHELL_PID,
+        sequence: 1,
+        text: "first".into(),
+        cwd: "/work/one".into(),
+        started_at: Timestamp(1_790_000_001_000),
+    });
+    assert!(matches!(first, LocalResponse::Command { .. }));
+
+    finish(&h, session.id, 2, 0, 1_790_000_002_100).unwrap();
+    finish(&h, session.id, 1, 3, 1_790_000_001_100).unwrap();
+
+    let history = h.store.history(Some(session.id), 10).unwrap();
+    assert_eq!(history.len(), 2);
+    let first = history
+        .iter()
+        .find(|command| command.text == "first")
+        .unwrap();
+    let second = history
+        .iter()
+        .find(|command| command.text == "second")
+        .unwrap();
+    assert_eq!(
+        (first.cwd.as_str(), first.exit_code),
+        ("/work/one", Some(3))
+    );
+    assert_eq!(
+        (second.cwd.as_str(), second.exit_code),
+        ("/work/two", Some(0))
     );
 }
 
@@ -425,8 +506,8 @@ fn restart_recovers_a_verified_live_shell_and_ends_an_unverifiable_one() {
     );
     // The recovered shell keeps reporting into the same Session.
     assert_eq!(register(&h).id, alive.id);
-    start(&h, alive.id, 2, "ls", 1_790_000_200_000);
-    assert!(finish(&h, alive.id, 2, 0, 1_790_000_200_010).is_some());
+    start(&h, alive.id, 99, "ls", 1_790_000_200_000);
+    assert!(finish(&h, alive.id, 99, 0, 1_790_000_200_010).is_some());
 }
 
 // ---- local socket dispatch and privacy --------------------------------------

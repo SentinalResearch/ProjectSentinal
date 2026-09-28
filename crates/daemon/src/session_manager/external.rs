@@ -15,8 +15,8 @@ use crate::{
     tracker::CommandTracker,
 };
 use protocol::{
-    CaptureLevel, Command, DaemonMessage, Session, SessionId, SessionOrigin, SessionState,
-    Timestamp,
+    CaptureLevel, Command, DaemonMessage, Event, EventKind, Session, SessionId, SessionOrigin,
+    SessionState, Timestamp,
 };
 use std::{
     collections::BTreeMap,
@@ -33,16 +33,28 @@ const MAX_TRACKED_SEQUENCES: usize = 16;
 pub(super) struct ShellReports {
     last_started: u64,
     running: Option<u64>,
+    /// A recovered shell may resume at a sequence the restarted daemon did not persist.
+    accept_initial_gap: bool,
+    /// Starts held until the missing earlier sequence arrives.
+    pending_start: BTreeMap<u64, PendingStart>,
     /// Finishes that arrived before their start (reporters run concurrently).
     pending_finish: BTreeMap<u64, (i32, Timestamp)>,
     /// Recent Commands by sequence, for idempotent repeated starts.
     recent: BTreeMap<u64, Command>,
 }
 
+#[derive(Debug, Clone)]
+struct PendingStart {
+    text: String,
+    cwd: String,
+    started_at: Timestamp,
+}
+
 impl ShellReports {
     /// Drop any running or queued Command state (the shell is gone).
     pub(super) fn forget_running(&mut self) {
         self.running = None;
+        self.pending_start.clear();
         self.pending_finish.clear();
     }
 
@@ -135,16 +147,75 @@ impl SessionManager {
         cwd: &str,
         started_at: Timestamp,
     ) -> Result<Command, SessionManagerError> {
+        self.report_shell_command_started(session_id, pid, sequence, text, cwd, started_at)?
+            .ok_or(SessionManagerError::SequenceConflict {
+                session_id,
+                sequence,
+            })
+    }
+
+    /// Record or queue a shell Command start whose reporter may arrive out of order.
+    pub fn report_shell_command_started(
+        &self,
+        session_id: SessionId,
+        pid: u32,
+        sequence: u64,
+        text: &str,
+        cwd: &str,
+        started_at: Timestamp,
+    ) -> Result<Option<Command>, SessionManagerError> {
         let handle = self.shell_handle(session_id, pid)?;
         let mut reports = lock_reports(&handle)?;
         if sequence <= reports.last_started {
-            return reports.recent.get(&sequence).cloned().ok_or(
+            return reports.recent.get(&sequence).cloned().map(Some).ok_or(
                 SessionManagerError::SequenceConflict {
                     session_id,
                     sequence,
                 },
             );
         }
+        if sequence > reports.last_started.saturating_add(1) && reports.accept_initial_gap {
+            reports.last_started = sequence.saturating_sub(1);
+            reports.accept_initial_gap = false;
+        } else if sequence > reports.last_started.saturating_add(1) {
+            reports
+                .pending_start
+                .entry(sequence)
+                .or_insert_with(|| PendingStart {
+                    text: text.into(),
+                    cwd: cwd.into(),
+                    started_at,
+                });
+            while reports.pending_start.len() > MAX_TRACKED_SEQUENCES {
+                reports.pending_start.pop_last();
+            }
+            return Ok(None);
+        }
+        reports.accept_initial_gap = false;
+        let requested = sequence;
+        let first = PendingStart {
+            text: text.into(),
+            cwd: cwd.into(),
+            started_at,
+        };
+        self.start_report(&handle, &mut reports, sequence, first)?;
+        loop {
+            let next = reports.last_started.saturating_add(1);
+            let Some(pending) = reports.pending_start.remove(&next) else {
+                break;
+            };
+            self.start_report(&handle, &mut reports, next, pending)?;
+        }
+        Ok(reports.recent.get(&requested).cloned())
+    }
+
+    fn start_report(
+        &self,
+        handle: &SessionHandle,
+        reports: &mut ShellReports,
+        sequence: u64,
+        pending: PendingStart,
+    ) -> Result<(), SessionManagerError> {
         if reports.running.take().is_some() {
             // The previous finish was lost; a shell runs Commands one at a time.
             if let Ok(mut tracker) = handle.tracker.lock() {
@@ -154,34 +225,34 @@ impl SessionManager {
         reports.last_started = sequence;
         let store = self.inner.store.as_deref();
         let _ = apply_signal(
-            session_id,
-            &handle,
+            handle.id,
+            handle,
             store,
-            ShellSignal::Cwd(cwd.into()),
-            started_at,
+            ShellSignal::Cwd(pending.cwd),
+            pending.started_at,
         );
         let _ = apply_signal(
-            session_id,
-            &handle,
+            handle.id,
+            handle,
             store,
-            ShellSignal::CommandText(text.into()),
-            started_at,
+            ShellSignal::CommandText(pending.text),
+            pending.started_at,
         );
         let mut command = apply_signal(
-            session_id,
-            &handle,
+            handle.id,
+            handle,
             store,
             ShellSignal::CommandStart,
-            started_at,
+            pending.started_at,
         )
         .and_then(|update| update.command)
         .ok_or(SessionManagerError::SequenceConflict {
-            session_id,
+            session_id: handle.id,
             sequence,
         })?;
         reports.running = Some(sequence);
         if let Some((exit_code, finished_at)) = reports.pending_finish.remove(&sequence) {
-            if let Some(finished) = self.finish_running(&handle, exit_code, finished_at, &command) {
+            if let Some(finished) = self.finish_running(handle, exit_code, finished_at, &command) {
                 reports.running = None;
                 command = finished;
             }
@@ -190,7 +261,7 @@ impl SessionManager {
             .pending_finish
             .retain(|pending, _| *pending > sequence);
         reports.remember(sequence, command.clone());
-        Ok(command)
+        Ok(())
     }
 
     /// Record a Command finish; `None` means it was queued until its start arrives.
@@ -230,10 +301,55 @@ impl SessionManager {
             }
             return Ok(None);
         }
+        if let Some(started) = reports.recent.get(&sequence).cloned() {
+            if started.finished_at.is_some() {
+                return Err(SessionManagerError::SequenceConflict {
+                    session_id,
+                    sequence,
+                });
+            }
+            let finished = self.finish_abandoned(&handle, exit_code, finished_at, started)?;
+            reports.remember(sequence, finished.clone());
+            return Ok(Some(finished));
+        }
         Err(SessionManagerError::SequenceConflict {
             session_id,
             sequence,
         })
+    }
+
+    fn finish_abandoned(
+        &self,
+        handle: &SessionHandle,
+        exit_code: i32,
+        finished_at: Timestamp,
+        mut command: Command,
+    ) -> Result<Command, SessionManagerError> {
+        let at = finished_at.max(command.started_at);
+        command.finish(exit_code, at)?;
+        let event = Event {
+            id: self.inner.tracker_ids.event(),
+            session_id: handle.id,
+            command_id: Some(command.id),
+            at,
+            kind: EventKind::CommandFinished {
+                exit_code,
+                duration_ms: command.duration(at),
+            },
+        };
+        if let Some(store) = &self.inner.store {
+            store.finish_command(&command)?;
+            store.insert_event(&event)?;
+        }
+        let command_message = DaemonMessage::CommandUpdated {
+            command: command.clone(),
+        };
+        let event_message = DaemonMessage::Event { event };
+        let _ = handle.structured.send(command_message.clone());
+        let _ = handle.structured.send(event_message.clone());
+        let _ = handle.observations.send(command_message);
+        let _ = handle.observations.send(event_message);
+        Ok(command)
     }
 
     pub(super) fn verify_owned_process(&self, pid: u32) -> Result<Timestamp, SessionManagerError> {
@@ -310,6 +426,7 @@ impl SessionManager {
             scrollback: Arc::new(Mutex::new(Scrollback::new(0))),
             output,
             structured,
+            observations: self.inner.observations.clone(),
             tracker: Mutex::new(CommandTracker::new(
                 self.inner.config.machine_id.clone(),
                 cwd,
@@ -317,7 +434,7 @@ impl SessionManager {
             )),
             initial_command: Mutex::new(None),
             shell_reports: Mutex::default(),
-            attached: std::sync::atomic::AtomicBool::new(false),
+            attached: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         });
         self.inner
             .sessions
@@ -327,6 +444,15 @@ impl SessionManager {
                 session_id: id,
             })?
             .insert(id, handle);
+        Ok(())
+    }
+
+    pub(super) fn allow_initial_shell_sequence_gap(
+        &self,
+        session_id: SessionId,
+    ) -> Result<(), SessionManagerError> {
+        let handle = self.handle(session_id)?;
+        lock_reports(&handle)?.accept_initial_gap = true;
         Ok(())
     }
 

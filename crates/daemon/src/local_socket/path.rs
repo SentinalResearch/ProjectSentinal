@@ -36,6 +36,7 @@ pub(super) fn prepare_private_parent(
     parent: &Path,
     expected_uid: u32,
 ) -> Result<(), LocalSocketError> {
+    validate_ancestors(parent, expected_uid)?;
     let base = parent
         .parent()
         .ok_or_else(|| LocalSocketError::MissingParent(parent.to_path_buf()))?;
@@ -102,6 +103,68 @@ pub(super) fn prepare_private_parent(
         });
     }
     Ok(())
+}
+
+fn validate_ancestors(path: &Path, expected_uid: u32) -> Result<(), LocalSocketError> {
+    if !path.is_absolute() {
+        return Err(LocalSocketError::UnsafePath {
+            path: path.to_path_buf(),
+            reason: "socket parent must be an absolute path".into(),
+        });
+    }
+    let mut current = PathBuf::new();
+    for component in path.components() {
+        current.push(component.as_os_str());
+        let metadata = match fs::symlink_metadata(&current) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(source) => {
+                return Err(LocalSocketError::Io {
+                    operation: "inspect socket ancestor for",
+                    path: current,
+                    source,
+                });
+            }
+        };
+        if metadata.file_type().is_symlink() && trusted_system_alias(&current) {
+            continue;
+        }
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(LocalSocketError::UnsafePath {
+                path: current,
+                reason: "ancestor is a symlink or is not a directory".into(),
+            });
+        }
+        let mode = metadata.permissions().mode();
+        let writable_by_others = mode & 0o022 != 0;
+        let sticky = mode & 0o1000 != 0;
+        if writable_by_others && (metadata.uid() == expected_uid || !sticky) {
+            return Err(LocalSocketError::UnsafePath {
+                path: current,
+                reason: "ancestor is group/world writable without safe sticky ownership".into(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn trusted_system_alias(path: &Path) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let expected = if path == Path::new("/var") {
+            Some(Path::new("private/var"))
+        } else if path == Path::new("/tmp") {
+            Some(Path::new("private/tmp"))
+        } else {
+            None
+        };
+        expected.is_some_and(|target| fs::read_link(path).ok().as_deref() == Some(target))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        false
+    }
 }
 
 /// Refuse a symlink, non-socket, foreign-owned, or live socket; remove a

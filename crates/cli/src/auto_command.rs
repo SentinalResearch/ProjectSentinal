@@ -17,6 +17,7 @@ use std::{
     io::{IsTerminal, Write},
     path::{Path, PathBuf},
     process::ExitCode,
+    time::Instant,
 };
 
 /// Run one auto-wrap operation.
@@ -79,6 +80,7 @@ fn configured_skip_vars() -> Vec<(String, String)> {
 }
 
 async fn enter(url: &str, token_file: Option<PathBuf>, shell: &str, shell_path: &str) -> u8 {
+    let started = Instant::now();
     let hook_shell = HookShell::from_shell_path(shell);
     if skip_reason(&capture_env(hook_shell, true)).is_some() {
         return FALLBACK_EXIT;
@@ -127,7 +129,13 @@ async fn enter(url: &str, token_file: Option<PathBuf>, shell: &str, shell_path: 
         .await;
         return FALLBACK_EXIT;
     }
-    match client.attach(session.id).await {
+    let Some(remaining) = ENTRY_DEADLINE.checked_sub(started.elapsed()) else {
+        return FALLBACK_EXIT;
+    };
+    match client
+        .attach_before(session.id, remaining, (cols, rows))
+        .await
+    {
         Ok(_) => 0,
         Err(_) => FALLBACK_EXIT,
     }

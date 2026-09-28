@@ -363,7 +363,7 @@ async fn an_auto_wrap_session_nobody_attaches_to_is_reaped() {
     assert_eq!(session.capture, CaptureLevel::Full);
     assert_eq!(
         daemon::session_manager::AUTO_WRAP_ATTACH_GRACE,
-        Duration::from_secs(5)
+        Duration::from_millis(300)
     );
 
     let spawn = h.fake.spawn_request(session.id).unwrap();
@@ -380,7 +380,9 @@ async fn an_auto_wrap_session_nobody_attaches_to_is_reaped() {
 async fn attached_or_non_auto_wrap_sessions_are_never_reaped() {
     let h = harness();
     let wrapped = h.manager.create(auto_wrap()).await.unwrap();
-    drop(h.manager.attach(wrapped.id).unwrap());
+    let attachment = h.manager.attach(wrapped.id).unwrap();
+    attachment.confirm();
+    drop(attachment);
     assert!(!h.manager.reap_unattached_auto_wrap(wrapped.id).unwrap());
 
     let watched = h.manager.create(watch(None)).await.unwrap();
@@ -391,6 +393,18 @@ async fn attached_or_non_auto_wrap_sessions_are_never_reaped() {
     );
     let _ = h.fake.exit(watched.id, 0);
     cleanup(h, wrapped.id);
+}
+
+#[tokio::test]
+async fn an_attachment_that_never_delivers_its_snapshot_does_not_commit_auto_wrap() {
+    let h = harness();
+    let wrapped = h.manager.create(auto_wrap()).await.unwrap();
+
+    drop(h.manager.attach(wrapped.id).unwrap());
+
+    assert!(h.manager.reap_unattached_auto_wrap(wrapped.id).unwrap());
+    wait_until(|| h.manager.session(wrapped.id).unwrap().state == SessionState::Interrupted).await;
+    fs::remove_dir_all(h.data_dir).unwrap();
 }
 
 #[tokio::test]

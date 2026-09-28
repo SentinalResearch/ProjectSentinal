@@ -9,7 +9,7 @@ use protocol::{
     CaptureLevel, DaemonMessage, LogSource, Session, SessionId, SessionLog, SessionOrigin,
     SessionState,
 };
-use std::path::Path;
+use std::{os::unix::fs::MetadataExt, path::Path};
 
 impl SessionManager {
     /// Adopt `pid` read-only; `log_path` is recorded for 1b.D, not tailed.
@@ -22,8 +22,15 @@ impl SessionManager {
         if pid == std::process::id() {
             return Err(SessionManagerError::AdoptSelf(pid));
         }
+        let owner_uid = self
+            .inner
+            .probe
+            .owner_uid()
+            .ok_or(SessionManagerError::ProcessProbeUnavailable)?;
         let started_at = self.verify_owned_process(pid)?;
-        let log = log_path.map(|path| explicit_log(&path)).transpose()?;
+        let log = log_path
+            .map(|path| explicit_log(&path, owner_uid))
+            .transpose()?;
         let _registration =
             self.inner
                 .registration
@@ -131,7 +138,7 @@ impl SessionManager {
 }
 
 /// Accept an explicit log only as an absolute, readable regular file.
-fn explicit_log(path: &str) -> Result<SessionLog, SessionManagerError> {
+fn explicit_log(path: &str, owner_uid: u32) -> Result<SessionLog, SessionManagerError> {
     let invalid = |reason: &str| SessionManagerError::InvalidLog {
         path: path.to_string(),
         reason: reason.to_string(),
@@ -143,6 +150,12 @@ fn explicit_log(path: &str) -> Result<SessionLog, SessionManagerError> {
         .map_err(|error| invalid(&format!("cannot read: {error}")))?;
     if !metadata.is_file() {
         return Err(invalid("is not a regular file"));
+    }
+    if metadata.uid() != owner_uid {
+        return Err(invalid(&format!(
+            "log uid {} does not match daemon uid {owner_uid}",
+            metadata.uid()
+        )));
     }
     std::fs::File::open(path).map_err(|error| invalid(&format!("cannot read: {error}")))?;
     Ok(SessionLog {

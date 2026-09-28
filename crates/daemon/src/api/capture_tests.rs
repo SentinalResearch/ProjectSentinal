@@ -155,7 +155,10 @@ async fn full_capture_ui_session_keeps_attach_resize_and_input() {
             }
         )
         .await,
-        WsAction::Reply(DaemonMessage::SessionUpdated { .. })
+        WsAction::Resize {
+            message: DaemonMessage::SessionUpdated { .. },
+            ..
+        }
     ));
     state
         .sessions

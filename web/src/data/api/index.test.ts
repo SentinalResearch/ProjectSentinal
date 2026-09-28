@@ -198,6 +198,14 @@ class FakeSocket implements ApiSocket {
     this.readyState = WebSocket.CLOSED;
     this.onclose?.(new CloseEvent("close", { code: 4_001, reason: "browser session expired" }));
   }
+
+  observe(payload: DaemonMessage) {
+    this.onmessage?.(
+      new MessageEvent("message", {
+        data: JSON.stringify({ version: 1, payload } satisfies Envelope<DaemonMessage>),
+      }),
+    );
+  }
 }
 
 function body(request: RequestInit): Record<string, unknown> {
@@ -329,6 +337,56 @@ describe("apiAdapter authentication", () => {
       }),
     ]);
     expect(sockets[0].requests).toContainEqual({ type: "SEARCH_COMMANDS", query: "train", limit: 500 });
+  });
+
+  it("maps reduced-capture command, event, and metric observations", async () => {
+    const { adapter, sockets } = setup();
+    const events: import("../adapter").LiveEvent[] = [];
+    adapter.subscribe((event) => events.push(event));
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getSessions();
+
+    sockets[0].observe({
+      type: "MACHINE_METRICS",
+      metrics: {
+        at: 1_700_000_000_100,
+        cpu_percent: 50,
+        ram_used_bytes: 8_589_934_592,
+        ram_total_bytes: 17_179_869_184,
+        gpus: [{ index: 0, util_percent: 96, vram_used_bytes: 12_884_901_888, vram_total_bytes: 25_769_803_776, temp_c: 71 }],
+      },
+    });
+    sockets[0].observe({
+      type: "SESSION_METRICS",
+      metrics: {
+        session_id: 1,
+        at: 1_700_000_000_100,
+        totals: { cpu_percent: 33.25, rss_bytes: 2_147_483_648, gpu_mem_bytes: 10_737_418_240 },
+      },
+    });
+    sockets[0].observe({ type: "COMMAND_UPDATED", command: { ...command, finished_at: null, exit_code: null } });
+    sockets[0].observe({
+      type: "EVENT",
+      event: {
+        id: 12,
+        session_id: 1,
+        command_id: 9,
+        at: 1_700_000_001_000,
+        kind: { type: "RESOURCE_HIGH", resource: "GPU", percent: 96 },
+      },
+    });
+
+    expect(events).toContainEqual({
+      type: "SESSION_METRICS",
+      sessionId: "1",
+      metrics: { cpuPct: 33.3, ramGB: 2, gpuPct: 96, vramGB: 10, vramTotalGB: 24 },
+    });
+    expect(events).toContainEqual({ type: "COMMAND_UPDATED", sessionId: "1", command: "python train.py" });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "EVENT_APPENDED",
+      sessionId: "1",
+      event: expect.arrayContaining(["RESOURCE_HIGH"]),
+    }));
   });
 
   it("rotates the browser session on password change and revokes it on logout", async () => {

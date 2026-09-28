@@ -46,7 +46,9 @@ socket. The implementation must:
 - reject a peer whose OS-reported UID differs from the daemon UID;
 - use bounded, versioned messages and recover from malformed messages;
 - remove only a verified stale socket owned by the same user;
-- refuse symlink and ownership-confusion paths;
+- refuse symlinks anywhere in the configured path, foreign-owned private
+  parents, and non-sticky group/world-writable ancestors (macOS's fixed
+  `/var` and `/tmp` system aliases are the only trusted aliases);
 - expose no terminal-input operation on the local reporting protocol;
 - keep hook reporting silent and asynchronous when unavailable.
 
@@ -63,8 +65,8 @@ Implemented in 1b.0 (`crates/daemon/src/local_socket.rs`):
   wrong peer UID is answered `FORBIDDEN` before the frame is read and is
   recorded in `<data_dir>/security-audit.jsonl` without payload bytes.
 - 1b.B handles `REGISTER_SHELL`, `SHELL_COMMAND_STARTED`, and
-  `SHELL_COMMAND_FINISHED`; `ADOPT_PROCESS` still returns `UNAVAILABLE`. No
-  local request can attach, resize, send input, or signal.
+  `SHELL_COMMAND_FINISHED`; 1b.C handles read-only `ADOPT_PROCESS`. No local
+  request can attach, resize, send input, or signal.
 - A shell can be registered only if its PID exists and is owned by the
   daemon's UID; reports must come for that Session's own PID. Session
   identity is PID plus OS start time, so a reused PID never inherits a
@@ -122,8 +124,10 @@ instead of creating a Session.
   prevent a shell from starting. Recursion is stopped by
   `SENTINAL_SESSION_ID` and the explicit `SENTINAL_AUTO_GUARD=1` that the
   daemon sets in every AUTO_WRAP shell; a reply not marked `AUTO_WRAP`
-  (an older daemon) is refused; unattached AUTO_WRAP Sessions are killed
-  after 5 s.
+  (an older daemon) is refused. Creation and receipt of the initial screen
+  share one 200 ms deadline. The client acknowledges that screen with its
+  first resize; without that acknowledgement the daemon interrupts the
+  AUTO_WRAP Session after 300 ms.
 - Adoption is local-only (`ADOPT_PROCESS` over the private socket) and
   read-only: the daemon's `ProcessProbe` exposes only identity, metadata,
   and log-discovery reads; it has no signal, write, ptrace, priority, or
@@ -131,6 +135,9 @@ instead of creating a Session.
   resize, and kill are refused even for handcrafted remote requests.
 - Only processes owned by the daemon's UID can be adopted, never
   `sentinald` itself; identity is PID + OS start time.
+- An explicit adopted log must be an absolute, readable regular file owned
+  by the daemon UID. The daemon records only its path until 1b.D enables
+  read-only tailing.
 - Log discovery reads `/proc/<pid>/fd` links or runs `lsof` with a 2 s
   timeout, off the request path; it opens nothing belonging to the process.
 

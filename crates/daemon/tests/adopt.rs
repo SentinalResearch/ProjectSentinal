@@ -18,6 +18,7 @@ use protocol::{
 use std::{
     collections::HashMap,
     fs,
+    os::unix::fs::MetadataExt,
     path::PathBuf,
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
@@ -388,6 +389,42 @@ async fn unusable_explicit_logs_are_rejected_before_adoption() {
         assert!(error.to_string().contains(expected), "{path}: {error}");
     }
     assert!(h.manager.list().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn an_explicit_log_owned_by_another_uid_is_rejected() {
+    let seed = harness();
+    let log = seed.data_dir.join("foreign.log");
+    fs::write(&log, "private output\n").unwrap();
+    let file_uid = fs::metadata(&log).unwrap().uid();
+
+    let table: Table = Arc::new(Mutex::new(HashMap::from([(
+        TARGET,
+        ProcessIdentity {
+            started_at: STARTED,
+            uid: file_uid.wrapping_add(1),
+        },
+    )])));
+    let lookup = table.clone();
+    let manager = SessionManager::new(
+        Arc::new(FakePty::new()),
+        SessionManagerConfig {
+            machine_id: MachineId("test-machine".into()),
+            data_dir: seed.data_dir.clone(),
+            scrollback_lines: 10,
+            clock: Arc::new(|| Timestamp(1_790_000_000_000)),
+        },
+        AuditLog::new(&seed.data_dir),
+    )
+    .with_process_probe(ProcessProbe::new(file_uid.wrapping_add(1), move |pid| {
+        lookup.lock().unwrap().get(&pid).copied()
+    }));
+
+    let error = manager
+        .adopt_process(TARGET, None, Some(log.display().to_string()))
+        .unwrap_err();
+    assert!(error.to_string().contains("log uid"), "{error}");
+    assert!(manager.list().unwrap().is_empty());
 }
 
 #[tokio::test]

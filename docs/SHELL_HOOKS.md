@@ -66,9 +66,10 @@ finish, and exit status through the private local socket. Hook sources are
   armed by the last `PROMPT_COMMAND` entry, reads the full line from
   `history 1`, and registers with bash-preexec's arrays instead when
   bash-preexec is loaded. fish uses `fish_preexec` / `fish_postexec`.
-- Each shell numbers its Commands. The daemon applies a finish that arrives
-  before its start, ignores repeats, clamps finish >= start, and does not let a
-  lost finish block the next Command.
+- Each shell numbers its Commands. The daemon buffers an early later start,
+  applies a finish that arrives before its start, repairs a late finish for an
+  already superseded Command, ignores repeats, clamps finish >= start, and
+  does not let a lost finish block the next Command.
 - `SENTINAL_SOCKET` overrides the socket path; set it in the shell's
   environment when `sentinald` uses a non-default `data_dir` or
   `local_socket`. `SENTINAL_TITLE` sets an optional Session title.

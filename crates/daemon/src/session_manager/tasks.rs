@@ -172,20 +172,31 @@ pub(super) fn apply_signal(
             tracing::error!(session = session_id.0, %error, "failed to persist shell signal");
         }
     }
+    let reduced = session.capture != protocol::CaptureLevel::Full;
     if let Some(command) = &update.command {
-        let _ = handle.structured.send(DaemonMessage::CommandUpdated {
+        let message = DaemonMessage::CommandUpdated {
             command: command.clone(),
-        });
+        };
+        let _ = handle.structured.send(message.clone());
+        if reduced {
+            let _ = handle.observations.send(message);
+        }
     }
     if let Some(event) = &update.event {
-        let _ = handle.structured.send(DaemonMessage::Event {
+        let message = DaemonMessage::Event {
             event: event.clone(),
-        });
+        };
+        let _ = handle.structured.send(message.clone());
+        if reduced {
+            let _ = handle.observations.send(message);
+        }
     }
     if update.session_changed {
-        let _ = handle
-            .structured
-            .send(DaemonMessage::SessionUpdated { session });
+        let message = DaemonMessage::SessionUpdated { session };
+        let _ = handle.structured.send(message.clone());
+        if reduced {
+            let _ = handle.observations.send(message);
+        }
     }
     Some(update)
 }

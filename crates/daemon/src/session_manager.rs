@@ -36,7 +36,7 @@ use store::Store;
 use tokio::sync::broadcast;
 
 /// How long an AUTO_WRAP Session may wait for its terminal to attach.
-pub const AUTO_WRAP_ATTACH_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
+pub const AUTO_WRAP_ATTACH_GRACE: std::time::Duration = std::time::Duration::from_millis(300);
 
 /// Function used to timestamp session and audit state.
 pub type Clock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
@@ -93,6 +93,15 @@ pub struct Attachment {
     pub output: broadcast::Receiver<Vec<u8>>,
     /// Structured command, event, Session, and metric updates.
     pub structured: broadcast::Receiver<DaemonMessage>,
+    pub(crate) confirmation: Arc<AtomicBool>,
+}
+
+impl Attachment {
+    /// Confirm that the screen snapshot reached the attaching transport.
+    pub fn confirm(&self) {
+        self.confirmation
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 
 struct SessionHandle {
@@ -106,13 +115,15 @@ struct SessionHandle {
     scrollback: Arc<Mutex<Scrollback>>,
     output: broadcast::Sender<Vec<u8>>,
     structured: broadcast::Sender<DaemonMessage>,
+    /// Global observation stream used by Sessions that cannot attach.
+    observations: broadcast::Sender<DaemonMessage>,
     tracker: Mutex<CommandTracker>,
     /// Rendered Watch initial Command, taken and typed at the first prompt.
     initial_command: Mutex<Option<Vec<u8>>>,
     /// Sequence bookkeeping for Commands reported by an external shell hook.
     shell_reports: Mutex<external::ShellReports>,
     /// Set by the first successful attach.
-    attached: AtomicBool,
+    attached: Arc<AtomicBool>,
 }
 
 struct SessionManagerInner {
@@ -222,23 +233,22 @@ impl SessionManager {
     pub fn attach(&self, session_id: SessionId) -> Result<Attachment, SessionManagerError> {
         let handle = self.handle(session_id)?;
         require_capture(&handle, CaptureOperation::Attach)?;
-        handle
-            .attached
-            .store(true, std::sync::atomic::Ordering::SeqCst);
-        let screen = handle
-            .parser
-            .lock()
-            .map_err(|_| SessionManagerError::Lock {
-                resource: "screen",
-                session_id,
-            })?
-            .screen()
-            .state_formatted();
-        Ok(Attachment {
-            screen,
-            output: handle.output.subscribe(),
-            structured: handle.structured.subscribe(),
-        })
+        snapshot_and_subscribe(
+            &handle.output,
+            &handle.structured,
+            handle.attached.clone(),
+            || {
+                Ok(handle
+                    .parser
+                    .lock()
+                    .map_err(|_| SessionManagerError::Lock {
+                        resource: "screen",
+                        session_id,
+                    })?
+                    .screen()
+                    .state_formatted())
+            },
+        )
     }
 
     /// Return the retained line-oriented scrollback.
@@ -339,6 +349,26 @@ impl SessionManager {
     }
 }
 
+fn snapshot_and_subscribe(
+    output_sender: &broadcast::Sender<Vec<u8>>,
+    structured_sender: &broadcast::Sender<DaemonMessage>,
+    confirmation: Arc<AtomicBool>,
+    snapshot: impl FnOnce() -> Result<Vec<u8>, SessionManagerError>,
+) -> Result<Attachment, SessionManagerError> {
+    // Subscribe before taking the snapshot. Output written while the parser
+    // lock is contended is then either present in the snapshot or waiting in
+    // this receiver, never lost between the two operations.
+    let output = output_sender.subscribe();
+    let structured = structured_sender.subscribe();
+    let screen = snapshot()?;
+    Ok(Attachment {
+        screen,
+        output,
+        structured,
+        confirmation,
+    })
+}
+
 fn validate_size(cols: u16, rows: u16) -> Result<(), SessionManagerError> {
     if cols == 0 || rows == 0 {
         Err(SessionManagerError::InvalidTerminalSize { cols, rows })
@@ -365,4 +395,29 @@ fn system_timestamp() -> Timestamp {
         .map(|duration| duration.as_millis())
         .unwrap_or(0);
     Timestamp(i64::try_from(millis).unwrap_or(i64::MAX))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn attachment_subscribes_before_snapshotting() {
+        let (output, _) = broadcast::channel(4);
+        let (structured, _) = broadcast::channel(4);
+        let mut attachment = snapshot_and_subscribe(
+            &output,
+            &structured,
+            Arc::new(AtomicBool::new(false)),
+            || {
+                let _ = output.send(b"during snapshot".to_vec());
+                Ok(b"screen".to_vec())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(attachment.screen, b"screen");
+        assert_eq!(attachment.output.try_recv().unwrap(), b"during snapshot");
+    }
 }

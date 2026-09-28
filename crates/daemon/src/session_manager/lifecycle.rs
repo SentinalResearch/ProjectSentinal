@@ -140,6 +140,7 @@ impl SessionManager {
             scrollback: scrollback.clone(),
             output: output.clone(),
             structured,
+            observations: self.inner.observations.clone(),
             tracker: Mutex::new(CommandTracker::new(
                 self.inner.config.machine_id.clone(),
                 cwd.to_string_lossy(),
@@ -147,7 +148,7 @@ impl SessionManager {
             )),
             initial_command: Mutex::new(initial_command),
             shell_reports: Mutex::default(),
-            attached: AtomicBool::new(false),
+            attached: Arc::new(AtomicBool::new(false)),
         });
         self.inner
             .sessions

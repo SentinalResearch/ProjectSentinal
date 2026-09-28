@@ -9,6 +9,7 @@ use protocol::{ClientRequest, DaemonMessage, Envelope, ProtocolError, SessionId}
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
+    time::Duration,
 };
 use tokio::io::AsyncWriteExt;
 use tokio_tungstenite::{
@@ -78,6 +79,9 @@ pub enum ClientError {
         /// I/O error.
         source: std::io::Error,
     },
+    /// The daemon did not deliver the initial screen before auto-wrap failed open.
+    #[error("daemon did not deliver the initial screen within {} ms", .0.as_millis())]
+    AttachReadyTimeout(Duration),
 }
 
 /// Whether `message` is an unsolicited observation (Metrics, Events,
@@ -168,17 +172,57 @@ impl DaemonClient {
 
     /// Attach this process's terminal until `Ctrl-\ d`, EOF, or the shell exits.
     pub async fn attach(mut self, session_id: SessionId) -> Result<AttachEnd, ClientError> {
+        self.attach_inner(session_id, None, None, false).await
+    }
+
+    /// Attach only if the initial screen arrives before `deadline`.
+    pub async fn attach_before(
+        mut self,
+        session_id: SessionId,
+        deadline: Duration,
+        size: (u16, u16),
+    ) -> Result<AttachEnd, ClientError> {
+        self.attach_inner(session_id, Some(deadline), Some(size), true)
+            .await
+    }
+
+    async fn attach_inner(
+        &mut self,
+        session_id: SessionId,
+        ready_deadline: Option<Duration>,
+        requested_size: Option<(u16, u16)>,
+        auto_wrap: bool,
+    ) -> Result<AttachEnd, ClientError> {
         self.send_control(ClientRequest::Attach { session_id })
             .await?;
-        if let Some((cols, rows)) = terminal_size() {
-            self.send_control(ClientRequest::Resize {
-                session_id,
-                cols,
-                rows,
-            })
-            .await?;
+        let ready = self.receive_initial_screen(session_id);
+        match ready_deadline {
+            Some(deadline) => tokio::time::timeout(deadline, ready)
+                .await
+                .map_err(|_| ClientError::AttachReadyTimeout(deadline))??,
+            None => ready.await?,
         }
+        // Do not acknowledge auto-wrap until this process can safely take
+        // ownership of the caller's terminal.
         let _raw = RawTerminal::enable()?;
+        // RESIZE is the attachment acknowledgement: it is sent only after
+        // this client has actually received the screen snapshot.
+        let (cols, rows) = requested_size.or_else(terminal_size).unwrap_or((80, 24));
+        self.send_control(ClientRequest::Resize {
+            session_id,
+            cols,
+            rows,
+        })
+        .await?;
+        let result = self.pump_attachment(session_id).await;
+        if auto_wrap && result.is_err() {
+            // Once acknowledged, falling back would start a second shell.
+            return Ok(AttachEnd::Detached);
+        }
+        result
+    }
+
+    async fn pump_attachment(&mut self, session_id: SessionId) -> Result<AttachEnd, ClientError> {
         let mut stdin = spawn_stdin_reader();
         let mut stdout = tokio::io::stdout();
         let mut detector = DetachDetector::new();
@@ -257,6 +301,41 @@ impl DaemonClient {
                 }
             }
         }
+    }
+
+    async fn receive_initial_screen(&mut self, session_id: SessionId) -> Result<(), ClientError> {
+        let mut stdout = tokio::io::stdout();
+        while let Some(message) = self.socket.next().await {
+            match message? {
+                Message::Binary(frame) => {
+                    let (frame_session, bytes) = decode_terminal_frame(&frame)
+                        .map_err(|error| ClientError::Daemon(error.to_string()))?;
+                    if frame_session == session_id {
+                        stdout
+                            .write_all(bytes)
+                            .await
+                            .map_err(|source| ClientError::Io {
+                                operation: "write",
+                                source,
+                            })?;
+                        stdout.flush().await.map_err(|source| ClientError::Io {
+                            operation: "flush",
+                            source,
+                        })?;
+                        return Ok(());
+                    }
+                }
+                Message::Text(text) => {
+                    let message = Envelope::<DaemonMessage>::decode(text.as_str())?.payload;
+                    if let DaemonMessage::Error { message } = message {
+                        return Err(ClientError::Daemon(message));
+                    }
+                }
+                Message::Close(_) => return Err(ClientError::Disconnected),
+                _ => {}
+            }
+        }
+        Err(ClientError::Disconnected)
     }
 
     async fn send_control(&mut self, request: ClientRequest) -> Result<(), ClientError> {

@@ -100,7 +100,13 @@ impl AppState {
                 cols,
                 rows,
             } => match self.sessions.resize(session_id, cols, rows) {
-                Ok(()) => session_reply(&self.sessions, session_id),
+                Ok(()) => match session_reply(&self.sessions, session_id) {
+                    WsAction::Reply(message) => WsAction::Resize {
+                        session_id,
+                        message,
+                    },
+                    action => action,
+                },
                 Err(error) => error_action(error),
             },
             ClientRequest::Kill { session_id } => match self.sessions.kill(session_id) {
@@ -133,6 +139,13 @@ pub enum WsAction {
         session_id: SessionId,
         /// Snapshot and output subscription.
         attachment: Attachment,
+    },
+    /// Confirm a delivered attachment and send the resize response.
+    Resize {
+        /// Session whose snapshot the client acknowledged.
+        session_id: SessionId,
+        /// Updated Session response.
+        message: DaemonMessage,
     },
     /// Stop forwarding one session to this client.
     Detach(SessionId),
@@ -235,7 +248,7 @@ async fn websocket(
 
 async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: String, token: String) {
     let (output_tx, mut output_rx) = mpsc::channel::<AttachedOutput>(256);
-    let mut attachments: HashMap<SessionId, JoinHandle<()>> = HashMap::new();
+    let mut attachments: HashMap<SessionId, AttachedForwarder> = HashMap::new();
     let mut observations = state.sessions.observe();
 
     loop {
@@ -300,8 +313,8 @@ async fn handle_socket(mut socket: WebSocket, state: AppState, client_addr: Stri
         }
     }
 
-    for (_, task) in attachments {
-        task.abort();
+    for (_, attachment) in attachments {
+        attachment.task.abort();
     }
 }
 
@@ -330,7 +343,7 @@ async fn handle_client_message(
     state: &AppState,
     client_addr: &str,
     output_tx: &mpsc::Sender<AttachedOutput>,
-    attachments: &mut HashMap<SessionId, JoinHandle<()>>,
+    attachments: &mut HashMap<SessionId, AttachedForwarder>,
     message: Message,
 ) -> bool {
     match message {
@@ -361,11 +374,22 @@ async fn handle_client_message(
 async fn apply_action(
     socket: &mut WebSocket,
     output_tx: &mpsc::Sender<AttachedOutput>,
-    attachments: &mut HashMap<SessionId, JoinHandle<()>>,
+    attachments: &mut HashMap<SessionId, AttachedForwarder>,
     action: WsAction,
 ) -> bool {
     match action {
         WsAction::Reply(message) => send_daemon_message(socket, message).await,
+        WsAction::Resize {
+            session_id,
+            message,
+        } => {
+            if let Some(attachment) = attachments.get(&session_id) {
+                attachment
+                    .confirmation
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            send_daemon_message(socket, message).await
+        }
         WsAction::Attach {
             session_id,
             mut attachment,
@@ -380,8 +404,9 @@ async fn apply_action(
                 return false;
             }
             if let Some(previous) = attachments.remove(&session_id) {
-                previous.abort();
+                previous.task.abort();
             }
+            let confirmation = attachment.confirmation.clone();
             let output_tx = output_tx.clone();
             let task = tokio::spawn(async move {
                 loop {
@@ -413,16 +438,21 @@ async fn apply_action(
                     }
                 }
             });
-            attachments.insert(session_id, task);
+            attachments.insert(session_id, AttachedForwarder { task, confirmation });
             true
         }
         WsAction::Detach(session_id) => {
             if let Some(task) = attachments.remove(&session_id) {
-                task.abort();
+                task.task.abort();
             }
             true
         }
     }
+}
+
+struct AttachedForwarder {
+    task: JoinHandle<()>,
+    confirmation: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 enum AttachedOutput {

@@ -18,12 +18,14 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(1);
 
 fn temp_dir(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!(
-        // Short names keep socket paths under the macOS 104-byte sun_path limit.
-        "sl{}-{}-{name}",
-        std::process::id(),
-        NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
-    ))
+    std::fs::canonicalize(std::env::temp_dir())
+        .unwrap()
+        .join(format!(
+            // Short names keep socket paths under the macOS 104-byte sun_path limit.
+            "sl{}-{}-{name}",
+            std::process::id(),
+            NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
+        ))
 }
 
 async fn exchange(
@@ -266,6 +268,36 @@ async fn listener_refuses_live_socket_regular_file_and_symlinked_parent() {
     .unwrap_err();
     assert!(error.to_string().contains("symlink"), "{error}");
     assert!(!real.join("sentinald.sock").exists());
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn listener_refuses_a_symlink_anywhere_in_the_parent_chain() {
+    let data_dir = temp_dir("al");
+    let real = data_dir.join("r");
+    fs::create_dir_all(real.join("n")).unwrap();
+    std::os::unix::fs::symlink(&real, data_dir.join("l")).unwrap();
+    let socket_path = data_dir.join("l/n/s/s.sock");
+
+    let error = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap_err();
+
+    assert!(error.to_string().contains("symlink"), "{error}");
+    assert!(!real.join("n/s/s.sock").exists());
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn listener_refuses_a_non_sticky_world_writable_ancestor() {
+    let data_dir = temp_dir("wa");
+    fs::create_dir_all(data_dir.join("base")).unwrap();
+    fs::set_permissions(&data_dir, fs::Permissions::from_mode(0o777)).unwrap();
+    let socket_path = data_dir.join("base/run/sentinald.sock");
+
+    let error = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap_err();
+
+    assert!(error.to_string().contains("writable"), "{error}");
+    assert!(!socket_path.exists());
+    fs::set_permissions(&data_dir, fs::Permissions::from_mode(0o700)).unwrap();
     fs::remove_dir_all(data_dir).unwrap();
 }
 

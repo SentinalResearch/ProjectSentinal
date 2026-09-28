@@ -2,6 +2,31 @@
 
 Status: Milestone 1b.C complete 2026-09-28; awaiting human review before Milestone 3.
 
+## Pre-Milestone 3 audit remediation
+
+- [x] Deliver reduced-capture Metrics, Commands, Events, and state through the real web adapter — daemon behaviour tests and `web/src/data/api/index.test.ts`
+- [x] Make AUTO_WRAP attachment a bounded, confirmed handoff with safe orphan cleanup — CLI and daemon auto-wrap regression tests
+- [x] Preserve external-shell Command order when background reporters arrive out of order — `crates/daemon/tests/external_shell.rs`
+- [x] Close the screen-snapshot/live-output subscription gap — `crates/daemon/tests/session_manager.rs`
+- [x] Enforce explicit adopted-log ownership and safe local-socket ancestors — adopt and local-socket filesystem tests
+- [x] Give Playwright a fresh persistent data directory on every run — repeated `pnpm -C web test:e2e`
+- [x] Re-run `just check`, every ignored integration available on this host, and Playwright before starting Milestone 3
+
+## Pre-Milestone 3 audit verification (2026-09-28, macOS arm64)
+
+- `just check` passes: fmt, clippy `-D warnings`, 348 fast Rust tests,
+  45 TypeScript export checks, and 48 web tests.
+- All 14 ignored integration/benchmark tests pass on this host. Real zsh and
+  bash paths ran; fish-specific scripts reported their documented skip
+  because fish is not installed. The hook benchmark remained below budget:
+  added p95 1.13 ms zsh and 2.48 ms bash.
+- Playwright passed twice consecutively (2/2 each run) with a newly generated
+  private daemon config, authentication file, token, SQLite data directory,
+  and local socket per run.
+- No protocol fixture or protocol-version change and no new dependency.
+- Remaining Milestone 1b release work is unchanged: 1b.D log tail/UI lands
+  with Milestone 3; Linux and real-fish platform rows remain pending.
+
 ## Plan
 
 - [x] 1b.0 contract and capability helpers — `crates/protocol/src/session.rs`,

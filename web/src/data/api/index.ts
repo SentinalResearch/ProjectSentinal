@@ -142,6 +142,8 @@ class DaemonTransport {
   private readonly pending: PendingReply[] = [];
   private readonly listeners = new Set<(event: LiveEvent) => void>();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private latestGpuPct: number | undefined;
+  private latestVramTotal = 0;
 
   constructor(
     private readonly url: string,
@@ -249,6 +251,46 @@ class DaemonTransport {
     if (message.type === "SESSION_UPDATED") {
       const session = mapSession(message.session);
       for (const listener of this.listeners) listener({ type: "SESSION_UPDATED", session });
+    } else if (message.type === "MACHINE_METRICS") {
+      this.latestGpuPct = message.metrics.gpus.reduce<number | undefined>(
+        (highest, gpu) => highest === undefined ? gpu.util_percent : Math.max(highest, gpu.util_percent),
+        undefined,
+      );
+      this.latestVramTotal = message.metrics.gpus.reduce((total, gpu) => total + gpu.vram_total_bytes, 0);
+    } else if (message.type === "SESSION_METRICS") {
+      const totals = message.metrics.totals;
+      const metrics = {
+        cpuPct: Math.round(totals.cpu_percent * 10) / 10,
+        ramGB: Math.round((totals.rss_bytes / 1024 ** 3) * 10) / 10,
+        gpuPct: totals.gpu_mem_bytes > 0 ? this.latestGpuPct : undefined,
+        vramGB: this.latestVramTotal > 0 || totals.gpu_mem_bytes > 0
+          ? Math.round((totals.gpu_mem_bytes / 1024 ** 3) * 10) / 10
+          : undefined,
+        vramTotalGB: this.latestVramTotal > 0
+          ? Math.round((this.latestVramTotal / 1024 ** 3) * 10) / 10
+          : undefined,
+      };
+      for (const listener of this.listeners) {
+        listener({ type: "SESSION_METRICS", sessionId: String(message.metrics.session_id), metrics });
+      }
+    } else if (message.type === "COMMAND_UPDATED") {
+      for (const listener of this.listeners) {
+        listener({
+          type: "COMMAND_UPDATED",
+          sessionId: String(message.command.session_id),
+          command: message.command.finished_at === null ? message.command.text : undefined,
+        });
+      }
+    } else if (message.type === "EVENT") {
+      const observed = message.event;
+      const event: import("../types").SessionEvent = [
+        new Date(observed.at).toLocaleTimeString(),
+        observed.kind.type,
+        "",
+      ];
+      for (const listener of this.listeners) {
+        listener({ type: "EVENT_APPENDED", sessionId: String(observed.session_id), event });
+      }
     }
 
     const index = this.pending.findIndex((pending) => pending.accepts(message));

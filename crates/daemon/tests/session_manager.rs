@@ -387,3 +387,23 @@ async fn attached_client_receives_metrics_and_resource_events() {
     wait_for_state(&manager, session.id, SessionState::Completed).await;
     fs::remove_dir_all(data_dir).unwrap();
 }
+
+#[tokio::test]
+async fn machine_metrics_reach_clients_without_an_attachment() {
+    let (manager, _fake, _data_dir) = manager("machine-metric-observer");
+    let mut observer = manager.observe();
+    let metrics = protocol::MachineMetrics {
+        at: Timestamp(1_790_000_000_100),
+        cpu_percent: 42.0,
+        ram_used_bytes: 512,
+        ram_total_bytes: 1024,
+        gpus: Vec::new(),
+    };
+
+    manager.publish_machine_metrics(metrics.clone()).unwrap();
+
+    assert!(matches!(
+        observer.try_recv().unwrap(),
+        DaemonMessage::MachineMetrics { metrics: received } if received == metrics
+    ));
+}

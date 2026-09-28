@@ -120,15 +120,16 @@ Ordinary IDE terminals (`TERM_PROGRAM=vscode`, JetBrains JediTerm, Emacs
 vterm) and interactive SSH are wrapped; there is no broad `TERM_PROGRAM`
 rule.
 
-Auto-wrap is fail-open: `auto enter` has 200 ms to reach the daemon and
-create the Session. On any skip, timeout, or error it exits 75 silently and
+Auto-wrap is fail-open: `auto enter` has 200 ms total to reach the daemon,
+create the Session, and receive its initial screen. On any skip, timeout, or error it exits 75 silently and
 the rc file simply continues, so the original shell keeps its own argv,
 environment, cwd, and exit behavior; nothing is relaunched, which also rules
-out exec loops. Measured worst case with a hung daemon: +231 ms (zsh), +214 ms
+out exec loops. Measured worst case with a hung daemon: +233 ms (zsh), +223 ms
 (bash) to shell start on macOS. A reply that arrives after the deadline is
-dropped, and the daemon kills an AUTO_WRAP Session nobody attaches to within
-5 s, so a late success can never leave a second shell. A daemon that does
-not mark the Session `AUTO_WRAP` is refused.
+dropped. An attachment commits only after the client receives the initial
+screen and acknowledges it with a resize; the daemon interrupts an
+unconfirmed AUTO_WRAP Session after 300 ms, so a late success cannot leave a
+second shell. A daemon that does not mark the Session `AUTO_WRAP` is refused.
 
 The wrapped shell is started by `sentinald`, so it gets the daemon's
 environment plus `SENTINAL_SESSION_ID` and `SENTINAL_AUTO_GUARD=1`, not the
@@ -147,6 +148,10 @@ Adopt registers an existing same-user PID as `ADOPTED` / `PROCESS`. The daemon
 samples the process tree and determines whether it remains alive. Because
 Sentinal is not the parent, completion is displayed as “Ended · exit code
 unknown.” It must not manufacture success or failure.
+
+An explicit `--log` path must be absolute, readable, a regular file, and
+owned by the daemon user. Until 1b.D, only this metadata is recorded and the
+file is not tailed.
 
 In 1b.C a log path is recorded as metadata only (`Session.log`, approved
 additive field): `--log` must be an absolute, readable regular file, and
