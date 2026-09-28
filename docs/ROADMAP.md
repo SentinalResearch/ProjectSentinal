@@ -50,10 +50,19 @@ demo you can actually use.
 persistent Sessions without exposing the machine token again.
 
 ## Milestone 2 — Command tracking + metrics (v0.2)
-- [ ] Shell hooks (zsh, bash, fish) emitting OSC 133
-- [ ] Command start/end/exit code parsed from the PTY stream
-- [ ] `store` crate: SQLite history with FTS5 search
-- [ ] Per-session process tree, CPU, RAM, GPU (NVIDIA)
+- [x] Shell hooks (zsh, bash, fish) emitting OSC 133
+- [x] Auto-source hooks while preserving user shell configuration
+- [x] Streaming OSC parser handles arbitrary byte splits and malformed input
+- [x] Command tracker records start/end/exit code, cwd, events, and session state
+- [x] `store` crate: ordered SQLite migrations, WAL, history, events, and FTS5 search
+- [x] Metric retention downsamples raw samples into one-minute averages
+- [x] Restart recovery marks orphaned sessions `INTERRUPTED`
+- [x] Per-session process tree plus machine CPU/RAM metrics
+- [x] Optional NVIDIA GPU metrics behind the `nvidia` feature
+- [x] Debounced `RESOURCE_HIGH` events after three consecutive samples
+- [x] Stream subscribed session metrics over WebSocket
+- [x] Real web history/search and live session resource bars
+- [x] Fast tests plus ignored zsh/bash/fish integration coverage
 
 **Demo:** history view with ✓/✗, durations, and live resource usage.
 
