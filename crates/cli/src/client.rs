@@ -85,6 +85,14 @@ pub struct DaemonClient {
     socket: Socket,
 }
 
+impl std::fmt::Debug for DaemonClient {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DaemonClient")
+            .finish_non_exhaustive()
+    }
+}
+
 impl DaemonClient {
     /// Connect using the bearer token stored at `token_path`.
     pub async fn connect(url: &str, token_path: &std::path::Path) -> Result<Self, ClientError> {
@@ -250,7 +258,8 @@ impl Drop for RawTerminal {
     }
 }
 
-fn terminal_size() -> Option<(u16, u16)> {
+/// Current terminal size as `(cols, rows)`, or `None` when unknown or 0x0.
+pub fn terminal_size() -> Option<(u16, u16)> {
     let output = Command::new("stty")
         .arg("size")
         .stdin(Stdio::inherit())
@@ -261,9 +270,10 @@ fn terminal_size() -> Option<(u16, u16)> {
     }
     let text = String::from_utf8_lossy(&output.stdout);
     let mut values = text.split_whitespace();
-    let rows = values.next()?.parse().ok()?;
-    let cols = values.next()?.parse().ok()?;
-    Some((cols, rows))
+    let rows: u16 = values.next()?.parse().ok()?;
+    let cols: u16 = values.next()?.parse().ok()?;
+    // A 0x0 report means the size is unknown; never send it as a resize.
+    (cols > 0 && rows > 0).then_some((cols, rows))
 }
 
 fn terminal_error(operation: &'static str, error: std::io::Error) -> ClientError {

@@ -1,6 +1,6 @@
 [package]
 name = "cli"
-description = "Command-line client for terminal-agent."
+description = "Sentinel command-line client (sentinel)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,9 +15,18 @@ thiserror.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
 
+[dev-dependencies]
+# Drives the CLI inside a real pseudo-terminal in the ignored watch_integration.
+portable-pty.workspace = true
+
+[[bin]]
+name = "sentinel"
+path = "src/bin/sentinel.rs"
+
+# Compatibility alias through the Milestone 1b migration.
 [[bin]]
 name = "ta"
-path = "src/main.rs"
+path = "src/bin/ta.rs"
 
 [lints]
 workspace = true

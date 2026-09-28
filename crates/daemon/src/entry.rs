@@ -1,6 +1,6 @@
-//! The terminal-agent daemon executable.
+//! Startup and serving for the `sentineld` daemon (and its `tad` alias).
 
-use daemon::{
+use crate::{
     api::{router, AppState},
     audit::AuditLog,
     auth::{load_or_create_token, AuthError, AuthManager},
@@ -21,51 +21,67 @@ use std::{
 };
 use store::{Store, StoreError};
 
+/// Errors that stop the daemon from starting or serving.
 #[derive(Debug, thiserror::Error)]
-enum MainError {
+pub enum DaemonError {
+    /// HOME is needed to find the default configuration.
     #[error("HOME is not set; cannot locate daemon configuration")]
     MissingHome,
+    /// Configuration could not be loaded.
     #[error(transparent)]
     Config(#[from] ConfigError),
+    /// The bearer token or owner auth could not be loaded.
     #[error(transparent)]
     Auth(#[from] AuthError),
+    /// SQLite storage failed.
     #[error(transparent)]
     Store(#[from] StoreError),
+    /// The Session manager failed to start.
     #[error(transparent)]
     Session(#[from] SessionManagerError),
+    /// The data directory could not be created.
     #[error("failed to create daemon data directory '{}': {source}", path.display())]
     DataDirectory {
+        /// Directory that could not be created.
         path: PathBuf,
+        /// Filesystem error.
         source: std::io::Error,
     },
+    /// Logging could not be initialized.
     #[error("failed to initialize tracing: {0}")]
     Tracing(String),
+    /// The HTTP/WebSocket listener could not bind.
     #[error("failed to bind daemon to {address}: {source}")]
     Bind {
+        /// Configured listen address.
         address: SocketAddr,
+        /// Socket error.
         source: std::io::Error,
     },
+    /// The HTTP/WebSocket server stopped with an error.
     #[error("daemon server failed: {0}")]
     Serve(std::io::Error),
+    /// The private local socket failed.
     #[error(transparent)]
     LocalSocket(#[from] LocalSocketError),
+    /// The local socket task panicked or was cancelled.
     #[error("local socket task failed: {0}")]
     LocalTask(tokio::task::JoinError),
 }
 
-#[tokio::main]
-async fn main() -> Result<(), MainError> {
+/// Load configuration, start every listener, and serve until SIGINT/SIGTERM.
+pub async fn run() -> Result<(), DaemonError> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "tad=info".into()),
         )
         .try_init()
-        .map_err(|error| MainError::Tracing(error.to_string()))?;
+        .map_err(|error| DaemonError::Tracing(error.to_string()))?;
 
     let home = std::env::var_os("HOME")
         .map(PathBuf::from)
-        .ok_or(MainError::MissingHome)?;
+        .ok_or(DaemonError::MissingHome)?;
     let config_path = std::env::var_os("TA_CONFIG")
         .map(PathBuf::from)
         .unwrap_or_else(|| home.join(".config/terminal-agent/daemon.toml"));
@@ -76,7 +92,7 @@ async fn main() -> Result<(), MainError> {
         .unwrap_or_else(|| config.auth_file.clone());
     let auth = AuthManager::load(&auth_file, token)?;
     let machine = machine_description();
-    fs::create_dir_all(&config.data_dir).map_err(|source| MainError::DataDirectory {
+    fs::create_dir_all(&config.data_dir).map_err(|source| DaemonError::DataDirectory {
         path: config.data_dir.clone(),
         source,
     })?;
@@ -115,7 +131,7 @@ async fn main() -> Result<(), MainError> {
     let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx));
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
-        .map_err(|source| MainError::Bind {
+        .map_err(|source| DaemonError::Bind {
             address: config.bind,
             source,
         })?;
@@ -126,9 +142,9 @@ async fn main() -> Result<(), MainError> {
     )
     .with_graceful_shutdown(shutdown_signal())
     .await
-    .map_err(MainError::Serve);
+    .map_err(DaemonError::Serve);
     let _ = local_shutdown.send(true);
-    local_task.await.map_err(MainError::LocalTask)??;
+    local_task.await.map_err(DaemonError::LocalTask)??;
     server_result
 }
 

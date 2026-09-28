@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Replaces dev.terminal-agent.tad.plist; load only one of the two. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.sentinel.sentineld</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/sentineld</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/sentineld.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/sentineld.error.log</string>
+</dict>
+</plist>

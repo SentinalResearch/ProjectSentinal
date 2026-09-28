@@ -1,0 +1,14 @@
+[Unit]
+Description=Sentinel daemon (persistent, observable terminal Sessions)
+After=network.target
+# Replaces tad.service; enable only one of the two.
+Conflicts=tad.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/sentineld
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

@@ -1,6 +1,6 @@
 [package]
 name = "daemon"
-description = "Persistent terminal session daemon for terminal-agent."
+description = "Sentinel daemon (sentineld): persistent, observable terminal Sessions."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -32,8 +32,14 @@ nvml-wrapper = { workspace = true, optional = true }
 tower.workspace = true
 
 [[bin]]
+name = "sentineld"
+path = "src/bin/sentineld.rs"
+
+# Compatibility alias through the Milestone 1b migration; existing service
+# units still start `tad`.
+[[bin]]
 name = "tad"
-path = "src/main.rs"
+path = "src/bin/tad.rs"
 
 [lints]
 workspace = true

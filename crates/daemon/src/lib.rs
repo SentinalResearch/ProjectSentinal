@@ -4,6 +4,7 @@ pub mod api;
 pub mod audit;
 pub mod auth;
 pub mod config;
+pub mod entry;
 pub mod framing;
 pub mod local_socket;
 pub mod metrics;

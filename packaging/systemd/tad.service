@@ -1,5 +1,7 @@
 [Unit]
-Description=terminal-agent persistent session daemon
+Description=terminal-agent persistent session daemon (compatibility; prefer sentineld.service)
+# Kept through the Milestone 1b migration. Enable only one of tad/sentineld.
+Conflicts=sentineld.service
 After=network.target
 
 [Service]

@@ -376,6 +376,7 @@ version = "0.0.1"
 dependencies = [
  "clap",
  "futures-util",
+ "portable-pty",
  "protocol",
  "serde_json",
  "thiserror 2.0.21",
