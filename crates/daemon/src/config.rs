@@ -23,6 +23,8 @@ pub struct DaemonConfig {
     pub token_file: PathBuf,
     /// File containing the single owner's password hash.
     pub auth_file: PathBuf,
+    /// Private same-user Unix socket for local reporting.
+    pub local_socket: PathBuf,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -32,6 +34,7 @@ struct RawConfig {
     scrollback_lines: Option<usize>,
     token_file: Option<PathBuf>,
     auth_file: Option<PathBuf>,
+    local_socket: Option<PathBuf>,
 }
 
 /// Errors produced while loading daemon configuration.
@@ -74,11 +77,26 @@ impl DaemonConfig {
                 });
             }
         };
-        Self::from_toml(&text, home)
+        Self::from_toml_with_runtime(
+            &text,
+            home,
+            std::env::var_os("XDG_RUNTIME_DIR")
+                .as_deref()
+                .map(Path::new),
+        )
     }
 
     /// Parse TOML configuration and resolve defaults relative to `home`.
     pub fn from_toml(text: &str, home: &Path) -> Result<Self, ConfigError> {
+        Self::from_toml_with_runtime(text, home, None)
+    }
+
+    /// Parse configuration with an injected Linux runtime directory.
+    pub fn from_toml_with_runtime(
+        text: &str,
+        home: &Path,
+        xdg_runtime_dir: Option<&Path>,
+    ) -> Result<Self, ConfigError> {
         let raw: RawConfig = toml::from_str(text)?;
         let bind_text = raw.bind.unwrap_or_else(|| DEFAULT_BIND.to_string());
         let bind: SocketAddr = bind_text
@@ -91,11 +109,19 @@ impl DaemonConfig {
             return Err(ConfigError::UnsafeBind(bind_text));
         }
 
+        let data_dir = raw
+            .data_dir
+            .unwrap_or_else(|| home.join(".local/share/terminal-agent"));
+        let local_socket = crate::local_socket::default_socket_path(
+            &data_dir,
+            raw.local_socket.as_deref(),
+            xdg_runtime_dir,
+            cfg!(target_os = "macos"),
+        );
+
         Ok(DaemonConfig {
             bind,
-            data_dir: raw
-                .data_dir
-                .unwrap_or_else(|| home.join(".local/share/terminal-agent")),
+            data_dir,
             scrollback_lines: raw.scrollback_lines.unwrap_or(DEFAULT_SCROLLBACK_LINES),
             token_file: raw
                 .token_file
@@ -103,6 +129,7 @@ impl DaemonConfig {
             auth_file: raw
                 .auth_file
                 .unwrap_or_else(|| home.join(".config/terminal-agent/auth.json")),
+            local_socket,
         })
     }
 }

@@ -5,6 +5,7 @@ use daemon::{
     audit::AuditLog,
     auth::{load_or_create_token, AuthError, AuthManager},
     config::{ConfigError, DaemonConfig},
+    local_socket::{LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{MetricsSampler, ResourceDebouncer},
     pty::{FakePty, PtyBackend, RealPty},
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
@@ -46,6 +47,10 @@ enum MainError {
     },
     #[error("daemon server failed: {0}")]
     Serve(std::io::Error),
+    #[error(transparent)]
+    LocalSocket(#[from] LocalSocketError),
+    #[error("local socket task failed: {0}")]
+    LocalTask(tokio::task::JoinError),
 }
 
 #[tokio::main]
@@ -104,6 +109,10 @@ async fn main() -> Result<(), MainError> {
     )?;
     spawn_metric_sampler(sessions.clone(), store);
     let state = AppState::new(sessions, machine, auth);
+    let local_socket =
+        UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
+    let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
+    let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx));
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .map_err(|source| MainError::Bind {
@@ -111,12 +120,39 @@ async fn main() -> Result<(), MainError> {
             source,
         })?;
     tracing::info!(address = %config.bind, config = %config_path.display(), "daemon listening");
-    axum::serve(
+    let server_result = axum::serve(
         listener,
         router(state).into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(shutdown_signal())
     .await
-    .map_err(MainError::Serve)
+    .map_err(MainError::Serve);
+    let _ = local_shutdown.send(true);
+    local_task.await.map_err(MainError::LocalTask)??;
+    server_result
+}
+
+async fn shutdown_signal() {
+    let control_c = tokio::signal::ctrl_c();
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                let _ = signal.recv().await;
+            }
+            Err(error) => {
+                tracing::error!(%error, "failed to install SIGTERM handler");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+    tokio::select! {
+        result = control_c => {
+            if let Err(error) = result {
+                tracing::error!(%error, "failed to wait for Ctrl-C");
+            }
+        }
+        () = terminate => {}
+    }
 }
 
 fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {

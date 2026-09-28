@@ -23,6 +23,10 @@ fn defaults_bind_only_to_loopback() {
         config.auth_file,
         Path::new("/home/tester/.config/terminal-agent/auth.json")
     );
+    assert_eq!(
+        config.local_socket,
+        Path::new("/home/tester/.local/share/terminal-agent/run/sentineld.sock")
+    );
 }
 
 #[test]
@@ -33,6 +37,7 @@ data_dir = "/var/tmp/terminal-agent"
 scrollback_lines = 25
 token_file = "/var/tmp/terminal-agent.token"
 auth_file = "/var/tmp/terminal-agent-auth.json"
+local_socket = "/var/tmp/sentineld.sock"
 "#;
 
     let config = DaemonConfig::from_toml(text, Path::new("/unused")).unwrap();
@@ -44,6 +49,23 @@ auth_file = "/var/tmp/terminal-agent-auth.json"
         config.auth_file,
         Path::new("/var/tmp/terminal-agent-auth.json")
     );
+    assert_eq!(config.local_socket, Path::new("/var/tmp/sentineld.sock"));
+}
+
+#[test]
+fn linux_runtime_directory_is_preferred_when_injected() {
+    let config = DaemonConfig::from_toml_with_runtime(
+        "",
+        Path::new("/home/tester"),
+        Some(Path::new("/run/user/1000")),
+    )
+    .unwrap();
+    let expected = if cfg!(target_os = "macos") {
+        Path::new("/home/tester/.local/share/terminal-agent/run/sentineld.sock")
+    } else {
+        Path::new("/run/user/1000/sentinel/sentineld.sock")
+    };
+    assert_eq!(config.local_socket, expected);
 }
 
 #[test]
