@@ -8,6 +8,8 @@ for when the underlying daemon features are expected to land.
 |---|---|---|---|
 | Machines list | Overview, Settings | partial | `VITE_DATA=api` shows the connected daemon's real Machine; multi-machine aggregation waits for Roadmap M4 |
 | Sessions list + live state | Overview, Session detail | real (M1) | `VITE_DATA=api` lists, creates, and polls real Sessions; daemon-pushed lifecycle events can replace polling later |
+| Capture origin/badge/capabilities | Every Session surface | planned (priority M1b) | Protocol origin/capture fields, capability enforcement, badges, reduced-capture explanations, and hidden unsupported actions |
+| Watch / external shell / auto-wrap / adopted Sessions | Overview, Session detail | planned (priority M1b) | Private local ingress and the four modes in `docs/CAPTURE_MODES.md`; adopted log progress completes with M3 watchers |
 | Terminal attach (input/output) | Session detail | real (M1) | `TerminalPane` mounts xterm.js and `useRealTerminalSession` attaches over the authenticated binary WebSocket; the Playwright smoke test covers the fake-daemon path |
 | Health card (progress/activity/resources/stability/errors) | Session detail | mock | Daemon: watcher + Event engine (Roadmap M3) |
 | Event journal | Session detail, Project | mock | Daemon: Event engine (M3) |
