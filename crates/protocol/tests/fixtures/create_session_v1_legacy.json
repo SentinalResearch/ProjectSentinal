@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "payload": {
+    "type": "CREATE_SESSION",
+    "shell": null,
+    "cwd": "~/Projects/TIM",
+    "cols": 120,
+    "rows": 40
+  }
+}

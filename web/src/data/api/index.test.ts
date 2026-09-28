@@ -30,6 +30,11 @@ const session: WireSession = {
   cwd: "/tmp",
   state: "IDLE",
   current_command: null,
+  origin: "UI",
+  capture: "FULL",
+  pid: 4242,
+  process_started_at: null,
+  exit_code: null,
   created_at: 1_700_000_000_000,
   updated_at: 1_700_000_000_000,
 };

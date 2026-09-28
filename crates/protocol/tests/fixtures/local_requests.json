@@ -1,0 +1,6 @@
+[
+  { "version": 1, "payload": { "type": "REGISTER_SHELL", "pid": 3124, "shell": "/bin/zsh", "cwd": "/Users/alice/Projects/TIM", "title": "TIM shell" } },
+  { "version": 1, "payload": { "type": "SHELL_COMMAND_STARTED", "session_id": 128, "pid": 3124, "sequence": 17, "text": "python train.py --config moe.yaml", "cwd": "/Users/alice/Projects/TIM", "started_at": 1790592000123 } },
+  { "version": 1, "payload": { "type": "SHELL_COMMAND_FINISHED", "session_id": 128, "pid": 3124, "sequence": 17, "exit_code": 0, "finished_at": 1790592031123 } },
+  { "version": 1, "payload": { "type": "ADOPT_PROCESS", "pid": 4242, "title": "Qwen Training", "log_path": "/Users/alice/Projects/TIM/train.log" } }
+]

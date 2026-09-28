@@ -29,6 +29,134 @@
 use crate::{CommandId, MachineId, ProjectId, ProtocolError, SessionId, Timestamp};
 use serde::{Deserialize, Serialize};
 
+/// How a Session entered Sentinel.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum SessionOrigin {
+    /// Created through the ordinary UI/API flow.
+    #[default]
+    Ui,
+    /// Created explicitly by `sentinel watch`.
+    Watch,
+    /// Registered by an ordinary shell integration.
+    ShellHook,
+    /// Created by the opt-in interactive-shell wrapper.
+    AutoWrap,
+    /// Existing OS process registered read-only.
+    Adopted,
+}
+
+impl std::fmt::Display for SessionOrigin {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            SessionOrigin::Ui => "UI",
+            SessionOrigin::Watch => "WATCH",
+            SessionOrigin::ShellHook => "SHELL_HOOK",
+            SessionOrigin::AutoWrap => "AUTO_WRAP",
+            SessionOrigin::Adopted => "ADOPTED",
+        })
+    }
+}
+
+/// How much structured and byte-stream state Sentinel can observe for a Session.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CaptureLevel {
+    /// Daemon-owned PTY with output, input, Commands, and Metrics.
+    #[default]
+    Full,
+    /// Structured Command boundaries and Metrics without terminal bytes.
+    Commands,
+    /// Read-only process log plus Metrics.
+    ProcessLog,
+    /// Process tree and Metrics only.
+    Process,
+}
+
+impl std::fmt::Display for CaptureLevel {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            CaptureLevel::Full => "FULL",
+            CaptureLevel::Commands => "COMMANDS",
+            CaptureLevel::ProcessLog => "PROCESS_LOG",
+            CaptureLevel::Process => "PROCESS",
+        })
+    }
+}
+
+/// Operations and observations permitted by one capture level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CaptureCapabilities {
+    /// A client may attach to the terminal screen.
+    pub can_attach: bool,
+    /// A client may send terminal bytes.
+    pub can_send_input: bool,
+    /// A client may resize the daemon-owned PTY.
+    pub can_resize: bool,
+    /// A client may kill the daemon-owned PTY.
+    pub can_kill_daemon_pty: bool,
+    /// Structured Commands are observable.
+    pub exposes_commands: bool,
+    /// PTY output is observable.
+    pub exposes_terminal_output: bool,
+    /// A configured read-only log is observable.
+    pub exposes_log_output: bool,
+    /// Process resource Metrics are observable.
+    pub exposes_metrics: bool,
+}
+
+impl CaptureLevel {
+    /// Derive every interface capability from capture alone.
+    pub const fn capabilities(self) -> CaptureCapabilities {
+        match self {
+            CaptureLevel::Full => CaptureCapabilities {
+                can_attach: true,
+                can_send_input: true,
+                can_resize: true,
+                can_kill_daemon_pty: true,
+                exposes_commands: true,
+                exposes_terminal_output: true,
+                exposes_log_output: false,
+                exposes_metrics: true,
+            },
+            CaptureLevel::Commands => CaptureCapabilities {
+                can_attach: false,
+                can_send_input: false,
+                can_resize: false,
+                can_kill_daemon_pty: false,
+                exposes_commands: true,
+                exposes_terminal_output: false,
+                exposes_log_output: false,
+                exposes_metrics: true,
+            },
+            CaptureLevel::ProcessLog => CaptureCapabilities {
+                can_attach: false,
+                can_send_input: false,
+                can_resize: false,
+                can_kill_daemon_pty: false,
+                exposes_commands: false,
+                exposes_terminal_output: false,
+                exposes_log_output: true,
+                exposes_metrics: true,
+            },
+            CaptureLevel::Process => CaptureCapabilities {
+                can_attach: false,
+                can_send_input: false,
+                can_resize: false,
+                can_kill_daemon_pty: false,
+                exposes_commands: false,
+                exposes_terminal_output: false,
+                exposes_log_output: false,
+                exposes_metrics: true,
+            },
+        }
+    }
+}
+
 /// Lifecycle state of a session. See the module docs for the diagram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -127,6 +255,21 @@ pub struct Session {
     pub state: SessionState,
     /// The command running right now, if any.
     pub current_command: Option<CommandId>,
+    /// How this Session entered Sentinel.
+    #[serde(default)]
+    pub origin: SessionOrigin,
+    /// Observation and control capability for this Session.
+    #[serde(default)]
+    pub capture: CaptureLevel,
+    /// OS process-tree root, or `None` when no trustworthy root is known.
+    #[serde(default)]
+    pub pid: Option<u32>,
+    /// OS-observed root-process start time, used to detect PID reuse.
+    #[serde(default)]
+    pub process_started_at: Option<Timestamp>,
+    /// Known shell exit code; absent means running or outcome unknown.
+    #[serde(default)]
+    pub exit_code: Option<i32>,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -151,9 +294,52 @@ impl Session {
             cwd: cwd.into(),
             state: SessionState::Created,
             current_command: None,
+            origin: SessionOrigin::Ui,
+            capture: CaptureLevel::Full,
+            pid: None,
+            process_started_at: None,
+            exit_code: None,
             created_at: at,
             updated_at: at,
         }
+    }
+
+    /// Validate capture, process identity, and lifecycle invariants.
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        let valid_capture = matches!(
+            (self.origin, self.capture),
+            (SessionOrigin::Ui, CaptureLevel::Full)
+                | (SessionOrigin::Watch, CaptureLevel::Full)
+                | (SessionOrigin::AutoWrap, CaptureLevel::Full)
+                | (SessionOrigin::ShellHook, CaptureLevel::Commands)
+                | (SessionOrigin::Adopted, CaptureLevel::Process)
+                | (SessionOrigin::Adopted, CaptureLevel::ProcessLog)
+        );
+        if !valid_capture {
+            return Err(ProtocolError::InvalidOriginCapture {
+                origin: self.origin,
+                capture: self.capture,
+            });
+        }
+        if self.pid == Some(0) {
+            return Err(ProtocolError::InvalidPid(0));
+        }
+        if self.pid.is_none() && self.process_started_at.is_some() {
+            return Err(ProtocolError::ProcessStartedWithoutPid);
+        }
+        if let Some(exit_code) = self.exit_code {
+            let valid_exit = matches!(
+                (self.state, exit_code),
+                (SessionState::Completed, 0) | (SessionState::Failed, 1..=i32::MAX)
+            ) || matches!(self.state, SessionState::Failed) && exit_code < 0;
+            if !valid_exit {
+                return Err(ProtocolError::InvalidSessionExit {
+                    state: self.state,
+                    exit_code,
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Move to a new state, or return `InvalidTransition` and change nothing.
@@ -325,5 +511,91 @@ mod tests {
         assert!(!Idle.is_busy());
         assert!(Completed.is_finished() && Failed.is_finished() && Interrupted.is_finished());
         assert!(!Disconnected.is_finished());
+    }
+
+    #[test]
+    fn every_capture_level_has_the_approved_capabilities() {
+        let full = CaptureLevel::Full.capabilities();
+        assert!(full.can_attach);
+        assert!(full.can_send_input);
+        assert!(full.can_resize);
+        assert!(full.can_kill_daemon_pty);
+        assert!(full.exposes_commands);
+        assert!(full.exposes_terminal_output);
+        assert!(!full.exposes_log_output);
+        assert!(full.exposes_metrics);
+
+        let commands = CaptureLevel::Commands.capabilities();
+        assert!(!commands.can_attach);
+        assert!(!commands.can_send_input);
+        assert!(!commands.can_resize);
+        assert!(!commands.can_kill_daemon_pty);
+        assert!(commands.exposes_commands);
+        assert!(!commands.exposes_terminal_output);
+        assert!(!commands.exposes_log_output);
+        assert!(commands.exposes_metrics);
+
+        let process_log = CaptureLevel::ProcessLog.capabilities();
+        assert!(!process_log.can_attach);
+        assert!(!process_log.can_send_input);
+        assert!(!process_log.can_resize);
+        assert!(!process_log.can_kill_daemon_pty);
+        assert!(!process_log.exposes_commands);
+        assert!(!process_log.exposes_terminal_output);
+        assert!(process_log.exposes_log_output);
+        assert!(process_log.exposes_metrics);
+
+        let process = CaptureLevel::Process.capabilities();
+        assert!(!process.can_attach);
+        assert!(!process.can_send_input);
+        assert!(!process.can_resize);
+        assert!(!process.can_kill_daemon_pty);
+        assert!(!process.exposes_commands);
+        assert!(!process.exposes_terminal_output);
+        assert!(!process.exposes_log_output);
+        assert!(process.exposes_metrics);
+    }
+
+    #[test]
+    fn legacy_session_json_receives_safe_defaults() {
+        let json = r#"{
+            "id":1,"machine_id":"test","project_id":null,"title":null,
+            "shell":"/bin/sh","cwd":"/work","state":"IDLE",
+            "current_command":null,"created_at":1,"updated_at":2
+        }"#;
+        let session: Session = serde_json::from_str(json).unwrap();
+        assert_eq!(session.origin, SessionOrigin::Ui);
+        assert_eq!(session.capture, CaptureLevel::Full);
+        assert_eq!(session.pid, None);
+        assert_eq!(session.process_started_at, None);
+        assert_eq!(session.exit_code, None);
+        assert_eq!(session.validate(), Ok(()));
+    }
+
+    #[test]
+    fn invalid_origin_capture_and_process_identity_are_rejected() {
+        let mut session = test_session();
+        session.origin = SessionOrigin::ShellHook;
+        assert!(session
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("SHELL_HOOK"));
+
+        session.capture = CaptureLevel::Commands;
+        session.pid = Some(0);
+        assert!(session
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("pid 0"));
+
+        session.pid = None;
+        session.process_started_at = Some(Timestamp(10));
+        assert!(session
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("process_started_at"));
     }
 }

@@ -1,6 +1,8 @@
 //! Axum HTTP and WebSocket API for daemon clients.
 
 mod auth_routes;
+#[cfg(test)]
+mod capture_tests;
 
 use crate::{
     auth::AuthManager,
@@ -67,12 +69,18 @@ impl AppState {
                 cwd,
                 cols,
                 rows,
+                origin,
+                title,
+                command,
             } => {
                 let request = CreateSession {
                     shell,
                     cwd: cwd.map(Into::into),
                     cols,
                     rows,
+                    origin,
+                    title,
+                    command,
                 };
                 match self.sessions.create(request).await {
                     Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),

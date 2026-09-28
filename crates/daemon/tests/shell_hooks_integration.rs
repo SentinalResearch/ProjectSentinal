@@ -43,6 +43,9 @@ async fn exercise(shell: &str) {
             cwd: Some(PathBuf::from("/")),
             cols: 80,
             rows: 24,
+            origin: protocol::SessionOrigin::Ui,
+            title: None,
+            command: None,
         })
         .await
         .unwrap();

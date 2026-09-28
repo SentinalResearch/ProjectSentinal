@@ -1,5 +1,6 @@
 //! Ownership and lifecycle management for persistent terminal sessions.
 
+mod capture;
 mod lifecycle;
 mod structured;
 mod tasks;
@@ -10,8 +11,10 @@ use crate::{
     scrollback::Scrollback,
     tracker::{CommandTracker, TrackerIds},
 };
+use capture::{require_capture, CaptureOperation};
 use protocol::{
-    DaemonMessage, MachineId, ProtocolError, Session, SessionId, SessionState, Timestamp,
+    CaptureLevel, DaemonMessage, MachineId, ProtocolError, Session, SessionId, SessionOrigin,
+    SessionState, Timestamp,
 };
 use std::{
     collections::HashMap,
@@ -62,6 +65,12 @@ pub struct CreateSession {
     pub cols: u16,
     /// Initial terminal height.
     pub rows: u16,
+    /// Approved daemon-owned Session origin.
+    pub origin: SessionOrigin,
+    /// Optional user-visible title.
+    pub title: Option<String>,
+    /// Optional initial argv, executed only by the Watch implementation in 1b.A.
+    pub command: Option<Vec<String>>,
 }
 
 /// A screen snapshot followed by a receiver for live terminal bytes.
@@ -121,6 +130,22 @@ pub enum SessionManagerError {
     /// This manager was constructed without persistent storage.
     #[error("persistent command history is unavailable")]
     StoreUnavailable,
+    /// A capture level does not permit a PTY operation.
+    #[error("capture level {capture} cannot {operation}")]
+    CaptureDenied {
+        /// Capture level of the target Session.
+        capture: CaptureLevel,
+        /// Requested operation.
+        operation: &'static str,
+    },
+    /// A future 1b origin or initial Command reached the stage-0 daemon.
+    #[error(
+        "Session origin {origin} with an initial Command is unavailable before Milestone 1b.A"
+    )]
+    WatchUnavailable {
+        /// Requested Session origin.
+        origin: SessionOrigin,
+    },
 }
 
 struct SessionHandle {
@@ -234,6 +259,7 @@ impl SessionManager {
     /// Snapshot the current screen and subscribe to subsequent output.
     pub fn attach(&self, session_id: SessionId) -> Result<Attachment, SessionManagerError> {
         let handle = self.handle(session_id)?;
+        require_capture(&handle, CaptureOperation::Attach)?;
         let screen = handle
             .parser
             .lock()
@@ -273,6 +299,7 @@ impl SessionManager {
     ) -> Result<(), SessionManagerError> {
         validate_size(cols, rows)?;
         let handle = self.handle(session_id)?;
+        require_capture(&handle, CaptureOperation::Resize)?;
         (handle.resize)(cols, rows)?;
         handle
             .parser
@@ -294,6 +321,7 @@ impl SessionManager {
         client_addr: &str,
     ) -> Result<(), SessionManagerError> {
         let handle = self.handle(session_id)?;
+        require_capture(&handle, CaptureOperation::Input)?;
         self.inner.audit.append(&AuditRecord {
             timestamp: (self.inner.config.clock)(),
             client_addr: client_addr.to_string(),
@@ -320,6 +348,7 @@ impl SessionManager {
     /// Kill a session and mark it interrupted without removing its history.
     pub fn kill(&self, session_id: SessionId) -> Result<(), SessionManagerError> {
         let handle = self.handle(session_id)?;
+        require_capture(&handle, CaptureOperation::Kill)?;
         (handle.kill)()?;
         let mut session = lock_session(&handle)?;
         if !session.state.is_finished() {

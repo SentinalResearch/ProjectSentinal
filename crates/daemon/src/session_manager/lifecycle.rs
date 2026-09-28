@@ -21,6 +21,11 @@ impl SessionManager {
     /// Spawn a shell and return its session in the idle state.
     pub async fn create(&self, request: CreateSession) -> Result<Session, SessionManagerError> {
         validate_size(request.cols, request.rows)?;
+        if request.origin != protocol::SessionOrigin::Ui || request.command.is_some() {
+            return Err(SessionManagerError::WatchUnavailable {
+                origin: request.origin,
+            });
+        }
         let id = SessionId(self.inner.next_id.fetch_add(1, Ordering::Relaxed));
         let shell = request
             .shell
@@ -73,6 +78,11 @@ impl SessionManager {
             cwd.to_string_lossy(),
             (self.inner.config.clock)(),
         );
+        session.origin = request.origin;
+        session.capture = protocol::CaptureLevel::Full;
+        session.title = request.title;
+        session.pid = spawned.root_pid;
+        session.validate()?;
         session.transition(SessionState::Idle, (self.inner.config.clock)())?;
 
         let (output, _) = broadcast::channel(256);

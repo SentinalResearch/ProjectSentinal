@@ -31,6 +31,9 @@ async fn persistent_session_integration() {
             cwd: Some("/tmp".into()),
             cols: 80,
             rows: 24,
+            origin: protocol::SessionOrigin::Ui,
+            title: None,
+            command: None,
         })
         .await
         .unwrap();

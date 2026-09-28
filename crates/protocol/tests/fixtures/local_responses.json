@@ -1,0 +1,5 @@
+[
+  { "version": 1, "payload": { "type": "SESSION", "session": { "id": 128, "machine_id": "mac", "project_id": null, "title": "TIM shell", "shell": "/bin/zsh", "cwd": "/work", "state": "IDLE", "current_command": null, "origin": "SHELL_HOOK", "capture": "COMMANDS", "pid": 3124, "process_started_at": 1790591999000, "exit_code": null, "created_at": 1790591999000, "updated_at": 1790592000000 } } },
+  { "version": 1, "payload": { "type": "COMMAND", "command": { "id": 8192, "session_id": 128, "machine_id": "mac", "text": "python train.py", "cwd": "/work", "started_at": 1790592000123, "finished_at": null, "exit_code": null, "class": null } } },
+  { "version": 1, "payload": { "type": "ERROR", "code": "INVALID_REQUEST", "message": "invalid pid 0; pid must be greater than zero" } }
+]

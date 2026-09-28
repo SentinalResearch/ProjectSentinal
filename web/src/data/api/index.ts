@@ -287,7 +287,16 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     getSessions,
     async createSession() {
       const message = await transport.request(
-        { type: "CREATE_SESSION", shell: null, cwd: null, cols: 80, rows: 24 },
+        {
+          type: "CREATE_SESSION",
+          shell: null,
+          cwd: null,
+          cols: 80,
+          rows: 24,
+          origin: "UI",
+          title: null,
+          command: null,
+        },
         (reply) => reply.type === "SESSION_UPDATED",
       );
       if (message.type !== "SESSION_UPDATED") throw daemonError("missing created session");

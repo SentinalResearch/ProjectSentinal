@@ -39,9 +39,12 @@ pub use error::ProtocolError;
 pub use event::{Event, EventKind, Resource, Severity};
 pub use ids::{CommandId, EventId, MachineId, ProjectId, SessionId};
 pub use machine::{Gpu, Machine, MachineStatus, Os};
-pub use message::{ClientRequest, DaemonMessage, Envelope, PROTOCOL_VERSION};
+pub use message::{
+    ClientRequest, DaemonMessage, Envelope, LocalErrorCode, LocalRequest, LocalResponse,
+    MAX_COMMAND_TEXT_BYTES, MAX_LOCAL_FRAME_BYTES, PROTOCOL_VERSION,
+};
 pub use metric::{GpuMetrics, MachineMetrics, SessionMetrics};
 pub use process::{tree_totals, Process, ProcessState, ProcessTotals};
 pub use recipe::{Recipe, RecipeParam};
-pub use session::{Session, SessionState};
+pub use session::{CaptureCapabilities, CaptureLevel, Session, SessionOrigin, SessionState};
 pub use time::{DurationMs, Timestamp};

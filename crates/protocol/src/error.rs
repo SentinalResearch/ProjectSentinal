@@ -1,6 +1,6 @@
 //! The single error type for this crate.
 
-use crate::{CommandId, SessionState};
+use crate::{CaptureLevel, CommandId, SessionOrigin, SessionState};
 
 /// Everything that can go wrong when using protocol types.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -59,6 +59,78 @@ pub enum ProtocolError {
         cols: u16,
         /// Requested rows.
         rows: u16,
+    },
+
+    /// A process identifier cannot name an OS process.
+    #[error("invalid pid {0}; pid must be greater than zero")]
+    InvalidPid(u32),
+
+    /// A local shell sequence cannot identify a command.
+    #[error("invalid command sequence {0}; sequence must be greater than zero")]
+    InvalidCommandSequence(u64),
+
+    /// A typed identifier used the reserved zero value.
+    #[error("invalid {field} 0; {field} must be greater than zero")]
+    InvalidIdentifier {
+        /// Input field containing the identifier.
+        field: &'static str,
+    },
+
+    /// A required string contained no bytes.
+    #[error("{field} must not be empty")]
+    EmptyField {
+        /// Input field that was empty.
+        field: &'static str,
+    },
+
+    /// A bounded string exceeded its protocol limit.
+    #[error("{field} is {actual} bytes; maximum is {maximum} bytes")]
+    FieldTooLong {
+        /// Input field that was too long.
+        field: &'static str,
+        /// Actual UTF-8 byte count.
+        actual: usize,
+        /// Maximum permitted byte count.
+        maximum: usize,
+    },
+
+    /// Initial structured Command argv contained no executable.
+    #[error("command argv must contain an executable")]
+    EmptyCommandArgv,
+
+    /// Initial structured Command argv used an empty executable.
+    #[error("command executable argv[0] must not be empty")]
+    EmptyCommandExecutable,
+
+    /// Combined structured Command arguments exceeded the wire limit.
+    #[error("command argv is {actual} bytes; maximum is {maximum} bytes")]
+    CommandArgumentsTooLong {
+        /// Combined argument byte count.
+        actual: usize,
+        /// Maximum permitted byte count.
+        maximum: usize,
+    },
+
+    /// A Session origin was paired with a capture level it cannot provide.
+    #[error("illegal origin/capture combination {origin}/{capture}")]
+    InvalidOriginCapture {
+        /// Session origin wire name.
+        origin: SessionOrigin,
+        /// Capture level wire name.
+        capture: CaptureLevel,
+    },
+
+    /// OS process start time was supplied without a root PID.
+    #[error("process_started_at requires a process-tree root pid")]
+    ProcessStartedWithoutPid,
+
+    /// A Session exit code contradicted its lifecycle state.
+    #[error("exit_code {exit_code} is invalid for session state {state:?}")]
+    InvalidSessionExit {
+        /// Current lifecycle state.
+        state: SessionState,
+        /// Exit code that was supplied.
+        exit_code: i32,
     },
 
     /// The JSON could not be parsed into the expected type.

@@ -12,8 +12,8 @@
 
 use protocol::{
     AuthChangePasswordRequest, AuthFailure, AuthLoginRequest, AuthSession, AuthSessionInfo,
-    AuthSetupRequest, AuthStatus, ClientRequest, Command, DaemonMessage, Envelope, Event, Machine,
-    MachineMetrics, Process, Recipe, Session, SessionMetrics,
+    AuthSetupRequest, AuthStatus, ClientRequest, Command, DaemonMessage, Envelope, Event,
+    LocalRequest, LocalResponse, Machine, MachineMetrics, Process, Recipe, Session, SessionMetrics,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
@@ -54,6 +54,18 @@ fn machine_contract() {
 #[test]
 fn session_contract() {
     assert_round_trip::<Session>(&load("session.json"), "session.json");
+}
+
+#[test]
+fn capture_session_contract() {
+    assert_each_round_trips::<Session>("sessions_1b.json");
+}
+
+#[test]
+fn legacy_session_and_create_request_still_decode() {
+    let _: Session = serde_json::from_value(load("session_v1_legacy.json")).unwrap();
+    let _: Envelope<ClientRequest> =
+        serde_json::from_value(load("create_session_v1_legacy.json")).unwrap();
 }
 
 #[test]
@@ -114,6 +126,35 @@ fn authentication_contract() {
 #[test]
 fn client_request_contract() {
     assert_each_round_trips::<Envelope<ClientRequest>>("client_requests.json");
+}
+
+#[test]
+fn local_request_and_response_contract() {
+    assert_each_round_trips::<Envelope<LocalRequest>>("local_requests.json");
+    assert_each_round_trips::<Envelope<LocalResponse>>("local_responses.json");
+}
+
+#[test]
+fn every_local_request_has_a_fixture() {
+    let all = [
+        "REGISTER_SHELL",
+        "SHELL_COMMAND_STARTED",
+        "SHELL_COMMAND_FINISHED",
+        "ADOPT_PROCESS",
+    ];
+    let requests = load("local_requests.json");
+    let present: Vec<&str> = requests
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["payload"]["type"].as_str().unwrap())
+        .collect();
+    for kind in all {
+        assert!(
+            present.contains(&kind),
+            "local_requests.json has no {kind} example"
+        );
+    }
 }
 
 #[test]

@@ -125,6 +125,7 @@ impl Store {
 
     /// Insert a Session snapshot.
     pub fn insert_session(&self, session: &Session) -> Result<(), StoreError> {
+        session.validate()?;
         self.lock()?.execute(
             "INSERT INTO sessions(id, state, updated_at, json) VALUES (?1, ?2, ?3, ?4)",
             (
@@ -139,6 +140,7 @@ impl Store {
 
     /// Update an existing Session snapshot.
     pub fn update_session(&self, session: &Session) -> Result<(), StoreError> {
+        session.validate()?;
         let changed = self.lock()?.execute(
             "UPDATE sessions SET state=?1, updated_at=?2, json=?3 WHERE id=?4",
             (
@@ -167,8 +169,7 @@ impl Store {
                 |row| row.get(0),
             )
             .optional()?;
-        json.map(|value| serde_json::from_str(&value).map_err(StoreError::from))
-            .transpose()
+        json.map(|value| decode_session(&value)).transpose()
     }
 
     /// Mark all persisted live Sessions interrupted after a daemon restart.
@@ -190,7 +191,7 @@ impl Store {
             })?;
         let mut events = Vec::with_capacity(json_values.len());
         for json in json_values {
-            let mut session: Session = serde_json::from_str(&json)?;
+            let mut session = decode_session(&json)?;
             let command_id = session.current_command;
             session.transition(SessionState::Interrupted, at)?;
             let event = Event {
@@ -253,6 +254,12 @@ impl Store {
     pub(crate) fn lock(&self) -> Result<MutexGuard<'_, Connection>, StoreError> {
         self.connection.lock().map_err(|_| StoreError::Lock)
     }
+}
+
+fn decode_session(json: &str) -> Result<Session, StoreError> {
+    let session: Session = serde_json::from_str(json)?;
+    session.validate()?;
+    Ok(session)
 }
 
 fn state_name(state: SessionState) -> Result<String, StoreError> {

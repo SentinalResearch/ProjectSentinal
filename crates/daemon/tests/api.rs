@@ -503,6 +503,32 @@ async fn bad_json_returns_error_then_dispatcher_accepts_next_message() {
 }
 
 #[tokio::test]
+async fn local_only_request_is_rejected_remotely_without_mutating_state() {
+    let state = state();
+    let local = serde_json::json!({
+        "version": 1,
+        "payload": {
+            "type": "ADOPT_PROCESS",
+            "pid": 4242,
+            "title": "must not exist",
+            "log_path": null
+        }
+    });
+
+    assert!(matches!(
+        state.dispatch_text(&local.to_string()).await,
+        WsAction::Reply(DaemonMessage::Error { .. })
+    ));
+    assert!(state.sessions.list().unwrap().is_empty());
+
+    let valid = Envelope::new(ClientRequest::ListSessions).encode().unwrap();
+    assert!(matches!(
+        state.dispatch_text(&valid).await,
+        WsAction::Reply(DaemonMessage::Sessions { sessions }) if sessions.is_empty()
+    ));
+}
+
+#[tokio::test]
 async fn unsupported_version_returns_error() {
     let action = state()
         .dispatch_text(r#"{"version":99,"payload":{"type":"LIST_SESSIONS"}}"#)

@@ -8,8 +8,8 @@ use daemon::{
     session_manager::{CreateSession, SessionManager, SessionManagerConfig, SessionManagerError},
 };
 use protocol::{
-    DaemonMessage, MachineId, ProcessTotals, Resource, SessionId, SessionMetrics, SessionState,
-    Timestamp,
+    CaptureLevel, DaemonMessage, MachineId, ProcessTotals, Resource, SessionId, SessionMetrics,
+    SessionOrigin, SessionState, Timestamp,
 };
 use std::{
     fs::{self, File},
@@ -71,6 +71,9 @@ fn request() -> CreateSession {
         cwd: Some("/tmp".into()),
         cols: 80,
         rows: 24,
+        origin: SessionOrigin::Ui,
+        title: None,
+        command: None,
     }
 }
 
@@ -112,8 +115,12 @@ async fn created_session_becomes_idle() {
     let session = manager.create(request()).await.unwrap();
 
     assert_eq!(session.state, SessionState::Idle);
+    assert_eq!(session.origin, SessionOrigin::Ui);
+    assert_eq!(session.capture, CaptureLevel::Full);
+    assert_eq!(session.pid, Some(10_001));
     fake.exit(session.id, 0).unwrap();
     wait_for_state(&manager, session.id, SessionState::Completed).await;
+    assert_eq!(manager.session(session.id).unwrap().exit_code, Some(0));
     fs::remove_dir_all(data_dir).unwrap();
 }
 
@@ -202,6 +209,7 @@ async fn child_exit_nonzero_marks_session_failed() {
     fake.exit(session.id, 3).unwrap();
 
     wait_for_state(&manager, session.id, SessionState::Failed).await;
+    assert_eq!(manager.session(session.id).unwrap().exit_code, Some(3));
     fs::remove_dir_all(data_dir).unwrap();
 }
 

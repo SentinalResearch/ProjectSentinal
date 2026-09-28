@@ -8,7 +8,9 @@
   { "version": 1, "payload": { "type": "SESSION_UPDATED", "session": {
       "id": 128, "machine_id": "rtx-pc", "project_id": "tim", "title": "Qwen Training",
       "shell": "/bin/zsh", "cwd": "~/Projects/TIM", "state": "RUNNING",
-      "current_command": 8192, "created_at": 1790000000000, "updated_at": 1790000120000 } } },
+      "current_command": 8192, "origin": "WATCH", "capture": "FULL", "pid": 4242,
+      "process_started_at": 1790000000000, "exit_code": null,
+      "created_at": 1790000000000, "updated_at": 1790000120000 } } },
   { "version": 1, "payload": { "type": "COMMAND_UPDATED", "command": {
       "id": 8192, "session_id": 128, "machine_id": "rtx-pc",
       "text": "python train.py --config moe.yaml", "cwd": "~/Projects/TIM",

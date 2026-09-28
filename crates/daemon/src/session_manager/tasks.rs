@@ -173,6 +173,7 @@ pub(super) fn spawn_exit_monitor(
                     };
                     match handle.session.lock() {
                         Ok(mut session) if !session.state.is_finished() => {
+                            session.exit_code = Some(code);
                             if let Err(error) = session.transition(target, clock()) {
                                 tracing::error!(session = session_id.0, %error, "failed to record child exit");
                             } else if let Some(store) = &store {

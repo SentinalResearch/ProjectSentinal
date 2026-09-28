@@ -43,6 +43,9 @@ async fn main() -> Result<(), MainError> {
                 cwd: cwd.map(|path| path.to_string_lossy().to_string()),
                 cols: 80,
                 rows: 24,
+                origin: protocol::SessionOrigin::Ui,
+                title: None,
+                command: None,
             };
             match client.request(request).await? {
                 DaemonMessage::SessionUpdated { session } => println!("{}", session.id.0),

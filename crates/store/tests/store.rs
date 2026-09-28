@@ -263,3 +263,63 @@ fn restart_marks_live_sessions_interrupted_and_records_an_event() {
     );
     assert_eq!(store.events_since(EventId(0)).unwrap().len(), 2);
 }
+
+#[test]
+fn pre_1b_session_json_loads_with_safe_defaults_and_updates_without_migration() {
+    let path = std::env::temp_dir().join(format!(
+        "terminal-agent-store-legacy-{}-{}.sqlite3",
+        std::process::id(),
+        NEXT_DATABASE.fetch_add(1, Ordering::Relaxed)
+    ));
+    let store = Store::open(&path).unwrap();
+    store
+        .insert_session(&session(1, SessionState::Idle))
+        .unwrap();
+    drop(store);
+
+    let legacy = r#"{"id":1,"machine_id":"test-machine","project_id":null,"title":null,"shell":"/bin/sh","cwd":"/work","state":"IDLE","current_command":null,"created_at":100,"updated_at":101}"#;
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute("UPDATE sessions SET json=?1 WHERE id=1", [legacy])
+        .unwrap();
+    drop(connection);
+
+    let store = Store::open(&path).unwrap();
+    let loaded = store.session(SessionId(1)).unwrap().unwrap();
+    assert_eq!(loaded.origin, protocol::SessionOrigin::Ui);
+    assert_eq!(loaded.capture, protocol::CaptureLevel::Full);
+    assert_eq!(loaded.pid, None);
+    store.update_session(&loaded).unwrap();
+    assert_eq!(store.schema_version().unwrap(), 1);
+    drop(store);
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn invalid_persisted_origin_capture_is_rejected_after_deserialization() {
+    let path = std::env::temp_dir().join(format!(
+        "terminal-agent-store-invalid-capture-{}-{}.sqlite3",
+        std::process::id(),
+        NEXT_DATABASE.fetch_add(1, Ordering::Relaxed)
+    ));
+    let store = Store::open(&path).unwrap();
+    store
+        .insert_session(&session(1, SessionState::Idle))
+        .unwrap();
+    drop(store);
+
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute(
+            "UPDATE sessions SET json=json_set(json, '$.origin', 'ADOPTED', '$.capture', 'FULL') WHERE id=1",
+            [],
+        )
+        .unwrap();
+    drop(connection);
+
+    let store = Store::open(&path).unwrap();
+    let error = store.session(SessionId(1)).unwrap_err();
+    assert!(error.to_string().contains("ADOPTED/FULL"));
+    drop(store);
+    std::fs::remove_file(path).unwrap();
+}
