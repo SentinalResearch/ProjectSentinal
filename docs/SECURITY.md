@@ -81,6 +81,31 @@ create the FULL Session, it prints a clear error and does not execute the
 requested command. Shell hooks and auto-wrap fail open: hooks silently do
 nothing, and auto-wrap starts the original shell within 300 ms.
 
+## Watch initial Command (1b.A)
+
+`sentinel watch -- COMMAND [ARG...]` sends a structured argv. The daemon, not
+the CLI, turns it into shell input, and only through
+`protocol::render_command_line`:
+
+- every argument is a single quoted word; the executable is always quoted,
+  so aliases, reserved words, and `NAME=value` assignments cannot change the
+  program; zsh `=word` expansion and bash history expansion never apply;
+- the line is typed into an interactive line editor, so control bytes
+  (Ctrl-C, Ctrl-U, Tab, ESC, CR/LF, C1 controls) are written as `$'\xHH'`
+  (bash/zsh) or `\xHH`/`\uHHHH` (fish) escapes, never as raw keystrokes;
+  bash/zsh also escape non-ASCII bytes so readline meta-conversion cannot
+  turn them into editor commands;
+- the rendered line is capped at 1,000 bytes, below the 1,024-byte canonical
+  input limit on macOS, so an early write can never be truncated into a
+  different command;
+- it is typed exactly once, after the first `OSC 133;A` prompt report, and
+  only for `WATCH` Sessions whose shell has Sentinel hooks. Terminal output
+  never contributes to what is typed.
+
+The CLI never executes the Command itself; every failure path (nested,
+not a terminal, daemon unavailable, rejected) exits non-zero before or
+instead of creating a Session.
+
 ## Capture capability enforcement (planned)
 
 The daemon—not the UI—maps capture levels to allowed operations:

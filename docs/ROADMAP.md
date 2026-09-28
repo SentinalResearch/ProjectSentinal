@@ -85,12 +85,12 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 - [x] Add `docs/SECURITY.md`, `docs/CLI.md`, and `docs/SHELL_HOOKS.md`
 
 ### 1b.A — Sentinel Watch
-- [ ] `sentinel watch`, `watch -- <command>`, and `watch -t <title> -- <command>`
-- [ ] Start in the caller's cwd, set origin `WATCH`, capture `FULL`, and attach immediately
-- [ ] Preserve structured argv without evaluating terminal output or concatenating shell text
-- [ ] Set and enforce `SENTINEL_SESSION_ID` so Watch cannot nest
-- [ ] A closed client only detaches; the Session and process survive
-- [ ] Daemon unavailable returns a clear non-zero error and never runs the command unwatched
+- [x] `sentinel watch`, `watch -- <command>`, and `watch -t <title> -- <command>`
+- [x] Start in the caller's cwd, set origin `WATCH`, capture `FULL`, and attach immediately
+- [x] Preserve structured argv without evaluating terminal output or concatenating shell text
+- [x] Set and enforce `SENTINEL_SESSION_ID` so Watch cannot nest
+- [x] A closed client only detaches; the Session and process survive
+- [x] Daemon unavailable returns a clear non-zero error and never runs the command unwatched
 
 ### 1b.B — External shell hook
 - [ ] `sentinel hook zsh|bash|fish`, plus idempotent install and exact uninstall

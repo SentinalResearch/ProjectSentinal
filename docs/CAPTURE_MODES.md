@@ -44,17 +44,24 @@ $ sentinel watch -t "Qwen Training" -- python train.py
 ```
 
 The CLI asks the daemon for a `WATCH` / `FULL` Session in the caller's cwd,
-then attaches in the current terminal. With a command, the daemon starts it
-from structured arguments and leaves the shell available afterward. Closing
-the client detaches but does not terminate the Session.
+at the caller's terminal size, then attaches in the current terminal. With a
+command, the daemon types it once at the shell's first prompt, rendered from
+the structured argv by `protocol::render_command_line`, and leaves the shell
+available afterward. Closing the client detaches but does not terminate the
+Session. `Session.pid` is the shell (process-tree root) and feeds process
+Metrics; the initial Command is captured by the ordinary OSC tracker and is
+stored once, like any typed Command.
 
-`SENTINEL_SESSION_ID` is set inside every FULL Session. Invoking Watch when it
-is already set must not create a nested Session. If the daemon is unavailable,
-Watch exits clearly and never runs the supplied command outside Sentinel.
+`SENTINEL_SESSION_ID` is set inside every daemon-owned FULL Session (UI and
+Watch) before user shell configuration loads. Invoking Watch when it is
+already set creates no Session: a bare Watch exits 0, and a Watch with a
+Command exits 1 without running it. If the daemon is unavailable or rejects
+creation, Watch exits 1 and never runs the supplied command outside Sentinel.
 
-The command's wire representation is a Milestone 1b.0 design gate. Prefer a
-structured argv over a shell string; whichever representation is selected
-must preserve arguments exactly and cannot evaluate terminal output.
+Wire representation (approved in 1b.0): `CREATE_SESSION.command` is a
+structured `Vec<String>` argv. Initial Commands are accepted only for
+`WATCH`, only with zsh/bash/fish (whose hooks report readiness), and only
+when the rendered line is at most 1,000 bytes. See `docs/CLI.md`.
 
 ## Mode 2 — external shell hook
 

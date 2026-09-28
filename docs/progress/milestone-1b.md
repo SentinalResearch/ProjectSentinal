@@ -1,6 +1,6 @@
 # Milestone 1b progress — Any terminal into Sentinel
 
-Status: Milestone 1b.0 complete 2026-09-28; awaiting human review before 1b.A.
+Status: Milestone 1b.A complete 2026-09-28; awaiting human review before 1b.B.
 
 ## Plan
 
@@ -11,7 +11,7 @@ Status: Milestone 1b.0 complete 2026-09-28; awaiting human review before 1b.A.
   `crates/daemon/tests/local_socket.rs` plus `local_socket_integration`
 - [x] 1b.0 capture enforcement — SessionManager and in-process API behavior tests
 - [x] 1b.0 legacy persistence/privacy — `crates/store/tests/store.rs` and audit assertions
-- [ ] Sentinel Watch and no-nesting behavior — CLI unit tests, fake daemon behavior tests, real PTY integration
+- [x] Sentinel Watch and no-nesting behavior — CLI unit tests, fake daemon behavior tests, real PTY integration
 - [ ] External hook generation/install/uninstall — script tests against a fake socket and byte-exact rc fixtures
 - [ ] Hook performance/fail-open behavior — injected transport tests plus recorded Linux/macOS benchmark
 - [ ] Auto-wrap guards and 300 ms fallback — table-driven unit tests and manual IDE/SSH smoke matrix
@@ -34,6 +34,27 @@ Status: Milestone 1b.0 complete 2026-09-28; awaiting human review before 1b.A.
   socket path fails startup with `PathTooLong`.
 - Web: only generated types and the `CREATE_SESSION` payload changed
   (`origin: "UI"`); capture-aware UI remains in 1b.D.
+
+## 1b.A verification (2026-09-28, macOS arm64, zsh 5.9 / bash 3.2)
+
+- `just check` passes: 278 Rust tests (9 ignored integrations) and 41 web
+  tests. New: 7 protocol rendering unit tests, 2 quoting contract tests,
+  6 daemon Watch tests, 14 CLI Watch tests, 1 Playwright test.
+- `cargo test --workspace -- --ignored` passes all 9, including
+  `watch_integration` (real `sentineld`, `sentinel watch` in a PTY, client
+  killed, same shell PID reattached from a second PTY, Command stored once)
+  and `shell_quoting_integration` (bash and zsh; fish not installed here).
+- `pnpm -C web test:e2e`: 2 passed, including a WATCH/FULL Session that
+  appears by title and attaches.
+- Manual demo on a real daemon: `sentinel watch -t "Web demo job" -- sh -c
+  '…ticks…'`, detach (exit 0 with reattach hint), then the web UI showed the
+  Session RUNNING and attached with ticks still advancing.
+- Found and fixed: a 0x0 terminal size (some PTYs report it) made Watch and
+  attach fail; it now means "unknown" and falls back to 80x24.
+- Not yet covered: Linux run of the ignored suite; fish on a host with fish.
+- Observed, out of scope: when `sentineld` stops, Session processes are not
+  terminated (existing behavior); under a parent that ignores SIGHUP they
+  keep running unobserved. Worth deciding before auto-wrap (1b.C).
 
 ## Proposed implementation sequence
 
