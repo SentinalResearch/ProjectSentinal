@@ -1,6 +1,6 @@
 # Milestone 1b progress — Any terminal into Sentinal
 
-Status: Milestone 1b.A complete 2026-09-28; awaiting human review before 1b.B.
+Status: Milestone 1b.B complete 2026-09-28; awaiting human review before 1b.C.
 
 ## Plan
 
@@ -12,8 +12,8 @@ Status: Milestone 1b.A complete 2026-09-28; awaiting human review before 1b.B.
 - [x] 1b.0 capture enforcement — SessionManager and in-process API behavior tests
 - [x] 1b.0 legacy persistence/privacy — `crates/store/tests/store.rs` and audit assertions
 - [x] Sentinal Watch and no-nesting behavior — CLI unit tests, fake daemon behavior tests, real PTY integration
-- [ ] External hook generation/install/uninstall — script tests against a fake socket and byte-exact rc fixtures
-- [ ] Hook performance/fail-open behavior — injected transport tests plus recorded Linux/macOS benchmark
+- [x] External hook generation/install/uninstall — script tests against a fake socket and byte-exact rc fixtures
+- [x] Hook performance/fail-open behavior — injected transport tests plus recorded Linux/macOS benchmark
 - [ ] Auto-wrap guards and 300 ms fallback — table-driven unit tests and manual IDE/SSH smoke matrix
 - [ ] Read-only adoption and unknown exit — fake process table, same-user tests, Linux/macOS integration
 - [ ] Rotation-safe log tail — temp-file append/truncate/rotate/partial-line behavior tests
@@ -34,6 +34,32 @@ Status: Milestone 1b.A complete 2026-09-28; awaiting human review before 1b.B.
   socket path fails startup with `PathTooLong`.
 - Web: only generated types and the `CREATE_SESSION` payload changed
   (`origin: "UI"`); capture-aware UI remains in 1b.D.
+
+## 1b.B verification (2026-09-28, macOS arm64, zsh 5.9 / bash 3.2.57)
+
+- `just check` passes: 334 Rust tests (12 ignored integrations/benchmark)
+  and 41 web tests. New fast tests: 16 daemon external-shell, 1 store
+  restart, 2 process-probe, 2 socket-path, 11 rc fixtures, 12 installer /
+  script, 12 reporter (paused-clock 50 ms deadline, silent binary,
+  suppression).
+- Ignored, run here: `hook_script_integration` (real zsh and bash vs a fake
+  socket: register/start/finish, exact text incl. metacharacters, cwd after
+  `cd`, exit codes, `$?` preserved, no output in socket traffic, zero messages
+  with `SENTINAL_SESSION_ID` or `SENTINAL_DISABLE=1`, silent prompt when the
+  socket is missing, hangs, or replies garbage) and
+  `external_shell_hook_integration` (real `sentinald`: Commands stored with
+  exact text/exit/cwd, attach refused, Session COMPLETED with unknown exit
+  when the shell exits, no output in SQLite/audit/logs). Both pass; all other
+  ignored integrations and Playwright (2) still pass.
+- Benchmark (`hook_benchmark`, release, 50 warmup + 500 iterations): added
+  p95 zsh 1.47 ms, bash 2.55 ms — below the 5 ms gate. Table in
+  `docs/SHELL_HOOKS.md`.
+- By hand: install / repeated install (no change) / uninstall (byte-exact,
+  mode 0640 kept, 0600 backups) / malformed marker and unknown shell refused;
+  an interactive zsh with the block installed and no daemon printed nothing
+  and kept `$?`.
+- Missing platform rows: fish (not installed on this host; hook written to
+  fish 3.1+ syntax but unexecuted), all Linux shells, and bash 5.x.
 
 ## 1b.A verification (2026-09-28, macOS arm64, zsh 5.9 / bash 3.2)
 

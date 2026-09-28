@@ -79,8 +79,11 @@ Reporting is asynchronous, silent when the daemon is unavailable, and uses a
 prompt. When `SENTINAL_SESSION_ID` is set, the external socket path is
 suppressed because daemon-owned PTYs already report OSC signals.
 
-The shell PID is observed for lifecycle only. Closing the ordinary terminal
-ends the Session; output and remote input are unavailable.
+The shell PID is the Session's process-tree root for Metrics and lifecycle.
+Closing the ordinary terminal ends the Session (`COMPLETED`, exit code
+unknown, checked every 2 s by PID and OS start time); output and remote input
+are unavailable. Implemented in 1b.B; details and measured overhead are in
+`docs/SHELL_HOOKS.md`.
 
 ## Mode 3 — auto-wrap
 

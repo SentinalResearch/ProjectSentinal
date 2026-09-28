@@ -28,9 +28,9 @@ sentinal watch
 sentinal watch -- COMMAND [ARG...]
 sentinal watch -t TITLE -- COMMAND [ARG...]
 
-sentinal hook zsh|bash|fish                 # planned
-sentinal hook install [zsh|bash|fish]       # planned
-sentinal hook uninstall [zsh|bash|fish]     # planned
+sentinal hook zsh|bash|fish
+sentinal hook install [zsh|bash|fish] [--rc PATH]
+sentinal hook uninstall [zsh|bash|fish] [--rc PATH]
 sentinal auto on|off|status                 # planned
 sentinal adopt PID [--log PATH] [-t TITLE]  # planned
 sentinal adopt --pick                       # planned
@@ -84,11 +84,25 @@ Exit status:
 | `1` | not an interactive terminal, invalid arguments, daemon unavailable, or creation rejected — the Command never runs outside Sentinal |
 | `1` | the Session was created but attaching failed — the Command runs inside that Session; the error names the ID to reattach |
 
-### `hook` (planned external mode)
+### `hook`
 
-`hook zsh|bash|fish` prints the integration without editing files. `install`
-adds one marker-delimited block and is idempotent. `uninstall` removes only
-the Sentinal block and restores all surrounding bytes exactly.
+Reports Commands from ordinary terminals as `SHELL_HOOK` / `COMMANDS`
+Sessions (no output, input, or attach). Full behavior, rc-file selection,
+limitations, and measurements are in `docs/SHELL_HOOKS.md`.
+
+- `hook zsh|bash|fish` prints the integration to stdout and edits nothing.
+- `install [SHELL] [--rc PATH]` adds one marker-delimited block to the rc
+  file for `SHELL` (default: `$SHELL`). A second install changes nothing. An
+  owner-only backup is written first, and the file is replaced atomically
+  with its permissions preserved.
+- `uninstall [SHELL] [--rc PATH]` removes exactly that block and restores the
+  rest of the file byte for byte.
+- Malformed markers, CRLF files, an ambiguous rc file, or world-writable
+  paths produce a clear error and no change. Exit status is 0 on success
+  (including "nothing changed") and 1 otherwise.
+
+Reporting itself runs through a hidden `hook report` subcommand that the
+hook starts in the background; it is always silent.
 
 ### `auto` (planned)
 
@@ -106,7 +120,9 @@ changing them. An adopted process's exit code is always unknown.
 | Variable | Status | Meaning |
 |---|---|---|
 | `SENTINAL_SESSION_ID` | current | set in every daemon-owned FULL Session; prevents nested Watch (and later double reporting) |
-| `SENTINAL_DISABLE=1` | planned | disables external hook reporting and auto-wrap |
+| `SENTINAL_DISABLE=1` | current | disables external hook reporting (and auto-wrap when it lands) |
+| `SENTINAL_SOCKET` | current | local socket path for hook reporting when `sentinald` does not use the default |
+| `SENTINAL_TITLE` | current | optional title for a shell's SHELL_HOOK Session |
 | `TA_CONFIG` | current internal | overrides `sentinald` configuration path |
 | `TA_AUTH_FILE` | current test/internal | overrides owner-auth storage |
 | `TA_FAKE_PTY` | current test-only | selects the fake PTY backend |

@@ -93,12 +93,12 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 - [x] Daemon unavailable returns a clear non-zero error and never runs the command unwatched
 
 ### 1b.B — External shell hook
-- [ ] `sentinal hook zsh|bash|fish`, plus idempotent install and exact uninstall
-- [ ] Register ordinary shells as `SHELL_HOOK` / `COMMANDS` Sessions
-- [ ] Report Command start, finish, cwd, duration, and exit code through the local socket
-- [ ] Inside a FULL Session, continue using OSC and never double-count through the socket
-- [ ] Background reporting is silent when unavailable and measures under 5 ms prompt overhead
-- [ ] Shell PID liveness ends the reduced-capture Session
+- [x] `sentinal hook zsh|bash|fish`, plus idempotent install and exact uninstall
+- [x] Register ordinary shells as `SHELL_HOOK` / `COMMANDS` Sessions
+- [x] Report Command start, finish, cwd, duration, and exit code through the local socket
+- [x] Inside a FULL Session, continue using OSC and never double-count through the socket
+- [x] Background reporting is silent when unavailable and measures under 5 ms prompt overhead
+- [x] Shell PID liveness ends the reduced-capture Session
 
 ### 1b.C — Auto-wrap and Adopt
 - [ ] `sentinal auto on|off|status`, off by default

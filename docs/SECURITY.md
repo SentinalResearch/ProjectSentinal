@@ -62,8 +62,17 @@ Implemented in 1b.0 (`crates/daemon/src/local_socket.rs`):
   `LocalRequest`; one request and one `LocalResponse` per connection. A
   wrong peer UID is answered `FORBIDDEN` before the frame is read and is
   recorded in `<data_dir>/security-audit.jsonl` without payload bytes.
-- In 1b.0 every valid request returns `UNAVAILABLE`; later stages add
-  handlers. No local request can attach, resize, send input, or signal.
+- 1b.B handles `REGISTER_SHELL`, `SHELL_COMMAND_STARTED`, and
+  `SHELL_COMMAND_FINISHED`; `ADOPT_PROCESS` still returns `UNAVAILABLE`. No
+  local request can attach, resize, send input, or signal.
+- A shell can be registered only if its PID exists and is owned by the
+  daemon's UID; reports must come for that Session's own PID. Session
+  identity is PID plus OS start time, so a reused PID never inherits a
+  Session.
+- COMMANDS Sessions store Command text, cwd, times, and exit codes only: no
+  terminal log, screen, input audit, or environment. The hook passes Command
+  text to its reporter through the environment rather than argv, so it is
+  not visible to other users in `ps`.
 
 Inspect a running daemon (default macOS path shown):
 
