@@ -264,6 +264,104 @@ impl ShellTerm {
         term
     }
 
+    /// Start `name` (zsh or bash) interactively with `rc` as its rc file in
+    /// `home`; returns the terminal and the time until the first prompt.
+    pub fn spawn_with_rc(
+        name: &str,
+        home: &Path,
+        rc: &str,
+        env: &[(&str, String)],
+    ) -> (Self, Duration) {
+        let shell = find_shell(name).unwrap();
+        let mut command = CommandBuilder::new(&shell);
+        match name {
+            "zsh" => {
+                std::fs::write(home.join(".zshrc"), rc).unwrap();
+                command.arg("-i");
+                command.env("ZDOTDIR", home.display().to_string());
+            }
+            "bash" => {
+                std::fs::write(home.join(".bashrc"), rc).unwrap();
+                command.args(["--noprofile", "--rcfile"]);
+                command.arg(home.join(".bashrc").display().to_string());
+                command.arg("-i");
+            }
+            other => panic!("unsupported shell {other}"),
+        }
+        command.env("HOME", home.display().to_string());
+        command.env("TERM", "xterm-256color");
+        command.env_remove("SENTINAL_SESSION_ID");
+        command.env_remove("SENTINAL_DISABLE");
+        command.env_remove("SENTINAL_AUTO_GUARD");
+        command.cwd(home);
+        for (key, value) in env {
+            command.env(key, value);
+        }
+        let started = Instant::now();
+        let mut term = Self::start(name, command);
+        term.wait_prompt(1);
+        (term, started.elapsed())
+    }
+
+    fn start(name: &str, command: CommandBuilder) -> Self {
+        let pair = native_pty_system()
+            .openpty(PtySize {
+                rows: 40,
+                cols: 200,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        let child = pair.slave.spawn_command(command).unwrap();
+        drop(pair.slave);
+        let mut reader = pair.master.try_clone_reader().unwrap();
+        let writer = pair.master.take_writer().unwrap();
+        let (sender, output) = mpsc::channel();
+        std::thread::spawn(move || {
+            let mut buffer = [0_u8; 4096];
+            while let Ok(count) = reader.read(&mut buffer) {
+                if count == 0 || sender.send(buffer[..count].to_vec()).is_err() {
+                    break;
+                }
+            }
+        });
+        ShellTerm {
+            name: name.into(),
+            master: pair.master,
+            child,
+            writer,
+            output,
+            seen: String::new(),
+            prompts: 0,
+        }
+    }
+
+    /// Type a line without waiting for a prompt (e.g. `exit`), then return the
+    /// shell's exit code once it has exited.
+    pub fn finish(mut self, line: &str) -> u32 {
+        self.writer.write_all(line.as_bytes()).unwrap();
+        self.writer.write_all(b"\r").unwrap();
+        self.writer.flush().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if let Some(status) = self.child.try_wait().unwrap() {
+                drop(self.master);
+                return status.exit_code();
+            }
+            while let Ok(bytes) = self.output.try_recv() {
+                self.seen.push_str(&String::from_utf8_lossy(&bytes));
+            }
+            if Instant::now() > deadline {
+                let _ = self.child.kill();
+                panic!(
+                    "{}: shell did not exit after {line:?}; saw:\n{}",
+                    self.name, self.seen
+                );
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
     /// The shell's PID.
     pub fn pid(&self) -> u32 {
         self.child.process_id().unwrap()
@@ -324,6 +422,8 @@ pub struct Daemon {
     pub data_dir: PathBuf,
     /// Daemon stdout+stderr log.
     pub log: PathBuf,
+    /// The daemon's HOME; shells it starts read their rc files from here.
+    pub home: PathBuf,
     root: PathBuf,
 }
 
@@ -376,6 +476,7 @@ impl Daemon {
             socket,
             data_dir,
             log,
+            home: root.clone(),
             root,
         }
     }

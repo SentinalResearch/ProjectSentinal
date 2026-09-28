@@ -15,7 +15,7 @@ use std::{future::Future, path::Path, time::Duration};
 pub const FALLBACK_EXIT: u8 = 75;
 /// Time allowed to reach the daemon and create the Session. Leaves headroom
 /// under the 300 ms fail-open budget for process start and the skip checks.
-pub const ENTRY_DEADLINE: Duration = Duration::from_millis(250);
+pub const ENTRY_DEADLINE: Duration = Duration::from_millis(200);
 
 /// Why a shell is not auto-wrapped.
 #[derive(Debug, Clone, PartialEq, Eq)]

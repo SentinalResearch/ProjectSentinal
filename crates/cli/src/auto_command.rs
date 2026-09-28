@@ -163,7 +163,7 @@ fn edit(
     let message = match (enabling, applied) {
         (true, Applied::Unchanged) => format!("Auto-wrap is already on for {name} in {file}; nothing changed."),
         (true, Applied::Written { backup }) => format!(
-            "Auto-wrap is on for {name}: added a block at the top of {file}{}. New interactive {name} terminals open inside a Sentinal Session; if sentinald does not answer within 250 ms they start normally.",
+            "Auto-wrap is on for {name}: added a block at the top of {file}{}. New interactive {name} terminals open inside a Sentinal Session; if sentinald does not answer within 200 ms they start normally.",
             backup_note(backup.as_deref(), &home)
         ),
         (false, Applied::Unchanged) => format!("Auto-wrap is not configured in {file}; nothing changed."),

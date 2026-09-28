@@ -76,3 +76,17 @@ fn cli_terminal_frame_round_trips() {
     assert_eq!(session_id, SessionId(42));
     assert_eq!(payload, b"output");
 }
+
+#[test]
+fn global_url_and_token_file_can_come_from_the_environment() {
+    let parsed = Cli::try_parse_from(["sentinal", "ls"]).unwrap();
+    assert_eq!(parsed.url, "ws://127.0.0.1:7420/api/v1/ws");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_sentinal"))
+        .arg("ls")
+        .env("SENTINAL_URL", "ws://127.0.0.1:9/api/v1/ws")
+        .env("SENTINAL_TOKEN_FILE", "/nonexistent/sentinal-token")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("/nonexistent/sentinal-token"), "{stderr}");
+}
