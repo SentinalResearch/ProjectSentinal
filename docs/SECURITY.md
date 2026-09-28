@@ -37,7 +37,7 @@ Commands may appear in PTY output because an interactive shell echoes them.
 Hidden prompts such as password entry disable echo and therefore do not
 appear in the output log. No component may add a separate keystroke recorder.
 
-## Milestone 1b local boundary (planned)
+## Milestone 1b local boundary
 
 External shell reporting, auto-wrap, and adoption use a private per-user Unix
 socket. The implementation must:
@@ -49,6 +49,32 @@ socket. The implementation must:
 - refuse symlink and ownership-confusion paths;
 - expose no terminal-input operation on the local reporting protocol;
 - keep hook reporting silent and asynchronous when unavailable.
+
+Implemented in 1b.0 (`crates/daemon/src/local_socket.rs`):
+
+- Location: Linux `$XDG_RUNTIME_DIR/sentinel/sentineld.sock` when that
+  variable is an absolute path; macOS, and Linux without it,
+  `<data_dir>/run/sentineld.sock`. `local_socket = "..."` in `daemon.toml`
+  overrides both. Paths over 100 bytes are refused (portable `sun_path`).
+- The expected UID is the daemon's own effective UID, read from a
+  socketpair's OS peer credentials (no `unsafe`, no new dependency).
+- Framing: 4-byte big-endian length, then 1..=65,536 bytes of versioned JSON
+  `LocalRequest`; one request and one `LocalResponse` per connection. A
+  wrong peer UID is answered `FORBIDDEN` before the frame is read and is
+  recorded in `<data_dir>/security-audit.jsonl` without payload bytes.
+- In 1b.0 every valid request returns `UNAVAILABLE`; later stages add
+  handlers. No local request can attach, resize, send input, or signal.
+
+Inspect a running daemon (default macOS path shown):
+
+```sh
+stat -f '%Sp %Su %N' ~/.local/share/terminal-agent/run ~/.local/share/terminal-agent/run/sentineld.sock   # macOS
+stat -c '%A %U %n' "$XDG_RUNTIME_DIR/sentinel" "$XDG_RUNTIME_DIR/sentinel/sentineld.sock"                  # Linux
+lsof -a -U -p "$(pgrep -x tad)" | grep sentineld   # the daemon holds the listener
+ss -xlp | grep sentineld                           # Linux alternative
+```
+
+Expected: directory `drwx------`, socket `srw-------`, both owned by you.
 
 Watch is an interactive CLI action and fails closed: if the daemon cannot
 create the FULL Session, it prints a clear error and does not execute the

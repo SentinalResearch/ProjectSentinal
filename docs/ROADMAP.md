@@ -77,12 +77,12 @@ the safety-sensitive shell integration does not land as one large change.
 The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 
 ### 1b.0 — Contract and local ingress
-- [ ] Add `SessionOrigin`, `CaptureLevel`, and the required Session process identity to the protocol
-- [ ] Define `CREATE_SESSION` watch fields plus `REGISTER_SHELL`, `SHELL_COMMAND_STARTED`, `SHELL_COMMAND_FINISHED`, and `ADOPT_PROCESS` with hand-reviewed fixtures
-- [ ] Add capture capability helpers used by daemon and web authorization
-- [ ] Add a private per-user Unix socket with mode `0600` and peer-UID verification
-- [ ] Reject input/resize/kill for capture levels that do not own a PTY
-- [ ] Add `docs/SECURITY.md`, `docs/CLI.md`, and `docs/SHELL_HOOKS.md`
+- [x] Add `SessionOrigin`, `CaptureLevel`, and the required Session process identity to the protocol
+- [x] Define `CREATE_SESSION` watch fields plus `REGISTER_SHELL`, `SHELL_COMMAND_STARTED`, `SHELL_COMMAND_FINISHED`, and `ADOPT_PROCESS` with hand-reviewed fixtures
+- [x] Add capture capability helpers used by daemon and web authorization (daemon enforces now; web consumes them in the capture-aware UI stage)
+- [x] Add a private per-user Unix socket with mode `0600` and peer-UID verification
+- [x] Reject input/resize/kill for capture levels that do not own a PTY
+- [x] Add `docs/SECURITY.md`, `docs/CLI.md`, and `docs/SHELL_HOOKS.md`
 
 ### 1b.A — Sentinel Watch
 - [ ] `sentinel watch`, `watch -- <command>`, and `watch -t <title> -- <command>`
