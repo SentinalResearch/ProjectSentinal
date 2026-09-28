@@ -28,6 +28,15 @@ Status: planned; next implementation priority after Milestone 2.
 Each numbered stage ends with a commit and human review. Do not start the
 next stage automatically.
 
+## Execution prompts
+
+- `prompts/03a-milestone-1b0-contract-local-ingress.md`
+- `prompts/03b-milestone-1ba-sentinel-watch.md`
+- `prompts/03c-milestone-1bb-external-shell-hook.md`
+- `prompts/03d-milestone-1bc-auto-wrap-adopt.md`
+- `prompts/04-milestone-3-events-watchers.md`
+- `prompts/04a-milestone-1bd-adopted-log-ui.md`
+
 ## Open questions / design gates
 
 - Choose the wire representation of Watch's initial Command. Structured argv
