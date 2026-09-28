@@ -6,6 +6,7 @@ mod error;
 mod external;
 mod external_lifecycle;
 mod lifecycle;
+mod local_dispatch;
 mod structured;
 mod tasks;
 
