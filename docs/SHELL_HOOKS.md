@@ -152,7 +152,8 @@ bash costs more because each Command reads `history 1` in a subshell.
 
 ## Troubleshooting
 
-1. Run `sentinal hook <shell>` to inspect the expected loader and hook.
+1. Run `sentinal hook <shell>` to inspect the expected loader and hook, and
+   `sentinal auto status` to see whether auto-wrap applies here.
 2. Set `SENTINAL_DISABLE=1` to bypass external reporting and auto-wrap.
 3. Confirm the per-user local socket exists and is owned by the current UID
    (see `docs/SECURITY.md`), or set `SENTINAL_SOCKET`.

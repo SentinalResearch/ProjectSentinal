@@ -101,13 +101,13 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 - [x] Shell PID liveness ends the reduced-capture Session
 
 ### 1b.C — Auto-wrap and Adopt
-- [ ] `sentinal auto on|off|status`, off by default
-- [ ] Skip IDE task runners, scp/rsync, non-interactive SSH, nested Sessions, and `SENTINAL_DISABLE=1`
-- [ ] If the daemon does not answer, auto-wrap falls through to a normal shell within 300 ms
-- [ ] `sentinal adopt <pid> [--log <path>] [-t <title>]` and `adopt --pick`
-- [ ] Permit same-user processes only; adoption is read-only
-- [ ] Detect process exit as “Ended · exit code unknown” and never infer an exit code
-- [ ] Detect redirected stdout/stderr off the prompt hot path where the OS supports it
+- [x] `sentinal auto on|off|status`, off by default
+- [x] Skip IDE task runners, scp/rsync, non-interactive SSH, nested Sessions, and `SENTINAL_DISABLE=1`
+- [x] If the daemon does not answer, auto-wrap falls through to a normal shell within 300 ms
+- [x] `sentinal adopt <pid> [--log <path>] [-t <title>]` and `adopt --pick`
+- [x] Permit same-user processes only; adoption is read-only
+- [x] Detect process exit as “Ended · exit code unknown” and never infer an exit code
+- [x] Detect redirected stdout/stderr off the prompt hot path where the OS supports it
 
 ### 1b.D — Adopted log tail and UI completion (lands with Milestone 3)
 - [ ] Read-only tail handles append, truncate, rotation, partial lines, and bounded buffering

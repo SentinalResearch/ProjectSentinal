@@ -115,6 +115,25 @@ The CLI never executes the Command itself; every failure path (nested,
 not a terminal, daemon unavailable, rejected) exits non-zero before or
 instead of creating a Session.
 
+## Auto-wrap and adoption (1b.C)
+
+- Auto-wrap never execs or relaunches a shell: the rc block runs a child and
+  continues on anything but success, so a broken or absent daemon cannot
+  prevent a shell from starting. Recursion is stopped by
+  `SENTINAL_SESSION_ID` and the explicit `SENTINAL_AUTO_GUARD=1` that the
+  daemon sets in every AUTO_WRAP shell; a reply not marked `AUTO_WRAP`
+  (an older daemon) is refused; unattached AUTO_WRAP Sessions are killed
+  after 5 s.
+- Adoption is local-only (`ADOPT_PROCESS` over the private socket) and
+  read-only: the daemon's `ProcessProbe` exposes only identity, metadata,
+  and log-discovery reads; it has no signal, write, ptrace, priority, or
+  kill method. Adopted Sessions are PROCESS capture, so attach, input,
+  resize, and kill are refused even for handcrafted remote requests.
+- Only processes owned by the daemon's UID can be adopted, never
+  `sentinald` itself; identity is PID + OS start time.
+- Log discovery reads `/proc/<pid>/fd` links or runs `lsof` with a 2 s
+  timeout, off the request path; it opens nothing belonging to the process.
+
 ## Capture capability enforcement (planned)
 
 The daemon—not the UI—maps capture levels to allowed operations:

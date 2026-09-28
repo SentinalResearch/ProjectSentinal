@@ -93,14 +93,46 @@ $ sentinal auto off
 $ sentinal auto status
 ```
 
-Auto-wrap is off by default. When enabled, a new interactive terminal enters
-an `AUTO_WRAP` / `FULL` watched Session. It skips nested Sessions, IDE task
-runners, scp/rsync, non-interactive SSH, and any environment with
-`SENTINAL_DISABLE=1`.
+Auto-wrap is off by default. `auto on` adds a marker-delimited block at the
+top of the shell's rc file (same editor, backup, and atomic replace as
+`hook install`). In a new interactive terminal the block runs
+`sentinal auto enter` as a child of the starting shell; it creates an
+`AUTO_WRAP` / `FULL` Session through the Watch path and attaches. When that
+Session's shell exits (or you detach), the outer shell exits too.
 
-Auto-wrap is fail-open: if the daemon does not answer, the original shell is
-started normally within 300 ms with no Sentinal output injected into the
-prompt.
+Skip rules (first match wins; one table in `crates/cli/src/auto_wrap.rs`):
+
+| Signal | Reason |
+|---|---|
+| `SENTINAL_DISABLE=1` | disabled |
+| `SENTINAL_SESSION_ID` non-empty | already inside a Session |
+| `SENTINAL_AUTO_GUARD` non-empty | recursion guard (set in every AUTO_WRAP shell) |
+| shell not interactive | non-interactive shell |
+| stdin or stdout not a tty | no terminal |
+| `SSH_ORIGINAL_COMMAND` runs scp, rsync, sftp, or sftp-server | file transfer |
+| `SSH_ORIGINAL_COMMAND` set, or `SSH_CONNECTION`/`SSH_CLIENT` without `SSH_TTY` | non-interactive SSH |
+| `VSCODE_RESOLVING_ENVIRONMENT` or `INTELLIJ_ENVIRONMENT_READER` | IDE reading the login environment |
+| any variable named in `SENTINAL_AUTO_SKIP` (comma-separated) is set | configured task runner |
+| `TERM` unset or `dumb` | dumb terminal |
+| not zsh, bash, or fish | unsupported shell |
+
+Ordinary IDE terminals (`TERM_PROGRAM=vscode`, JetBrains JediTerm, Emacs
+vterm) and interactive SSH are wrapped; there is no broad `TERM_PROGRAM`
+rule.
+
+Auto-wrap is fail-open: `auto enter` has 200 ms to reach the daemon and
+create the Session. On any skip, timeout, or error it exits 75 silently and
+the rc file simply continues, so the original shell keeps its own argv,
+environment, cwd, and exit behavior; nothing is relaunched, which also rules
+out exec loops. Measured worst case with a hung daemon: +231 ms (zsh), +214 ms
+(bash) to shell start on macOS. A reply that arrives after the deadline is
+dropped, and the daemon kills an AUTO_WRAP Session nobody attaches to within
+5 s, so a late success can never leave a second shell. A daemon that does
+not mark the Session `AUTO_WRAP` is refused.
+
+The wrapped shell is started by `sentinald`, so it gets the daemon's
+environment plus `SENTINAL_SESSION_ID` and `SENTINAL_AUTO_GUARD=1`, not the
+terminal's (same as Watch).
 
 ## Mode 4 — adopt
 
@@ -116,12 +148,24 @@ samples the process tree and determines whether it remains alive. Because
 Sentinal is not the parent, completion is displayed as “Ended · exit code
 unknown.” It must not manufacture success or failure.
 
-An explicit or safely detected log path upgrades capture to `PROCESS_LOG`.
-The tail is read-only and handles append, partial lines, truncation, rotation,
-temporary absence, and bounded buffering. Lines enter the same deterministic
-watcher pipeline as PTY output. stdout/stderr discovery runs off the prompt
-hot path; Linux may inspect `/proc`, while macOS may use a cached `lsof`
-probe.
+In 1b.C a log path is recorded as metadata only (`Session.log`, approved
+additive field): `--log` must be an absolute, readable regular file, and
+otherwise redirected stdout/stderr are detected after adoption, off the
+request path (Linux `/proc/<pid>/fd/{1,2}`; macOS `lsof -a -p PID -d 1,2
+-Fftn` with a 2 s timeout). Pipes, sockets, devices, deleted files, and
+non-regular files are ignored; failure leaves no log. Capture stays
+`PROCESS` and interfaces say "log detected; tailing not enabled yet".
+
+From 1b.D, a log upgrades capture to `PROCESS_LOG`. The tail is read-only
+and handles append, partial lines, truncation, rotation, temporary absence,
+and bounded buffering. Lines enter the same deterministic watcher pipeline
+as PTY output.
+
+Adopt resolves the target before any change: the PID must be non-zero,
+alive, owned by the daemon user, not `sentinald` itself, and not already
+adopted (a reused PID ends the stale Session instead of inheriting it).
+Name, executable, and cwd are recorded when available. Metrics and endings
+of reduced-capture Sessions reach every web client without attaching.
 
 Adoption never writes, signals, reparents, attaches a debugger, or opens the
 process's input. A future explicit signal action requires a separate security

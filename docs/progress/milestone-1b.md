@@ -1,6 +1,6 @@
 # Milestone 1b progress — Any terminal into Sentinal
 
-Status: Milestone 1b.B complete 2026-09-28; awaiting human review before 1b.C.
+Status: Milestone 1b.C complete 2026-09-28; awaiting human review before Milestone 3.
 
 ## Plan
 
@@ -14,10 +14,10 @@ Status: Milestone 1b.B complete 2026-09-28; awaiting human review before 1b.C.
 - [x] Sentinal Watch and no-nesting behavior — CLI unit tests, fake daemon behavior tests, real PTY integration
 - [x] External hook generation/install/uninstall — script tests against a fake socket and byte-exact rc fixtures
 - [x] Hook performance/fail-open behavior — injected transport tests plus recorded Linux/macOS benchmark
-- [ ] Auto-wrap guards and 300 ms fallback — table-driven unit tests and manual IDE/SSH smoke matrix
-- [ ] Read-only adoption and unknown exit — fake process table, same-user tests, Linux/macOS integration
+- [x] Auto-wrap guards and 300 ms fallback — table-driven unit tests and manual IDE/SSH smoke matrix (manual IDE/SSH matrix not yet run)
+- [x] Read-only adoption and unknown exit — fake process table, same-user tests, Linux/macOS integration (Linux pending)
 - [ ] Rotation-safe log tail — temp-file append/truncate/rotate/partial-line behavior tests
-- [ ] Capture-aware web UI — Testing Library coverage for badges and forbidden actions
+- [ ] Capture-aware web UI — Testing Library coverage for badges and forbidden actions (1b.C: detail/split badge, unknown exit, read-only terminal area, log hint; completion in 1b.D)
 - [ ] Privacy review — inspect SQLite, audit JSONL, PTY logs, and adopted-log metadata
 - [ ] Full verification — `just check`, Playwright, ignored integration suite, platform matrix
 
@@ -34,6 +34,38 @@ Status: Milestone 1b.B complete 2026-09-28; awaiting human review before 1b.C.
   socket path fails startup with `PathTooLong`.
 - Web: only generated types and the `CREATE_SESSION` payload changed
   (`origin: "UI"`); capture-aware UI remains in 1b.D.
+
+## 1b.C verification (2026-09-28, macOS arm64, zsh 5.9 / bash 3.2.57)
+
+- `just check` passes: 385 Rust tests (14 ignored integrations/benchmark)
+  and 47 web tests. Playwright 2/2.
+- Ignored, all 14 pass here, including new `auto_wrap_integration` (real
+  zsh and bash enter exactly one AUTO_WRAP / FULL Session, no nesting,
+  `exit` closes the terminal with status 0; with a hung daemon the original
+  shell starts with identical `$0`/cwd/env marker and `exit 3` status,
+  added start time +231 ms zsh / +214 ms bash) and
+  `adopt_process_integration` (real same-user child adopted read-only,
+  `--pick` cancel adopts nothing, duplicate refused, real `lsof` discovers
+  the redirected log as STDOUT_AND_STDERR, live SESSION_METRICS arrive
+  without attaching, remote kill refused with the process alive, and on
+  exit the Session is COMPLETED with unknown exit and no Command).
+- Found and fixed along the way: attach/watch clients hung after the shell
+  exited (Tokio stdin kept the runtime alive; the exit monitor also never
+  notified attached clients); reduced-capture Metrics never reached the web
+  (they needed an attachment); clients could mistake the new observation
+  messages for replies (CLI and web).
+- Interpretation: "PID reuse" is handled by never letting a reused PID
+  inherit a Session (the stale Session ends; the new process can be adopted
+  separately). ADOPT_PROCESS has no start-time field to reject a PID that
+  was reused between listing and adopting.
+- Platform-specific discovery gaps: Linux `/proc/<pid>/fd` discovery is
+  covered only by sample-data tests (no Linux host); macOS `lsof` does not
+  flag deleted files, so they are excluded only because the path no longer
+  resolves to a regular file; no discovery on other Unix systems; sysinfo
+  may report no cwd/executable for some macOS processes (recorded as empty,
+  not an error); fish auto-wrap (needs fish ≥ 3.2 for `status fish-path`)
+  and fish adoption flows are unexecuted here.
+- Not run: manual IDE / SSH smoke matrix for auto-wrap, and all Linux rows.
 
 ## 1b.B verification (2026-09-28, macOS arm64, zsh 5.9 / bash 3.2.57)
 
@@ -102,6 +134,13 @@ next stage automatically.
 - `prompts/03d-milestone-1bc-auto-wrap-adopt.md`
 - `prompts/04-milestone-3-events-watchers.md`
 - `prompts/04a-milestone-1bd-adopted-log-ui.md`
+
+## Approved 1b.C design gate (2026-09-28)
+
+- Session gains `log: Option<SessionLog>` (serde default, PROTOCOL_VERSION
+  stays 1) with `SessionLog { path, source: EXPLICIT | STDOUT | STDERR |
+  STDOUT_AND_STDERR }`. Only ADOPTED Sessions carry it; capture stays PROCESS
+  until 1b.D tails the log.
 
 ## Approved 1b.0 design gates
 

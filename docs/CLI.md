@@ -31,9 +31,9 @@ sentinal watch -t TITLE -- COMMAND [ARG...]
 sentinal hook zsh|bash|fish
 sentinal hook install [zsh|bash|fish] [--rc PATH]
 sentinal hook uninstall [zsh|bash|fish] [--rc PATH]
-sentinal auto on|off|status                 # planned
-sentinal adopt PID [--log PATH] [-t TITLE]  # planned
-sentinal adopt --pick                       # planned
+sentinal auto on|off|status [zsh|bash|fish] [--rc PATH]
+sentinal adopt PID [--log PATH] [-t TITLE]
+sentinal adopt --pick
 ```
 
 - `ls` lists Session ID, state, cwd, and shell.
@@ -104,25 +104,51 @@ limitations, and measurements are in `docs/SHELL_HOOKS.md`.
 Reporting itself runs through a hidden `hook report` subcommand that the
 hook starts in the background; it is always silent.
 
-### `auto` (planned)
+### `auto`
 
-Enables, disables, or reports opt-in shell auto-wrap. `on` must describe the
-config file it changes. `SENTINAL_DISABLE=1` always bypasses it.
+Opt-in auto-wrap of new interactive terminals (details and skip table in
+`docs/CAPTURE_MODES.md`, Mode 3).
 
-### `adopt` (planned)
+- `auto on [SHELL] [--rc PATH]` adds a block at the top of the rc file and
+  prints which file changed and its backup; idempotent.
+- `auto off` removes exactly that block.
+- `auto status` prints the file and line range of the block (or that it is
+  off) and whether a new shell in this terminal would be wrapped, or why not:
 
-Registers a same-user process read-only. `--log` selects an explicit log and
-upgrades capture to PROCESS_LOG. `--pick` offers same-user candidates without
-changing them. An adopted process's exit code is always unknown.
+```console
+$ sentinal auto status
+Auto-wrap: on for zsh — block at lines 1–6 of ~/.zshrc
+This terminal: inside Sentinal Session 12
+```
+
+### `adopt`
+
+Registers an existing same-user process read-only as `ADOPTED` / `PROCESS`
+over the private local socket.
+
+- `adopt PID [-t TITLE]` adopts one process; `--log PATH` records a readable
+  regular log file (tailing lands in 1b.D).
+- `adopt --pick` lists your processes (newest first, excluding itself, its
+  shell, and `sentinald`) and adopts only after you type a list number or
+  PID; Enter or `q` adopts nothing.
+- Exit status 0 on adoption or cancel; 1 when the daemon is unreachable or
+  refuses (dead PID, another user's process, `sentinald`, already adopted,
+  bad log). Nothing is adopted on any error.
+- Sentinal never signals, traces, or writes to an adopted process; its exit
+  code is always shown as unknown.
 
 ## Environment
 
 | Variable | Status | Meaning |
 |---|---|---|
 | `SENTINAL_SESSION_ID` | current | set in every daemon-owned FULL Session; prevents nested Watch (and later double reporting) |
-| `SENTINAL_DISABLE=1` | current | disables external hook reporting (and auto-wrap when it lands) |
+| `SENTINAL_DISABLE=1` | current | disables external hook reporting and auto-wrap |
 | `SENTINAL_SOCKET` | current | local socket path for hook reporting when `sentinald` does not use the default |
 | `SENTINAL_TITLE` | current | optional title for a shell's SHELL_HOOK Session |
+| `SENTINAL_URL` | current | daemon WebSocket URL (same as `--url`) |
+| `SENTINAL_TOKEN_FILE` | current | bearer token file (same as `--token-file`) |
+| `SENTINAL_AUTO_GUARD` | current | set in every AUTO_WRAP shell; any value stops auto-wrap |
+| `SENTINAL_AUTO_SKIP` | current | comma-separated variable names; auto-wrap skips when any is set |
 | `TA_CONFIG` | current internal | overrides `sentinald` configuration path |
 | `TA_AUTH_FILE` | current test/internal | overrides owner-auth storage |
 | `TA_FAKE_PTY` | current test-only | selects the fake PTY backend |
