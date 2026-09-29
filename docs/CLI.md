@@ -16,6 +16,37 @@ sentinal [--url ws://127.0.0.1:7420/api/v1/ws] [--token-file PATH] <command>
 
 The token file defaults to `~/.config/terminal-agent/token`.
 
+## Tailscale development server
+
+From the repository root, one command starts both `sentinald` and the Vite
+frontend on this machine's Tailscale IPv4 address:
+
+```console
+$ just network
+Sentinal Tailscale development server
+Web UI:    http://100.x.y.z:5173
+Daemon API: http://100.x.y.z:7420
+```
+
+Open the displayed Web UI URL on another device connected to the same
+Tailnet. On the first run, read the bootstrap token in a second SSH terminal
+with the exact `cat .../token` command printed by the launcher, paste it into
+the setup page, and choose the single owner's password. Later visits use
+that password; the launcher does not create or print a default password.
+
+The launcher binds to one `100.64.0.0/10` Tailscale address. It refuses
+`0.0.0.0`, ordinary LAN addresses, and non-Tailscale overrides. It is a
+development server: keep the terminal open, and press Ctrl-C to stop both
+processes. Tailnet policy and the host firewall must permit ports 5173 and
+7420. Check the generated configuration without starting anything with:
+
+```console
+$ just network --dry-run
+```
+
+Useful overrides are `SENTINAL_TAILSCALE_IP`, `SENTINAL_DAEMON_PORT`,
+`SENTINAL_WEB_PORT`, `SENTINAL_DATA_DIR`, and `SENTINAL_CONFIG_DIR`.
+
 ## Commands
 
 ```console
@@ -149,6 +180,11 @@ over the private local socket.
 | `SENTINAL_TOKEN_FILE` | current | bearer token file (same as `--token-file`) |
 | `SENTINAL_AUTO_GUARD` | current | set in every AUTO_WRAP shell; any value stops auto-wrap |
 | `SENTINAL_AUTO_SKIP` | current | comma-separated variable names; auto-wrap skips when any is set |
+| `SENTINAL_TAILSCALE_IP` | development | overrides Tailscale IPv4 discovery for `just network`; still validated as `100.64.0.0/10` |
+| `SENTINAL_DAEMON_PORT` | development | daemon port used by `just network` (default `7420`) |
+| `SENTINAL_WEB_PORT` | development | Vite port used by `just network` (default `5173`) |
+| `SENTINAL_DATA_DIR` | development | persistent data path used by `just network` |
+| `SENTINAL_CONFIG_DIR` | development | token/auth path used by `just network` |
 | `TA_CONFIG` | current internal | overrides `sentinald` configuration path |
 | `TA_AUTH_FILE` | current test/internal | overrides owner-auth storage |
 | `TA_FAKE_PTY` | current test-only | selects the fake PTY backend |

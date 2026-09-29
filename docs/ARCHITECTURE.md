@@ -39,6 +39,7 @@ sentinal/
 │   ├── watcher/         output → Events               (Milestone 3)
 │   └── cli/             command-line client           (Milestone 1)
 ├── shell/               zsh/bash/fish hooks (OSC 133) (Milestone 2)
+├── scripts/             development launchers and offline tests
 ├── web/                 Vite + xterm.js PWA           (Milestone 1)
 ├── intelligence/        Python agent + training       (V2)
 └── recipes/             built-in TOML recipes         (Milestone 4)

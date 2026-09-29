@@ -4,6 +4,8 @@ Status: Milestone 1b.C complete 2026-09-28; awaiting human review before Milesto
 
 ## Pre-Milestone 3 audit remediation
 
+- [x] Add a one-command Tailscale-only daemon/web launcher —
+  `scripts/tests/run-network-test.sh` plus a manual health/login smoke test
 - [x] Deliver reduced-capture Metrics, Commands, Events, and state through the real web adapter — daemon behaviour tests and `web/src/data/api/index.test.ts`
 - [x] Make AUTO_WRAP attachment a bounded, confirmed handoff with safe orphan cleanup — CLI and daemon auto-wrap regression tests
 - [x] Preserve external-shell Command order when background reporters arrive out of order — `crates/daemon/tests/external_shell.rs`
@@ -26,6 +28,21 @@ Status: Milestone 1b.C complete 2026-09-28; awaiting human review before Milesto
 - No protocol fixture or protocol-version change and no new dependency.
 - Remaining Milestone 1b release work is unchanged: 1b.D log tail/UI lands
   with Milestone 3; Linux and real-fish platform rows remain pending.
+
+## Tailscale launcher verification (2026-09-29, macOS arm64)
+
+- `scripts/tests/run-network-test.sh` passes with generated-config/proxy
+  assertions and rejection of wildcard, LAN, out-of-range CGNAT, and invalid
+  ports. It is part of `just check`.
+- `just network` discovered `100.93.101.56`, built and started `sentinald` on
+  port 7420, and started Vite on port 5173. Direct daemon health and proxied
+  frontend health both returned `{"ok":true,"version":1}`; the frontend root
+  returned the Vite HTML page.
+- Ctrl-C stopped both listeners and removed the ephemeral configuration.
+  Persistent Sessions, token, and owner authentication remain in the normal
+  per-user directories. No dependency or protocol change was required.
+- Final `just check` passes: formatting, clippy with warnings denied, all
+  Rust tests, generated TypeScript, 48 web tests, and the launcher test.
 
 ## Plan
 

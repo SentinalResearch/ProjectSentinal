@@ -20,6 +20,14 @@ and roadmap checkbox are complete.
 - PTY output is retained in compressed Session logs. Terminal output is
   untrusted and is never executed.
 
+`just network` is the development path for remote browser testing. It asks
+Tailscale for this machine's IPv4 address, validates that the address is in
+`100.64.0.0/10`, and binds both the daemon and Vite to that exact address.
+It never falls back to a wildcard or LAN bind. Vite proxies `/api` to the
+same Tailscale-bound daemon, so browser credentials remain same-origin. This
+does not bypass Tailnet ACLs or the host firewall and is not a public-internet
+deployment mechanism.
+
 ## Data Sentinal records
 
 | Data | Stored | Notes |

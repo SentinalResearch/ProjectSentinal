@@ -50,6 +50,11 @@ check:
     cargo test --workspace
     just gen-ts --check
     pnpm -C web check
+    bash scripts/tests/run-network-test.sh
+
+# Start the daemon and web UI on this machine's Tailscale IPv4 address
+network *args:
+    bash scripts/run-network.sh {{args}}
 
 # Slow tests that need a real shell / PTY
 test-integration:

@@ -112,7 +112,13 @@ produces with `insta`. When a parser changes, review the snapshot diff.
 ```bash
 just test              # all fast tests
 just check             # fmt + clippy + tests (run before every commit)
+just network --dry-run # validate/inspect the Tailscale development launch
 cargo test -p protocol # one crate
 cargo test session     # tests whose name contains "session"
 cargo test -- --ignored  # integration tests
 ```
+
+`just check` also runs `scripts/tests/run-network-test.sh`. The script test
+uses an injected Tailscale address and no network: it checks generated TOML,
+frontend proxy arguments, port bounds, and rejection of wildcard, LAN, and
+out-of-range CGNAT addresses.

@@ -118,6 +118,7 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 - [ ] Offer “Watch fully next time” from reduced-capture Sessions
 
 ### 1b release gates
+- [x] One-command Tailscale-only development launcher starts daemon and web UI together
 - [x] Fast unit, contract, script, fake-process, and UI capability tests pass
 - [x] Hook latency benchmark records p50/p95/max and p95 is below 5 ms
 - [x] Auto-wrap timeout test proves fail-open within 300 ms without sleeps over 100 ms
