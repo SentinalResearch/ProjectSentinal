@@ -84,6 +84,44 @@
   color: var(--text-2);
 }
 
+.unavailablePanel {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.unavailablePanel h2 {
+  margin: 0;
+  color: var(--text-1);
+  font-size: 24px;
+  line-height: 28px;
+}
+
+.unavailablePanel strong {
+  color: var(--text-1);
+}
+
+.connectedMachineList {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.connectedMachine {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) 120px;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
 .primaryBtn {
   height: 40px;
   padding: 0 18px;

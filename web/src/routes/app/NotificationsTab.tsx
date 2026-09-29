@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { dataAdapter } from "../../data";
+import { dataAdapter, isMockData } from "../../data";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { JournalNotification, NotificationRuleSet, NotificationRules } from "../../data/types";
 import styles from "./SettingsPage.module.css";
@@ -19,6 +19,22 @@ function previewAccent(text: string): string {
 }
 
 export function NotificationsTab() {
+  if (!isMockData) {
+    return (
+      <div className={styles.unavailablePanel}>
+        <h2>Notifications are not available yet</h2>
+        <span>
+          Notification rules and delivery have not been implemented by the daemon. Live Session state remains
+          available without notifications.
+        </span>
+      </div>
+    );
+  }
+
+  return <NotificationRules />;
+}
+
+function NotificationRules() {
   const { sessions, machines } = useLiveData();
   const [rules, setRules] = useState<NotificationRules | null>(null);
   const [journal, setJournal] = useState<JournalNotification[]>([]);

@@ -60,7 +60,7 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} />
+      {isMockData && <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} />}
     </div>
   );
 }

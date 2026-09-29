@@ -11,6 +11,36 @@
   color: var(--text-3);
 }
 
+.unavailable {
+  max-width: 720px;
+  margin: 48px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.unavailable h1,
+.unavailable p {
+  margin: 0;
+}
+
+.unavailable h1 {
+  font-size: 28px;
+  line-height: 32px;
+}
+
+.unavailable p {
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.unavailable code {
+  color: var(--text-1);
+}
+
 .aside {
   border-right: 1px solid var(--line);
   display: flex;

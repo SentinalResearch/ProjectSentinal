@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { dataAdapter } from "../../data";
+import { dataAdapter, isMockData } from "../../data";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { MachineToken } from "../../data/types";
 import styles from "./SettingsPage.module.css";
@@ -17,6 +17,53 @@ export interface MachinesTabProps {
  * Detail's Ctrl-C modal. Still satisfies rule 5: revoke never completes on one click.
  */
 export function MachinesTab({ onOpenPair }: MachinesTabProps) {
+  return isMockData ? <MachineTokens onOpenPair={onOpenPair} /> : <ConnectedMachine />;
+}
+
+function ConnectedMachine() {
+  const { machines } = useLiveData();
+
+  return (
+    <>
+      <header className={styles.tabHeader}>
+        <div className={styles.tabHeaderText}>
+          <h2 className={styles.tabTitle}>Machines</h2>
+          <span className={styles.tabSubtitle}>The Machine served by the daemon configured for this web app.</span>
+        </div>
+      </header>
+
+      <div className={styles.unavailablePanel}>
+        <strong>Pairing and token management are not available yet.</strong>
+        <span>This build connects to one daemon. Multi-Machine enrollment and aggregation are a later milestone.</span>
+      </div>
+
+      <div className={styles.connectedMachineList}>
+        {machines.map((machine) => (
+          <div key={machine.id} className={styles.connectedMachine}>
+            <div className={styles.machineNameCol}>
+              <span className={styles.machineName}>{machine.name}</span>
+              <span className={styles.machineOs}>{machine.os}</span>
+            </div>
+            <span className={styles.machineHw}>{machine.hardware}</span>
+            <span className={styles.machineStatus}>
+              <span
+                className={styles.statusDot}
+                style={{
+                  background: machine.status === "ONLINE" ? "var(--s-running)" : "transparent",
+                  boxShadow: machine.status === "ONLINE" ? "none" : "inset 0 0 0 1.5px var(--s-disconnected-fg)",
+                }}
+              />
+              {machine.status === "ONLINE" ? "Online" : "Offline"}
+            </span>
+          </div>
+        ))}
+        {machines.length === 0 && <span className={styles.tabLoading}>No Machine is available from the daemon.</span>}
+      </div>
+    </>
+  );
+}
+
+function MachineTokens({ onOpenPair }: MachinesTabProps) {
   const { machines } = useLiveData();
   const [tokens, setTokens] = useState<MachineToken[] | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);

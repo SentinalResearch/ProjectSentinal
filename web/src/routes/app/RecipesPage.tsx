@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
 import { MockBadge } from "../../components/MockBadge";
-import { dataAdapter } from "../../data";
+import { dataAdapter, isMockData } from "../../data";
 import { extractPort } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { Recipe } from "../../data/types";
@@ -36,6 +36,26 @@ function renderTemplate(template: string, values: Record<string, string>): strin
 
 /** design_handoff_sentinal/design/SentinalRecipes.dc.html */
 export function RecipesPage() {
+  if (!isMockData) {
+    return (
+      <div className={styles.unavailable}>
+        <span className={styles.overline}>REAL DATA MODE</span>
+        <h1>Recipes are not available yet</h1>
+        <p>
+          Recipe storage and execution have not been implemented by the daemon. This page will not substitute
+          demonstration data while connected to a real Machine.
+        </p>
+        <p>
+          Start work now with <code>sentinal watch -- COMMAND [ARG...]</code>.
+        </p>
+      </div>
+    );
+  }
+
+  return <RecipeCatalog />;
+}
+
+function RecipeCatalog() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const { machines, sessions } = useLiveData();
