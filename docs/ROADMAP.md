@@ -155,6 +155,19 @@ then continue in a new FULL Session with the same cwd.
 **Demo:** install the worker on one Machine, run only the control UI on a
 second Machine, and complete one real Watch handoff over Tailscale.
 
+## Milestone 1d — Session continuation history
+- [ ] Approve the additive lineage wire/storage proposal before implementation
+- [ ] Persist a linear predecessor/successor relationship across browser and daemon restart
+- [ ] Continue a finished FULL Session atomically into one distinct UI/FULL Session generation
+- [ ] Preserve each generation's immutable output, Commands, exit result, Metrics, and audit boundary
+- [ ] Present bounded combined output with visible generation boundaries and version navigation
+- [ ] Route input, resize, signals, and kill only to the latest live generation
+- [ ] Prove duplicate/concurrent Continue requests create exactly one successor
+
+**Demo:** finish a Session, Continue it twice across page reloads, inspect all
+three retained outputs as one ordered history, and interact only with the
+latest live generation.
+
 ## Milestone 3 — Events + watcher (v0.3)
 - [ ] Event engine (raw observations → `Event`)
 - [ ] Generic watcher (idle, waiting for input, possibly stalled)
