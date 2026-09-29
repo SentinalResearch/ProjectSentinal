@@ -174,6 +174,16 @@ impl Store {
         json.map(|value| decode_session(&value)).transpose()
     }
 
+    /// Load every persisted Session snapshot ordered by ID.
+    pub fn sessions(&self) -> Result<Vec<Session>, StoreError> {
+        let connection = self.lock()?;
+        let mut statement = connection.prepare("SELECT json FROM sessions ORDER BY id")?;
+        let values = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        values.iter().map(|value| decode_session(value)).collect()
+    }
+
     /// Mark all persisted live Sessions interrupted after a daemon restart.
     pub fn interrupt_orphaned_sessions(&self, at: Timestamp) -> Result<Vec<Event>, StoreError> {
         let mut connection = self.lock()?;

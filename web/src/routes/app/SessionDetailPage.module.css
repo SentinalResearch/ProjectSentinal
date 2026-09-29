@@ -117,6 +117,44 @@
   background: color-mix(in srgb, var(--s-failed-fg) 12%, transparent);
 }
 
+.continueButton {
+  height: 36px;
+  padding: 0 14px;
+  border: 1.5px solid var(--accent);
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.continueButton:disabled {
+  opacity: 0.6;
+}
+
+.endedBanner,
+.newSessionBanner {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.endedBanner strong,
+.newSessionBanner {
+  color: var(--text-1);
+}
+
+.continueError {
+  margin: 0;
+  color: var(--s-failed-fg);
+  font-size: 13px;
+}
+
 .body {
   display: flex;
   flex-wrap: wrap;
@@ -209,7 +247,8 @@
   }
 
   .splitButton,
-  .ctrlCButton {
+  .ctrlCButton,
+  .continueButton {
     height: 44px;
     flex: 1 1 auto;
   }

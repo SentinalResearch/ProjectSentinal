@@ -422,6 +422,8 @@ impl SessionManager {
             writer: Arc::new(Mutex::new(Box::new(NoPty))),
             resize: Arc::new(move |_, _| Err(unsupported("resize"))),
             kill: Arc::new(move || Err(unsupported("kill"))),
+            try_wait: Arc::new(|| Ok(None)),
+            pty_closed: std::sync::atomic::AtomicBool::new(true),
             parser: Arc::new(Mutex::new(vt100::Parser::new(1, 1, 0))),
             scrollback: Arc::new(Mutex::new(Scrollback::new(0))),
             output,

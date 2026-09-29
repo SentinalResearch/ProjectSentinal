@@ -99,7 +99,42 @@ sentinal adopt --pick
 - `ls` lists Session ID, state, cwd, and shell.
 - `new` creates a FULL persistent Session and prints its ID.
 - `attach` connects the current terminal. Detach with `Ctrl-\` then `d`.
-- `kill` terminates a daemon-owned Session and marks it interrupted.
+  Detaching a live Session never ends it. Finished Sessions are records; use
+  the web read-only view or the authenticated replay resource below.
+- `kill` terminates a live daemon-owned Session and marks it interrupted. A
+  second kill, or any input/resize/signal after the Session ends, is rejected
+  before the closed PTY and input audit log are touched.
+
+### Finished Session output
+
+The web UI opens `COMPLETED`, `FAILED`, and `INTERRUPTED` FULL Sessions in a
+read-only xterm view and pages their saved ANSI bytes from the daemon. It
+shows state and known exit code, removes input/resize/mobile-key/kill actions,
+and offers **Continue in new Session**. Continue creates a distinct UI/FULL
+Session from the old shell, cwd, known dimensions, and a derived title. It
+does not reuse the old ID or run the old Command.
+
+The same authenticated resource can export ANSI bytes without revealing a
+server filesystem path. Paste either a browser-session token or the Machine
+token into `TOKEN`, then request pages until
+`X-Sentinal-Output-Complete: true`:
+
+```sh
+TOKEN='paste-token-here'
+curl --fail-with-body \
+  -H "Authorization: Bearer $TOKEN" \
+  -D session-12.headers \
+  -o session-12.part-0.ansi \
+  'http://127.0.0.1:7420/api/v1/sessions/12/output?offset=0&limit=1048576'
+```
+
+If the response says it is incomplete, copy
+`X-Sentinal-Output-Next-Offset` into the next request's `offset` and append
+that response to the export. One page is at most 1 MiB and one request scans
+at most 64 MiB of decompressed output. ANSI/control bytes are preserved and
+must be opened in a terminal emulator or treated as binary data, never HTML
+or shell text. `X-Sentinal-Output-Warning: TRUNCATED_ZSTD` means verified
+preceding output was returned but the final compressed frame was incomplete.
 
 ### `watch`
 

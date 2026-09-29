@@ -3,6 +3,7 @@
 mod auth_routes;
 #[cfg(test)]
 mod capture_tests;
+mod output;
 
 use crate::{
     auth::AuthManager,
@@ -165,6 +166,7 @@ pub fn router(state: AppState) -> Router {
     let protected = Router::new()
         .route("/api/v1/machine", get(machine))
         .route("/api/v1/sessions", get(sessions))
+        .route("/api/v1/sessions/{session_id}/output", get(output::output))
         .route("/api/v1/ws", any(websocket))
         .route_layer(middleware::from_fn_with_state(state.clone(), authorize));
 

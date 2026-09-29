@@ -136,6 +136,8 @@ impl SessionManager {
             writer,
             resize,
             kill,
+            try_wait: try_wait.clone(),
+            pty_closed: AtomicBool::new(false),
             parser: parser.clone(),
             scrollback: scrollback.clone(),
             output: output.clone(),

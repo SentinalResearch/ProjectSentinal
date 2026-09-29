@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { dataAdapter, isMockData } from "../data";
 import type { Session, SessionEvent } from "../data/types";
 import { useRealTerminalSession } from "./useRealTerminalSession";
+import { isReadOnlyTerminalState } from "./lifecycle";
 import styles from "./TerminalPane.module.css";
 
 const TERM_BG = "#0C0C0C";
@@ -55,6 +56,7 @@ export interface TerminalPaneProps {
   onAttachedChange?: (attached: boolean) => void;
   /** The key bar's Ctrl-C key always opens a confirm dialog — it never sends the byte directly (rule 5). */
   onRequestInterrupt?: () => void;
+  onDimensionsChange?: (cols: number, rows: number) => void;
   className?: string;
 }
 
@@ -80,6 +82,7 @@ export function TerminalPane({
   showKeyBar = true,
   onAttachedChange,
   onRequestInterrupt,
+  onDimensionsChange,
   className,
 }: TerminalPaneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -87,13 +90,17 @@ export function TerminalPane({
   const inputLineRef = useRef("");
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const seenEventCount = useRef(0);
+  const [replayWarning, setReplayWarning] = useState<string | null>(null);
+  const [replayError, setReplayError] = useState<string | null>(null);
+  const readOnly = isReadOnlyTerminalState(session.state);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
 
     const term = new Terminal({
-      cursorBlink: true,
+      cursorBlink: !readOnly,
+      disableStdin: readOnly,
       convertEol: true,
       scrollback: 4000,
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
@@ -131,19 +138,52 @@ export function TerminalPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
+  useEffect(() => {
+    if (!terminal) return;
+    terminal.options.disableStdin = readOnly;
+    terminal.options.cursorBlink = !readOnly;
+  }, [readOnly, terminal]);
+
+  useEffect(() => {
+    if (!terminal || !onDimensionsChange) return;
+    onDimensionsChange(terminal.cols, terminal.rows);
+    const disposable = terminal.onResize(({ cols, rows }) => onDimensionsChange(cols, rows));
+    return () => disposable.dispose();
+  }, [onDimensionsChange, terminal]);
+
   const { attached: realAttached, sendBytes: sendRealBytes } = useRealTerminalSession(
-    isMockData ? "" : sessionId,
-    isMockData ? null : terminal,
+    isMockData || readOnly ? "" : sessionId,
+    isMockData || readOnly ? null : terminal,
   );
 
   useEffect(() => {
     onAttachedChange?.(isMockData ? true : realAttached);
   }, [isMockData, realAttached, onAttachedChange]);
 
+  useEffect(() => {
+    if (isMockData || !readOnly || !terminal) return;
+    let cancelled = false;
+    setReplayWarning(null);
+    setReplayError(null);
+    void dataAdapter
+      .replayOutput(sessionId, (chunk) => {
+        if (!cancelled) terminal.write(chunk);
+      })
+      .then((result) => {
+        if (!cancelled) setReplayWarning(result.warning ?? null);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setReplayError(error instanceof Error ? error.message : "Saved output could not be loaded.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [readOnly, sessionId, terminal]);
+
   // Mock mode: seed scrollback from the session's events, then replay only newly
   // appended ones as they arrive (LiveDataContext keeps `session.events` growing).
   useEffect(() => {
-    if (!isMockData || !terminal) return;
+    if (!isMockData || !terminal || readOnly) return;
     const events = session.events ?? [];
     if (seenEventCount.current === 0) {
       for (const event of events) writeEventLine(terminal, event);
@@ -193,7 +233,7 @@ export function TerminalPane({
       }
     });
     return () => disposable.dispose();
-  }, [isMockData, terminal, sessionId]);
+  }, [isMockData, readOnly, terminal, sessionId]);
 
   function pressKey(label: string, bytes: number[]) {
     if (isMockData) {
@@ -223,8 +263,11 @@ export function TerminalPane({
         className={fill ? `${styles.host} ${styles.hostFill}` : styles.host}
         style={fill ? undefined : { height }}
         data-testid="terminal-host"
+        aria-readonly={readOnly}
       />
-      {showKeyBar && (
+      {replayWarning && <p className={styles.replayWarning} role="alert">Saved output warning: {replayWarning}</p>}
+      {replayError && <p className={styles.replayWarning} role="alert">{replayError}</p>}
+      {showKeyBar && !readOnly && (
         <div className={styles.keyBar} aria-label="Terminal keys">
           <button type="button" className={`${styles.key} ${styles.ctrlC}`} onClick={onRequestInterrupt}>
             Ctrl‑C

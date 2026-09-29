@@ -1,7 +1,7 @@
 //! Errors produced by the Session manager.
 
 use crate::pty::PtyError;
-use protocol::{CaptureLevel, ProtocolError, SessionId, SessionOrigin};
+use protocol::{CaptureLevel, ProtocolError, SessionId, SessionOrigin, SessionState};
 use std::path::PathBuf;
 use store::StoreError;
 
@@ -59,6 +59,59 @@ pub enum SessionManagerError {
         capture: CaptureLevel,
         /// Requested operation.
         operation: &'static str,
+    },
+    /// A mutating operation targeted a Session whose PTY has ended.
+    #[error("Session {session_id} is in terminal state {state:?} and cannot {operation}")]
+    TerminalStateDenied {
+        /// Target Session.
+        session_id: SessionId,
+        /// Terminal lifecycle state.
+        state: SessionState,
+        /// Rejected operation.
+        operation: &'static str,
+    },
+    /// The PTY closed before its child exit status became observable.
+    #[error("Session {session_id} PTY is closed while state is {state:?}; cannot {operation}")]
+    PtyClosed {
+        /// Target Session.
+        session_id: SessionId,
+        /// Last known lifecycle state.
+        state: SessionState,
+        /// Rejected operation.
+        operation: &'static str,
+    },
+    /// Persisted output does not exist for a known Session.
+    #[error("saved output for Session {0} was not found")]
+    OutputNotFound(SessionId),
+    /// This capture level has no daemon-owned terminal output.
+    #[error("Session {session_id} capture level {capture} has no terminal output")]
+    OutputUnavailable {
+        /// Target Session.
+        session_id: SessionId,
+        /// Session capture level.
+        capture: CaptureLevel,
+    },
+    /// A replay range exceeds the per-request bounds.
+    #[error(
+        "output range offset {offset} limit {limit} exceeds max page {max_page} and max scan {max_scan}"
+    )]
+    InvalidOutputRange {
+        /// Decompressed byte offset.
+        offset: u64,
+        /// Requested bytes.
+        limit: usize,
+        /// Maximum page bytes.
+        max_page: usize,
+        /// Maximum decompressed scan.
+        max_scan: u64,
+    },
+    /// A known output file could not be opened.
+    #[error("saved output for Session {session_id} could not be read: {source}")]
+    OutputRead {
+        /// Target Session.
+        session_id: SessionId,
+        /// Filesystem error without exposing the server path.
+        source: std::io::Error,
     },
     /// An origin that CREATE_SESSION cannot create yet was requested.
     #[error("Session origin {origin} cannot be created through CREATE_SESSION")]

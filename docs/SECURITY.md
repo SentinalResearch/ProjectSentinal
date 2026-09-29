@@ -17,6 +17,9 @@ and roadmap checkbox are complete.
   rate-limited per client address.
 - Every remote terminal input frame appends timestamp, client address,
   Session ID, and byte count to `audit.jsonl`. The input payload is excluded.
+- Finished FULL Sessions reject input, resize, signal, and kill before a PTY
+  handle or input audit entry is touched. A closed-device race is reconciled
+  once and returned as a stable Session error, never a raw OS `EIO`.
 - PTY output is retained in compressed Session logs. Terminal output is
   untrusted and is never executed.
 
@@ -149,7 +152,7 @@ instead of creating a Session.
 - Log discovery reads `/proc/<pid>/fd` links or runs `lsof` with a 2 s
   timeout, off the request path; it opens nothing belonging to the process.
 
-## Capture capability enforcement (planned)
+## Capture and lifecycle capability enforcement
 
 The daemon—not the UI—maps capture levels to allowed operations:
 
@@ -165,6 +168,22 @@ The daemon—not the UI—maps capture levels to allowed operations:
 
 Adoption is same-user and read-only. It does not signal, write to, debug,
 reparent, or claim an exit code for a process Sentinal did not start.
+
+Capture permission is necessary but not sufficient for PTY mutation. The
+daemon applies one state-aware operation gate after the capture check:
+`COMPLETED`, `FAILED`, and `INTERRUPTED` can still expose retained output but
+cannot accept input, resize, signal, or kill. Rejected input is absent from
+the input audit, SQLite, and terminal log.
+
+Saved FULL output is exposed only through authenticated
+`GET /api/v1/sessions/{numeric-id}/output`. The daemon derives the path from
+its configured data directory and the parsed numeric ID; cwd, title, adopted
+log paths, and caller paths are never used. Responses preserve ANSI bytes,
+are limited to 1 MiB, and scan at most 64 MiB of decompressed data per
+request. Corrupt/truncated final frames return preceding output with a stable
+warning. The web writes these bytes to xterm, not `innerHTML`, and Continue
+uses structured safe metadata to create a new Session without copying output
+or an old Command into a shell.
 
 ## Intelligence permissions
 
@@ -183,6 +202,10 @@ must not be interpolated into a shell command or treated as a policy source.
 - Wrong-user, malformed, oversized, stale-socket, and symlink cases fail
   safely.
 - Every reduced capture level is rejected by attach/input/resize/kill tests.
+- Every terminal FULL state is rejected by input/resize/kill tests before fake
+  PTY counters or the input audit change; live detach/reattach stays writable.
+- Authenticated replay covers restart, pagination bounds, empty/missing/
+  corrupt logs, unknown Sessions, and traversal attempts.
 - Storage inspection finds no raw input payload in SQLite, audit JSONL, or a
   separate file.
 - Hook/auto-wrap daemon-down tests prove the documented fail behavior.

@@ -19,6 +19,18 @@ export interface HistoryFilters {
   query?: string;
 }
 
+export interface CreateSessionOptions {
+  shell?: string;
+  cwd?: string;
+  title?: string;
+  cols?: number;
+  rows?: number;
+}
+
+export interface OutputReplayResult {
+  warning?: string;
+}
+
 export type LiveEvent =
   | { type: "DATA_RESET"; machines: Machine[]; sessions: Session[] }
   | { type: "SESSION_UPDATED"; session: Session }
@@ -43,7 +55,11 @@ export class NotImplemented extends Error {
 export interface DataAdapter {
   getMachines(): Promise<Machine[]>;
   getSessions(): Promise<Session[]>;
-  createSession(): Promise<Session>;
+  createSession(options?: CreateSessionOptions): Promise<Session>;
+  replayOutput(
+    sessionId: string,
+    onChunk: (chunk: Uint8Array) => void,
+  ): Promise<OutputReplayResult>;
   getRecipes(): Promise<Recipe[]>;
   getHistory(filters?: HistoryFilters): Promise<HistoryEntry[]>;
 

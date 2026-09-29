@@ -80,6 +80,8 @@ export interface Session {
   capture?: CaptureLevel;
   /** Shell exit code; `null` on an ended Session means the exit code is unknown. */
   exitCode?: number | null;
+  /** Executable used for this Session's shell; never a command line. */
+  shell?: string;
   /** Adopted process log, recorded but not tailed before 1b.D. */
   log?: SessionLog;
 }

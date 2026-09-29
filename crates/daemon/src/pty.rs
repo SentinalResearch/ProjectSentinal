@@ -5,7 +5,10 @@ use std::{
     collections::HashMap,
     io::{Cursor, Read, Write},
     path::PathBuf,
-    sync::{mpsc, Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc, Arc, Mutex,
+    },
 };
 
 /// Parameters needed to start a shell in a PTY.
@@ -189,6 +192,21 @@ struct FakeControl {
     input: Arc<Mutex<Vec<u8>>>,
     size: Arc<Mutex<(u16, u16)>>,
     status: Arc<Mutex<Option<i32>>>,
+    closed: Arc<AtomicBool>,
+    writes: Arc<AtomicUsize>,
+    resizes: Arc<AtomicUsize>,
+    kills: Arc<AtomicUsize>,
+}
+
+/// Counts of fake PTY operations used to prove lifecycle gates have no side effects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FakePtyOperationCounts {
+    /// Number of attempted writes.
+    pub writes: usize,
+    /// Number of attempted resizes.
+    pub resizes: usize,
+    /// Number of attempted kills.
+    pub kills: usize,
 }
 
 /// Deterministic PTY backend controlled directly by tests.
@@ -234,8 +252,31 @@ impl FakePty {
         *control.status.lock().map_err(|_| {
             operation_error(session_id, "lock fake child status for", "lock poisoned")
         })? = Some(code);
+        control.closed.store(true, Ordering::SeqCst);
         control.output.take();
         Ok(())
+    }
+
+    /// Return attempted control operations for one fake PTY.
+    pub fn operation_counts(
+        &self,
+        session_id: SessionId,
+    ) -> Result<FakePtyOperationCounts, PtyError> {
+        let sessions = self.sessions.lock().map_err(|_| {
+            operation_error(
+                session_id,
+                "lock fake backend for operation counts on",
+                "lock poisoned",
+            )
+        })?;
+        let control = sessions
+            .get(&session_id)
+            .ok_or(PtyError::UnknownSession(session_id))?;
+        Ok(FakePtyOperationCounts {
+            writes: control.writes.load(Ordering::SeqCst),
+            resizes: control.resizes.load(Ordering::SeqCst),
+            kills: control.kills.load(Ordering::SeqCst),
+        })
     }
 
     /// Return every byte written to a fake child's input.
@@ -295,6 +336,10 @@ impl PtyBackend for FakePty {
         let input = Arc::new(Mutex::new(Vec::new()));
         let size = Arc::new(Mutex::new((request.cols, request.rows)));
         let status = Arc::new(Mutex::new(None));
+        let closed = Arc::new(AtomicBool::new(false));
+        let writes = Arc::new(AtomicUsize::new(0));
+        let resizes = Arc::new(AtomicUsize::new(0));
+        let kills = Arc::new(AtomicUsize::new(0));
         let session_id = request.session_id;
 
         self.sessions
@@ -310,11 +355,17 @@ impl PtyBackend for FakePty {
                     input: input.clone(),
                     size: size.clone(),
                     status: status.clone(),
+                    closed: closed.clone(),
+                    writes: writes.clone(),
+                    resizes: resizes.clone(),
+                    kills: kills.clone(),
                 },
             );
 
         let resize_size = size.clone();
+        let resize_count = resizes.clone();
         let resize = Arc::new(move |cols, rows| {
+            resize_count.fetch_add(1, Ordering::SeqCst);
             *resize_size.lock().map_err(|_| {
                 operation_error(session_id, "lock fake size for", "lock poisoned")
             })? = (cols, rows);
@@ -323,7 +374,10 @@ impl PtyBackend for FakePty {
 
         let kill_sessions = self.sessions.clone();
         let kill_status = status.clone();
+        let kill_closed = closed.clone();
+        let kill_count = kills.clone();
         let kill = Arc::new(move || {
+            kill_count.fetch_add(1, Ordering::SeqCst);
             *kill_status.lock().map_err(|_| {
                 operation_error(
                     session_id,
@@ -331,6 +385,7 @@ impl PtyBackend for FakePty {
                     "lock poisoned",
                 )
             })? = Some(130);
+            kill_closed.store(true, Ordering::SeqCst);
             let mut sessions = kill_sessions.lock().map_err(|_| {
                 operation_error(session_id, "lock fake backend to kill", "lock poisoned")
             })?;
@@ -362,7 +417,11 @@ impl PtyBackend for FakePty {
                 receiver,
                 current: Cursor::new(Vec::new()),
             }),
-            writer: Arc::new(Mutex::new(Box::new(FakeWriter { input }))),
+            writer: Arc::new(Mutex::new(Box::new(FakeWriter {
+                input,
+                closed,
+                writes,
+            }))),
             resize,
             kill,
             try_wait,
@@ -389,10 +448,19 @@ impl Read for FakeReader {
 
 struct FakeWriter {
     input: Arc<Mutex<Vec<u8>>>,
+    closed: Arc<AtomicBool>,
+    writes: Arc<AtomicUsize>,
 }
 
 impl Write for FakeWriter {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.writes.fetch_add(1, Ordering::SeqCst);
+        if self.closed.load(Ordering::SeqCst) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "fake PTY is closed",
+            ));
+        }
         self.input
             .lock()
             .map_err(|_| std::io::Error::other("fake PTY input lock poisoned"))?

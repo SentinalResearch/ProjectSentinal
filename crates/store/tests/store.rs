@@ -30,6 +30,25 @@ fn session(id: u64, state: SessionState) -> Session {
     session
 }
 
+#[test]
+fn persisted_sessions_are_listed_in_id_order_and_empty_is_valid() {
+    let store = Store::open_in_memory().unwrap();
+    assert!(store.sessions().unwrap().is_empty());
+    store
+        .insert_session(&session(9, SessionState::Idle))
+        .unwrap();
+    store
+        .insert_session(&session(3, SessionState::Idle))
+        .unwrap();
+
+    let listed = store.sessions().unwrap();
+
+    assert_eq!(
+        listed.iter().map(|value| value.id.0).collect::<Vec<_>>(),
+        vec![3, 9]
+    );
+}
+
 fn command(id: u64, session_id: u64, text: &str, at: i64) -> Command {
     Command::start(
         CommandId(id),

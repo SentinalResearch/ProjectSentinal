@@ -60,6 +60,24 @@ describe("SessionDetailPage", () => {
     expect(await screen.findByText("FAILURE SUMMARY")).toBeInTheDocument();
     expect(screen.getByText("3 failed")).toBeInTheDocument();
     expect(screen.getByText("182 passed · 42s")).toBeInTheDocument();
+    expect(screen.getByText(/Session ended — output saved/)).toHaveTextContent("FAILED");
+    expect(screen.getByText(/Session ended — output saved/)).toHaveTextContent("saved with this Session");
+    expect(screen.queryByRole("button", { name: "Ctrl‑C" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ctrl‑C…" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("terminal-host")).toHaveAttribute("aria-readonly", "true");
+  });
+
+  it("continues a finished Session under a distinct ID without its old Command", async () => {
+    renderSession("/app/sessions/pytest");
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "pytest" });
+
+    await user.click(screen.getByRole("button", { name: "Continue in new Session" }));
+
+    expect(await screen.findByRole("heading", { name: "pytest (continued)" })).toBeInTheDocument();
+    expect(screen.queryByText("pytest tests/")).not.toBeInTheDocument();
+    expect(screen.getByText(/New Session ID:/)).toHaveTextContent(/New Session ID: session-\d+/);
+    expect(screen.getByTestId("terminal-host")).toHaveAttribute("aria-readonly", "false");
   });
 
   it("renders the waiting panel with y/n for a WAITING session", async () => {
@@ -93,5 +111,9 @@ describe("SessionDetailPage", () => {
     expect(screen.getByText(/Ended · exit code unknown/)).toBeInTheDocument();
     expect(screen.getAllByText("ENDED").length).toBeGreaterThan(0);
     expect(screen.queryByText("COMPLETED")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Session ended — output saved/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Continue in new Session" }),
+    ).not.toBeInTheDocument();
   });
 });

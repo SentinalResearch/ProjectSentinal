@@ -72,6 +72,7 @@ class FakeAuthServer {
   password: string | null;
   readonly tokens = new Set<string>();
   private nextToken = 1;
+  readonly outputRequests: URL[] = [];
 
   constructor(password: string | null) {
     this.password = password;
@@ -115,6 +116,27 @@ class FakeAuthServer {
       this.password = values.new_password as string;
       this.tokens.clear();
       return json(this.issue());
+    }
+    if (url.pathname === "/api/v1/sessions/1/output") {
+      this.outputRequests.push(url);
+      const offset = Number(url.searchParams.get("offset") ?? "0");
+      if (offset === 0) {
+        return new Response(new TextEncoder().encode("saved "), {
+          headers: {
+            "content-type": "application/octet-stream",
+            "x-sentinal-output-next-offset": "6",
+            "x-sentinal-output-complete": "false",
+          },
+        });
+      }
+      return new Response(new TextEncoder().encode("output"), {
+        headers: {
+          "content-type": "application/octet-stream",
+          "x-sentinal-output-next-offset": "12",
+          "x-sentinal-output-complete": "true",
+          "x-sentinal-output-warning": "TRUNCATED_ZSTD",
+        },
+      });
     }
     return new Response(null, { status: 404 });
   };
@@ -309,6 +331,44 @@ describe("apiAdapter authentication", () => {
     expect(frame.sessionId).toBe(1);
     expect(new TextDecoder().decode(frame.payload)).toBe("echo ready\n");
     unsubscribe();
+  });
+
+  it("continues with only safe Session metadata and no old Command", async () => {
+    const { adapter, sockets } = setup();
+    await adapter.auth.login("correct horse battery staple");
+
+    await adapter.createSession({
+      shell: "/bin/zsh",
+      cwd: "/safe/work",
+      title: "Training (continued)",
+      cols: 132,
+      rows: 42,
+    });
+
+    expect(sockets[0].requests.at(-1)).toEqual({
+      type: "CREATE_SESSION",
+      shell: "/bin/zsh",
+      cwd: "/safe/work",
+      cols: 132,
+      rows: 42,
+      origin: "UI",
+      title: "Training (continued)",
+      command: null,
+    });
+  });
+
+  it("pages authenticated saved output as bytes and reports decoder warnings", async () => {
+    const { adapter, server } = setup();
+    await adapter.auth.login("correct horse battery staple");
+    const chunks: Uint8Array[] = [];
+
+    const replay = await adapter.replayOutput("1", (chunk) => chunks.push(chunk));
+
+    expect(chunks.map((chunk) => new TextDecoder().decode(chunk)).join("")).toBe("saved output");
+    expect(replay.warning).toBe("TRUNCATED_ZSTD");
+    expect(server.outputRequests).toHaveLength(2);
+    expect(server.outputRequests[0].searchParams.get("offset")).toBe("0");
+    expect(server.outputRequests[1].searchParams.get("offset")).toBe("6");
   });
 
   it("never mistakes an unsolicited observation for a create or kill reply", async () => {

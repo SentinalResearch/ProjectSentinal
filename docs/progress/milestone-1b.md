@@ -1,6 +1,7 @@
 # Milestone 1b progress — Any terminal into Sentinal
 
-Status: Milestone 1b.C complete 2026-09-28; awaiting human review before Milestone 3.
+Status: Milestone 1b.E complete 2026-09-29; 1b.D remains scheduled with
+Milestone 3 and 1c remains the next deployment slice.
 
 ## Pre-Milestone 3 audit remediation
 

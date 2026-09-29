@@ -133,12 +133,12 @@ close the window, then attach to the same process and screen from another
 terminal or phone.
 
 ### 1b.E — Finished Session lifecycle and output replay
-- [ ] Finished FULL Sessions remain viewable but reject input, resize, signals, and kill before touching a closed PTY
-- [ ] Web terminal becomes visibly read-only for `COMPLETED`, `FAILED`, and `INTERRUPTED`
-- [ ] “Continue in new Session” reuses safe metadata but never claims to resurrect the old process
-- [ ] Persisted `.log.zst` output is available through a bounded authenticated replay/export path
-- [ ] Errors name the Session and terminal state instead of exposing an OS `EIO`
-- [ ] Regression coverage proves rejected input is not written or input-audited
+- [x] Finished FULL Sessions remain viewable but reject input, resize, signals, and kill before touching a closed PTY
+- [x] Web terminal becomes visibly read-only for `COMPLETED`, `FAILED`, and `INTERRUPTED`
+- [x] “Continue in new Session” reuses safe metadata but never claims to resurrect the old process
+- [x] Persisted `.log.zst` output is available through a bounded authenticated replay/export path
+- [x] Errors name the Session and terminal state instead of exposing an OS `EIO`
+- [x] Regression coverage proves rejected input is not written or input-audited
 
 **Demo:** open a completed Session, inspect its saved output without PTY errors,
 then continue in a new FULL Session with the same cwd.

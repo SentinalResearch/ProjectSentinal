@@ -7,20 +7,22 @@ mod external;
 mod external_lifecycle;
 mod lifecycle;
 mod local_dispatch;
+mod operations;
+mod replay;
 mod structured;
 mod tasks;
 
 use crate::{
-    audit::{AuditLog, AuditRecord},
+    audit::AuditLog,
     process_probe::ProcessProbe,
     pty::{PtyBackend, PtyError},
     scrollback::Scrollback,
     tracker::{CommandTracker, TrackerIds},
 };
-use capture::{require_capture, CaptureOperation};
 pub use error::SessionManagerError;
-use protocol::{
-    DaemonMessage, MachineId, Session, SessionId, SessionOrigin, SessionState, Timestamp,
+use protocol::{DaemonMessage, MachineId, Session, SessionId, SessionOrigin, Timestamp};
+pub use replay::{
+    OutputReplay, DEFAULT_OUTPUT_PAGE_BYTES, MAX_OUTPUT_PAGE_BYTES, MAX_OUTPUT_SCAN_BYTES,
 };
 use std::{
     collections::HashMap,
@@ -111,6 +113,8 @@ struct SessionHandle {
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     resize: Arc<dyn Fn(u16, u16) -> Result<(), PtyError> + Send + Sync>,
     kill: Arc<dyn Fn() -> Result<(), PtyError> + Send + Sync>,
+    try_wait: Arc<dyn Fn() -> Result<Option<i32>, PtyError> + Send + Sync>,
+    pty_closed: AtomicBool,
     parser: Arc<Mutex<vt100::Parser>>,
     scrollback: Arc<Mutex<Scrollback>>,
     output: broadcast::Sender<Vec<u8>>,
@@ -206,6 +210,16 @@ impl SessionManager {
 
     /// Return all sessions ordered by ID.
     pub fn list(&self) -> Result<Vec<Session>, SessionManagerError> {
+        let mut by_id = self
+            .inner
+            .store
+            .as_ref()
+            .map(|store| store.sessions())
+            .transpose()?
+            .unwrap_or_default()
+            .into_iter()
+            .map(|session| (session.id, session))
+            .collect::<HashMap<_, _>>();
         let sessions = self
             .inner
             .sessions
@@ -214,10 +228,11 @@ impl SessionManager {
                 resource: "session map",
                 session_id: SessionId(0),
             })?;
-        let mut result = sessions
-            .values()
-            .map(|handle| lock_session(handle).map(|session| session.clone()))
-            .collect::<Result<Vec<_>, _>>()?;
+        for handle in sessions.values() {
+            let session = lock_session(handle)?.clone();
+            by_id.insert(session.id, session);
+        }
+        let mut result = by_id.into_values().collect::<Vec<_>>();
         result.sort_by_key(|session| session.id);
         Ok(result)
     }
@@ -229,110 +244,20 @@ impl SessionManager {
         Ok(session)
     }
 
-    /// Snapshot the current screen and subscribe to subsequent output.
-    pub fn attach(&self, session_id: SessionId) -> Result<Attachment, SessionManagerError> {
-        let handle = self.handle(session_id)?;
-        require_capture(&handle, CaptureOperation::Attach)?;
-        snapshot_and_subscribe(
-            &handle.output,
-            &handle.structured,
-            handle.attached.clone(),
-            || {
-                Ok(handle
-                    .parser
-                    .lock()
-                    .map_err(|_| SessionManagerError::Lock {
-                        resource: "screen",
-                        session_id,
-                    })?
-                    .screen()
-                    .state_formatted())
-            },
-        )
-    }
-
-    /// Return the retained line-oriented scrollback.
-    pub fn scrollback(&self, session_id: SessionId) -> Result<Vec<String>, SessionManagerError> {
-        let handle = self.handle(session_id)?;
-        let lines = handle
-            .scrollback
-            .lock()
-            .map_err(|_| SessionManagerError::Lock {
-                resource: "scrollback",
-                session_id,
-            })?
-            .lines();
-        Ok(lines)
-    }
-
-    /// Resize a session's PTY and in-memory screen.
-    pub fn resize(
-        &self,
-        session_id: SessionId,
-        cols: u16,
-        rows: u16,
-    ) -> Result<(), SessionManagerError> {
-        validate_size(cols, rows)?;
-        let handle = self.handle(session_id)?;
-        require_capture(&handle, CaptureOperation::Resize)?;
-        (handle.resize)(cols, rows)?;
-        handle
-            .parser
-            .lock()
-            .map_err(|_| SessionManagerError::Lock {
-                resource: "screen",
-                session_id,
-            })?
-            .screen_mut()
-            .set_size(rows, cols);
-        Ok(())
-    }
-
-    /// Write terminal input and append its metadata to the audit log.
-    pub fn write_input(
-        &self,
-        session_id: SessionId,
-        bytes: &[u8],
-        client_addr: &str,
-    ) -> Result<(), SessionManagerError> {
-        let handle = self.handle(session_id)?;
-        require_capture(&handle, CaptureOperation::Input)?;
-        self.inner.audit.append(&AuditRecord {
-            timestamp: (self.inner.config.clock)(),
-            client_addr: client_addr.to_string(),
-            session_id,
-            byte_count: bytes.len(),
-        })?;
-        let mut writer = handle
-            .writer
-            .lock()
-            .map_err(|_| SessionManagerError::Lock {
-                resource: "PTY writer",
-                session_id,
-            })?;
-        writer
-            .write_all(bytes)
-            .and_then(|()| writer.flush())
-            .map_err(|source| SessionManagerError::File {
-                operation: "write PTY input for",
-                path: PathBuf::from(format!("session-{}", session_id.0)),
-                source,
-            })
-    }
-
-    /// Kill a session and mark it interrupted without removing its history.
-    pub fn kill(&self, session_id: SessionId) -> Result<(), SessionManagerError> {
-        let handle = self.handle(session_id)?;
-        require_capture(&handle, CaptureOperation::Kill)?;
-        (handle.kill)()?;
-        let mut session = lock_session(&handle)?;
-        if !session.state.is_finished() {
-            session.transition(SessionState::Interrupted, (self.inner.config.clock)())?;
-            if let Some(store) = &self.inner.store {
-                store.update_session(&session)?;
-            }
+    fn known_session(&self, session_id: SessionId) -> Result<Session, SessionManagerError> {
+        match self.session(session_id) {
+            Ok(session) => return Ok(session),
+            Err(SessionManagerError::UnknownSession(_)) => {}
+            Err(error) => return Err(error),
         }
-        Ok(())
+        let persisted = self
+            .inner
+            .store
+            .as_ref()
+            .map(|store| store.session(session_id))
+            .transpose()?
+            .flatten();
+        persisted.ok_or(SessionManagerError::UnknownSession(session_id))
     }
 
     fn handle(&self, session_id: SessionId) -> Result<Arc<SessionHandle>, SessionManagerError> {
@@ -347,26 +272,6 @@ impl SessionManager {
             .cloned()
             .ok_or(SessionManagerError::UnknownSession(session_id))
     }
-}
-
-fn snapshot_and_subscribe(
-    output_sender: &broadcast::Sender<Vec<u8>>,
-    structured_sender: &broadcast::Sender<DaemonMessage>,
-    confirmation: Arc<AtomicBool>,
-    snapshot: impl FnOnce() -> Result<Vec<u8>, SessionManagerError>,
-) -> Result<Attachment, SessionManagerError> {
-    // Subscribe before taking the snapshot. Output written while the parser
-    // lock is contended is then either present in the snapshot or waiting in
-    // this receiver, never lost between the two operations.
-    let output = output_sender.subscribe();
-    let structured = structured_sender.subscribe();
-    let screen = snapshot()?;
-    Ok(Attachment {
-        screen,
-        output,
-        structured,
-        confirmation,
-    })
 }
 
 fn validate_size(cols: u16, rows: u16) -> Result<(), SessionManagerError> {
@@ -395,29 +300,4 @@ fn system_timestamp() -> Timestamp {
         .map(|duration| duration.as_millis())
         .unwrap_or(0);
     Timestamp(i64::try_from(millis).unwrap_or(i64::MAX))
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn attachment_subscribes_before_snapshotting() {
-        let (output, _) = broadcast::channel(4);
-        let (structured, _) = broadcast::channel(4);
-        let mut attachment = snapshot_and_subscribe(
-            &output,
-            &structured,
-            Arc::new(AtomicBool::new(false)),
-            || {
-                let _ = output.send(b"during snapshot".to_vec());
-                Ok(b"screen".to_vec())
-            },
-        )
-        .unwrap();
-
-        assert_eq!(attachment.screen, b"screen");
-        assert_eq!(attachment.output.try_recv().unwrap(), b"during snapshot");
-    }
 }

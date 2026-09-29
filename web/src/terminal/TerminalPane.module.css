@@ -47,6 +47,15 @@
   background: var(--s-failed);
 }
 
+.replayWarning {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--s-warning);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 @media (max-width: 640px) {
   .key {
     height: 48px;

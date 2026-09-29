@@ -107,6 +107,7 @@ export function mapSession(session: WireSession): Session {
     state: session.state,
     runningFor: formatDuration(Date.now() - session.created_at),
     details: session.shell,
+    shell: session.shell,
     events: [],
     origin: session.origin,
     capture: session.capture,
@@ -344,22 +345,55 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   return {
     getMachines,
     getSessions,
-    async createSession() {
+    async createSession(options = {}) {
       const message = await transport.request(
         {
           type: "CREATE_SESSION",
-          shell: null,
-          cwd: null,
-          cols: 80,
-          rows: 24,
+          shell: options.shell ?? null,
+          cwd: options.cwd ?? null,
+          cols: options.cols ?? 80,
+          rows: options.rows ?? 24,
           origin: "UI",
-          title: null,
+          title: options.title ?? null,
           command: null,
         },
         (reply) => isFullSessionUpdate(reply),
       );
       if (message.type !== "SESSION_UPDATED") throw daemonError("missing created session");
       return mapSession(message.session);
+    },
+    async replayOutput(sessionId, onChunk) {
+      const token = storage.getItem(SESSION_TOKEN_KEY);
+      if (!token) throw daemonError("missing browser session");
+      let offset = 0;
+      let warning: string | undefined;
+      for (let page = 0; page < 256; page += 1) {
+        const endpoint = `${authBaseUrl}/sessions/${encodeURIComponent(sessionId)}/output?offset=${offset}&limit=262144`;
+        const response = await fetcher(endpoint, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          let message = `saved output request failed with status ${response.status}`;
+          try {
+            const failure = (await response.json()) as { message?: string };
+            if (failure.message) message = failure.message;
+          } catch {
+            // Keep the bounded status-only fallback for a non-JSON proxy error.
+          }
+          throw daemonError(message);
+        }
+        const chunk = new Uint8Array(await response.arrayBuffer());
+        if (chunk.length > 0) onChunk(chunk);
+        warning = response.headers.get("x-sentinal-output-warning") ?? warning;
+        const complete = response.headers.get("x-sentinal-output-complete") === "true";
+        if (complete) return warning ? { warning } : {};
+        const next = Number(response.headers.get("x-sentinal-output-next-offset"));
+        if (!Number.isSafeInteger(next) || next <= offset) {
+          throw daemonError("saved output returned an invalid continuation offset");
+        }
+        offset = next;
+      }
+      throw daemonError("saved output exceeded the 64 MiB replay limit");
     },
     getRecipes: () => unsupported("getRecipes"),
     async getHistory(filters = {}) {

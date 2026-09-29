@@ -284,6 +284,141 @@ async fn remote_input_is_written_and_audited_by_byte_count() {
 }
 
 #[tokio::test]
+async fn every_finished_state_rejects_mutation_before_touching_the_pty_or_audit() {
+    for (name, exit_code, expected) in [
+        ("completed", Some(0), SessionState::Completed),
+        ("failed", Some(3), SessionState::Failed),
+        ("interrupted", None, SessionState::Interrupted),
+    ] {
+        let (manager, fake, data_dir) = manager(name);
+        let session = manager.create(request()).await.unwrap();
+        if let Some(code) = exit_code {
+            fake.exit(session.id, code).unwrap();
+            wait_for_state(&manager, session.id, expected).await;
+        } else {
+            manager.kill(session.id).unwrap();
+        }
+        let before_counts = fake.operation_counts(session.id).unwrap();
+
+        let input = manager
+            .write_input(session.id, b"never-store-this-secret", "100.64.0.2:5000")
+            .unwrap_err();
+        let resize = manager.resize(session.id, 120, 40).unwrap_err();
+        let kill = manager.kill(session.id).unwrap_err();
+
+        for (operation, error) in [
+            ("accept terminal input", input),
+            ("resize", resize),
+            ("kill a daemon-owned PTY", kill),
+        ] {
+            assert!(matches!(
+                error,
+                SessionManagerError::TerminalStateDenied {
+                    session_id,
+                    state,
+                    operation: rejected,
+                } if session_id == session.id && state == expected && rejected == operation
+            ));
+            let text = error.to_string();
+            assert!(text.contains(&session.id.0.to_string()), "{text}");
+            assert!(text.contains(&format!("{expected:?}")), "{text}");
+            assert!(!text.contains("os error"), "{text}");
+        }
+        assert_eq!(fake.operation_counts(session.id).unwrap(), before_counts);
+        assert_eq!(fake.input(session.id).unwrap(), b"");
+        assert!(!data_dir.join("audit.jsonl").exists());
+
+        let attachment = manager.attach(session.id).unwrap();
+        assert!(attachment.output.is_empty());
+        fs::remove_dir_all(data_dir).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn closed_pty_write_race_reconciles_once_and_returns_a_stable_error() {
+    let (manager, fake, data_dir) = manager("closed-write-race");
+    let session = manager.create(request()).await.unwrap();
+    fake.exit(session.id, 0).unwrap();
+
+    let first = manager
+        .write_input(session.id, b"secret-race-input", "100.64.0.2:5000")
+        .unwrap_err();
+    let second = manager
+        .write_input(session.id, b"secret-race-input", "100.64.0.2:5000")
+        .unwrap_err();
+
+    for error in [first, second] {
+        assert!(matches!(
+            error,
+            SessionManagerError::TerminalStateDenied {
+                session_id,
+                state: SessionState::Completed,
+                operation: "accept terminal input",
+            } if session_id == session.id
+        ));
+        assert!(!error.to_string().contains("os error"));
+    }
+    assert!(fake.operation_counts(session.id).unwrap().writes <= 1);
+    assert_eq!(fake.input(session.id).unwrap(), b"");
+    assert!(!data_dir.join("audit.jsonl").exists());
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn rejected_finished_input_is_absent_from_audit_store_and_output_log() {
+    let (manager, fake, store, data_dir) = stored_manager("finished-input-privacy");
+    let session = manager.create(request()).await.unwrap();
+    fake.exit(session.id, 0).unwrap();
+    wait_for_state(&manager, session.id, SessionState::Completed).await;
+
+    manager
+        .write_input(session.id, b"unique-finished-secret", "100.64.0.2:5000")
+        .unwrap_err();
+
+    assert!(!data_dir.join("audit.jsonl").exists());
+    let stored = serde_json::to_vec(&store.session(session.id).unwrap()).unwrap();
+    assert!(!stored
+        .windows(b"unique-finished-secret".len())
+        .any(|window| window == b"unique-finished-secret"));
+    assert!(store.history(Some(session.id), 10).unwrap().is_empty());
+    let log_path = data_dir.join("sessions/1.log.zst");
+    let output = tokio::time::timeout(Duration::from_millis(100), async {
+        loop {
+            if let Ok(file) = File::open(&log_path) {
+                if let Ok(output) = zstd::stream::decode_all(file) {
+                    return output;
+                }
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(!output
+        .windows(b"unique-finished-secret".len())
+        .any(|window| window == b"unique-finished-secret"));
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn live_detach_and_reattach_remains_writable() {
+    let (manager, fake, data_dir) = manager("live-reattach-input");
+    let session = manager.create(request()).await.unwrap();
+    drop(manager.attach(session.id).unwrap());
+
+    let attachment = manager.attach(session.id).unwrap();
+    manager
+        .write_input(session.id, b"still-live\r", "100.64.0.2:5000")
+        .unwrap();
+
+    assert_eq!(fake.input(session.id).unwrap(), b"still-live\r");
+    drop(attachment);
+    fake.exit(session.id, 0).unwrap();
+    wait_for_state(&manager, session.id, SessionState::Completed).await;
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
 async fn raw_output_is_appended_to_a_compressed_session_log() {
     let (manager, fake, data_dir) = manager("compressed-log");
     let session = manager.create(request()).await.unwrap();

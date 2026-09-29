@@ -1,7 +1,7 @@
 //! Capture-level gate for daemon-owned PTY operations.
 
 use super::{lock_session, SessionHandle, SessionManagerError};
-use protocol::CaptureLevel;
+use protocol::{CaptureLevel, Session};
 
 pub(super) fn require_capture(
     handle: &SessionHandle,
@@ -9,6 +9,41 @@ pub(super) fn require_capture(
 ) -> Result<(), SessionManagerError> {
     let capture = lock_session(handle)?.capture;
     ensure_capture(capture, operation)
+}
+
+pub(super) fn require_operation(
+    handle: &SessionHandle,
+    operation: CaptureOperation,
+) -> Result<(), SessionManagerError> {
+    let session = lock_session(handle)?;
+    ensure_session_operation(
+        &session,
+        handle.pty_closed.load(std::sync::atomic::Ordering::SeqCst),
+        operation,
+    )
+}
+
+pub(super) fn ensure_session_operation(
+    session: &Session,
+    pty_closed: bool,
+    operation: CaptureOperation,
+) -> Result<(), SessionManagerError> {
+    ensure_capture(session.capture, operation)?;
+    if operation.mutates_pty() && session.state.is_finished() {
+        return Err(SessionManagerError::TerminalStateDenied {
+            session_id: session.id,
+            state: session.state,
+            operation: operation.description(),
+        });
+    }
+    if operation.mutates_pty() && pty_closed {
+        return Err(SessionManagerError::PtyClosed {
+            session_id: session.id,
+            state: session.state,
+            operation: operation.description(),
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -19,23 +54,38 @@ pub(super) enum CaptureOperation {
     Kill,
 }
 
+impl CaptureOperation {
+    pub(super) fn description(self) -> &'static str {
+        match self {
+            CaptureOperation::Attach => "attach",
+            CaptureOperation::Input => "accept terminal input",
+            CaptureOperation::Resize => "resize",
+            CaptureOperation::Kill => "kill a daemon-owned PTY",
+        }
+    }
+
+    fn mutates_pty(self) -> bool {
+        !matches!(self, CaptureOperation::Attach)
+    }
+}
+
 pub(super) fn ensure_capture(
     capture: CaptureLevel,
     operation: CaptureOperation,
 ) -> Result<(), SessionManagerError> {
     let capabilities = capture.capabilities();
-    let (allowed, description) = match operation {
-        CaptureOperation::Attach => (capabilities.can_attach, "attach"),
-        CaptureOperation::Input => (capabilities.can_send_input, "accept terminal input"),
-        CaptureOperation::Resize => (capabilities.can_resize, "resize"),
-        CaptureOperation::Kill => (capabilities.can_kill_daemon_pty, "kill a daemon-owned PTY"),
+    let allowed = match operation {
+        CaptureOperation::Attach => capabilities.can_attach,
+        CaptureOperation::Input => capabilities.can_send_input,
+        CaptureOperation::Resize => capabilities.can_resize,
+        CaptureOperation::Kill => capabilities.can_kill_daemon_pty,
     };
     if allowed {
         Ok(())
     } else {
         Err(SessionManagerError::CaptureDenied {
             capture,
-            operation: description,
+            operation: operation.description(),
         })
     }
 }

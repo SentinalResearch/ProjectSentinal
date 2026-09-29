@@ -212,6 +212,9 @@ pub(super) fn spawn_exit_monitor(
         loop {
             match try_wait() {
                 Ok(Some(code)) => {
+                    handle
+                        .pty_closed
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
                     let target = if code == 0 {
                         SessionState::Completed
                     } else {
