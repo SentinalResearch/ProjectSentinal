@@ -22,16 +22,25 @@ model) to build the whole system, one milestone at a time.
 | 1b.A | `03b-milestone-1ba-sentinal-watch.md` | `sentinal watch`, durable full capture from any terminal |
 | 1b.B | `03c-milestone-1bb-external-shell-hook.md` | Command/Metrics capture from ordinary shells |
 | 1b.C | `03d-milestone-1bc-auto-wrap-adopt.md` | Fail-open auto-wrap and read-only process adoption |
+| 1b.E | `03e-milestone-1be-finished-session-replay.md` | Read-only finished Sessions, saved-output replay, safe Continue |
+| 1c | `03f-milestone-1c-worker-packaging-two-host.md` | Installable one-worker/two-host Tailscale acceptance |
 | 3 | `04-milestone-3-events-watchers.md` | Progress, health, events without AI (v0.3) |
 | 1b.D | `04a-milestone-1bd-adopted-log-ui.md` | Adopted log tail and capture-aware UI |
-| 4 | `05-milestone-4-dashboard-recipes-notify.md` | Multi-machine, recipes, notifications (**V1**) |
+| 4.0 | `05a-milestone-40-secure-machine-enrollment.md` | Threat-reviewed pairing and per-Machine credentials |
+| 4.A | `05b-milestone-4a-multi-machine-aggregation.md` | Direct multi-Machine aggregation and safe routing |
+| 4.B | `05-milestone-4-dashboard-recipes-notify.md` | Recipes and notifications complete **V1** |
 | 5 | `06-milestone-5-projects-autocomplete.md` | Projects, command library, autocomplete |
 | 6 | `07-milestone-6-intelligence-foundation.md` | Agent tool API, datasets, evals, baselines |
 | 7 | `08-milestone-7-finetune-agent.md` | Fine-tuned small model, heartbeat, journal (**V2**) |
+| R1 | `09-reliability-r1-daemon-restart-sessions.md` | Optional keeper architecture for PTYs across daemon restart |
 
-Milestone 1b.0 begins with a mandatory human review of the exact wire format,
-Session termination semantics, and socket location. Paste the approval back
-into the same agent session; do not let the agent infer those decisions.
+Milestones 1b.0 and 4.0, plus Reliability R1, begin with a mandatory human
+review. Paste the approval back into the same agent session; do not let the
+agent infer wire, pairing, or PTY-ownership decisions.
+
+The recommended path from the current repository is 1b.E → 1c → 3 → 1b.D →
+4.0 → 4.A → 4.B. R1 is a separate reliability project: schedule it before a
+production-stability claim, but do not mix it into watcher or dashboard work.
 
 ## Review checklist (5 minutes per milestone)
 

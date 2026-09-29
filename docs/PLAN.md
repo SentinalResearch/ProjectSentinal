@@ -9,8 +9,8 @@ several machines persistent, observable, searchable, and remotely reachable.
 User-facing names:
 
 - Product: **Sentinal**
-- CLI: `sentinal` (currently `ta` until the Milestone 1b migration)
-- Daemon: `sentinald` (currently `tad` until the Milestone 1b migration)
+- CLI: `sentinal` (`ta` remains a compatibility alias)
+- Daemon: `sentinald` (`tad` remains a compatibility alias)
 
 Sentinal answers five everyday questions:
 
@@ -58,8 +58,8 @@ Milestone 1b adds two orthogonal Session dimensions:
 - origin: `UI`, `WATCH`, `SHELL_HOOK`, `AUTO_WRAP`, or `ADOPTED`
 - capture: `FULL`, `COMMANDS`, `PROCESS_LOG`, or `PROCESS`
 
-These additions are planned but are not yet present in the protocol. Their
-wire representation and fixtures are the first Milestone 1b task.
+These additions are implemented in the protocol with contract fixtures and
+generated TypeScript. Daemon and web capability checks remain authoritative.
 
 ## Architecture
 
@@ -100,7 +100,7 @@ Auto-source OSC shell hooks in daemon-owned PTYs, track exact Commands and
 cwd, persist SQLite history and FTS5, recover orphaned Sessions, sample
 process trees and resources, and stream live Metrics to the web UI.
 
-### Phase 1b — any terminal into Sentinal (next priority)
+### Phase 1b — any terminal into Sentinal (A–C complete; D/E pending)
 
 Bring ordinary terminals and already-running processes into Sentinal through
 four explicit modes:
@@ -112,8 +112,16 @@ four explicit modes:
    same-user process.
 
 This phase is divided into contract/local ingress, Watch, external hook,
-auto-wrap/adopt, and watcher-backed log tail stages. Safety and test gates are
-normative in `CAPTURE_MODES.md`, `SECURITY.md`, and `TESTING.md`.
+auto-wrap/adopt, watcher-backed log tail, and finished-Session replay stages.
+Safety and test gates are normative in `CAPTURE_MODES.md`, `SECURITY.md`, and
+`TESTING.md`.
+
+### Phase 1c — deployable worker and two-host acceptance
+
+Package the existing daemon, CLI, hooks, and user service as one worker bundle.
+Provide distinct same-Machine, daemon-only worker, and remote control-UI launch
+roles, plus a tested installer and exact Tailscale setup guide. This proves one
+selected worker from a second Machine; it does not claim aggregation.
 
 ### Phase 3 — Event engine and deterministic watchers
 
@@ -121,10 +129,20 @@ Turn output, process state, Metrics, Commands, and exit status into Events.
 Ship a generic watcher, training/pytest/vLLM adapters, declarative adapters,
 and adopted-log ingestion.
 
-### Phase 4 — Recipes, notifications, and multi-Machine dashboard
+### Phase 4 — enrollment, multi-Machine dashboard, Recipes, notifications
 
-Launch built-in or saved Recipes, aggregate per-Machine APIs in the PWA, and
-deliver event-driven ntfy notifications.
+Threat-review and implement short-lived Machine pairing without exposing
+Machine tokens to browsers, aggregate independently authenticated per-Machine
+APIs in the PWA, launch built-in or saved Recipes, and deliver event-driven
+ntfy notifications.
+
+### Reliability R1 — daemon-restart-resilient FULL Sessions
+
+UI/CLI disconnect persistence is implemented. Surviving a `sentinald` process
+restart is a separate architecture change because the daemon currently owns
+the PTY. The planned review compares keeper/supervisor designs and must be
+approved before PTY ownership moves. Until R1 lands, restart recovery safely
+marks daemon-owned Sessions interrupted.
 
 ### V2 — deterministic completion and local intelligence
 
@@ -158,9 +176,11 @@ protocol/data model (complete)
   → Sentinal Watch
   → external shell hook
   → auto-wrap + read-only adopt
+  → finished Session replay + worker packaging/two-host acceptance
   → Event engine + generic watcher
   → adopted log tail
-  → multi-Machine/PWA + Recipes
+  → secure Machine enrollment + aggregation
+  → Recipes + notifications
   → autocomplete + specialized watchers + notifications
   → Projects
   → optional local agent + journal + suggestions
@@ -195,12 +215,12 @@ Each milestone updates every affected document before it is complete.
 | Roadmap/checklists | `docs/ROADMAP.md` | current |
 | Testing guide | `docs/TESTING.md` | current |
 | Approved dependencies | `docs/DEPENDENCIES.md` | current |
-| Protocol/data model | `crates/protocol` + fixtures | current through M2; capture additions pending 1b |
-| Capture modes | `docs/CAPTURE_MODES.md` | specified; implementation pending |
+| Protocol/data model | `crates/protocol` + fixtures | current through M2 and 1b.C |
+| Capture modes | `docs/CAPTURE_MODES.md` | implemented through 1b.C; log tail pending |
 | Security/privacy | `docs/SECURITY.md` | current + planned guarantees labelled |
 | CLI reference | `docs/CLI.md` | current commands + 1b target specified |
 | Shell hooks | `docs/SHELL_HOOKS.md` | current OSC path + external path specified |
-| Setup/Tailscale/PWA | `docs/SETUP.md` | due Phase 4 multi-Machine work |
+| Setup/Tailscale/PWA | `docs/SETUP.md` | due Milestone 1c; expanded in Phase 4 |
 | Design sources | `design_handoff_sentinal/design/` | in progress |
 | Eval results | `docs/EVALS.md` | due V2 intelligence work |
 | Milestone reports | `docs/progress/<milestone>.md` | per milestone |

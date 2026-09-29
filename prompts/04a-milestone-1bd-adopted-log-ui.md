@@ -92,4 +92,5 @@ injected notifications/clocks.
 Adopted log progress works end to end, all four modes display accurate
 capabilities, the full Milestone 1b release gates and Linux/macOS matrix are
 recorded, `just check` and Playwright pass, and Roadmap 1b.D/release gates are
-checked. Commit, send the Milestone 1b.D report, and stop before Milestone 4.
+checked. Commit, send the Milestone 1b.D report, and stop before Milestone 4.0
+secure Machine enrollment.

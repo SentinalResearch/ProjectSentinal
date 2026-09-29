@@ -131,6 +131,29 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 close the window, then attach to the same process and screen from another
 terminal or phone.
 
+### 1b.E — Finished Session lifecycle and output replay
+- [ ] Finished FULL Sessions remain viewable but reject input, resize, signals, and kill before touching a closed PTY
+- [ ] Web terminal becomes visibly read-only for `COMPLETED`, `FAILED`, and `INTERRUPTED`
+- [ ] “Continue in new Session” reuses safe metadata but never claims to resurrect the old process
+- [ ] Persisted `.log.zst` output is available through a bounded authenticated replay/export path
+- [ ] Errors name the Session and terminal state instead of exposing an OS `EIO`
+- [ ] Regression coverage proves rejected input is not written or input-audited
+
+**Demo:** open a completed Session, inspect its saved output without PTY errors,
+then continue in a new FULL Session with the same cwd.
+
+## Milestone 1c — Deployable worker and two-host acceptance
+- [ ] `just agent` runs a daemon-only worker on its exact Tailscale address in real API mode
+- [ ] `just control WORKER_IP=...` runs the web UI against one remote worker without starting a local daemon
+- [ ] A release installer installs `sentinal`, `sentinald`, shell assets, safe config, and the existing user service
+- [ ] Upgrade and uninstall preserve user data and credentials unless deletion is explicitly requested
+- [ ] `docs/SETUP.md` documents macOS/Linux, Tailscale ACLs, service inspection, backup, and recovery
+- [ ] A two-host manual checklist proves Watch → detach → browser attach → exit/kill → SQLite/log/audit
+- [ ] The worker package remains the daemon + CLI + hooks; no duplicate “watcher agent” process is introduced
+
+**Demo:** install the worker on one Machine, run only the control UI on a
+second Machine, and complete one real Watch handoff over Tailscale.
+
 ## Milestone 3 — Events + watcher (v0.3)
 - [ ] Event engine (raw observations → `Event`)
 - [ ] Generic watcher (idle, waiting for input, possibly stalled)
@@ -138,11 +161,31 @@ terminal or phone.
 - [ ] Declarative TOML regex adapters
 - [ ] Complete Milestone 1b.D adopted-log ingestion and watcher coverage
 
-## Milestone 4 — Recipes + mobile dashboard (v0.4)
+## Milestone 4.0 — Secure Machine enrollment
+- [ ] Complete the mandatory pairing threat-model and wire-format review before implementation
+- [ ] Generate short-lived, single-use pairing authority without exposing the Machine token to a browser
+- [ ] Persist a stable Machine registry and per-Machine browser credentials locally
+- [ ] Audit pairing creation, exchange, expiry, revocation, and failed attempts without logging secrets
+- [ ] Document HTTPS/Tailscale Serve and explicit allowed browser origins
+
+## Milestone 4.A — Multi-Machine aggregation
+- [ ] Connect to every enrolled daemon independently; there is no required central cloud service
+- [ ] Namespace Session/Command/Event identities by Machine in the web data layer
+- [ ] Isolate failures and show offline Machines with last-seen time
+- [ ] Route attach, input, Metrics, history, and search to the owning Machine only
+- [ ] Prove two fake daemons in Playwright, then complete a two-real-Machine acceptance run
+
+## Milestone 4.B — Recipes + notifications + mobile dashboard (v0.4)
 - [ ] Recipe files in `recipes/`, launch from UI
 - [ ] "Save as recipe" after a successful command
-- [ ] Multi-machine view (each daemon serves its own API; UI aggregates)
 - [ ] ntfy notifications for completed / failed / waiting / stalled
+
+## Reliability R1 — Daemon-restart-resilient FULL Sessions
+- [ ] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation
+- [ ] A per-Session owner keeps the PTY and log alive while `sentinald` restarts
+- [ ] A restarted daemon securely reclaims same-user keepers and rebuilds screen/tracker state
+- [ ] Missing, foreign, or inconsistent keepers fail closed and mark the Session interrupted
+- [ ] Service upgrade and crash tests prove the process, screen, log, and audit boundary survive
 
 ## V2 — Intelligence
 - [ ] Tool API for the agent (same permissions as a user, capped at Level 2)
