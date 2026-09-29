@@ -35,6 +35,10 @@ assert_contains "$dry_run" 'VITE_DAEMON_PROXY_TARGET=http://100.64.12.34:17420'
 assert_contains "$dry_run" 'VITE_DATA=api'
 assert_contains "$dry_run" 'pnpm -C web dev --host 100.64.12.34 --port 14173 --strictPort'
 
+user_test="$(cd "$repo_root" && just --dry-run user-test 2>&1)"
+assert_contains "$user_test" 'VITE_DATA=mock'
+assert_contains "$user_test" 'pnpm -C web dev --host 127.0.0.1 --port 5173 --strictPort'
+
 for unsafe_ip in 0.0.0.0 192.168.1.10 100.128.0.1; do
   if output="$(SENTINAL_TAILSCALE_IP="$unsafe_ip" "$launcher" --dry-run 2>&1)"; then
     fail "unsafe address $unsafe_ip was accepted"

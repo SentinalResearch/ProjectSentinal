@@ -124,6 +124,42 @@ export const store = {
   } as AuthState,
 };
 
+/** Fixture-backed state that may be replaced by the user-testing harness. */
+export type MockStoreSnapshot = Pick<
+  typeof store,
+  "machines" | "sessions" | "history" | "recipes" | "journal" | "notificationRules" | "tokens"
+>;
+
+/** Return an isolated copy of the current fixture-backed product state. */
+export function snapshotStore(): MockStoreSnapshot {
+  return structuredClone({
+    machines: store.machines,
+    sessions: store.sessions,
+    history: store.history,
+    recipes: store.recipes,
+    journal: store.journal,
+    notificationRules: store.notificationRules,
+    tokens: store.tokens,
+  });
+}
+
+/** Replace simulated product state while preserving the facilitator's auth state. */
+export function replaceStore(snapshot: MockStoreSnapshot): void {
+  const next = structuredClone(snapshot);
+  store.machines = next.machines;
+  store.sessions = next.sessions;
+  store.history = next.history;
+  store.recipes = next.recipes;
+  store.journal = next.journal;
+  store.notificationRules = next.notificationRules;
+  store.tokens = next.tokens;
+  emit({
+    type: "DATA_RESET",
+    machines: structuredClone(store.machines),
+    sessions: structuredClone(store.sessions),
+  });
+}
+
 type Listener = (event: import("../adapter").LiveEvent) => void;
 const listeners = new Set<Listener>();
 

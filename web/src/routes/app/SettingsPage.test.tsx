@@ -1,13 +1,14 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
 import { AppShell } from "./AppShell";
 import { SettingsPage } from "./SettingsPage";
 import styles from "./SettingsPage.module.css";
+import { resetSimulation } from "../../data/mock/simulation";
 
 function renderSettings(path: string) {
   return render(
@@ -30,6 +31,8 @@ describe("SettingsPage", () => {
   beforeAll(() => {
     Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 1440 });
   });
+
+  beforeEach(() => resetSimulation());
 
   it("defaults to Machines & tokens and switches tabs", async () => {
     renderSettings("/app/settings");
@@ -92,5 +95,21 @@ describe("SettingsPage", () => {
     expect(await screen.findByText("Run this on Office PC", {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/sentinal-agent pair/)).toBeInTheDocument();
     expect(screen.getByText(/expires in/)).toBeInTheDocument();
+  });
+
+  it("offers repeatable mock-only simulation controls", async () => {
+    renderSettings("/app/settings/simulation");
+
+    expect(await screen.findByRole("heading", { name: "User testing simulation" })).toBeInTheDocument();
+    expect(screen.getByText("Fixtures only — no daemon is connected")).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Scenario"), "needs-attention");
+    await user.click(screen.getByRole("button", { name: "Apply scenario" }));
+
+    expect(await screen.findByText("3 Sessions · 2 Machines")).toBeInTheDocument();
+    expect(screen.getByText("3 need attention")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reset mixed demo" }));
+    expect(await screen.findByText("8 Sessions · 3 Machines")).toBeInTheDocument();
   });
 });

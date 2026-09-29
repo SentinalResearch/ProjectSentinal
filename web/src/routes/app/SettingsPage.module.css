@@ -95,6 +95,82 @@
   flex: none;
 }
 
+/* Explicit fixture-only user-testing controls */
+
+.simulationPanel {
+  border: 1px solid var(--line);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.simulationField {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.simulationField select {
+  width: min(100%, 420px);
+  height: 40px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-0);
+  color: var(--text-1);
+  padding: 0 10px;
+  font: inherit;
+}
+
+.simulationDescription {
+  max-width: 680px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.simulationChoices,
+.simulationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.simulationChoice,
+.simulationChoiceActive {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.simulationChoiceActive {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-1);
+}
+
+.simulationSummary {
+  border-left: 3px solid var(--accent);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.simulationSummary strong {
+  color: var(--text-1);
+}
+
 .overline {
   font-size: 11px;
   font-weight: 700;

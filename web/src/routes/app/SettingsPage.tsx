@@ -2,22 +2,19 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { MockBadge } from "../../components/MockBadge";
+import { isMockData } from "../../data";
 import { AccountTab } from "./AccountTab";
 import { MachinesTab } from "./MachinesTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { PairMachineDialog } from "./PairMachineDialog";
+import { SimulationTab } from "./SimulationTab";
+import { settingsTabs, type SettingsTabKey } from "./settings-tabs";
 import styles from "./SettingsPage.module.css";
 
-const TABS = [
-  { key: "machines", label: "Machines & tokens" },
-  { key: "notifications", label: "Notifications" },
-  { key: "account", label: "Account" },
-] as const;
+const TABS = settingsTabs(isMockData);
 
-type TabKey = (typeof TABS)[number]["key"];
-
-function normalizeTab(tab: string | undefined): TabKey {
-  return TABS.some((t) => t.key === tab) ? (tab as TabKey) : "machines";
+function normalizeTab(tab: string | undefined): SettingsTabKey {
+  return TABS.some((t) => t.key === tab) ? (tab as SettingsTabKey) : "machines";
 }
 
 /** design_handoff_sentinal/design/SentinalSettings.dc.html */
@@ -59,6 +56,7 @@ export function SettingsPage() {
           {active === "machines" && <MachinesTab onOpenPair={() => setPairOpen(true)} />}
           {active === "notifications" && <NotificationsTab />}
           {active === "account" && <AccountTab />}
+          {active === "simulation" && isMockData && <SimulationTab />}
         </div>
       </section>
 

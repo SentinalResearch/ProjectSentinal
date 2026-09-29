@@ -38,7 +38,10 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
     });
 
     const unsubscribe = dataAdapter.subscribe((event: LiveEvent) => {
-      if (event.type === "SESSION_UPDATED") {
+      if (event.type === "DATA_RESET") {
+        setMachines(event.machines);
+        setSessions(event.sessions);
+      } else if (event.type === "SESSION_UPDATED") {
         setSessions((prev) => {
           const idx = prev.findIndex((s) => s.id === event.session.id);
           if (idx < 0) return [...prev, event.session];

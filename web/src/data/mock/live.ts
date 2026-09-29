@@ -1,8 +1,10 @@
 import { appendEvent, findSession, store, updateSession } from "./store";
 
-const TICK_MS = 5000;
+const DEFAULT_TICK_MS = 5000;
+let tickMs: number | null = DEFAULT_TICK_MS;
 
-function tick() {
+/** Advance every eligible simulated Session by one deterministic product tick. */
+export function advanceLiveSimulation() {
   const now = new Date();
   const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
@@ -16,7 +18,7 @@ function tick() {
       };
       if (session.metrics?.loss) {
         const { from, to } = session.metrics.loss;
-        const nextTo = Math.max(0.05, to - (Math.random() * 0.004 + 0.001));
+        const nextTo = Math.max(0.05, to - 0.002);
         patch.metrics = { ...session.metrics, loss: { from, to: Number(nextTo.toFixed(3)) } };
       }
       updateSession(session.id, patch);
@@ -34,17 +36,32 @@ function tick() {
 let interval: ReturnType<typeof setInterval> | null = null;
 let refCount = 0;
 
+function stopInterval(): void {
+  if (interval !== null) {
+    clearInterval(interval);
+    interval = null;
+  }
+}
+
+function startInterval(): void {
+  stopInterval();
+  if (refCount > 0 && tickMs !== null) {
+    interval = setInterval(advanceLiveSimulation, tickMs);
+  }
+}
+
+/** Configure automatic fixture playback; `null` pauses it. */
+export function configureLivePlayback(nextTickMs: number | null): void {
+  tickMs = nextTickMs;
+  startInterval();
+}
+
 export function acquireLiveUpdates(): () => void {
   refCount += 1;
-  if (interval === null) {
-    interval = setInterval(tick, TICK_MS);
-  }
+  startInterval();
   return () => {
     refCount = Math.max(0, refCount - 1);
-    if (refCount === 0 && interval !== null) {
-      clearInterval(interval);
-      interval = null;
-    }
+    if (refCount === 0) stopInterval();
   };
 }
 

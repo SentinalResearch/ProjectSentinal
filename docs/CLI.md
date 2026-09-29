@@ -63,6 +63,19 @@ The underlying setting is `VITE_DATA=mock`; any missing, misspelled, or
 `api` value selects the real API. Demo mode is never selected by
 `just network`.
 
+For facilitated interface research, use the same isolated fixture boundary
+with repeatable controls:
+
+```console
+$ just user-test
+# Settings → Simulation
+```
+
+The Simulation tab provides named scenarios, pause/normal/fast playback, a
+manual tick, and baseline reset. It does not exist in real API mode. See
+`docs/USER_TESTING.md` for the task script and what may be claimed from a
+simulation.
+
 ## Commands
 
 ```console

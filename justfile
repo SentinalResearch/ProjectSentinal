@@ -60,6 +60,10 @@ network *args:
 demo:
     VITE_DATA=mock pnpm -C web dev --host 127.0.0.1 --port 5173 --strictPort
 
+# Start the fixture-backed UI with repeatable Settings → Simulation controls
+user-test:
+    VITE_DATA=mock pnpm -C web dev --host 127.0.0.1 --port 5173 --strictPort
+
 # Slow tests that need a real shell / PTY
 test-integration:
     cargo test --workspace -- --ignored
