@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-test("sets the owner password, creates a session, and attaches", async ({ page }) => {
+test("control proxy authenticates to one fake worker and attaches", async ({ page }) => {
+  const health = await page.request.get("/api/v1/health");
+  expect(health.status()).toBe(200);
+  await expect(health.json()).resolves.toMatchObject({ ok: true, version: 1 });
+
   await page.goto("/setup");
+  await expect(page.getByText("MOCK", { exact: true })).toHaveCount(0);
   await page.getByLabel("Machine token").fill("test-token");
   await page.getByLabel("New password").fill("test-password-for-playwright");
   await page.getByLabel("Confirm password").fill("test-password-for-playwright");

@@ -1,6 +1,7 @@
 # Milestone 1c progress — Deployable worker and two-host acceptance
 
-Status: in progress 2026-09-29.
+Status: implementation complete; blocked on the real two-host acceptance run
+2026-09-29.
 
 ## Tasks and proof
 
@@ -17,16 +18,16 @@ Status: in progress 2026-09-29.
 - [x] Render systemd and launchd user services with exact installed paths and
   no credentials, including paths containing spaces —
   `scripts/tests/install-worker-test.sh` snapshots/assertions.
-- [ ] Prove browser authentication and WebSocket attach through the control
+- [x] Prove browser authentication and WebSocket attach through the control
   proxy against the fake daemon — `web/e2e/session-smoke.spec.ts` through the
   control-role Playwright server configuration.
-- [ ] Document setup, service operations, backup/recovery, inspection, current
+- [x] Document setup, service operations, backup/recovery, inspection, current
   boundaries, and the manual two-host checklist — `docs/SETUP.md`,
   `docs/CLI.md`, and `docs/SECURITY.md`.
 - [ ] Run and record the two-host Watch → detach → browser attach → input →
   graceful exit/kill → SQLite/log/audit acceptance on every available host —
   this file and the Milestone 1c report.
-- [ ] Run `just check`, Playwright, installer/launcher tests, update Roadmap
+- [x] Run `just check`, Playwright, installer/launcher tests, update Roadmap
   1c, commit logical changes, and report exact installed/service paths.
 
 ## Open questions and resolved scope
@@ -47,3 +48,14 @@ Status: in progress 2026-09-29.
 - This development host is macOS. A second Tailnet Machine and Linux host are
   not assumed available; missing manual coverage will be named rather than
   simulated or claimed.
+
+## Acceptance record
+
+- `just check` passed on macOS 27.0, including 365 fast Rust tests, 68 Vitest
+  tests, TypeScript generation, and all four shell validation suites.
+- `just test-e2e` passed: 3 Playwright scenarios use `VITE_DATA=api`, proxy to
+  one fake worker, authenticate, attach over WebSocket, replay, and Continue.
+- Tailscale reports this macOS host plus online macOS and Linux peers. No peer
+  was selected and no authority/login details were supplied for installing or
+  starting a worker remotely, so the real two-host checklist above remains
+  deliberately unchecked. Do not infer it from the fake-worker test.

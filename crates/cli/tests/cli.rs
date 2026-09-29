@@ -80,7 +80,7 @@ fn cli_terminal_frame_round_trips() {
 #[test]
 fn global_url_and_token_file_can_come_from_the_environment() {
     let parsed = Cli::try_parse_from(["sentinal", "ls"]).unwrap();
-    assert_eq!(parsed.url, "ws://127.0.0.1:7420/api/v1/ws");
+    assert_eq!(parsed.url, None);
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_sentinal"))
         .arg("ls")
         .env("SENTINAL_URL", "ws://127.0.0.1:9/api/v1/ws")

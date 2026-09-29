@@ -9,12 +9,8 @@ use std::path::PathBuf;
 #[command(name = "sentinal", version, about)]
 pub struct Cli {
     /// Daemon WebSocket URL.
-    #[arg(
-        long,
-        env = "SENTINAL_URL",
-        default_value = "ws://127.0.0.1:7420/api/v1/ws"
-    )]
-    pub url: String,
+    #[arg(long, env = "SENTINAL_URL")]
+    pub url: Option<String>,
     /// Bearer token file; defaults to ~/.config/terminal-agent/token.
     #[arg(long, env = "SENTINAL_TOKEN_FILE")]
     pub token_file: Option<PathBuf>,

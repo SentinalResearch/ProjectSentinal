@@ -6,6 +6,7 @@ pub mod args;
 pub mod auto_command;
 pub mod auto_wrap;
 pub mod client;
+pub mod daemon_url;
 pub mod detach;
 pub mod frame;
 pub mod hook_command;

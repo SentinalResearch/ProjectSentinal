@@ -49,6 +49,7 @@ assert_contains "$agent_output" 'bind = "100.64.12.34:17420"'
 assert_contains "$agent_output" "Token bootstrap: cat $test_root/config\\ with\\ spaces/token"
 assert_contains "$agent_output" "$test_root/data with spaces/run/sentinald.sock"
 assert_contains "$agent_output" 'cargo build --locked -p daemon --bin sentinald'
+assert_contains "$agent_output" 'SENTINAL_URL=ws://100.64.12.34:17420/api/v1/ws sentinal watch'
 assert_not_contains "$agent_output" 'VITE_DATA='
 assert_not_contains "$agent_output" 'Starting Vite'
 

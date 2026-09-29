@@ -11,10 +11,15 @@ Commands marked **planned** are not available yet.
 ## Global options
 
 ```console
-sentinal [--url ws://127.0.0.1:7420/api/v1/ws] [--token-file PATH] <command>
+sentinal [--url ws://HOST:PORT/api/v1/ws] [--token-file PATH] <command>
 ```
 
-The token file defaults to `~/.config/terminal-agent/token`.
+The token file defaults to `~/.config/terminal-agent/token`. Without
+`--url` or `SENTINAL_URL`, the CLI reads `bind` from
+`~/.config/terminal-agent/daemon.toml`; if that config does not exist it uses
+the loopback development default `ws://127.0.0.1:7420/api/v1/ws`. This makes
+an installed CLI reach its Tailscale-bound worker without duplicating the
+address in shell configuration.
 
 ## Tailscale development server
 
@@ -49,6 +54,29 @@ $ just network --dry-run
 
 Useful overrides are `SENTINAL_TAILSCALE_IP`, `SENTINAL_DAEMON_PORT`,
 `SENTINAL_WEB_PORT`, `SENTINAL_DATA_DIR`, and `SENTINAL_CONFIG_DIR`.
+
+### Separate worker and control roles
+
+For the Milestone 1c two-Machine shape, the worker runs only the daemon and
+the control Machine runs only Vite:
+
+```console
+worker$ just agent
+control$ just control WORKER_IP=100.x.y.z
+```
+
+Both commands bind only to the exact local Tailscale IPv4. `just control`
+always selects the real API adapter and proxies HTTP and WebSocket traffic to
+the one named worker; it never starts a local daemon or falls back to mock
+data. The source-tree `just agent` prints the explicit `SENTINAL_URL` needed
+by a CLI in another terminal. An installed CLI instead discovers the worker
+bind from its persistent daemon config.
+
+Install or upgrade the worker with `just install-worker`; remove programs and
+the user service with `just uninstall-worker`. Config and data are preserved
+unless exact-path data deletion is separately requested. Full prerequisites,
+service commands, paths, backup, and acceptance steps are in
+`docs/SETUP.md`.
 
 ### Explicit fixture demo
 
@@ -246,11 +274,11 @@ over the private local socket.
 | `SENTINAL_TOKEN_FILE` | current | bearer token file (same as `--token-file`) |
 | `SENTINAL_AUTO_GUARD` | current | set in every AUTO_WRAP shell; any value stops auto-wrap |
 | `SENTINAL_AUTO_SKIP` | current | comma-separated variable names; auto-wrap skips when any is set |
-| `SENTINAL_TAILSCALE_IP` | development | overrides Tailscale IPv4 discovery for `just network`; still validated as `100.64.0.0/10` |
-| `SENTINAL_DAEMON_PORT` | development | daemon port used by `just network` (default `7420`) |
-| `SENTINAL_WEB_PORT` | development | Vite port used by `just network` (default `5173`) |
-| `SENTINAL_DATA_DIR` | development | persistent data path used by `just network` |
-| `SENTINAL_CONFIG_DIR` | development | token/auth path used by `just network` |
+| `SENTINAL_TAILSCALE_IP` | development | overrides local IPv4 discovery for `just network`, `agent`, or `control`; still validated as `100.64.0.0/10` |
+| `SENTINAL_DAEMON_PORT` | development | worker daemon port used by launch roles (default `7420`) |
+| `SENTINAL_WEB_PORT` | development | Vite port used by web launch roles (default `5173`) |
+| `SENTINAL_DATA_DIR` | development | persistent data path used by daemon launch roles |
+| `SENTINAL_CONFIG_DIR` | development | token/auth path used by daemon launch roles |
 | `TA_CONFIG` | current internal | overrides `sentinald` configuration path |
 | `TA_AUTH_FILE` | current test/internal | overrides owner-auth storage |
 | `TA_FAKE_PTY` | current test-only | selects the fake PTY backend |

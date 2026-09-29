@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- reference template only. install-worker.sh renders actual paths without credentials. -->
 <!-- Replaces dev.terminal-agent.tad.plist; load only one of the two. -->
 <plist version="1.0">
 <dict>

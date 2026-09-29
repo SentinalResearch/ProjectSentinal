@@ -64,6 +64,7 @@ main() {
   echo "Local socket:   $local_socket"
   echo "Token file:     $token_file"
   echo "Token bootstrap: cat $(printf '%q' "$token_file")"
+  echo "Local Watch:    SENTINAL_URL=ws://$tailscale_ip:$daemon_port/api/v1/ws sentinal watch"
   echo "Stop sentinald with Ctrl-C."
 
   if [[ "$dry_run" == true ]]; then

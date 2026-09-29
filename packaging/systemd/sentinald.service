@@ -2,6 +2,8 @@
 Description=Sentinal daemon (persistent, observable terminal Sessions)
 After=network.target
 # Replaces tad.service; enable only one of the two.
+# This is a reference template. install-worker.sh renders actual binary and
+# config paths for the current user and never embeds credentials.
 Conflicts=tad.service
 
 [Service]

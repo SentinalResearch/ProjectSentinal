@@ -144,13 +144,13 @@ terminal or phone.
 then continue in a new FULL Session with the same cwd.
 
 ## Milestone 1c — Deployable worker and two-host acceptance
-- [ ] `just agent` runs a daemon-only worker on its exact Tailscale address in real API mode
-- [ ] `just control WORKER_IP=...` runs the web UI against one remote worker without starting a local daemon
-- [ ] A release installer installs `sentinal`, `sentinald`, shell assets, safe config, and the existing user service
-- [ ] Upgrade and uninstall preserve user data and credentials unless deletion is explicitly requested
-- [ ] `docs/SETUP.md` documents macOS/Linux, Tailscale ACLs, service inspection, backup, and recovery
+- [x] `just agent` runs a daemon-only worker on its exact Tailscale address in real API mode
+- [x] `just control WORKER_IP=...` runs the web UI against one remote worker without starting a local daemon
+- [x] A release installer installs `sentinal`, `sentinald`, shell assets, safe config, and the existing user service
+- [x] Upgrade and uninstall preserve user data and credentials unless deletion is explicitly requested
+- [x] `docs/SETUP.md` documents macOS/Linux, Tailscale ACLs, service inspection, backup, and recovery
 - [ ] A two-host manual checklist proves Watch → detach → browser attach → exit/kill → SQLite/log/audit
-- [ ] The worker package remains the daemon + CLI + hooks; no duplicate “watcher agent” process is introduced
+- [x] The worker package remains the daemon + CLI + hooks; no duplicate “watcher agent” process is introduced
 
 **Demo:** install the worker on one Machine, run only the control UI on a
 second Machine, and complete one real Watch handoff over Tailscale.

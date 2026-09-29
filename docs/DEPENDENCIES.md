@@ -28,7 +28,7 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `regex` | 3 | Watcher adapters |
 | `insta` (dev) | 3 | Snapshot tests for watcher output |
 | `ts-rs` | 0 | Generate TypeScript types from protocol |
-| `toml` | 1 | Parse the required daemon TOML configuration |
+| `toml` | 1 | Parse daemon TOML for daemon startup and installed CLI address discovery |
 | `tokio-tungstenite` | 1 | WebSocket client transport for `ta` |
 | `futures-util` | 1 | Async WebSocket stream and sink handling for `ta` |
 | `tower` (dev) | 1 | Exercise Axum routes in-process without network sockets |

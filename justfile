@@ -53,6 +53,7 @@ check:
     bash scripts/tests/run-network-test.sh
     bash scripts/tests/run-roles-test.sh
     bash scripts/tests/install-worker-test.sh
+    bash scripts/tests/setup-doc-test.sh
 
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:

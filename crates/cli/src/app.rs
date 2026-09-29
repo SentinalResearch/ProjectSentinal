@@ -1,8 +1,9 @@
 //! Command dispatch shared by the `sentinal` binary and its `ta` alias.
 
 use crate::{
-    args::{Cli, Command},
+    args::{AutoAction, Cli, Command},
     client::{terminal_size, AttachEnd, ClientError, DaemonClient},
+    daemon_url::{self, DaemonUrlError},
     watch::{create_session, plan_watch, WatchContext, WatchError, WatchPlan, SESSION_ENV},
 };
 use protocol::{ClientRequest, DaemonMessage, SessionId, SessionOrigin};
@@ -30,6 +31,8 @@ enum AppError {
     #[error("cannot read the current directory: {0}")]
     Cwd(std::io::Error),
     #[error(transparent)]
+    DaemonUrl(#[from] DaemonUrlError),
+    #[error(transparent)]
     Client(#[from] ClientError),
     #[error("{0}; the command was not run outside Sentinal")]
     Watch(#[from] WatchError),
@@ -48,7 +51,12 @@ async fn dispatch(
     let cli = match cli.command {
         Command::Hook { action } => return Ok(crate::hook_command::run(action, out, err).await),
         Command::Auto { action } => {
-            return Ok(crate::auto_command::run(action, &cli.url, cli.token_file, out, err).await);
+            let url = if matches!(&action, AutoAction::Enter { .. }) {
+                resolve_daemon_url(cli.url.as_deref())?
+            } else {
+                cli.url.unwrap_or_default()
+            };
+            return Ok(crate::auto_command::run(action, &url, cli.token_file, out, err).await);
         }
         Command::Adopt {
             pid,
@@ -67,7 +75,7 @@ async fn dispatch(
         Some(path) => path,
         None => default_token_file()?,
     };
-    let url = cli.url;
+    let url = resolve_daemon_url(cli.url.as_deref())?;
     if let Command::Watch { title, command } = cli.command {
         return watch(&url, &token_file, title, command, err).await;
     }
@@ -186,6 +194,17 @@ fn default_token_file() -> Result<PathBuf, AppError> {
         .map(PathBuf::from)
         .map(|home| home.join(".config/terminal-agent/token"))
         .ok_or(AppError::MissingHome)
+}
+
+fn resolve_daemon_url(explicit: Option<&str>) -> Result<String, AppError> {
+    if let Some(url) = explicit {
+        return Ok(url.to_owned());
+    }
+    let config = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .map(|home| home.join(".config/terminal-agent/daemon.toml"))
+        .ok_or(AppError::MissingHome)?;
+    Ok(daemon_url::resolve(None, &config)?)
 }
 
 fn print_unexpected(err: &mut dyn Write, message: DaemonMessage) {

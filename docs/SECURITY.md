@@ -23,13 +23,23 @@ and roadmap checkbox are complete.
 - PTY output is retained in compressed Session logs. Terminal output is
   untrusted and is never executed.
 
-`just network` is the development path for remote browser testing. It asks
-Tailscale for this machine's IPv4 address, validates that the address is in
-`100.64.0.0/10`, and binds both the daemon and Vite to that exact address.
-It never falls back to a wildcard or LAN bind. Vite proxies `/api` to the
-same Tailscale-bound daemon, so browser credentials remain same-origin. This
-does not bypass Tailnet ACLs or the host firewall and is not a public-internet
-deployment mechanism.
+`just network` is the combined development path for remote browser testing.
+`just agent` binds only the worker daemon; `just control WORKER_IP=...` binds
+only Vite and proxies HTTP/WebSocket traffic to that one worker. Every role
+asks Tailscale for its Machine's IPv4 address, validates all addresses are in
+`100.64.0.0/10`, rejects occupied/malformed ports, and never falls back to a
+wildcard, ordinary LAN, fixtures, or localhost. Same-origin Vite proxying
+keeps browser credentials out of frontend configuration. These launchers do
+not bypass Tailnet ACLs or the host firewall and are not public-internet
+deployment mechanisms.
+
+The release installer likewise requires an exact validated Tailscale bind.
+It accepts only current-user-owned, non-group/world-writable source binaries,
+uses atomic program replacement, creates owner-only config/data directories,
+and renders service files containing paths but no token or password hash.
+Reinstall preserves credentials and user data. Uninstall retains them by
+default; data deletion requires the exact resolved data path. Operational
+commands and backup boundaries are documented in `docs/SETUP.md`.
 
 ## Data Sentinal records
 
