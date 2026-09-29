@@ -10,11 +10,11 @@ Status: in progress 2026-09-29.
 - [x] Add `just agent` and `just control WORKER_IP=...`, force real API mode,
   reject unsafe addresses and occupied ports, and clean up child processes —
   `scripts/tests/run-roles-test.sh`.
-- [ ] Add an offline per-user worker installer for source trees and prebuilt
+- [x] Add an offline per-user worker installer for source trees and prebuilt
   release directories, including dry-run, reinstall/upgrade, non-service
   mode, safe source validation, and data-preserving uninstall —
   `scripts/tests/install-worker-test.sh`.
-- [ ] Render systemd and launchd user services with exact installed paths and
+- [x] Render systemd and launchd user services with exact installed paths and
   no credentials, including paths containing spaces —
   `scripts/tests/install-worker-test.sh` snapshots/assertions.
 - [ ] Prove browser authentication and WebSocket attach through the control

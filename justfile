@@ -52,6 +52,7 @@ check:
     pnpm -C web check
     bash scripts/tests/run-network-test.sh
     bash scripts/tests/run-roles-test.sh
+    bash scripts/tests/install-worker-test.sh
 
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:
@@ -64,6 +65,14 @@ agent *args:
 # Start only the real-data control UI for one selected worker
 control *args:
     bash scripts/run-control.sh {{args}}
+
+# Install or upgrade the per-user worker from this checked-out source tree
+install-worker *args:
+    bash scripts/install-worker.sh install {{args}}
+
+# Uninstall worker programs while retaining config and data by default
+uninstall-worker *args:
+    bash scripts/install-worker.sh uninstall {{args}}
 
 # Start the fixture-backed UI explicitly for a local product demonstration
 demo:
