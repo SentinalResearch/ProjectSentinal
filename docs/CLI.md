@@ -38,8 +38,10 @@ that password; the launcher does not create or print a default password.
 The launcher binds to one `100.64.0.0/10` Tailscale address. It refuses
 `0.0.0.0`, ordinary LAN addresses, and non-Tailscale overrides. It is a
 development server: keep the terminal open, and press Ctrl-C to stop both
-processes. Tailnet policy and the host firewall must permit ports 5173 and
-7420. Check the generated configuration without starting anything with:
+processes. It also refuses a stale assigned address while Tailscale is stopped
+or still starting; turn Tailscale on and wait until it reports connected.
+Tailnet policy and the host firewall must permit ports 5173 and 7420. Check
+the generated configuration without starting anything with:
 
 ```console
 $ just network --dry-run

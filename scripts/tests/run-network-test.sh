@@ -17,6 +17,30 @@ assert_contains() {
   [[ "$haystack" == *"$needle"* ]] || fail "expected output to contain: $needle"
 }
 
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  [[ "$haystack" != *"$needle"* ]] || fail "expected output not to contain: $needle"
+}
+
+fake_bin="$test_root/fake-bin"
+mkdir -p "$fake_bin"
+cat >"$fake_bin/tailscale" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+  status) echo 'Tailscale is stopped.'; exit 1 ;;
+  ip) echo '100.93.101.56' ;;
+  *) exit 2 ;;
+esac
+EOF
+chmod 700 "$fake_bin/tailscale"
+
+if stopped_output="$(PATH="$fake_bin:$PATH" "$launcher" --dry-run 2>&1)"; then
+  fail "a stopped Tailscale backend was accepted"
+fi
+assert_contains "$stopped_output" "Tailscale is not running"
+assert_contains "$stopped_output" "Turn Tailscale on"
+
 dry_run="$({
   SENTINAL_TAILSCALE_IP=100.64.12.34 \
   SENTINAL_DAEMON_PORT=17420 \
@@ -33,7 +57,9 @@ assert_contains "$dry_run" "Web UI:    http://100.64.12.34:14173"
 assert_contains "$dry_run" "Daemon API: http://100.64.12.34:17420"
 assert_contains "$dry_run" 'VITE_DAEMON_PROXY_TARGET=http://100.64.12.34:17420'
 assert_contains "$dry_run" 'VITE_DATA=api'
-assert_contains "$dry_run" 'pnpm -C web dev --host 100.64.12.34 --port 14173 --strictPort'
+assert_contains "$dry_run" "cd $repo_root/web &&"
+assert_contains "$dry_run" '/web/node_modules/.bin/vite --host 100.64.12.34 --port 14173 --strictPort'
+assert_not_contains "$dry_run" 'pnpm -C web dev'
 
 user_test="$(cd "$repo_root" && just --dry-run user-test 2>&1)"
 assert_contains "$user_test" 'VITE_DATA=mock'

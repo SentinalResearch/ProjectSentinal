@@ -76,6 +76,28 @@ discover_tailscale_ipv4() {
   die "Tailscale reported no IPv4 address; connect Tailscale and try again"
 }
 
+require_tailscale_running() {
+  require_command tailscale
+  local status first_line
+  if ! status="$(tailscale status 2>&1)"; then
+    first_line="${status%%$'\n'*}"
+    case "$first_line" in
+      "Tailscale is stopped."*|"Tailscale is starting."*|"Logged out."*)
+        die "Tailscale is not running (status: $first_line). Turn Tailscale on, wait until connected, then run 'just network' again."
+        ;;
+      *)
+        die "could not read Tailscale status; open Tailscale and confirm it is connected"
+        ;;
+    esac
+  fi
+  first_line="${status%%$'\n'*}"
+  case "$first_line" in
+    "Tailscale is stopped."*|"Tailscale is starting."*|"Logged out."*)
+      die "Tailscale is not running (status: $first_line). Turn Tailscale on, wait until connected, then run 'just network' again."
+      ;;
+  esac
+}
+
 toml_string() {
   local value="$1"
   value="${value//\\/\\\\}"
@@ -138,7 +160,11 @@ main() {
   require_command cargo
   require_command pnpm
 
-  local tailscale_ip daemon_port web_port data_dir config_dir token_file auth_file
+  if [[ "$dry_run" == false || -z "${SENTINAL_TAILSCALE_IP:-}" ]]; then
+    require_tailscale_running
+  fi
+
+  local tailscale_ip daemon_port web_port data_dir config_dir token_file auth_file vite_bin
   tailscale_ip="$(discover_tailscale_ipv4)"
   daemon_port="${SENTINAL_DAEMON_PORT:-7420}"
   web_port="${SENTINAL_WEB_PORT:-5173}"
@@ -146,11 +172,13 @@ main() {
   config_dir="${SENTINAL_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/terminal-agent}"
   token_file="$config_dir/token"
   auth_file="$config_dir/auth.json"
+  vite_bin="$REPO_ROOT/web/node_modules/.bin/vite"
 
   validate_tailscale_ipv4 "$tailscale_ip"
   validate_port daemon "$daemon_port"
   validate_port web "$web_port"
   [[ "$daemon_port" != "$web_port" ]] || die "daemon and web ports must be different"
+  [[ -x "$vite_bin" ]] || die "Vite is not installed; run 'pnpm -C web install' and try again"
 
   runtime_dir="$(mktemp -d "${TMPDIR:-/tmp}/sentinal-network.XXXXXX")"
   local config_file="$runtime_dir/daemon.toml"
@@ -178,7 +206,7 @@ main() {
     echo "Commands:"
     echo "cargo build --locked -p daemon --bin sentinald"
     echo "TA_CONFIG=$(printf '%q' "$config_file") $REPO_ROOT/target/debug/sentinald"
-    echo "VITE_DATA=api VITE_DAEMON_PROXY_TARGET=http://$tailscale_ip:$daemon_port pnpm -C web dev --host $tailscale_ip --port $web_port --strictPort"
+    echo "cd $(printf '%q' "$REPO_ROOT/web") && VITE_DATA=api VITE_DAEMON_PROXY_TARGET=http://$tailscale_ip:$daemon_port $vite_bin --host $tailscale_ip --port $web_port --strictPort"
     return
   fi
 
@@ -202,9 +230,10 @@ main() {
 
   echo "Starting Vite..."
   (
-    cd "$REPO_ROOT"
-    VITE_DATA=api VITE_DAEMON_PROXY_TARGET="http://$tailscale_ip:$daemon_port" \
-      pnpm -C web dev --host "$tailscale_ip" --port "$web_port" --strictPort
+    cd "$REPO_ROOT/web"
+    export VITE_DATA=api
+    export VITE_DAEMON_PROXY_TARGET="http://$tailscale_ip:$daemon_port"
+    exec "$vite_bin" --host "$tailscale_ip" --port "$web_port" --strictPort
   ) &
   web_pid=$!
 
