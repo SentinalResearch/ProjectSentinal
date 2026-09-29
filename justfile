@@ -51,10 +51,19 @@ check:
     just gen-ts --check
     pnpm -C web check
     bash scripts/tests/run-network-test.sh
+    bash scripts/tests/run-roles-test.sh
 
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:
     bash scripts/run-network.sh {{args}}
+
+# Start only the worker daemon on this Machine's exact Tailscale address
+agent *args:
+    bash scripts/run-agent.sh {{args}}
+
+# Start only the real-data control UI for one selected worker
+control *args:
+    bash scripts/run-control.sh {{args}}
 
 # Start the fixture-backed UI explicitly for a local product demonstration
 demo:
