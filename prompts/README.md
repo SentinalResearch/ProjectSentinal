@@ -24,6 +24,7 @@ model) to build the whole system, one milestone at a time.
 | 1b.C | `03d-milestone-1bc-auto-wrap-adopt.md` | Fail-open auto-wrap and read-only process adoption |
 | 1b.E | `03e-milestone-1be-finished-session-replay.md` | Read-only finished Sessions, saved-output replay, safe Continue |
 | 1c | `03f-milestone-1c-worker-packaging-two-host.md` | Installable one-worker/two-host Tailscale acceptance |
+| 1c.1 | `03h-milestone-1c1-tailnet-bootstrap.md` | Tailnet curl bootstrap and private verified package delivery |
 | 1d | `03g-milestone-1d-session-continuation-history.md` | Persistent continuation lineage and bounded combined output history |
 | 3 | `04-milestone-3-events-watchers.md` | Progress, health, events without AI (v0.3) |
 | 1b.D | `04a-milestone-1bd-adopted-log-ui.md` | Adopted log tail and capture-aware UI |
@@ -39,8 +40,8 @@ Milestones 1b.0 and 4.0, plus Reliability R1, begin with a mandatory human
 review. Paste the approval back into the same agent session; do not let the
 agent infer wire, pairing, or PTY-ownership decisions.
 
-The recommended path from the current repository is 1b.E → 1c → 1d → 3 →
-1b.D → 4.0 → 4.A → 4.B. R1 is a separate reliability project: schedule it
+The recommended path from the current repository is 1b.E → 1c → 1c.1 → 1d →
+3 → 1b.D → 4.0 → 4.A → 4.B. R1 is a separate reliability project: schedule it
 before a production-stability claim, but do not mix it into watcher or
 dashboard work.
 

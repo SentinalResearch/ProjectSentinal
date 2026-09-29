@@ -155,6 +155,20 @@ then continue in a new FULL Session with the same cwd.
 **Demo:** install the worker on one Machine, run only the control UI on a
 second Machine, and complete one real Watch handoff over Tailscale.
 
+## Milestone 1c.1 — Tailnet bootstrap and private package delivery
+- [ ] Approve the package-service, release-manifest, HTTPS, and integrity design before implementation
+- [ ] Build versioned Linux/macOS worker bundles for supported architectures from the existing worker package
+- [ ] Serve a bounded release manifest, immutable artifacts, and `install.sh` from an owner-controlled Tailnet control Machine
+- [ ] Verify target, length, compatibility, and checksum before invoking the existing installer
+- [ ] Installation never enrolls or receives a pairing secret; it ends visibly `UNPAIRED`
+- [ ] Reinstall/update preserve config, credentials, Machine data, SQLite, logs, adapters, and recipes
+- [ ] `sentinal doctor` reports install/service/Tailscale health without connecting implicitly
+- [ ] Prove curl install on an available real peer and retain the offline/source-tree install path
+
+**Demo:** copy one Tailnet HTTPS curl command onto a fresh Linux Machine,
+install the worker, and see `UNPAIRED` plus the separate `sentinal connect`
+next step.
+
 ## Milestone 1d — Session continuation history
 - [ ] Approve the additive lineage wire/storage proposal before implementation
 - [ ] Persist a linear predecessor/successor relationship across browser and daemon restart
@@ -177,13 +191,21 @@ latest live generation.
 
 ## Milestone 4.0 — Secure Machine enrollment
 - [ ] Complete the mandatory pairing threat-model and wire-format review before implementation
-- [ ] Generate short-lived, single-use pairing authority without exposing the Machine token to a browser
-- [ ] Persist a stable Machine registry and per-Machine browser credentials locally
+- [ ] Generate short-lived, single-use pairing authority without exposing the Machine token to a browser or control service
+- [ ] Persist an immutable Machine ID separately from its owner-editable display name
+- [ ] `sentinal connect` pairs one installed worker through a hidden prompt/stdin and never accepts a pairing code in argv or a URL
+- [ ] Exchange the one-time code for a unique revocable Machine credential; the Machine token stays local
+- [ ] Persist the owner-controlled Machine registry, connection state, last seen, and per-Machine credential metadata locally
+- [ ] Rename, reconnect, disconnect, and revoke one Machine without reinstalling it or affecting another
 - [ ] Audit pairing creation, exchange, expiry, revocation, and failed attempts without logging secrets
 - [ ] Document HTTPS/Tailscale Serve and explicit allowed browser origins
 
+**Demo:** install a worker, choose Add Machine in the control UI, run
+`sentinal connect CONTROL_URL --name "RTX PC"`, enter the code at the hidden
+prompt, and see the stable Machine ID appear under that display name.
+
 ## Milestone 4.A — Multi-Machine aggregation
-- [ ] Connect to every enrolled daemon independently; there is no required central cloud service
+- [ ] The local control Machine connects independently to every enrolled daemon; there is no required cloud service
 - [ ] Namespace Session/Command/Event identities by Machine in the web data layer
 - [ ] Isolate failures and show offline Machines with last-seen time
 - [ ] Route attach, input, Metrics, history, and search to the owning Machine only

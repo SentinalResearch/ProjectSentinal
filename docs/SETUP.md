@@ -247,3 +247,20 @@ command in `docs/progress/milestone-1c.md`.
   FULL Sessions are interrupted and their PTYs are not reattachable yet.
 - Rich watcher-derived progress, health, errors, and adopted-log tailing remain
   later milestones. Real mode shows only data the current daemon supplies.
+
+## Planned seamless onboarding
+
+The next deployment stages preserve a deliberate two-step boundary:
+
+```text
+curl install → UNPAIRED worker
+sentinal connect → PAIRED Machine
+```
+
+Milestone 1c.1 will serve verified worker packages from an owner-controlled
+Tailnet HTTPS URL. It will not embed a pairing code or Machine credential.
+Milestone 4.0 will add Settings → Machines → Add Machine and `sentinal
+connect`; the code is entered through a hidden prompt, and the resulting
+Machine appears under a stable ID plus editable display name. Until those
+milestones are complete, use the explicit one-worker commands documented
+above and do not treat the mock pairing screen as functional.

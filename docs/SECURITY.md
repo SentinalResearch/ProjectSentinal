@@ -41,6 +41,30 @@ Reinstall preserves credentials and user data. Uninstall retains them by
 default; data deletion requires the exact resolved data path. Operational
 commands and backup boundaries are documented in `docs/SETUP.md`.
 
+## Planned package and enrollment boundaries
+
+Milestone 1c.1 package delivery and Milestone 4.0 enrollment are intentionally
+separate security ceremonies:
+
+| Credential/state | Location | Purpose |
+|---|---|---|
+| Owner password hash | control Machine | Human login to the local control UI |
+| Machine token | each worker only | Local daemon bootstrap/CLI boundary; never enrollment |
+| Pairing code | hash on control; plaintext shown once | Short-lived, single-use connect authority |
+| Machine credential | one worker + control registry | Unique revocable post-pairing identity |
+| Browser Session | browser + control Machine | Owner UI access; contains no worker credential |
+
+The private package URL contains none of these secrets. Install/reinstall
+leaves a worker `UNPAIRED`. `sentinal connect` reads the code through a hidden
+TTY prompt or bounded stdin; there is deliberately no pairing-code argv,
+query-string, environment, or service-file form. A stable Machine ID is
+authorization-neutral and separate from the editable display name.
+
+The control role remains owner-operated inside Tailscale. It may serve
+verified packages and hold the Machine registry, but it is not a required
+vendor cloud. Exact code entropy, credentials, origin checks, transport, and
+recovery remain subject to the mandatory Milestone 4.0 design approval.
+
 ## Data Sentinal records
 
 | Data | Stored | Notes |

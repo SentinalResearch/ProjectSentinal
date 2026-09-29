@@ -60,6 +60,38 @@ sentinal/
 | Networking | Tailscale only | No public exposure |
 | AI | Separate process, suggest-only | Lower layers work without it |
 
+## Installation and Machine enrollment
+
+One owner-selected Machine may run the local control role in addition to its
+normal `sentinald` responsibilities. It serves the PWA and verified worker
+packages to ACL-authorized Tailnet peers. This is local infrastructure, not a
+required cloud service. Session aggregation/routing remains a later approved
+design decision.
+
+Installation and authority are separate boundaries:
+
+```text
+Tailnet HTTPS package service
+          │ verified release
+          ▼
+ installed worker (UNPAIRED, stable Machine ID)
+          │ sentinal connect + one-time code
+          ▼
+ control Machine registry (PAIRED, unique revocable credential)
+```
+
+- The package URL contains no Machine token, owner password, pairing code, or
+  per-Machine credential.
+- The immutable Machine ID identifies one installation across rename,
+  reconnect, update, and control-URL changes. The display name is editable.
+- `sentinal connect` receives its one-time pairing code through a hidden TTY
+  prompt or bounded stdin, never argv, a URL, environment, or shell history.
+- Pairing exchanges the code for a credential unique to that Machine. The
+  Machine token stays local and remains the daemon's local CLI/bootstrap
+  boundary.
+- Removing or revoking a Machine does not uninstall it or delete its local
+  Sessions. Reconnecting is an explicit owner-authorized action.
+
 ## Capture boundaries
 
 Every Session declares an origin and a capture level. These fields are

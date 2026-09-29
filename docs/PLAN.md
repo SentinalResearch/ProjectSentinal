@@ -100,7 +100,7 @@ Auto-source OSC shell hooks in daemon-owned PTYs, track exact Commands and
 cwd, persist SQLite history and FTS5, recover orphaned Sessions, sample
 process trees and resources, and stream live Metrics to the web UI.
 
-### Phase 1b — any terminal into Sentinal (A–C complete; D/E pending)
+### Phase 1b — any terminal into Sentinal (A–C/E complete; D pending)
 
 Bring ordinary terminals and already-running processes into Sentinal through
 four explicit modes:
@@ -123,18 +123,42 @@ Provide distinct same-Machine, daemon-only worker, and remote control-UI launch
 roles, plus a tested installer and exact Tailscale setup guide. This proves one
 selected worker from a second Machine; it does not claim aggregation.
 
+### Phase 1c.1 — Tailnet bootstrap and private package delivery
+
+Designate one owner-controlled `sentinald` as the local control Machine and
+let it serve verified Linux/macOS worker releases inside the Tailnet. The
+bootstrap URL installs binaries, hooks, config, and the user service, but
+does not enroll the Machine or carry any pairing secret:
+
+```console
+curl -fsSL https://sentinal-control.<tailnet>.ts.net/install.sh | sh
+```
+
+Installation and enrollment are deliberately separate. The lifecycle is:
+
+```text
+install → UNPAIRED → connect → PAIRED
+```
+
+Reinstall and update preserve Machine identity, credentials, SQLite, logs,
+adapters, and recipes. Package delivery is Tailnet-local infrastructure, not
+a public package repository or cloud requirement.
+
 ### Phase 3 — Event engine and deterministic watchers
 
 Turn output, process state, Metrics, Commands, and exit status into Events.
 Ship a generic watcher, training/pytest/vLLM adapters, declarative adapters,
 and adopted-log ingestion.
 
-### Phase 4 — enrollment, multi-Machine dashboard, Recipes, notifications
+### Phase 4 — connect, enrollment, multi-Machine dashboard, Recipes, notifications
 
-Threat-review and implement short-lived Machine pairing without exposing
-Machine tokens to browsers, aggregate independently authenticated per-Machine
-APIs in the PWA, launch built-in or saved Recipes, and deliver event-driven
-ntfy notifications.
+After installation, `sentinal connect` explicitly pairs the worker with the
+given control URL. The UI creates a short-lived, single-use code; the CLI
+reads it from a hidden prompt or stdin, never argv or a URL. Connect presents
+the worker's stable Machine ID and requested display name, then exchanges the
+code for a unique revocable Machine credential. The Machine token stays local.
+Later stages aggregate enrolled Machines, launch built-in or saved Recipes,
+and deliver event-driven ntfy notifications.
 
 ### Reliability R1 — daemon-restart-resilient FULL Sessions
 
@@ -177,6 +201,7 @@ protocol/data model (complete)
   → external shell hook
   → auto-wrap + read-only adopt
   → finished Session replay + worker packaging/two-host acceptance
+  → Tailnet bootstrap + private package delivery
   → Event engine + generic watcher
   → adopted log tail
   → secure Machine enrollment + aggregation
@@ -220,7 +245,7 @@ Each milestone updates every affected document before it is complete.
 | Security/privacy | `docs/SECURITY.md` | current + planned guarantees labelled |
 | CLI reference | `docs/CLI.md` | current commands + 1b target specified |
 | Shell hooks | `docs/SHELL_HOOKS.md` | current OSC path + external path specified |
-| Setup/Tailscale/PWA | `docs/SETUP.md` | due Milestone 1c; expanded in Phase 4 |
+| Setup/Tailscale/PWA | `docs/SETUP.md` | current through Milestone 1c; expanded in 1c.1/Phase 4 |
 | Design sources | `design_handoff_sentinal/design/` | in progress |
 | Eval results | `docs/EVALS.md` | due V2 intelligence work |
 | Milestone reports | `docs/progress/<milestone>.md` | per milestone |

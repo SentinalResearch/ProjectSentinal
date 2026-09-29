@@ -78,6 +78,28 @@ unless exact-path data deletion is separately requested. Full prerequisites,
 service commands, paths, backup, and acceptance steps are in
 `docs/SETUP.md`.
 
+### Planned private install and `connect` flow
+
+Milestone 1c.1 will let an owner-controlled Tailnet control Machine serve a
+verified `install.sh` and versioned worker artifacts. Installation ends
+`UNPAIRED`; it never consumes a pairing code or registers the Machine.
+
+Milestone 4.0 then adds these commands:
+
+```console
+sentinal connect CONTROL_URL [--name NAME]
+sentinal connect CONTROL_URL [--name NAME] --code-stdin
+sentinal connection status
+sentinal disconnect
+```
+
+Interactive `connect` prompts for the one-time code with terminal echo
+disabled. There will be no `--code VALUE` option: pairing codes must not enter
+argv, URLs, environment variables, process listings, or shell history. A
+stable Machine ID survives rename, reconnect, reinstall, and update; the
+display name is owner-editable. These commands are **planned**, not available
+in the current binary.
+
 ### Explicit fixture demo
 
 Real daemon data is the default for ordinary Vite builds and development.

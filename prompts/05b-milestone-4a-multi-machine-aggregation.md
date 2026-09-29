@@ -3,16 +3,17 @@
 Goal: one PWA shows every enrolled Machine and routes each read/control action
 only to the daemon that owns the selected Session.
 
-Depends on completed Milestone 4.0 enrollment. Keep the direct local-first
-architecture: the browser connects independently to per-Machine APIs; no cloud
-service is required.
+Depends on completed Milestone 4.0 enrollment. Keep the approved local-first
+control-Machine architecture: the browser authenticates only to its control
+origin, and the control plane routes to independently credentialed workers.
+No cloud service is required.
 
 ## 1. Multi-Machine data model
 
-- Replace the singleton daemon assumption with a `MachineConnection` per
-  enrolled Machine: stable ID, display name, base HTTP/WS URLs, credential
-  reference, connection state, last successful contact, capabilities, and
-  bounded retry state.
+- Replace the singleton daemon assumption with a control-plane
+  `MachineConnection` per enrolled Machine: stable ID, display name, approved
+  HTTP/WS endpoint, credential reference, connection state, last successful
+  contact, capabilities, and bounded retry state.
 - Namespace every client-side Session, Command, Event, Metric, and pending
   request by Machine ID. Numeric Session ID `1` on two Machines must never
   collide.
@@ -29,9 +30,9 @@ service is required.
 - Route list/history/search/Metrics/Event subscriptions, terminal attach,
   binary input, resize, Ctrl-C, kill, and later Recipe execution through the
   owning `MachineConnection` only.
-- A terminal WebSocket uses that Machine's URL and credential. Never send a
-  credential for Machine A to Machine B or to the control UI origin unless it
-  is Machine A's approved origin.
+- A routed terminal WebSocket uses only the owning Machine's endpoint and
+  credential behind the control boundary. Never send a worker credential to
+  the browser, Machine B, or any unapproved origin.
 - Offline Machines retain their last known structured snapshot, clearly
   labelled `OFFLINE` with last-seen time. Do not relabel persisted terminal
   Session state as `DISCONNECTED` on disk merely because this browser is
