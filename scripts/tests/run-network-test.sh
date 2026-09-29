@@ -23,6 +23,7 @@ dry_run="$({
   SENTINAL_WEB_PORT=14173 \
   SENTINAL_DATA_DIR="$test_root/data with spaces" \
   SENTINAL_CONFIG_DIR="$test_root/config with spaces" \
+  VITE_DATA=mock \
     "$launcher" --dry-run
 } 2>&1)"
 
@@ -31,6 +32,7 @@ assert_contains "$dry_run" "data_dir = \"$test_root/data with spaces\""
 assert_contains "$dry_run" "Web UI:    http://100.64.12.34:14173"
 assert_contains "$dry_run" "Daemon API: http://100.64.12.34:17420"
 assert_contains "$dry_run" 'VITE_DAEMON_PROXY_TARGET=http://100.64.12.34:17420'
+assert_contains "$dry_run" 'VITE_DATA=api'
 assert_contains "$dry_run" 'pnpm -C web dev --host 100.64.12.34 --port 14173 --strictPort'
 
 for unsafe_ip in 0.0.0.0 192.168.1.10 100.128.0.1; do

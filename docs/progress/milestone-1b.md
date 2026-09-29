@@ -4,6 +4,8 @@ Status: Milestone 1b.C complete 2026-09-28; awaiting human review before Milesto
 
 ## Pre-Milestone 3 audit remediation
 
+- [x] Make real API data the default and mock fixtures explicit demo-only —
+  `web/src/data/mode.test.ts`, mock badge tests, and the network launcher test
 - [x] Add a one-command Tailscale-only daemon/web launcher —
   `scripts/tests/run-network-test.sh` plus a manual health/login smoke test
 - [x] Deliver reduced-capture Metrics, Commands, Events, and state through the real web adapter — daemon behaviour tests and `web/src/data/api/index.test.ts`
@@ -43,6 +45,17 @@ Status: Milestone 1b.C complete 2026-09-28; awaiting human review before Milesto
   per-user directories. No dependency or protocol change was required.
 - Final `just check` passes: formatting, clippy with warnings denied, all
   Rust tests, generated TypeScript, 48 web tests, and the launcher test.
+
+## Real-data default verification (2026-09-29)
+
+- Missing, `api`, and invalid `VITE_DATA` values select the real adapter;
+  only the exact `mock` value selects fixtures. `.env.test` keeps fixture UI
+  tests explicit, and `just demo` is the human-facing fixture showcase.
+- `just network --dry-run` includes `VITE_DATA=api`, and the live launcher
+  overrides any inherited mock setting. API mode renders no `MOCK` badge.
+- The explicit API production build, full `just check` (including 52 web
+  tests), and both real-adapter Playwright handoff tests pass. No dependency
+  or protocol change was required.
 
 ## Plan
 

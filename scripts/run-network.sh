@@ -178,7 +178,7 @@ main() {
     echo "Commands:"
     echo "cargo build --locked -p daemon --bin sentinald"
     echo "TA_CONFIG=$(printf '%q' "$config_file") $REPO_ROOT/target/debug/sentinald"
-    echo "VITE_DAEMON_PROXY_TARGET=http://$tailscale_ip:$daemon_port pnpm -C web dev --host $tailscale_ip --port $web_port --strictPort"
+    echo "VITE_DATA=api VITE_DAEMON_PROXY_TARGET=http://$tailscale_ip:$daemon_port pnpm -C web dev --host $tailscale_ip --port $web_port --strictPort"
     return
   fi
 
@@ -203,7 +203,7 @@ main() {
   echo "Starting Vite..."
   (
     cd "$REPO_ROOT"
-    VITE_DAEMON_PROXY_TARGET="http://$tailscale_ip:$daemon_port" \
+    VITE_DATA=api VITE_DAEMON_PROXY_TARGET="http://$tailscale_ip:$daemon_port" \
       pnpm -C web dev --host "$tailscale_ip" --port "$web_port" --strictPort
   ) &
   web_pid=$!

@@ -1,11 +1,10 @@
 import { apiAdapter } from "./api";
 import { mockAdapter } from "./mock";
 import type { DataAdapter } from "./adapter";
+import { dataMode, isMockData } from "./mode";
 
-const mode = import.meta.env.VITE_DATA === "api" ? "api" : "mock";
-
-export const dataAdapter: DataAdapter = mode === "api" ? apiAdapter : mockAdapter;
-export const isMockData = mode === "mock";
+export const dataAdapter: DataAdapter = dataMode === "mock" ? mockAdapter : apiAdapter;
+export { dataMode, isMockData } from "./mode";
 
 export type { DataAdapter, HistoryFilters, LiveEvent } from "./adapter";
 export * from "./types";

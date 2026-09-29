@@ -113,6 +113,7 @@ produces with `insta`. When a parser changes, review the snapshot diff.
 just test              # all fast tests
 just check             # fmt + clippy + tests (run before every commit)
 just network --dry-run # validate/inspect the Tailscale development launch
+just demo              # explicit local fixture UI (not a backend test)
 cargo test -p protocol # one crate
 cargo test session     # tests whose name contains "session"
 cargo test -- --ignored  # integration tests
@@ -121,4 +122,6 @@ cargo test -- --ignored  # integration tests
 `just check` also runs `scripts/tests/run-network-test.sh`. The script test
 uses an injected Tailscale address and no network: it checks generated TOML,
 frontend proxy arguments, port bounds, and rejection of wildcard, LAN, and
-out-of-range CGNAT addresses.
+out-of-range CGNAT addresses. It also proves the network launcher forces
+`VITE_DATA=api`; data-mode and badge tests prove fixtures are opt-in and
+labelled.

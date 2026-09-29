@@ -1,3 +1,5 @@
+import { isMockData } from "../data/mode";
+
 const style = {
   display: "inline-flex",
   alignItems: "center",
@@ -13,7 +15,7 @@ const style = {
 
 /** Marks a feature backed by the mock adapter rather than a real API. Dev builds only. */
 export function MockBadge() {
-  if (!import.meta.env.DEV) return null;
+  if (!import.meta.env.DEV || !isMockData) return null;
   return (
     <span style={style} title="Backed by the mock data adapter">
       MOCK

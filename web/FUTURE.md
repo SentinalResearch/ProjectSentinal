@@ -4,6 +4,10 @@ Tracks what's backed by `src/data/mock` versus the real daemon API (`src/data/ap
 Update this whenever a feature moves from `mock` to `real`. See `docs/ROADMAP.md`
 for when the underlying daemon features are expected to land.
 
+Normal builds default to the real API. Fixture data is available only with
+the explicit `VITE_DATA=mock` setting (normally `just demo`) and carries a
+visible `MOCK` label. `just network` always forces API mode.
+
 | Feature | Screen | Status | What's needed to make it real |
 |---|---|---|---|
 | Machines list | Overview, Settings | partial | `VITE_DATA=api` shows the connected daemon's real Machine; multi-machine aggregation waits for Roadmap M4 |

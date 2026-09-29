@@ -19,7 +19,8 @@ The token file defaults to `~/.config/terminal-agent/token`.
 ## Tailscale development server
 
 From the repository root, one command starts both `sentinald` and the Vite
-frontend on this machine's Tailscale IPv4 address:
+frontend on this machine's Tailscale IPv4 address. This command always uses
+the real daemon API; fixture data cannot leak into a handoff test:
 
 ```console
 $ just network
@@ -46,6 +47,21 @@ $ just network --dry-run
 
 Useful overrides are `SENTINAL_TAILSCALE_IP`, `SENTINAL_DAEMON_PORT`,
 `SENTINAL_WEB_PORT`, `SENTINAL_DATA_DIR`, and `SENTINAL_CONFIG_DIR`.
+
+### Explicit fixture demo
+
+Real daemon data is the default for ordinary Vite builds and development.
+To show the complete future-facing design without a daemon, opt into the
+clearly labelled local fixture demo:
+
+```console
+$ just demo
+# opens http://127.0.0.1:5173 with visible MOCK labels
+```
+
+The underlying setting is `VITE_DATA=mock`; any missing, misspelled, or
+`api` value selects the real API. Demo mode is never selected by
+`just network`.
 
 ## Commands
 

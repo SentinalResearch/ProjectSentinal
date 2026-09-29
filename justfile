@@ -56,6 +56,10 @@ check:
 network *args:
     bash scripts/run-network.sh {{args}}
 
+# Start the fixture-backed UI explicitly for a local product demonstration
+demo:
+    VITE_DATA=mock pnpm -C web dev --host 127.0.0.1 --port 5173 --strictPort
+
 # Slow tests that need a real shell / PTY
 test-integration:
     cargo test --workspace -- --ignored

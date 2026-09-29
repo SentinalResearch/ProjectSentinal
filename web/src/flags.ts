@@ -4,16 +4,16 @@
  * All false by default; true only when running against the mock adapter, so the
  * placeholder UI is visible while developing and absent once a real API lands.
  */
-const mockMode = (import.meta.env.VITE_DATA ?? "mock") === "mock";
+import { isMockData } from "./data/mode";
 
 export const flags = {
-  phoneScreens: mockMode,
-  suggestionCard: mockMode,
-  journalView: mockMode,
-  askBox: mockMode,
+  phoneScreens: isMockData,
+  suggestionCard: isMockData,
+  journalView: isMockData,
+  askBox: isMockData,
   recipeEditor: false,
-  pushNotifications: mockMode,
-  multiBrowserSessions: mockMode,
+  pushNotifications: isMockData,
+  multiBrowserSessions: isMockData,
 } as const;
 
 export type FlagName = keyof typeof flags;
