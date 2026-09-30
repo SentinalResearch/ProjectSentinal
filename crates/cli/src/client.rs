@@ -103,7 +103,7 @@ pub fn is_observation(message: &DaemonMessage) -> bool {
 /// Why an interactive attachment ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttachEnd {
-    /// The user detached (Ctrl-\\ d) or input reached EOF; the Session keeps running.
+    /// The user detached (`Ctrl+J`) or input reached EOF; the Session keeps running.
     Detached,
     /// The Session's shell exited.
     Ended {
@@ -170,7 +170,7 @@ impl DaemonClient {
         Err(ClientError::Disconnected)
     }
 
-    /// Attach this process's terminal until `Ctrl-\ d`, EOF, or the shell exits.
+    /// Attach this process's terminal until `Ctrl+J`, EOF, or the shell exits.
     pub async fn attach(mut self, session_id: SessionId) -> Result<AttachEnd, ClientError> {
         self.attach_inner(session_id, None, None, false).await
     }

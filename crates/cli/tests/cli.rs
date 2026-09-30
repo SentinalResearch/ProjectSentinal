@@ -92,7 +92,27 @@ fn rejects_attach_without_session_id() {
 }
 
 #[test]
-fn detach_sequence_is_removed_from_terminal_input() {
+fn control_j_detaches_without_forwarding_input() {
+    let mut detector = DetachDetector::new();
+
+    let result = detector.push(b"hello\x0aignored");
+
+    assert_eq!(result.bytes, b"hello");
+    assert!(result.detach);
+}
+
+#[test]
+fn enter_is_forwarded_without_detaching() {
+    let mut detector = DetachDetector::new();
+
+    let result = detector.push(b"hello\r");
+
+    assert_eq!(result.bytes, b"hello\r");
+    assert!(!result.detach);
+}
+
+#[test]
+fn legacy_detach_sequence_is_removed_from_terminal_input() {
     let mut detector = DetachDetector::new();
 
     let first = detector.push(b"hello\x1c");

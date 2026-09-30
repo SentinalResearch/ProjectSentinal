@@ -337,8 +337,8 @@ command in `docs/progress/milestone-1c.md`.
    badge or fixture Sessions appear.
 3. On the worker, start
    `sentinal watch -t "Handoff test" -- python3 -u scripts/examples/long_job.py`.
-4. Detach with `Ctrl-\`, then `d`, or close that terminal. Confirm the process
-   and Session remain live in the browser.
+4. Detach with `Ctrl+J` (or the legacy `Ctrl-\`, then `d`), or close that
+   terminal. Confirm the process and Session remain live in the browser.
 5. Attach in the browser, send safe input to the shell after the job, detach
    the pane, and reattach with `sentinal attach <ID>` on the worker.
 6. Let one Session exit gracefully (`exit 0`) and confirm it becomes

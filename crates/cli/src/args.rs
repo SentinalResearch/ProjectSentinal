@@ -65,7 +65,7 @@ pub enum Command {
     /// Run this terminal inside a persistent Sentinal Session and attach.
     ///
     /// With `-- COMMAND [ARG...]`, the Command runs once in the Session's
-    /// shell and the shell stays open afterwards. Detach with Ctrl-\ then d;
+    /// shell and the shell stays open afterwards. Detach with Ctrl+J;
     /// closing the window also only detaches.
     Watch {
         /// Session title shown in `ls` and the web UI.

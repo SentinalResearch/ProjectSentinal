@@ -172,7 +172,8 @@ sentinal update [--check | --rollback VERSION] [--prefix DIR]
 
 - `ls` lists Session ID, state, cwd, and shell.
 - `new` creates a FULL persistent Session and prints its ID.
-- `attach` connects the current terminal. Detach with `Ctrl-\` then `d`.
+- `attach` connects the current terminal. Detach with `Ctrl+J`. The legacy
+  `Ctrl-\`, then `d` sequence remains available for compatibility.
   Detaching a live Session never ends it. Finished Sessions are records; use
   the web read-only view or the authenticated replay resource below.
 - `kill` terminates a live daemon-owned Session and marks it interrupted. A
@@ -215,8 +216,9 @@ preceding output was returned but the final compressed frame was incomplete.
 Creates a `WATCH` / `FULL` Session and attaches the current terminal to it
 immediately. The Session uses the caller's current directory, current
 terminal size (80x24 when unknown or reported as 0x0), and `$SHELL`.
-Detach with `Ctrl-\` then `d`; EOF, a crashed client, or a closed window
-also only detach. The shell and anything it runs keep going; reattach with
+Detach with `Ctrl+J`; the legacy `Ctrl-\`, then `d` sequence also works. EOF,
+a crashed client, or a closed window also only detach. The shell and anything
+it runs keep going; reattach with
 `sentinal attach <ID>` or the web UI.
 
 ```console

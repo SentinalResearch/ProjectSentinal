@@ -1,13 +1,14 @@
-//! Recognition of the `Ctrl-\ d` local detach sequence.
+//! Recognition of the `Ctrl+J` and legacy `Ctrl-\ d` local detach shortcuts.
 
 const CONTROL_BACKSLASH: u8 = 0x1c;
+const CONTROL_J: u8 = 0x0a;
 
 /// Bytes to forward and whether the local client should detach.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DetachResult {
     /// Input bytes that are not part of the detach sequence.
     pub bytes: Vec<u8>,
-    /// True once `Ctrl-\ d` has been consumed.
+    /// True once a local detach shortcut has been consumed.
     pub detach: bool,
 }
 
@@ -27,6 +28,13 @@ impl DetachDetector {
     pub fn push(&mut self, input: &[u8]) -> DetachResult {
         let mut bytes = Vec::with_capacity(input.len());
         for byte in input {
+            if *byte == CONTROL_J {
+                self.pending_control = false;
+                return DetachResult {
+                    bytes,
+                    detach: true,
+                };
+            }
             if self.pending_control {
                 self.pending_control = false;
                 if *byte == b'd' {
