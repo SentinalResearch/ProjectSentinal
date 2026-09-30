@@ -523,6 +523,27 @@ cp "$SENTINAL_TEST_ARCHIVE" "$output"
     let custom_invocation = fs::read_to_string(&custom_install_log).unwrap();
     assert!(custom_invocation.contains(&format!("--prefix {}", custom_prefix.display())));
 
+    let fake_app_cli = fake_bin.join("TailscaleApp");
+    fs::rename(fake_bin.join("tailscale"), &fake_app_cli).unwrap();
+    let app_install_log = root.0.join("app-cli-installer.log");
+    let app_cli = Command::new("/bin/sh")
+        .arg(&script)
+        .env("PATH", &path)
+        .env("SENTINAL_TAILSCALE_CLI", &fake_app_cli)
+        .env("SENTINAL_TEST_ARCHIVE", &archive)
+        .env("SENTINAL_TEST_INSTALL_LOG", &app_install_log)
+        .output()
+        .unwrap();
+    assert!(
+        app_cli.status.success(),
+        "{}",
+        String::from_utf8_lossy(&app_cli.stderr)
+    );
+    assert!(app_install_log.exists());
+    fs::rename(&fake_app_cli, fake_bin.join("tailscale")).unwrap();
+    let rendered = fs::read_to_string(&script).unwrap();
+    assert!(rendered.contains("/Applications/Tailscale.app/Contents/MacOS/Tailscale"));
+
     fs::write(&archive, b"corrupt").unwrap();
     let rejected = Command::new("/bin/sh")
         .arg(&script)

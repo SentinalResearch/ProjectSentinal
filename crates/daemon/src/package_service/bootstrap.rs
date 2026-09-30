@@ -65,7 +65,16 @@ esac
 
 command -v curl >/dev/null 2>&1 || fail "curl is required"
 command -v tar >/dev/null 2>&1 || fail "tar is required"
-command -v tailscale >/dev/null 2>&1 || fail "Tailscale is required and must be connected"
+tailscale_cli="${{SENTINAL_TAILSCALE_CLI:-}}"
+if [ -n "$tailscale_cli" ]; then
+  [ -x "$tailscale_cli" ] || fail "Tailscale CLI '$tailscale_cli' is not executable"
+elif tailscale_cli="$(command -v tailscale 2>/dev/null)"; then
+  :
+elif [ "$(uname -s)" = 'Darwin' ] && [ -x '/Applications/Tailscale.app/Contents/MacOS/Tailscale' ]; then
+  tailscale_cli='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
+else
+  fail "Tailscale CLI was not found; install it or enable the macOS app CLI integration"
+fi
 
 temporary="$(mktemp -d "${{TMPDIR:-/tmp}}/sentinal-bootstrap.XXXXXX")" || fail "cannot create temporary directory"
 trap 'rm -rf -- "$temporary"' EXIT HUP INT TERM
@@ -110,10 +119,10 @@ release="$temporary/extracted/sentinal-worker"
 [ -x "$release/bin/sentinald" ] || fail "artifact is missing bin/sentinald"
 [ -f "$release/scripts/install-worker.sh" ] || fail "artifact is missing the installer"
 
-bind_ip="$(tailscale ip -4 2>/dev/null | awk 'NR == 1 {{ print; exit }}')"
+bind_ip="$(TAILSCALE_BE_CLI=1 "$tailscale_cli" ip -4 2>/dev/null | awk 'NR == 1 {{ print; exit }}')"
 case "$bind_ip" in
   100.*) ;;
-  *) fail "Tailscale did not return a 100.64.0.0/10 address" ;;
+  *) fail "Tailscale is not connected; no Tailnet IPv4 address was returned" ;;
 esac
 second="$(printf '%s' "$bind_ip" | awk -F. '{{print $2}}')"
 [ "$second" -ge 64 ] 2>/dev/null && [ "$second" -le 127 ] 2>/dev/null || fail "Tailscale address '$bind_ip' is outside 100.64.0.0/10"
