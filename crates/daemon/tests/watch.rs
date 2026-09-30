@@ -150,11 +150,19 @@ async fn watch_session_records_origin_capture_title_cwd_pid_and_session_env() {
     assert!(spawn
         .env
         .contains(&("SENTINAL_SESSION_ID".into(), session.id.0.to_string())));
+    let has_term = spawn
+        .env
+        .contains(&("TERM".into(), "xterm-256color".into()));
+    let has_colorterm = spawn
+        .env
+        .contains(&("COLORTERM".into(), "truecolor".into()));
     // A bare Watch never types anything into the shell.
     h.fake.output(session.id, PROMPT).unwrap();
     sync(&h, session.id).await;
     assert!(h.fake.input(session.id).unwrap().is_empty());
     cleanup(h, session.id);
+    assert!(has_term);
+    assert!(has_colorterm);
 }
 
 #[tokio::test]

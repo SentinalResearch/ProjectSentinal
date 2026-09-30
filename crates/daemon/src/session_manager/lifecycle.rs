@@ -60,6 +60,15 @@ impl SessionManager {
             }
         };
         let id = SessionId(self.inner.next_id.fetch_add(1, Ordering::Relaxed));
+        // The daemon may be started by launchd/systemd without a terminal.
+        // Every PTY still emulates an xterm-compatible color terminal, so do
+        // not inherit an absent or unsuitable TERM from the service process.
+        shell_launch
+            .env
+            .push(("TERM".into(), "xterm-256color".into()));
+        shell_launch
+            .env
+            .push(("COLORTERM".into(), "truecolor".into()));
         // Every FULL Session identifies itself before user shell configuration
         // loads, so Watch and external hooks can refuse to nest inside it.
         shell_launch

@@ -112,6 +112,16 @@ fn enter_is_forwarded_without_detaching() {
 }
 
 #[test]
+fn backspace_and_delete_are_forwarded_without_translation() {
+    let mut detector = DetachDetector::new();
+
+    let result = detector.push(b"\x08\x7f");
+
+    assert_eq!(result.bytes, b"\x08\x7f");
+    assert!(!result.detach);
+}
+
+#[test]
 fn legacy_detach_sequence_is_removed_from_terminal_input() {
     let mut detector = DetachDetector::new();
 
