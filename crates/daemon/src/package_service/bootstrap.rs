@@ -33,11 +33,12 @@ release_version='{}'
 mode='install'
 rollback=''
 prefix="${{HOME:-}}/.local"
+prefix_explicit='false'
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --check) mode='check'; shift ;;
     --rollback) [ "$#" -ge 2 ] || fail "--rollback requires a version"; rollback="$2"; shift 2 ;;
-    --prefix) [ "$#" -ge 2 ] || fail "--prefix requires a path"; prefix="$2"; shift 2 ;;
+    --prefix) [ "$#" -ge 2 ] || fail "--prefix requires a path"; prefix="$2"; prefix_explicit='true'; shift 2 ;;
     *) fail "unknown bootstrap argument '$1'" ;;
   esac
 done
@@ -119,8 +120,8 @@ second="$(printf '%s' "$bind_ip" | awk -F. '{{print $2}}')"
 
 set --
 [ -z "$rollback" ] || set -- "$@" --rollback "$rollback"
-set -- "$@" --prefix "$prefix"
-sh "$release/scripts/install-worker.sh" install --release-dir "$release" --bind "$bind_ip" \
+[ "$prefix_explicit" = 'false' ] || set -- "$@" --prefix "$prefix"
+"$release/scripts/install-worker.sh" install --release-dir "$release" --bind "$bind_ip" \
   --control-url "$control_url" --artifact-sha "$expected_sha" "$@"
 printf '%s\n' 'Sentinal worker installed and running'
 printf '%s\n' 'State: UNPAIRED'

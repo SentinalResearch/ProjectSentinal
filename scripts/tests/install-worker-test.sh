@@ -62,6 +62,32 @@ install_worker() {
       --port 17420
 }
 
+# GNU stat accepts `-f` as filesystem mode, writes filesystem details, and
+# then rejects the BSD format operand. A failed platform probe must not leak
+# that stdout into the owner/mode result used by the safety check.
+fake_stat_bin="$test_root/fake GNU stat"
+mkdir -p "$fake_stat_bin"
+cat >"$fake_stat_bin/stat" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == -f ]]; then
+  echo 'unexpected filesystem details'
+  exit 1
+fi
+if [[ "\${1:-}" == -c ]]; then
+  echo '$(id -u) 755'
+  exit 0
+fi
+exit 2
+EOF
+chmod 755 "$fake_stat_bin/stat"
+owner_mode="$(
+  PATH="$fake_stat_bin:$PATH" bash -c \
+    'source "$1"; sentinal_stat_owner_mode "$2"' _ \
+    "$repo_root/scripts/lib/install-common.sh" "$repo_root/Cargo.toml"
+)"
+[[ "$owner_mode" == "$(id -u) 755" ]] || \
+  fail "GNU stat fallback leaked probe output: $owner_mode"
+
 release="$test_root/release v1"
 prefix="$test_root/install prefix"
 config="$test_root/config retained"
@@ -91,6 +117,7 @@ mac_service="$prefix/service/dev.sentinal.sentinald.plist"
 assert_file_contains "$mac_service" "<string>$prefix/bin/sentinald</string>"
 assert_file_contains "$mac_service" "<string>$config/daemon.toml</string>"
 assert_file_contains "$service_log" "bootstrap gui/$(id -u) $mac_service"
+assert_file_contains "$service_log" "wait launchd bootout gui/$(id -u)/dev.sentinal.sentinald"
 if grep -Eq 'token[^_]|password|auth\.json' "$mac_service"; then
   fail 'launchd service contains a credential or credential path'
 fi

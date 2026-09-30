@@ -45,6 +45,17 @@ second_artifact="$second/$artifact_name"
 [[ "$(sha256 "$first_artifact")" == "$(sha256 "$second_artifact")" ]] || fail 'same inputs did not produce the same archive'
 
 entries="$(tar -tzf "$first_artifact")"
+duplicates="$(printf '%s\n' "$entries" | LC_ALL=C sort | uniq -d)"
+[[ -z "$duplicates" ]] || fail "archive contains duplicate entries: $duplicates"
+while IFS= read -r listing; do
+  permissions="${listing%% *}"
+  case "${permissions:0:1}" in
+    -|d) ;;
+    *) fail "archive contains a non-file entry: $listing" ;;
+  esac
+  [[ "${permissions:5:1}" != w && "${permissions:8:1}" != w ]] || \
+    fail "archive entry is group/world writable: $listing"
+done < <(tar -tvzf "$first_artifact")
 for required in \
   sentinal-worker/BUILD.json \
   sentinal-worker/bin/sentinal \

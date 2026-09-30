@@ -76,10 +76,11 @@ sentinal_canonical_existing_path() {
 
 sentinal_stat_owner_mode() {
   local path="$1"
-  if stat -f '%u %Lp' "$path" 2>/dev/null; then
-    return
+  if stat -f '%u %Lp' "$path" >/dev/null 2>&1; then
+    stat -f '%u %Lp' "$path"
+  else
+    stat -c '%u %a' "$path"
   fi
-  stat -c '%u %a' "$path"
 }
 
 sentinal_validate_source_binary() {
@@ -181,13 +182,31 @@ sentinal_service_action() {
   "$@"
 }
 
+sentinal_wait_for_launchd_bootout() {
+  local service="$1" attempt
+  if [[ -n "${SENTINAL_SERVICE_TEST_LOG:-}" ]]; then
+    printf 'wait launchd bootout %s\n' "$service" >>"$SENTINAL_SERVICE_TEST_LOG"
+    return
+  fi
+  for attempt in {1..20}; do
+    if ! launchctl print "$service" >/dev/null 2>&1; then
+      return
+    fi
+    sleep 0.05
+  done
+  echo "sentinal installer: launchd service '$service' did not finish stopping" >&2
+  return 1
+}
+
 sentinal_enable_service() {
   local platform="$1" service_file="$2"
   if [[ "$platform" == macos ]]; then
-    sentinal_service_action launchctl bootout "gui/$(id -u)/dev.sentinal.sentinald" 2>/dev/null || true
+    local service="gui/$(id -u)/dev.sentinal.sentinald"
+    sentinal_service_action launchctl bootout "$service" 2>/dev/null || true
+    sentinal_wait_for_launchd_bootout "$service" || return
     sentinal_service_action launchctl bootstrap "gui/$(id -u)" "$service_file" || return
-    sentinal_service_action launchctl enable "gui/$(id -u)/dev.sentinal.sentinald" || return
-    sentinal_service_action launchctl kickstart -k "gui/$(id -u)/dev.sentinal.sentinald" || return
+    sentinal_service_action launchctl enable "$service" || return
+    sentinal_service_action launchctl kickstart -k "$service" || return
   else
     sentinal_service_action systemctl --user daemon-reload || return
     sentinal_service_action systemctl --user enable sentinald.service || return

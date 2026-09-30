@@ -108,14 +108,18 @@ cat >"$root/BUILD.json" <<EOF
 }
 EOF
 
-# Normalize all entry timestamps; gzip -n removes its own timestamp. Sorted
-# input and numeric ownership make the archive repeatable for identical files.
+# Normalize permissions and timestamps; gzip -n removes its own timestamp.
+# Sorted, non-recursive input and numeric ownership make the archive repeatable
+# without duplicate hardlink entries when directories are listed explicitly.
+find "$root" -type d -exec chmod 755 {} +
+find "$root" -type f -exec chmod 644 {} +
+chmod 755 "$root/bin/sentinal" "$root/bin/sentinald" "$root/scripts/install-worker.sh"
 find "$root" -exec touch -t 198001010000 {} +
 (cd "$stage" && find sentinal-worker -print | LC_ALL=C sort >"$stage/entries")
 if tar --version 2>/dev/null | grep -qi 'gnu tar'; then
-  (cd "$stage" && tar --format=ustar --owner=0 --group=0 --numeric-owner -cf - -T "$stage/entries") | gzip -n >"$temporary_archive"
+  (cd "$stage" && tar --no-recursion --format=ustar --owner=0 --group=0 --numeric-owner -cf - -T "$stage/entries") | gzip -n >"$temporary_archive"
 else
-  (export COPYFILE_DISABLE=1; cd "$stage" && tar --format ustar --uid 0 --gid 0 --numeric-owner -cf - -T "$stage/entries") | gzip -n >"$temporary_archive"
+  (export COPYFILE_DISABLE=1; cd "$stage" && tar --no-recursion --format ustar --uid 0 --gid 0 --numeric-owner -cf - -T "$stage/entries") | gzip -n >"$temporary_archive"
 fi
 chmod 600 "$temporary_archive"
 mv -f "$temporary_archive" "$archive"

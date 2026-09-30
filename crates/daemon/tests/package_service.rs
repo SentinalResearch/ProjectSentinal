@@ -475,13 +475,17 @@ cp "$SENTINAL_TEST_ARCHIVE" "$output"
         &fake_bin.join("tailscale"),
         "#!/bin/sh\n[ \"$1 $2\" = 'ip -4' ] || exit 2\nprintf '%s\\n' '100.90.80.70'\n",
     );
+    write_executable(
+        &fake_bin.join("sh"),
+        "#!/bin/sh\nprintf '%s\\n' 'bootstrap invoked installer through PATH sh' >&2\nexit 91\n",
+    );
     let install_log = root.0.join("installer.log");
     let path = format!(
         "{}:{}",
         fake_bin.display(),
         std::env::var("PATH").unwrap_or_default()
     );
-    let output = Command::new("sh")
+    let output = Command::new("/bin/sh")
         .arg(&script)
         .env("PATH", &path)
         .env("SENTINAL_TEST_ARCHIVE", &archive)
@@ -498,9 +502,29 @@ cp "$SENTINAL_TEST_ARCHIVE" "$output"
     let invocation = fs::read_to_string(&install_log).unwrap();
     assert!(invocation.contains("install --release-dir"));
     assert!(invocation.contains("--bind 100.90.80.70"));
+    assert!(!invocation.contains("--prefix"));
+
+    let custom_prefix = root.0.join("custom prefix");
+    let custom_install_log = root.0.join("custom-installer.log");
+    let custom = Command::new("/bin/sh")
+        .arg(&script)
+        .arg("--prefix")
+        .arg(&custom_prefix)
+        .env("PATH", &path)
+        .env("SENTINAL_TEST_ARCHIVE", &archive)
+        .env("SENTINAL_TEST_INSTALL_LOG", &custom_install_log)
+        .output()
+        .unwrap();
+    assert!(
+        custom.status.success(),
+        "{}",
+        String::from_utf8_lossy(&custom.stderr)
+    );
+    let custom_invocation = fs::read_to_string(&custom_install_log).unwrap();
+    assert!(custom_invocation.contains(&format!("--prefix {}", custom_prefix.display())));
 
     fs::write(&archive, b"corrupt").unwrap();
-    let rejected = Command::new("sh")
+    let rejected = Command::new("/bin/sh")
         .arg(&script)
         .env("PATH", &path)
         .env("SENTINAL_TEST_ARCHIVE", &archive)

@@ -163,7 +163,7 @@ second Machine, and complete one real Watch handoff over Tailscale.
 - [x] Installation never enrolls or receives a pairing secret; it ends visibly `UNPAIRED`
 - [x] Reinstall/update preserve config, credentials, Machine data, SQLite, logs, adapters, and recipes
 - [x] `sentinal doctor` reports install/service/Tailscale health without connecting implicitly
-- [ ] Prove curl install on an available real peer and retain the offline/source-tree install path
+- [x] Prove curl install on an available real peer and retain the offline/source-tree install path
 
 **Demo:** copy one Tailnet HTTPS curl command onto a fresh Linux Machine,
 install the worker, and see `UNPAIRED` plus the separate `sentinal connect`
