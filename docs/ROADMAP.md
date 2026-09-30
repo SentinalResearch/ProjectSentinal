@@ -149,7 +149,7 @@ then continue in a new FULL Session with the same cwd.
 - [x] A release installer installs `sentinal`, `sentinald`, shell assets, safe config, and the existing user service
 - [x] Upgrade and uninstall preserve user data and credentials unless deletion is explicitly requested
 - [x] `docs/SETUP.md` documents macOS/Linux, Tailscale ACLs, service inspection, backup, and recovery
-- [ ] A two-host manual checklist proves Watch → detach → browser attach → exit/kill → SQLite/log/audit
+- [x] A two-host manual checklist proves Watch → detach → browser attach → exit/kill → SQLite/log/audit
 - [x] The worker package remains the daemon + CLI + hooks; no duplicate “watcher agent” process is introduced
 
 **Demo:** install the worker on one Machine, run only the control UI on a

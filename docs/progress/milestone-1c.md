@@ -1,7 +1,6 @@
 # Milestone 1c progress — Deployable worker and two-host acceptance
 
-Status: implementation complete; blocked on the real two-host acceptance run
-2026-09-29.
+Status: complete, including the real two-host acceptance run on 2026-09-30.
 
 ## Tasks and proof
 
@@ -24,7 +23,7 @@ Status: implementation complete; blocked on the real two-host acceptance run
 - [x] Document setup, service operations, backup/recovery, inspection, current
   boundaries, and the manual two-host checklist — `docs/SETUP.md`,
   `docs/CLI.md`, and `docs/SECURITY.md`.
-- [ ] Run and record the two-host Watch → detach → browser attach → input →
+- [x] Run and record the two-host Watch → detach → browser attach → input →
   graceful exit/kill → SQLite/log/audit acceptance on every available host —
   this file and the Milestone 1c report.
 - [x] Run `just check`, Playwright, installer/launcher tests, update Roadmap
@@ -45,9 +44,9 @@ Status: implementation complete; blocked on the real two-host acceptance run
 - Uninstall retains config/data by default. Data removal requires a separate
   explicit flag containing the exact resolved data directory; a missing or
   mismatched value is refused.
-- This development host is macOS. A second Tailnet Machine and Linux host are
-  not assumed available; missing manual coverage will be named rather than
-  simulated or claimed.
+- The real acceptance covers a macOS arm64 control Machine and an x86_64 Linux
+  worker. A second macOS worker installation was exercised separately during
+  private package bootstrap, but the complete checklist below used Linux.
 
 ## Acceptance record
 
@@ -55,7 +54,55 @@ Status: implementation complete; blocked on the real two-host acceptance run
   tests, TypeScript generation, and all four shell validation suites.
 - `just test-e2e` passed: 3 Playwright scenarios use `VITE_DATA=api`, proxy to
   one fake worker, authenticate, attach over WebSocket, replay, and Continue.
-- Tailscale reports this macOS host plus online macOS and Linux peers. No peer
-  was selected and no authority/login details were supplied for installing or
-  starting a worker remotely, so the real two-host checklist above remains
-  deliberately unchecked. Do not infer it from the fake-worker test.
+- Real control Machine: macOS 27.0 arm64, Tailscale `100.93.101.56`.
+- Real worker Machine: Pop!_OS 24.04, Linux
+  `6.18.7-76061807-generic` x86_64, Tailscale `100.74.239.89`, verified worker
+  release `0.1.5`. Tested repository commit:
+  `7e3cc20831255d18ec74d1de58f8a8e4cfc41e4c`.
+- The first run exposed `Linger=no`: closing the SSH login stopped the systemd
+  user manager and correctly caused the restarted daemon to mark Session `1`
+  `INTERRUPTED`. After `sudo loginctl enable-linger "$USER"`, daemon PID
+  `58321` and Python PID `60021` survived CLI detach and SSH disconnect.
+  `docs/SETUP.md` now documents this Linux prerequisite.
+- `just control WORKER_IP=100.74.239.89` served the real API UI at
+  `http://100.93.101.56:5173`. The owner completed bootstrap authentication,
+  confirmed there was no `MOCK` badge, attached to Session `2`, observed live
+  output, sent Ctrl-C, ran `echo SENTINAL_BROWSER_INPUT_OK`, and detached the
+  pane.
+- CLI reattach restored the screen including `SENTINAL_BROWSER_INPUT_OK`.
+  `exit 0` made Session `2` `COMPLETED`. Its authenticated replay returned
+  5,386 bytes and remained byte-identical in length after daemon restart.
+- Session `3` was detached while its Python process ran, then
+  `sentinal kill 3` made it `INTERRUPTED`. A repeated kill returned
+  `Session #3 is in terminal state Interrupted and cannot kill a daemon-owned
+  PTY`; no raw OS `EIO` appeared and no test process remained.
+- SQLite stored Session `2` as `COMPLETED` with exit code 0, the browser marker
+  Command with exit code 0, and the interrupted Python Command with exit code
+  130. Session logs `2.log.zst` and `3.log.zst` were non-empty. Five audit
+  records contained `byte_count`; neither the browser marker nor the long-job
+  path appeared in `audit.jsonl`.
+- Restarting `sentinald` changed PID `58321` to `62416`; health returned
+  protocol version 1, Session states remained `INTERRUPTED`, `COMPLETED`, and
+  `INTERRUPTED`, and finished output replay still contained the browser marker.
+
+Commands used for the real acceptance (tokens were read locally and never
+recorded here):
+
+```console
+worker$ sudo loginctl enable-linger "$USER"
+worker$ loginctl show-user "$USER" -p Linger
+worker$ sentinal update --check
+worker$ sentinal update
+control$ curl http://100.74.239.89:7420/api/v1/health
+control$ just control WORKER_IP=100.74.239.89
+worker$ sentinal watch -t "Handoff acceptance" -- python3 -u /tmp/sentinal-two-host-long-job.py
+# Ctrl+J detached the first CLI.
+worker$ sentinal ls
+worker$ sentinal attach 2
+worker$ sentinal watch -t "Kill acceptance" -- python3 -u /tmp/sentinal-two-host-long-job.py
+# Ctrl+J detached the second CLI.
+worker$ sentinal kill 3
+worker$ sentinal kill 3
+worker$ systemctl --user restart sentinald
+worker$ sentinal ls
+```

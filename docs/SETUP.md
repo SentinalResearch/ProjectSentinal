@@ -237,10 +237,18 @@ fixtures or localhost. Use `--dry-run` to inspect each role.
 Linux user service:
 
 ```console
+$ loginctl show-user "$USER" -p Linger
+$ sudo loginctl enable-linger "$USER" # once, when the result was Linger=no
 $ systemctl --user status sentinald.service
 $ journalctl --user -u sentinald.service --since today
 $ systemctl --user restart sentinald.service
 ```
+
+The systemd user manager must remain active after logout for a worker to be
+persistent. On distributions where `loginctl show-user "$USER" -p Linger`
+reports `Linger=no`, enable lingering once with the command above. Otherwise
+closing the last login can stop `sentinald` and interrupt every live FULL
+Session even though the service itself is enabled.
 
 macOS user agent:
 
