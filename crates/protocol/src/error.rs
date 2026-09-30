@@ -1,6 +1,6 @@
 //! The single error type for this crate.
 
-use crate::{CaptureLevel, CommandId, SessionOrigin, SessionState};
+use crate::{CaptureLevel, CommandId, SessionId, SessionOrigin, SessionState};
 
 /// Everything that can go wrong when using protocol types.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -142,6 +142,10 @@ pub enum ProtocolError {
     /// A Session log path must be absolute.
     #[error("log path '{0}' must be absolute")]
     RelativeLogPath(String),
+
+    /// A Session named itself as its direct predecessor.
+    #[error("Session {0} cannot continue itself")]
+    SelfContinuation(SessionId),
 
     /// The JSON could not be parsed into the expected type.
     #[error("invalid JSON: {0}")]

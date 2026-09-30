@@ -70,6 +70,10 @@ export type Session = {
    */
   log: SessionLog | null;
   /**
+   * Direct predecessor in a linear continuation history, if any.
+   */
+  continued_from?: SessionId | null;
+  /**
    * When the session was created.
    */
   created_at: Timestamp;

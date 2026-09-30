@@ -2,6 +2,7 @@
   { "version": 1, "payload": { "type": "GET_MACHINE" } },
   { "version": 1, "payload": { "type": "LIST_SESSIONS" } },
   { "version": 1, "payload": { "type": "CREATE_SESSION", "shell": null, "cwd": "~/Projects/TIM", "cols": 120, "rows": 40, "origin": "WATCH", "title": "Qwen Training", "command": ["python", "train.py", "--config", "moe.yaml"] } },
+  { "version": 1, "payload": { "type": "CONTINUE_SESSION", "session_id": 128 } },
   { "version": 1, "payload": { "type": "ATTACH", "session_id": 128 } },
   { "version": 1, "payload": { "type": "DETACH", "session_id": 128 } },
   { "version": 1, "payload": { "type": "RESIZE", "session_id": 128, "cols": 80, "rows": 24 } },

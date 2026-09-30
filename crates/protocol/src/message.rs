@@ -95,6 +95,11 @@ pub enum ClientRequest {
         #[serde(default)]
         command: Option<Vec<String>>,
     },
+    /// Continue one finished FULL Session as a distinct generation.
+    ContinueSession {
+        /// Finished source Session.
+        session_id: SessionId,
+    },
     /// Start streaming a session's output to this client.
     Attach {
         /// Session to attach to.
@@ -172,6 +177,11 @@ impl ClientRequest {
                     validate_argv(argv)?;
                 }
                 Ok(())
+            }
+            ClientRequest::ContinueSession { session_id } if session_id.0 == 0 => {
+                Err(ProtocolError::InvalidIdentifier {
+                    field: "session_id",
+                })
             }
             _ => Ok(()),
         }
@@ -536,6 +546,19 @@ mod tests {
             rows: 1,
         };
         assert_eq!(req.validate(), Ok(()));
+    }
+
+    #[test]
+    fn continuation_requires_a_nonzero_session_id() {
+        let request = ClientRequest::ContinueSession {
+            session_id: SessionId(0),
+        };
+        assert_eq!(
+            request.validate(),
+            Err(ProtocolError::InvalidIdentifier {
+                field: "session_id"
+            })
+        );
     }
 
     #[test]

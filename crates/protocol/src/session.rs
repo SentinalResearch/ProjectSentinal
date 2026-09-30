@@ -273,6 +273,9 @@ pub struct Session {
     /// Log file of an adopted process, if one is known (not yet tailed in 1b.C).
     #[serde(default)]
     pub log: Option<SessionLog>,
+    /// Direct predecessor in a linear continuation history, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continued_from: Option<SessionId>,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -303,6 +306,7 @@ impl Session {
             process_started_at: None,
             exit_code: None,
             log: None,
+            continued_from: None,
             created_at: at,
             updated_at: at,
         }
@@ -340,6 +344,9 @@ impl Session {
             if !log.path.starts_with('/') {
                 return Err(ProtocolError::RelativeLogPath(log.path.clone()));
             }
+        }
+        if self.continued_from == Some(self.id) {
+            return Err(ProtocolError::SelfContinuation(self.id));
         }
         if let Some(exit_code) = self.exit_code {
             let valid_exit = matches!(
@@ -583,7 +590,18 @@ mod tests {
         assert_eq!(session.pid, None);
         assert_eq!(session.process_started_at, None);
         assert_eq!(session.exit_code, None);
+        assert_eq!(session.continued_from, None);
         assert_eq!(session.validate(), Ok(()));
+    }
+
+    #[test]
+    fn session_cannot_continue_itself() {
+        let mut session = test_session();
+        session.continued_from = Some(session.id);
+        assert_eq!(
+            session.validate(),
+            Err(ProtocolError::SelfContinuation(session.id))
+        );
     }
 
     #[test]

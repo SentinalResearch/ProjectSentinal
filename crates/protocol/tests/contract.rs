@@ -59,6 +59,7 @@ fn session_contract() {
 #[test]
 fn capture_session_contract() {
     assert_each_round_trips::<Session>("sessions_1b.json");
+    assert_round_trip::<Session>(&load("session_continued.json"), "session_continued.json");
 }
 
 #[test]
@@ -66,6 +67,19 @@ fn legacy_session_and_create_request_still_decode() {
     let _: Session = serde_json::from_value(load("session_v1_legacy.json")).unwrap();
     let _: Envelope<ClientRequest> =
         serde_json::from_value(load("create_session_v1_legacy.json")).unwrap();
+}
+
+#[test]
+fn continuation_contract_is_additive_and_preserves_lineage() {
+    let mut continued = load("session.json");
+    continued["id"] = Value::from(129);
+    continued["continued_from"] = Value::from(128);
+    let parsed: Session = serde_json::from_value(continued).unwrap();
+    let encoded = serde_json::to_value(parsed).unwrap();
+    assert_eq!(encoded["continued_from"], Value::from(128));
+
+    let request = r#"{"version":1,"payload":{"type":"CONTINUE_SESSION","session_id":128}}"#;
+    assert!(Envelope::<ClientRequest>::decode(request).is_ok());
 }
 
 #[test]
@@ -198,6 +212,7 @@ fn every_client_request_has_a_fixture() {
         "GET_MACHINE",
         "LIST_SESSIONS",
         "CREATE_SESSION",
+        "CONTINUE_SESSION",
         "ATTACH",
         "DETACH",
         "RESIZE",

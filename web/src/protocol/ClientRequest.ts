@@ -38,6 +38,12 @@ export type ClientRequest = { "type": "GET_MACHINE" } | {
    */
   command: Array<string> | null;
 } | {
+  "type": "CONTINUE_SESSION";
+  /**
+   * Finished source Session.
+   */
+  session_id: SessionId;
+} | {
   "type": "ATTACH";
   /**
    * Session to attach to.

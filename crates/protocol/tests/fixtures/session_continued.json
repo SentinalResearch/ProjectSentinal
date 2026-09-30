@@ -1,0 +1,19 @@
+{
+  "id": 129,
+  "machine_id": "rtx-pc",
+  "project_id": "tim",
+  "title": "Qwen Training",
+  "shell": "/bin/zsh",
+  "cwd": "~/Projects/TIM",
+  "state": "IDLE",
+  "current_command": null,
+  "origin": "UI",
+  "capture": "FULL",
+  "pid": 4343,
+  "process_started_at": null,
+  "exit_code": null,
+  "log": null,
+  "continued_from": 128,
+  "created_at": 1790000200000,
+  "updated_at": 1790000200000
+}
