@@ -170,13 +170,13 @@ install the worker, and see `UNPAIRED` plus the separate `sentinal connect`
 next step.
 
 ## Milestone 1d — Session continuation history
-- [ ] Approve the additive lineage wire/storage proposal before implementation
-- [ ] Persist a linear predecessor/successor relationship across browser and daemon restart
-- [ ] Continue a finished FULL Session atomically into one distinct UI/FULL Session generation
-- [ ] Preserve each generation's immutable output, Commands, exit result, Metrics, and audit boundary
-- [ ] Present bounded combined output with visible generation boundaries and version navigation
-- [ ] Route input, resize, signals, and kill only to the latest live generation
-- [ ] Prove duplicate/concurrent Continue requests create exactly one successor
+- [x] Approve the additive lineage wire/storage proposal before implementation
+- [x] Persist a linear predecessor/successor relationship across browser and daemon restart
+- [x] Continue a finished FULL Session atomically into one distinct UI/FULL Session generation
+- [x] Preserve each generation's immutable output, Commands, exit result, Metrics, and audit boundary
+- [x] Present bounded combined output with visible generation boundaries and version navigation
+- [x] Route input, resize, signals, and kill only to the latest live generation
+- [x] Prove duplicate/concurrent Continue requests create exactly one successor
 
 **Demo:** finish a Session, Continue it twice across page reloads, inspect all
 three retained outputs as one ordered history, and interact only with the

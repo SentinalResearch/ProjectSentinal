@@ -108,3 +108,17 @@ The daemon enforces these capabilities for every client, including the
 intelligence service. Reduced-capture Sessions cannot attach, accept terminal
 input, resize, or be signalled through an adoption API. See
 `CAPTURE_MODES.md` for lifecycle and ingress details.
+
+## Session continuation
+
+A finished PTY is never revived. `CONTINUE_SESSION` creates a new `UI` / `FULL`
+Session with a new ID, PID, PTY, compressed output log, and audit boundary. Its
+optional `continued_from` field points to the immutable predecessor. SQLite
+enforces at most one direct successor, so continuation histories are linear and
+idempotent under a double-click or concurrent clients.
+
+The web assembles one bounded history from those persisted Session generations.
+Each generation is replayed into a separate xterm instance so historical ANSI
+state cannot affect another generation. Only the latest live generation can
+receive input or resize requests. Ancestor output remains in its original
+per-Session log and is never copied into a descendant PTY or log.

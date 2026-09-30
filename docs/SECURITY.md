@@ -242,6 +242,14 @@ warning. The web writes these bytes to xterm, not `innerHTML`, and Continue
 uses structured safe metadata to create a new Session without copying output
 or an old Command into a shell.
 
+Continuation is a daemon operation rather than client-side CREATE_SESSION
+metadata. It accepts only a finished FULL source and inherits only its validated
+shell, cwd, Project, stable title, and fixed initial dimensions. The new Session
+has an independent ID, PID, PTY, log, lifecycle, and input-audit boundary.
+SQLite permits one successor per source, and duplicate requests return that
+same successor. Historical terminal bytes remain untrusted display data and
+never become a title, request payload, Command, or shell input.
+
 ## Intelligence permissions
 
 The intelligence service is an ordinary authenticated client. Initial levels
