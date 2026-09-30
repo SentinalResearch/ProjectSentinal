@@ -27,6 +27,7 @@ fn defaults_bind_only_to_loopback() {
         config.local_socket,
         Path::new("/home/tester/.local/share/terminal-agent/run/sentinald.sock")
     );
+    assert!(config.packages.is_none());
 }
 
 #[test]
@@ -111,4 +112,82 @@ fn tailscale_ipv6_bind_is_allowed() {
     .unwrap();
 
     assert_eq!(config.bind.to_string(), "[fd7a:115c:a1e0::1]:7420");
+}
+
+#[test]
+fn package_service_loads_only_on_loopback_https_tailnet_name() {
+    let config = DaemonConfig::from_toml(
+        r#"
+[packages]
+enabled = true
+listen = "127.0.0.1:7422"
+directory = "/srv/sentinal/packages"
+public_base_url = "https://sentinal-control.example.ts.net"
+max_artifact_bytes = 1048576
+"#,
+        Path::new("/home/tester"),
+    )
+    .unwrap();
+
+    let packages = config.packages.unwrap();
+    assert_eq!(packages.listen.to_string(), "127.0.0.1:7422");
+    assert_eq!(packages.directory, Path::new("/srv/sentinal/packages"));
+    assert_eq!(
+        packages.public_base_url,
+        "https://sentinal-control.example.ts.net"
+    );
+    assert_eq!(packages.max_artifact_bytes, 1_048_576);
+}
+
+#[test]
+fn package_service_refuses_non_loopback_listener() {
+    let error = DaemonConfig::from_toml(
+        r#"
+[packages]
+enabled = true
+listen = "100.100.10.20:7422"
+directory = "/srv/sentinal/packages"
+public_base_url = "https://sentinal-control.example.ts.net"
+"#,
+        Path::new("/home/tester"),
+    )
+    .unwrap_err();
+
+    assert!(
+        matches!(error, ConfigError::UnsafePackageBind(ref value) if value == "100.100.10.20:7422")
+    );
+}
+
+#[test]
+fn package_service_refuses_plain_http_and_non_tailnet_names() {
+    for url in [
+        "http://sentinal-control.example.ts.net",
+        "https://192.168.1.20",
+        "https://sentinal.example.com",
+        "https://user:secret@sentinal-control.example.ts.net",
+        "https://sentinal-control.example.ts.net/path",
+    ] {
+        let text = format!(
+            r#"
+[packages]
+enabled = true
+directory = "/srv/sentinal/packages"
+public_base_url = "{url}"
+"#
+        );
+        let error = DaemonConfig::from_toml(&text, Path::new("/home/tester")).unwrap_err();
+        assert!(
+            matches!(error, ConfigError::InvalidPackageUrl { .. }),
+            "{url}: {error}"
+        );
+    }
+}
+
+#[test]
+fn disabled_package_section_does_not_require_service_fields() {
+    let config =
+        DaemonConfig::from_toml("[packages]\nenabled = false\n", Path::new("/home/tester"))
+            .unwrap();
+
+    assert!(config.packages.is_none());
 }

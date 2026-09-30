@@ -38,6 +38,55 @@ fn parses_attach_and_kill_session_ids() {
 }
 
 #[test]
+fn parses_doctor_with_optional_install_paths() {
+    let cli = Cli::try_parse_from([
+        "sentinal",
+        "doctor",
+        "--prefix",
+        "/opt/sentinal",
+        "--config-dir",
+        "/private/sentinal-config",
+    ])
+    .unwrap();
+
+    assert!(matches!(
+        cli.command,
+        Command::Doctor { prefix: Some(prefix), config_dir: Some(config_dir) }
+            if prefix == Path::new("/opt/sentinal")
+                && config_dir == Path::new("/private/sentinal-config")
+    ));
+}
+
+#[test]
+fn parses_update_check_and_explicit_rollback() {
+    let check = Cli::try_parse_from(["sentinal", "update", "--check"]).unwrap();
+    assert!(matches!(
+        check.command,
+        Command::Update {
+            check: true,
+            rollback: None,
+            prefix: None
+        }
+    ));
+
+    let rollback = Cli::try_parse_from([
+        "sentinal",
+        "update",
+        "--rollback",
+        "0.0.1",
+        "--prefix",
+        "/opt/sentinal",
+    ])
+    .unwrap();
+    assert!(matches!(
+        rollback.command,
+        Command::Update { check: false, rollback: Some(version), prefix: Some(prefix) }
+            if version == "0.0.1" && prefix == Path::new("/opt/sentinal")
+    ));
+    assert!(Cli::try_parse_from(["sentinal", "update", "--check", "--rollback", "0.0.1"]).is_err());
+}
+
+#[test]
 fn rejects_attach_without_session_id() {
     assert!(Cli::try_parse_from(["ta", "attach"]).is_err());
 }

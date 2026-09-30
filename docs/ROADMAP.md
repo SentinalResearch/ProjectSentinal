@@ -156,13 +156,13 @@ then continue in a new FULL Session with the same cwd.
 second Machine, and complete one real Watch handoff over Tailscale.
 
 ## Milestone 1c.1 — Tailnet bootstrap and private package delivery
-- [ ] Approve the package-service, release-manifest, HTTPS, and integrity design before implementation
-- [ ] Build versioned Linux/macOS worker bundles for supported architectures from the existing worker package
-- [ ] Serve a bounded release manifest, immutable artifacts, and `install.sh` from an owner-controlled Tailnet control Machine
-- [ ] Verify target, length, compatibility, and checksum before invoking the existing installer
-- [ ] Installation never enrolls or receives a pairing secret; it ends visibly `UNPAIRED`
-- [ ] Reinstall/update preserve config, credentials, Machine data, SQLite, logs, adapters, and recipes
-- [ ] `sentinal doctor` reports install/service/Tailscale health without connecting implicitly
+- [x] Approve the package-service, release-manifest, HTTPS, and integrity design before implementation
+- [x] Build versioned Linux/macOS worker bundles for supported architectures from the existing worker package
+- [x] Serve a bounded release manifest, immutable artifacts, and `install.sh` from an owner-controlled Tailnet control Machine
+- [x] Verify target, length, compatibility, and checksum before invoking the existing installer
+- [x] Installation never enrolls or receives a pairing secret; it ends visibly `UNPAIRED`
+- [x] Reinstall/update preserve config, credentials, Machine data, SQLite, logs, adapters, and recipes
+- [x] `sentinal doctor` reports install/service/Tailscale health without connecting implicitly
 - [ ] Prove curl install on an available real peer and retain the offline/source-tree install path
 
 **Demo:** copy one Tailnet HTTPS curl command onto a fresh Linux Machine,

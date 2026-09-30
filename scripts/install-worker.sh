@@ -23,6 +23,9 @@ Install options:
   --port PORT            daemon port (default: 7420)
   --no-service           do not render, enable, start, stop, or remove a user service
   --dry-run              print actions without building or writing
+  --rollback VERSION     explicitly allow installing this older release
+  --control-url URL      verified Tailnet package origin for release metadata
+  --artifact-sha SHA256  verified release digest for release metadata
 
 Uninstall additionally accepts:
   --delete-data PATH     delete data only when PATH exactly resolves to --data-dir
@@ -46,6 +49,9 @@ daemon_port=7420
 install_service=true
 dry_run=false
 delete_data_confirmation=""
+rollback_version=""
+control_url=""
+artifact_sha=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -59,6 +65,9 @@ while [[ $# -gt 0 ]]; do
     --delete-data) delete_data_confirmation="${2:-}"; shift 2 ;;
     --no-service) install_service=false; shift ;;
     --dry-run) dry_run=true; shift ;;
+    --rollback) rollback_version="${2:-}"; shift 2 ;;
+    --control-url) control_url="${2:-}"; shift 2 ;;
+    --artifact-sha) artifact_sha="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) sentinal_install_die "unknown argument '$1'" ;;
   esac
@@ -75,6 +84,7 @@ platform="$(sentinal_install_platform)"
 
 bin_dir="$prefix/bin"
 share_dir="$prefix/share/sentinal"
+release_state="$share_dir/release.json"
 config_file="$config_dir/daemon.toml"
 if [[ "$prefix_explicit" == true ]]; then
   service_dir="$prefix/service"
@@ -141,6 +151,34 @@ else
   build_command="cargo build --locked --offline --release -p daemon --bin sentinald -p cli --bin sentinal"
 fi
 
+release_version=""
+release_target=""
+if [[ -n "$release_dir" && -f "$release_dir/BUILD.json" && ! -L "$release_dir/BUILD.json" ]]; then
+  release_version="$(sentinal_release_field "$release_dir/BUILD.json" version || true)"
+  release_target="$(sentinal_release_field "$release_dir/BUILD.json" target || true)"
+  sentinal_valid_release_version "$release_version" || sentinal_install_die "invalid release version '$release_version' in '$release_dir/BUILD.json'"
+  [[ "$release_target" =~ ^[A-Za-z0-9._-]+$ ]] || sentinal_install_die "invalid release target '$release_target' in '$release_dir/BUILD.json'"
+fi
+if [[ -n "$rollback_version" ]]; then
+  sentinal_valid_release_version "$rollback_version" || sentinal_install_die "invalid rollback version '$rollback_version'"
+  [[ -n "$release_version" ]] || sentinal_install_die "--rollback requires release metadata"
+  [[ "$rollback_version" == "$release_version" ]] || sentinal_install_die "rollback version '$rollback_version' does not match release '$release_version'"
+fi
+if [[ -n "$control_url" ]]; then sentinal_validate_control_url "$control_url"; fi
+if [[ -n "$artifact_sha" && ! "$artifact_sha" =~ ^[0-9a-f]{64}$ ]]; then
+  sentinal_install_die "artifact SHA-256 must be 64 lowercase hexadecimal characters"
+fi
+if [[ -e "$release_state" || -L "$release_state" ]]; then
+  [[ -f "$release_state" && ! -L "$release_state" ]] || sentinal_install_die "existing release metadata '$release_state' is not a regular file"
+  installed_version="$(sentinal_release_field "$release_state" version || true)"
+  sentinal_valid_release_version "$installed_version" || sentinal_install_die "invalid installed release version '$installed_version'"
+  if [[ -n "$release_version" && "$(sentinal_compare_release_versions "$release_version" "$installed_version")" == -1 && -z "$rollback_version" ]]; then
+    sentinal_install_die "refusing downgrade from $installed_version to $release_version; rerun with --rollback $release_version"
+  fi
+else
+  installed_version=""
+fi
+
 [[ -d "$shell_source" ]] || sentinal_install_die "missing shell assets at '$shell_source'"
 for asset in ta.zsh ta.bash ta.fish external/sentinal.zsh external/sentinal.bash external/sentinal.fish vendor/bash-preexec.sh; do
   [[ -f "$shell_source/$asset" && ! -L "$shell_source/$asset" ]] || sentinal_install_die "missing shell asset '$shell_source/$asset'"
@@ -156,6 +194,7 @@ if [[ "$dry_run" == true ]]; then
   echo "Would install: $bin_dir/sentinal"
   echo "Would install: $bin_dir/sentinald"
   echo "Would install shell assets: $share_dir/shell"
+  [[ -z "$release_version" ]] || echo "Release metadata: $release_version ($release_target)"
   echo "Would create config if absent: $config_file"
   echo "Worker bind: $bind_ip:$daemon_port"
   if [[ "$install_service" == true ]]; then
@@ -175,6 +214,20 @@ sentinal_validate_source_binary "$source_bin_dir/sentinald"
 
 mkdir -p "$bin_dir" "$share_dir" "$config_dir" "$data_dir"
 chmod 700 "$config_dir" "$data_dir"
+
+# Keep a private, same-filesystem copy so a service-manager failure can put
+# the previous program bundle back without touching user data or credentials.
+transaction="$share_dir/.install-backup.$$"
+rm -rf -- "$transaction"
+mkdir -p "$transaction"
+transaction_cleanup() { rm -rf -- "$transaction"; }
+trap transaction_cleanup EXIT HUP INT TERM
+[[ ! -f "$bin_dir/sentinal" ]] || cp -p "$bin_dir/sentinal" "$transaction/sentinal"
+[[ ! -f "$bin_dir/sentinald" ]] || cp -p "$bin_dir/sentinald" "$transaction/sentinald"
+[[ ! -d "$share_dir/shell" ]] || cp -R "$share_dir/shell" "$transaction/shell"
+[[ ! -f "$release_state" ]] || cp -p "$release_state" "$transaction/release.json"
+[[ ! -f "$service_file" ]] || cp -p "$service_file" "$transaction/service"
+
 sentinal_atomic_install "$source_bin_dir/sentinal" "$bin_dir/sentinal"
 sentinal_atomic_install "$source_bin_dir/sentinald" "$bin_dir/sentinald"
 
@@ -195,6 +248,22 @@ else
   mv "$temporary_config" "$config_file"
 fi
 
+if [[ -n "$release_version" ]]; then
+  temporary_release="$release_state.tmp.$$"
+  cat >"$temporary_release" <<EOF
+{
+  "schema_version": 1,
+  "version": "$release_version",
+  "target": "$release_target",
+  "artifact_sha256": "$artifact_sha",
+  "channel": "stable",
+  "control_url": "$control_url"
+}
+EOF
+  chmod 600 "$temporary_release"
+  mv "$temporary_release" "$release_state"
+fi
+
 if [[ "$install_service" == true ]]; then
   mkdir -p "$service_dir"
   temporary_service="$service_file.tmp.$$"
@@ -205,8 +274,20 @@ if [[ "$install_service" == true ]]; then
   fi
   chmod 600 "$temporary_service"
   mv "$temporary_service" "$service_file"
-  sentinal_enable_service "$platform" "$service_file"
+  if ! sentinal_enable_service "$platform" "$service_file"; then
+    if [[ -f "$transaction/sentinal" ]]; then sentinal_atomic_install "$transaction/sentinal" "$bin_dir/sentinal"; else rm -f -- "$bin_dir/sentinal"; fi
+    if [[ -f "$transaction/sentinald" ]]; then sentinal_atomic_install "$transaction/sentinald" "$bin_dir/sentinald"; else rm -f -- "$bin_dir/sentinald"; fi
+    rm -rf -- "$shell_destination"
+    [[ ! -d "$transaction/shell" ]] || mv "$transaction/shell" "$shell_destination"
+    if [[ -f "$transaction/release.json" ]]; then mv "$transaction/release.json" "$release_state"; else rm -f -- "$release_state"; fi
+    if [[ -f "$transaction/service" ]]; then mv "$transaction/service" "$service_file"; else rm -f -- "$service_file"; fi
+    restored="${installed_version:-previous installation}"
+    sentinal_install_die "service failed to start; restored $restored; config and data were preserved"
+  fi
 fi
+
+transaction_cleanup
+trap - EXIT HUP INT TERM
 
 echo "Installed sentinal and sentinald in $bin_dir"
 echo "Installed shell assets in $shell_destination"

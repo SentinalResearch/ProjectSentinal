@@ -78,9 +78,9 @@ unless exact-path data deletion is separately requested. Full prerequisites,
 service commands, paths, backup, and acceptance steps are in
 `docs/SETUP.md`.
 
-### Planned private install and `connect` flow
+### Private install and planned `connect` flow
 
-Milestone 1c.1 will let an owner-controlled Tailnet control Machine serve a
+An owner-controlled Tailnet control Machine can serve a
 verified `install.sh` and versioned worker artifacts. Installation ends
 `UNPAIRED`; it never consumes a pairing code or registers the Machine.
 
@@ -99,6 +99,26 @@ argv, URLs, environment variables, process listings, or shell history. A
 stable Machine ID survives rename, reconnect, reinstall, and update; the
 display name is owner-editable. These commands are **planned**, not available
 in the current binary.
+
+Package installation and maintenance commands available now are:
+
+```console
+curl -fsSL https://sentinal-control.TAILNET.ts.net/install.sh | sh
+sentinal doctor [--prefix DIR] [--config-dir DIR]
+sentinal update --check [--prefix DIR]
+sentinal update [--prefix DIR]
+sentinal update --rollback VERSION [--prefix DIR]
+```
+
+`doctor` reads local installation/configuration state and invokes the native
+service manager and Tailscale status commands. It makes no enrollment request
+and reports `Pairing: UNPAIRED` until Milestone 4.0 exists.
+
+`update` reads the credential-free HTTPS `.ts.net` origin from
+`<prefix>/share/sentinal/release.json`, downloads the same bounded bootstrap
+used by fresh installation, and reuses its target, length, and SHA-256 checks.
+`--check` downloads no artifact. A downgrade requires `--rollback` with the
+exact version after the control owner has moved the stable pointer.
 
 ### Explicit fixture demo
 
@@ -146,6 +166,8 @@ sentinal hook uninstall [zsh|bash|fish] [--rc PATH]
 sentinal auto on|off|status [zsh|bash|fish] [--rc PATH]
 sentinal adopt PID [--log PATH] [-t TITLE]
 sentinal adopt --pick
+sentinal doctor [--prefix DIR] [--config-dir DIR]
+sentinal update [--check | --rollback VERSION] [--prefix DIR]
 ```
 
 - `ls` lists Session ID, state, cwd, and shell.

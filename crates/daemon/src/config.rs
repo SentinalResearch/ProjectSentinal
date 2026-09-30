@@ -9,6 +9,21 @@ use std::{
 
 const DEFAULT_BIND: &str = "127.0.0.1:7420";
 const DEFAULT_SCROLLBACK_LINES: usize = 10_000;
+const DEFAULT_PACKAGE_BIND: &str = "127.0.0.1:7422";
+const DEFAULT_MAX_ARTIFACT_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Configuration for the optional Tailnet package listener.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackageServiceConfig {
+    /// Loopback address consumed by Tailscale Serve.
+    pub listen: SocketAddr,
+    /// Private directory containing published manifests and artifacts.
+    pub directory: PathBuf,
+    /// Tailnet HTTPS origin advertised by generated bootstrap scripts.
+    pub public_base_url: String,
+    /// Maximum accepted artifact length.
+    pub max_artifact_bytes: u64,
+}
 
 /// Configuration used to start the daemon.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +40,8 @@ pub struct DaemonConfig {
     pub auth_file: PathBuf,
     /// Private same-user Unix socket for local reporting.
     pub local_socket: PathBuf,
+    /// Optional private package service for unpaired workers.
+    pub packages: Option<PackageServiceConfig>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -35,6 +52,17 @@ struct RawConfig {
     token_file: Option<PathBuf>,
     auth_file: Option<PathBuf>,
     local_socket: Option<PathBuf>,
+    packages: Option<RawPackageConfig>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RawPackageConfig {
+    #[serde(default)]
+    enabled: bool,
+    listen: Option<String>,
+    directory: Option<PathBuf>,
+    public_base_url: Option<String>,
+    max_artifact_bytes: Option<u64>,
 }
 
 /// Errors produced while loading daemon configuration.
@@ -62,6 +90,31 @@ pub enum ConfigError {
     /// Binding on every interface is forbidden.
     #[error("refusing unsafe daemon bind address '{0}'; use localhost or a Tailscale IP")]
     UnsafeBind(String),
+    /// The package listener was not loopback-only.
+    #[error("refusing unsafe package bind address '{0}'; Tailscale Serve must proxy to loopback")]
+    UnsafePackageBind(String),
+    /// A required package setting was absent.
+    #[error("package service is enabled but '{0}' is missing")]
+    MissingPackageField(&'static str),
+    /// The package listener value is not a socket address.
+    #[error("invalid package listen address '{value}': {source}")]
+    InvalidPackageBind {
+        /// Invalid configuration value.
+        value: String,
+        /// Address parser error.
+        source: std::net::AddrParseError,
+    },
+    /// The public package origin was unsafe or malformed.
+    #[error("invalid package public_base_url '{value}': {reason}")]
+    InvalidPackageUrl {
+        /// Invalid URL.
+        value: String,
+        /// Validation failure.
+        reason: &'static str,
+    },
+    /// The package artifact limit was outside the supported range.
+    #[error("invalid package max_artifact_bytes {0}; expected 1..={DEFAULT_MAX_ARTIFACT_BYTES}")]
+    InvalidPackageSize(u64),
 }
 
 impl DaemonConfig {
@@ -118,6 +171,7 @@ impl DaemonConfig {
             xdg_runtime_dir,
             cfg!(target_os = "macos"),
         );
+        let packages = parse_package_config(raw.packages)?;
 
         Ok(DaemonConfig {
             bind,
@@ -130,8 +184,69 @@ impl DaemonConfig {
                 .auth_file
                 .unwrap_or_else(|| home.join(".config/terminal-agent/auth.json")),
             local_socket,
+            packages,
         })
     }
+}
+
+fn parse_package_config(
+    raw: Option<RawPackageConfig>,
+) -> Result<Option<PackageServiceConfig>, ConfigError> {
+    let Some(raw) = raw.filter(|value| value.enabled) else {
+        return Ok(None);
+    };
+    let listen_text = raw
+        .listen
+        .unwrap_or_else(|| DEFAULT_PACKAGE_BIND.to_string());
+    let listen: SocketAddr =
+        listen_text
+            .parse()
+            .map_err(|source| ConfigError::InvalidPackageBind {
+                value: listen_text.clone(),
+                source,
+            })?;
+    if !listen.ip().is_loopback() {
+        return Err(ConfigError::UnsafePackageBind(listen_text));
+    }
+    let directory = raw
+        .directory
+        .ok_or(ConfigError::MissingPackageField("directory"))?;
+    let public_base_url = raw
+        .public_base_url
+        .ok_or(ConfigError::MissingPackageField("public_base_url"))?;
+    validate_package_url(&public_base_url)?;
+    let max_artifact_bytes = raw.max_artifact_bytes.unwrap_or(DEFAULT_MAX_ARTIFACT_BYTES);
+    if max_artifact_bytes == 0 || max_artifact_bytes > DEFAULT_MAX_ARTIFACT_BYTES {
+        return Err(ConfigError::InvalidPackageSize(max_artifact_bytes));
+    }
+    Ok(Some(PackageServiceConfig {
+        listen,
+        directory,
+        public_base_url,
+        max_artifact_bytes,
+    }))
+}
+
+fn validate_package_url(value: &str) -> Result<(), ConfigError> {
+    let Some(host) = value.strip_prefix("https://") else {
+        return Err(ConfigError::InvalidPackageUrl {
+            value: value.to_string(),
+            reason: "production package URLs must use HTTPS",
+        });
+    };
+    let safe_host = !host.is_empty()
+        && host.ends_with(".ts.net")
+        && !host.contains(['/', '?', '#', '@', ':'])
+        && host
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-'));
+    if !safe_host {
+        return Err(ConfigError::InvalidPackageUrl {
+            value: value.to_string(),
+            reason: "expected one credential-free .ts.net origin with no path or port",
+        });
+    }
+    Ok(())
 }
 
 fn is_safe_bind_ip(ip: IpAddr) -> bool {

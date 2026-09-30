@@ -41,6 +41,27 @@ pub enum Command {
         /// Session ID.
         id: u64,
     },
+    /// Check the local worker installation without pairing or changing it.
+    Doctor {
+        /// Installed program prefix; defaults to ~/.local.
+        #[arg(long)]
+        prefix: Option<PathBuf>,
+        /// Daemon configuration directory; defaults to ~/.config/terminal-agent.
+        #[arg(long)]
+        config_dir: Option<PathBuf>,
+    },
+    /// Check for, install, or explicitly roll back a verified worker release.
+    Update {
+        /// Report whether the stable release differs without installing it.
+        #[arg(long, conflicts_with = "rollback")]
+        check: bool,
+        /// Explicitly permit installing this older stable release.
+        #[arg(long, value_name = "VERSION")]
+        rollback: Option<String>,
+        /// Installed program prefix; defaults to the running binary's prefix.
+        #[arg(long)]
+        prefix: Option<PathBuf>,
+    },
     /// Run this terminal inside a persistent Sentinal Session and attach.
     ///
     /// With `-- COMMAND [ARG...]`, the Command runs once in the Session's

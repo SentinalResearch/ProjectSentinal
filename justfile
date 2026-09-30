@@ -55,6 +55,7 @@ check:
     bash scripts/tests/install-worker-test.sh
     bash scripts/tests/setup-doc-test.sh
     bash scripts/tests/deployment-plan-test.sh
+    bash scripts/tests/package-release-test.sh
 
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:
@@ -75,6 +76,18 @@ install-worker *args:
 # Uninstall worker programs while retaining config and data by default
 uninstall-worker *args:
     bash scripts/install-worker.sh uninstall {{args}}
+
+# Build one verified worker artifact for an exact supported target
+package-worker version target output="dist":
+    bash scripts/build-worker-release.sh --version {{version}} --target {{target}} --output "$(cd . && pwd)/{{output}}"
+
+# Atomically publish one worker artifact to the private package directory
+publish-worker version package_dir artifact:
+    bash scripts/publish-worker-release.sh publish --version {{version}} --package-dir {{package_dir}} --artifact {{artifact}}
+
+# Move the stable package pointer to an existing immutable release
+rollback-worker version package_dir:
+    bash scripts/publish-worker-release.sh rollback --version {{version}} --package-dir {{package_dir}}
 
 # Start the fixture-backed UI explicitly for a local product demonstration
 demo:

@@ -10,6 +10,7 @@ pub mod local_socket;
 pub mod log_discovery;
 pub mod metrics;
 pub mod osc;
+pub mod package_service;
 pub mod process_probe;
 pub mod pty;
 pub mod scrollback;

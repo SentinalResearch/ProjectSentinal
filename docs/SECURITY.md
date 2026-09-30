@@ -41,9 +41,9 @@ Reinstall preserves credentials and user data. Uninstall retains them by
 default; data deletion requires the exact resolved data path. Operational
 commands and backup boundaries are documented in `docs/SETUP.md`.
 
-## Planned package and enrollment boundaries
+## Package and planned enrollment boundaries
 
-Milestone 1c.1 package delivery and Milestone 4.0 enrollment are intentionally
+Sentinal package delivery and Milestone 4.0 enrollment are intentionally
 separate security ceremonies:
 
 | Credential/state | Location | Purpose |
@@ -64,6 +64,29 @@ The control role remains owner-operated inside Tailscale. It may serve
 verified packages and hold the Machine registry, but it is not a required
 vendor cloud. Exact code entropy, credentials, origin checks, transport, and
 recovery remain subject to the mandatory Milestone 4.0 design approval.
+
+The implemented package boundary is intentionally narrower than the terminal
+API:
+
+- `sentinald` binds the package router only to loopback; Tailscale Serve
+  supplies the `.ts.net` HTTPS endpoint. Funnel is forbidden.
+- Tailnet Grants/ACLs authorize downloads. Unpaired workers cannot present a
+  Sentinal Machine credential, so package GETs neither accept nor require the
+  Machine token or owner password.
+- The router exposes only `install.sh`, bounded channel/release manifests, and
+  exact manifest-declared artifacts. It has no upload endpoint, control API,
+  WebSocket, terminal route, or caller-provided filesystem path.
+- Publishing is a same-user local operation in owner-only directories. The
+  stable pointer changes only after immutable files are complete.
+- HTTPS authenticates the Tailnet name and SHA-256 detects corruption or
+  truncation. Neither protects against a compromised control Machine or
+  publisher; independent artifact signing needs separate approval.
+- Package audits contain timestamp, route class, release/target, status, and
+  byte count only. Headers, queries, credentials, terminal data, and local
+  paths are excluded.
+- `sentinal update` takes its origin only from owner-written release metadata
+  and revalidates a credential-free HTTPS `.ts.net` origin. Downloaded
+  bootstrap scripts are capped at 64 KiB.
 
 ## Data Sentinal records
 

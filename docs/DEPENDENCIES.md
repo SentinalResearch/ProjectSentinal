@@ -30,7 +30,7 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `ts-rs` | 0 | Generate TypeScript types from protocol |
 | `toml` | 1 | Parse daemon TOML for daemon startup and installed CLI address discovery |
 | `tokio-tungstenite` | 1 | WebSocket client transport for `ta` |
-| `futures-util` | 1 | Async WebSocket stream and sink handling for `ta` |
+| `futures-util` | 1/1c.1 | Async WebSocket handling for the CLI and bounded file streaming for the daemon package service |
 | `tower` (dev) | 1 | Exercise Axum routes in-process without network sockets |
 | `argon2` | 1.1 | Hash and verify the single owner's password with Argon2id |
 

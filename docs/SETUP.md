@@ -64,6 +64,119 @@ Default installed paths:
 | macOS service | `~/Library/LaunchAgents/dev.sentinal.sentinald.plist` |
 | Linux service | `~/.config/systemd/user/sentinald.service` |
 
+## Private Tailnet package delivery
+
+Milestone 1c.1 supports one owner-selected control Machine serving verified
+worker releases. The package role is a second, loopback-only HTTP listener in
+the existing `sentinald`; it is not another agent or a public cloud service.
+Tailscale Serve terminates Tailnet HTTPS and proxies to the listener. Never
+enable Funnel for this service.
+
+The control Machine needs `cargo`, `tar`, `gzip`, a SHA-256 tool
+(`sha256sum` or `shasum`), Tailscale with MagicDNS/HTTPS enabled, and a
+Tailnet Grant allowing only the intended owner/worker identities to reach
+control TCP port 443. Build each target on a toolchain that actually supports
+it; missing cross-target toolchains fail rather than producing a false build:
+
+```console
+control$ just package-worker 0.0.1 aarch64-apple-darwin dist
+control$ just package-worker 0.0.1 x86_64-unknown-linux-musl dist-linux
+```
+
+Supported targets are `x86_64-unknown-linux-musl`,
+`aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, and
+`aarch64-apple-darwin`. Publish every artifact for one version together:
+
+```console
+control$ scripts/publish-worker-release.sh publish \
+  --version 0.0.1 \
+  --package-dir "$HOME/.local/share/terminal-agent/packages" \
+  --artifact "$PWD/dist/sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz" \
+  --artifact "$PWD/dist-linux/sentinal-worker-0.0.1-x86_64-unknown-linux-musl.tar.gz"
+```
+
+The publisher validates target, size, and SHA-256; installs immutable files
+first; and atomically moves `stable` last. Reusing a version with different
+bytes is refused. An interruption cannot partially advance stable.
+
+Enable the package role in the control Machine's existing
+`~/.config/terminal-agent/daemon.toml` using real absolute values:
+
+```toml
+[packages]
+enabled = true
+listen = "127.0.0.1:7422"
+directory = "/Users/OWNER/.local/share/terminal-agent/packages"
+public_base_url = "https://sentinal-control.TAILNET.ts.net"
+max_artifact_bytes = 268435456
+```
+
+The daemon rejects plain HTTP, URL paths/ports/credentials, non-`.ts.net`
+names, and a package listener that is not loopback. Restart `sentinald`, then:
+
+```console
+control$ tailscale serve --bg --https=443 http://127.0.0.1:7422
+control$ tailscale serve status
+```
+
+Use the reviewable installation form first:
+
+```console
+worker$ curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+  --output install-sentinal.sh \
+  https://sentinal-control.TAILNET.ts.net/install.sh
+worker$ less install-sentinal.sh
+worker$ sh install-sentinal.sh
+```
+
+The convenience form is:
+
+```console
+worker$ curl -fsSL https://sentinal-control.TAILNET.ts.net/install.sh | sh
+```
+
+The bootstrap selects an exact OS/architecture, disables redirects, checks
+the declared compressed length and SHA-256, refuses unsafe archive entries,
+and only then calls the offline installer. It starts the user service and
+ends with:
+
+```text
+Sentinal worker installed and running
+State: UNPAIRED
+Next (available in Milestone 4.0):
+  sentinal connect https://sentinal-control.TAILNET.ts.net
+```
+
+The `connect` line is a forward reference; enrollment is not present in this
+milestone. Inspect and update without pairing:
+
+```console
+worker$ sentinal doctor
+worker$ sentinal update --check
+worker$ sentinal update
+```
+
+An accidental downgrade is refused. For an explicit rollback, the control
+owner moves stable to an existing immutable release, then the worker confirms
+that exact version:
+
+```console
+control$ just rollback-worker 0.0.1 \
+  "$HOME/.local/share/terminal-agent/packages"
+worker$ sentinal update --rollback 0.0.1
+```
+
+Reinstall/update preserves configuration, credentials, SQLite, Session logs,
+audits, adapters, and recipes. A service-start failure restores the previous
+program bundle. A daemon restart still interrupts live FULL Sessions until
+Reliability R1.
+
+Package manifests/scripts are capped at 64 KiB, artifacts at 256 MiB, and
+eight artifact streams may run concurrently. Ranges and arbitrary paths are
+refused. `<data_dir>/packages/package-audit.jsonl` contains only timestamp,
+route, release/target, status, and byte count—never headers, queries,
+credentials, or terminal data.
+
 ## First start and authentication
 
 The daemon creates an owner-only Machine token on first start. There is no
@@ -155,6 +268,10 @@ $ just install-worker --bind 100.x.y.z
 The user service restarts. FULL Sessions are interrupted by a `sentinald`
 restart and cannot be reattached until Reliability R1 implements a separate
 per-Session owner. Their saved output remains available.
+
+For a worker installed from the Tailnet package service, prefer `sentinal
+update --check` and `sentinal update`; both reuse the stored verified control
+origin. Re-running the original curl command is also an update.
 
 ## Backup and inspection
 

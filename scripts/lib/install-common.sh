@@ -5,6 +5,44 @@ sentinal_install_die() {
   exit 1
 }
 
+sentinal_release_field() {
+  local file="$1" field="$2"
+  [[ -f "$file" && ! -L "$file" ]] || return 1
+  sed -n "s/.*\"$field\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$file" | head -n 1
+}
+
+sentinal_valid_release_version() {
+  local value="$1" major minor patch extra part
+  IFS=. read -r major minor patch extra <<<"$value"
+  [[ -z "${extra:-}" && -n "${major:-}" && -n "${minor:-}" && -n "${patch:-}" ]] || return 1
+  for part in "$major" "$minor" "$patch"; do
+    [[ "$part" =~ ^(0|[1-9][0-9]{0,8})$ ]] || return 1
+  done
+}
+
+sentinal_compare_release_versions() {
+  local left="$1" right="$2" left_parts right_parts index left_value right_value
+  IFS=. read -r -a left_parts <<<"$left"
+  IFS=. read -r -a right_parts <<<"$right"
+  for index in 0 1 2; do
+    left_value=$((10#${left_parts[$index]}))
+    right_value=$((10#${right_parts[$index]}))
+    if ((left_value < right_value)); then printf '%s\n' -1; return; fi
+    if ((left_value > right_value)); then printf '%s\n' 1; return; fi
+  done
+  printf '%s\n' 0
+}
+
+sentinal_validate_control_url() {
+  local value="$1" host
+  host="${value#https://}"
+  [[ "$value" == https://* && "$host" == *.ts.net ]] || sentinal_install_die "control URL '$value' must be one HTTPS .ts.net origin"
+  case "$host" in
+    *'/'*|*'?'*|*'#'*|*'@'*|*':'*) sentinal_install_die "control URL '$value' must not contain a path, port, query, fragment, or credentials" ;;
+  esac
+  [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || sentinal_install_die "control URL '$value' contains invalid hostname characters"
+}
+
 sentinal_install_platform() {
   local value="${SENTINAL_INSTALL_PLATFORM:-}"
   if [[ -z "$value" ]]; then
@@ -135,6 +173,9 @@ EOF
 sentinal_service_action() {
   if [[ -n "${SENTINAL_SERVICE_TEST_LOG:-}" ]]; then
     printf '%s\n' "$*" >>"$SENTINAL_SERVICE_TEST_LOG"
+    if [[ -n "${SENTINAL_SERVICE_TEST_FAIL_ON:-}" && "$*" == *"$SENTINAL_SERVICE_TEST_FAIL_ON"* ]]; then
+      return 1
+    fi
     return
   fi
   "$@"
@@ -144,13 +185,13 @@ sentinal_enable_service() {
   local platform="$1" service_file="$2"
   if [[ "$platform" == macos ]]; then
     sentinal_service_action launchctl bootout "gui/$(id -u)/dev.sentinal.sentinald" 2>/dev/null || true
-    sentinal_service_action launchctl bootstrap "gui/$(id -u)" "$service_file"
-    sentinal_service_action launchctl enable "gui/$(id -u)/dev.sentinal.sentinald"
-    sentinal_service_action launchctl kickstart -k "gui/$(id -u)/dev.sentinal.sentinald"
+    sentinal_service_action launchctl bootstrap "gui/$(id -u)" "$service_file" || return
+    sentinal_service_action launchctl enable "gui/$(id -u)/dev.sentinal.sentinald" || return
+    sentinal_service_action launchctl kickstart -k "gui/$(id -u)/dev.sentinal.sentinald" || return
   else
-    sentinal_service_action systemctl --user daemon-reload
-    sentinal_service_action systemctl --user enable sentinald.service
-    sentinal_service_action systemctl --user restart sentinald.service
+    sentinal_service_action systemctl --user daemon-reload || return
+    sentinal_service_action systemctl --user enable sentinald.service || return
+    sentinal_service_action systemctl --user restart sentinald.service || return
   fi
 }
 

@@ -26,7 +26,13 @@ assert_absent() {
 }
 
 make_release() {
-  local root="$1" version="$2"
+  local root="$1" version="$2" release_version
+  case "$version" in
+    v1) release_version=0.0.1 ;;
+    v2) release_version=0.0.2 ;;
+    v3) release_version=0.0.3 ;;
+    *) release_version=0.0.9 ;;
+  esac
   mkdir -p "$root/bin" "$root/shell/external" "$root/shell/vendor"
   printf '#!/usr/bin/env bash\necho sentinal-%s\n' "$version" >"$root/bin/sentinal"
   printf '#!/usr/bin/env bash\necho sentinald-%s\n' "$version" >"$root/bin/sentinald"
@@ -38,6 +44,9 @@ make_release() {
   printf 'pty bash %s\n' "$version" >"$root/shell/ta.bash"
   printf 'pty fish %s\n' "$version" >"$root/shell/ta.fish"
   printf 'vendor %s\n' "$version" >"$root/shell/vendor/bash-preexec.sh"
+  cat >"$root/BUILD.json" <<EOF
+{"schema_version":1,"version":"$release_version","git_commit":"test","source_date_epoch":1,"target":"aarch64-apple-darwin","protocol_version":1}
+EOF
 }
 
 install_worker() {
@@ -67,6 +76,7 @@ assert_contains "$fresh_output" 'Worker bind: 100.90.80.70:17420'
 [[ -x "$prefix/bin/sentinald" ]] || fail 'sentinald was not installed executable'
 assert_file_contains "$prefix/bin/sentinal" 'sentinal-v1'
 assert_file_contains "$prefix/share/sentinal/shell/external/sentinal.zsh" 'zsh hook v1'
+assert_file_contains "$prefix/share/sentinal/release.json" '"version": "0.0.1"'
 assert_file_contains "$config/daemon.toml" 'bind = "100.90.80.70:17420"'
 assert_file_contains "$config/daemon.toml" "data_dir = \"$data\""
 if config_mode="$(stat -f '%Lp' "$config/daemon.toml" 2>/dev/null)"; then
@@ -105,9 +115,43 @@ assert_file_contains "$data/sentinal.db" 'sqlite'
 assert_file_contains "$data/sessions/1.log.zst" 'output'
 assert_file_contains "$data/adapters/custom.toml" 'adapter'
 assert_file_contains "$data/recipes/custom.toml" 'recipe'
+assert_file_contains "$prefix/share/sentinal/release.json" '"version": "0.0.2"'
 if find "$prefix/bin" -maxdepth 1 -name '*.tmp.*' | grep -q .; then
   fail 'atomic replacement left a temporary binary'
 fi
+
+rollback_release="$test_root/rollback release"
+make_release "$rollback_release" v1
+if output="$(
+  SENTINAL_INSTALL_PLATFORM=macos SENTINAL_SERVICE_TEST_LOG="$service_log" \
+    "$installer" install --release-dir "$rollback_release" --prefix "$prefix" \
+      --config-dir "$config" --data-dir "$data" --bind 100.90.80.70 2>&1
+)"; then
+  fail 'implicit downgrade was accepted'
+fi
+assert_contains "$output" 'refusing downgrade from 0.0.2 to 0.0.1'
+assert_file_contains "$prefix/bin/sentinal" 'sentinal-v2'
+
+SENTINAL_INSTALL_PLATFORM=macos SENTINAL_SERVICE_TEST_LOG="$service_log" \
+  "$installer" install --release-dir "$rollback_release" --prefix "$prefix" \
+    --config-dir "$config" --data-dir "$data" --bind 100.90.80.70 \
+    --rollback 0.0.1 >/dev/null
+assert_file_contains "$prefix/bin/sentinal" 'sentinal-v1'
+assert_file_contains "$prefix/share/sentinal/release.json" '"version": "0.0.1"'
+
+# A service failure restores the previous programs and release metadata.
+make_release "$release" v3
+if output="$(
+  SENTINAL_INSTALL_PLATFORM=macos SENTINAL_SERVICE_TEST_LOG="$service_log" \
+  SENTINAL_SERVICE_TEST_FAIL_ON='bootstrap' \
+    "$installer" install --release-dir "$release" --prefix "$prefix" \
+      --config-dir "$config" --data-dir "$data" --bind 100.90.80.70 2>&1
+)"; then
+  fail 'service failure unexpectedly completed installation'
+fi
+assert_contains "$output" 'service failed to start; restored 0.0.1'
+assert_file_contains "$prefix/bin/sentinal" 'sentinal-v1'
+assert_file_contains "$prefix/share/sentinal/release.json" '"version": "0.0.1"'
 
 linux_prefix="$test_root/linux prefix"
 linux_config="$test_root/linux config"

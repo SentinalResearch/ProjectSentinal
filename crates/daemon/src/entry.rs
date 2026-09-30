@@ -7,6 +7,7 @@ use crate::{
     config::{ConfigError, DaemonConfig},
     local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{MetricsSampler, ResourceDebouncer},
+    package_service::{package_router, PackageService, PackageServiceError},
     process_probe::ProcessProbe,
     pty::{FakePty, PtyBackend, RealPty},
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
@@ -15,6 +16,7 @@ use protocol::{Machine, MachineId, MachineStatus, Os, Resource, Timestamp};
 use std::{
     collections::HashMap,
     fs,
+    future::IntoFuture,
     net::SocketAddr,
     path::{Path, PathBuf},
     sync::Arc,
@@ -68,6 +70,23 @@ pub enum DaemonError {
     /// The local socket task panicked or was cancelled.
     #[error("local socket task failed: {0}")]
     LocalTask(tokio::task::JoinError),
+    /// The private package service could not be prepared.
+    #[error(transparent)]
+    Package(#[from] PackageServiceError),
+    /// The private package listener could not bind.
+    #[error("failed to bind package service to {address}: {source}")]
+    PackageBind {
+        /// Configured loopback listen address.
+        address: SocketAddr,
+        /// Socket error.
+        source: std::io::Error,
+    },
+    /// The package HTTP server stopped with an error.
+    #[error("package service failed: {0}")]
+    PackageServe(std::io::Error),
+    /// The package server task panicked or was cancelled.
+    #[error("package service task failed: {0}")]
+    PackageTask(tokio::task::JoinError),
 }
 
 /// Load configuration, start every listener, and serve until SIGINT/SIGTERM.
@@ -114,6 +133,7 @@ pub async fn run() -> Result<(), DaemonError> {
     } else {
         Arc::new(RealPty)
     };
+    let daemon_uid = current_uid(&config.local_socket)?;
     let sessions = SessionManager::with_store(
         backend,
         SessionManagerConfig::system(
@@ -124,7 +144,7 @@ pub async fn run() -> Result<(), DaemonError> {
         AuditLog::new(&config.data_dir),
         store.clone(),
     )?
-    .with_process_probe(ProcessProbe::system(current_uid(&config.local_socket)?));
+    .with_process_probe(ProcessProbe::system(daemon_uid));
     // FULL Sessions were interrupted above; reduced-capture ones are resumed
     // only when their root process identity still matches.
     sessions.recover_external_sessions(store.live_sessions()?)?;
@@ -137,6 +157,31 @@ pub async fn run() -> Result<(), DaemonError> {
     let state = AppState::new(sessions, machine, auth);
     let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
     let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx, handler));
+    let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
+    let package_task = if let Some(package_config) = config.packages.clone() {
+        let package_address = package_config.listen;
+        let package_origin = package_config.public_base_url.clone();
+        let service = PackageService::open(package_config, daemon_uid)?;
+        let package_listener = tokio::net::TcpListener::bind(package_address)
+            .await
+            .map_err(|source| DaemonError::PackageBind {
+                address: package_address,
+                source,
+            })?;
+        let package_shutdown = server_shutdown_rx.clone();
+        tracing::info!(
+            address = %package_address,
+            public_origin = %package_origin,
+            "private package service listening for Tailscale Serve"
+        );
+        Some(tokio::spawn(async move {
+            axum::serve(package_listener, package_router(service))
+                .with_graceful_shutdown(wait_for_shutdown(package_shutdown))
+                .await
+        }))
+    } else {
+        None
+    };
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .map_err(|source| DaemonError::Bind {
@@ -144,16 +189,69 @@ pub async fn run() -> Result<(), DaemonError> {
             source,
         })?;
     tracing::info!(address = %config.bind, config = %config_path.display(), "daemon listening");
-    let server_result = axum::serve(
+    let main_server = axum::serve(
         listener,
         router(state).into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .map_err(DaemonError::Serve);
+    .with_graceful_shutdown(wait_for_shutdown(server_shutdown_rx))
+    .into_future();
+    tokio::pin!(main_server);
+    let signal_shutdown = server_shutdown.clone();
+    let signal_task = tokio::spawn(async move {
+        shutdown_signal().await;
+        let _ = signal_shutdown.send(true);
+    });
+    let mut package_task = package_task;
+    let (mut server_result, main_finished, package_finished) =
+        if let Some(task) = package_task.as_mut() {
+            tokio::select! {
+                result = &mut main_server => (result.map_err(DaemonError::Serve), true, false),
+                result = task => {
+                    let result = match result {
+                        Ok(Ok(())) => Ok(()),
+                        Ok(Err(error)) => Err(DaemonError::PackageServe(error)),
+                        Err(error) => Err(DaemonError::PackageTask(error)),
+                    };
+                    (result, false, true)
+                }
+            }
+        } else {
+            (
+                main_server.as_mut().await.map_err(DaemonError::Serve),
+                true,
+                true,
+            )
+        };
+    let _ = server_shutdown.send(true);
     let _ = local_shutdown.send(true);
+    if !main_finished {
+        let result = main_server.as_mut().await.map_err(DaemonError::Serve);
+        if server_result.is_ok() {
+            server_result = result;
+        }
+    }
+    if !package_finished {
+        if let Some(task) = package_task {
+            let result = match task.await {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(error)) => Err(DaemonError::PackageServe(error)),
+                Err(error) => Err(DaemonError::PackageTask(error)),
+            };
+            if server_result.is_ok() {
+                server_result = result;
+            }
+        }
+    }
     local_task.await.map_err(DaemonError::LocalTask)??;
+    signal_task.abort();
     server_result
+}
+
+async fn wait_for_shutdown(mut shutdown: tokio::sync::watch::Receiver<bool>) {
+    if *shutdown.borrow() {
+        return;
+    }
+    let _ = shutdown.changed().await;
 }
 
 async fn shutdown_signal() {

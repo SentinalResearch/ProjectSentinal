@@ -34,6 +34,8 @@ enum AppError {
     DaemonUrl(#[from] DaemonUrlError),
     #[error(transparent)]
     Client(#[from] ClientError),
+    #[error(transparent)]
+    Update(#[from] crate::update::UpdateError),
     #[error("{0}; the command was not run outside Sentinal")]
     Watch(#[from] WatchError),
     #[error(
@@ -49,6 +51,14 @@ async fn dispatch(
 ) -> Result<ExitCode, AppError> {
     // Hook commands never use the WebSocket API and need no token.
     let cli = match cli.command {
+        Command::Doctor { prefix, config_dir } => {
+            return Ok(crate::doctor::run(prefix, config_dir, out));
+        }
+        Command::Update {
+            check,
+            rollback,
+            prefix,
+        } => return Ok(crate::update::run(check, rollback, prefix)?),
         Command::Hook { action } => return Ok(crate::hook_command::run(action, out, err).await),
         Command::Auto { action } => {
             let url = if matches!(&action, AutoAction::Enter { .. }) {
@@ -128,6 +138,8 @@ async fn dispatch(
             }
         }
         Command::Watch { .. }
+        | Command::Doctor { .. }
+        | Command::Update { .. }
         | Command::Hook { .. }
         | Command::Auto { .. }
         | Command::Adopt { .. } => {}
