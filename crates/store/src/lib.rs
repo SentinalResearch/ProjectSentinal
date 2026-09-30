@@ -1,5 +1,7 @@
 //! SQLite persistence for Machines, Sessions, Commands, Events, and Metrics.
 
+mod error;
+mod lineage;
 mod metrics;
 mod records;
 
@@ -12,40 +14,13 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
+pub use error::StoreError;
 pub use metrics::{MinuteMetric, RawMetricSample};
 
-const MIGRATIONS: &[(u32, &str)] = &[(1, include_str!("../migrations/001_initial.sql"))];
-
-/// Errors reading or writing structured state.
-#[derive(Debug, thiserror::Error)]
-pub enum StoreError {
-    /// SQLite rejected an operation.
-    #[error("SQLite store operation failed: {0}")]
-    Sql(#[from] rusqlite::Error),
-    /// Persisted JSON could not be encoded or decoded.
-    #[error("store JSON operation failed: {0}")]
-    Json(#[from] serde_json::Error),
-    /// A persisted Session could not make the required lifecycle transition.
-    #[error(transparent)]
-    Protocol(#[from] protocol::ProtocolError),
-    /// Shared connection state was poisoned by a panic.
-    #[error("failed to lock SQLite store: lock poisoned")]
-    Lock,
-    /// An unsigned wire identifier cannot be represented by SQLite.
-    #[error("wire identifier {value} is outside SQLite's signed integer range")]
-    IdRange {
-        /// Identifier that could not be stored.
-        value: u64,
-    },
-    /// An update targeted a record that does not exist.
-    #[error("store has no {kind} {id}")]
-    Missing {
-        /// Record category.
-        kind: &'static str,
-        /// Missing record identifier.
-        id: u64,
-    },
-}
+const MIGRATIONS: &[(u32, &str)] = &[
+    (1, include_str!("../migrations/001_initial.sql")),
+    (2, include_str!("../migrations/002_session_lineage.sql")),
+];
 
 /// Thread-safe connection to one terminal-agent SQLite database.
 pub struct Store {
@@ -128,8 +103,13 @@ impl Store {
     /// Insert a Session snapshot.
     pub fn insert_session(&self, session: &Session) -> Result<(), StoreError> {
         session.validate()?;
+        if session.continued_from.is_some() {
+            return Err(StoreError::LineageInsertRequired {
+                session_id: session.id,
+            });
+        }
         self.lock()?.execute(
-            "INSERT INTO sessions(id, state, updated_at, json) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO sessions(id, state, updated_at, json, continued_from) VALUES (?1, ?2, ?3, ?4, NULL)",
             (
                 to_sql_id(session.id.0)?,
                 state_name(session.state)?,
@@ -143,7 +123,16 @@ impl Store {
     /// Update an existing Session snapshot.
     pub fn update_session(&self, session: &Session) -> Result<(), StoreError> {
         session.validate()?;
-        let changed = self.lock()?.execute(
+        let connection = self.lock()?;
+        let stored_lineage = lineage::continued_from_on(&connection, session.id)?;
+        if stored_lineage != session.continued_from {
+            return Err(StoreError::LineageMismatch {
+                session_id: session.id,
+                column: stored_lineage,
+                json: session.continued_from,
+            });
+        }
+        let changed = connection.execute(
             "UPDATE sessions SET state=?1, updated_at=?2, json=?3 WHERE id=?4",
             (
                 state_name(session.state)?,
@@ -163,25 +152,24 @@ impl Store {
 
     /// Load one Session snapshot.
     pub fn session(&self, id: SessionId) -> Result<Option<Session>, StoreError> {
-        let json: Option<String> = self
-            .lock()?
-            .query_row(
-                "SELECT json FROM sessions WHERE id=?1",
-                [to_sql_id(id.0)?],
-                |row| row.get(0),
-            )
-            .optional()?;
-        json.map(|value| decode_session(&value)).transpose()
+        let connection = self.lock()?;
+        lineage::session_on(&connection, id)
     }
 
     /// Load every persisted Session snapshot ordered by ID.
     pub fn sessions(&self) -> Result<Vec<Session>, StoreError> {
         let connection = self.lock()?;
-        let mut statement = connection.prepare("SELECT json FROM sessions ORDER BY id")?;
+        let mut statement =
+            connection.prepare("SELECT json, continued_from FROM sessions ORDER BY id")?;
         let values = statement
-            .query_map([], |row| row.get::<_, String>(0))?
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?))
+            })?
             .collect::<Result<Vec<_>, _>>()?;
-        values.iter().map(|value| decode_session(value)).collect()
+        values
+            .iter()
+            .map(|(json, predecessor)| decode_session(json, *predecessor))
+            .collect()
     }
 
     /// Mark all persisted live Sessions interrupted after a daemon restart.
@@ -190,10 +178,12 @@ impl Store {
         let transaction = connection.transaction()?;
         let json_values = {
             let mut statement = transaction.prepare(
-                "SELECT json FROM sessions WHERE state NOT IN ('COMPLETED','FAILED','INTERRUPTED') ORDER BY id",
+                "SELECT json, continued_from FROM sessions WHERE state NOT IN ('COMPLETED','FAILED','INTERRUPTED') ORDER BY id",
             )?;
             let values = statement
-                .query_map([], |row| row.get::<_, String>(0))?
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?))
+                })?
                 .collect::<Result<Vec<_>, _>>()?;
             values
         };
@@ -202,8 +192,8 @@ impl Store {
                 row.get(0)
             })?;
         let mut events = Vec::with_capacity(json_values.len());
-        for json in json_values {
-            let mut session = decode_session(&json)?;
+        for (json, predecessor) in json_values {
+            let mut session = decode_session(&json, predecessor)?;
             // Only daemon-owned PTYs die with the daemon; reduced-capture
             // Sessions are verified by the daemon's external recovery instead.
             if session.capture != CaptureLevel::Full {
@@ -242,12 +232,17 @@ impl Store {
     pub fn live_sessions(&self) -> Result<Vec<Session>, StoreError> {
         let connection = self.lock()?;
         let mut statement = connection.prepare(
-            "SELECT json FROM sessions WHERE state NOT IN ('COMPLETED','FAILED','INTERRUPTED') ORDER BY id",
+            "SELECT json, continued_from FROM sessions WHERE state NOT IN ('COMPLETED','FAILED','INTERRUPTED') ORDER BY id",
         )?;
         let values = statement
-            .query_map([], |row| row.get::<_, String>(0))?
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?))
+            })?
             .collect::<Result<Vec<_>, _>>()?;
-        values.iter().map(|json| decode_session(json)).collect()
+        values
+            .iter()
+            .map(|(json, predecessor)| decode_session(json, *predecessor))
+            .collect()
     }
 
     /// Return the first unused Session ID.
@@ -285,9 +280,26 @@ impl Store {
     }
 }
 
-fn decode_session(json: &str) -> Result<Session, StoreError> {
+pub(crate) fn decode_session(
+    json: &str,
+    continued_from: Option<i64>,
+) -> Result<Session, StoreError> {
     let session: Session = serde_json::from_str(json)?;
     session.validate()?;
+    let column = continued_from
+        .map(|value| {
+            u64::try_from(value)
+                .map(SessionId)
+                .map_err(|_| StoreError::InvalidStoredId { value })
+        })
+        .transpose()?;
+    if session.continued_from != column {
+        return Err(StoreError::LineageMismatch {
+            session_id: session.id,
+            column,
+            json: session.continued_from,
+        });
+    }
     Ok(session)
 }
 

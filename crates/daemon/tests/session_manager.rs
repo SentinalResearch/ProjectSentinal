@@ -4,12 +4,12 @@
 
 use daemon::{
     audit::AuditLog,
-    pty::FakePty,
+    pty::{FakePty, PtyBackend, PtyError, PtySpawnRequest},
     session_manager::{CreateSession, SessionManager, SessionManagerConfig, SessionManagerError},
 };
 use protocol::{
-    CaptureLevel, DaemonMessage, MachineId, ProcessTotals, Resource, SessionId, SessionMetrics,
-    SessionOrigin, SessionState, Timestamp,
+    CaptureLevel, DaemonMessage, MachineId, ProcessTotals, Resource, Session, SessionId,
+    SessionMetrics, SessionOrigin, SessionState, Timestamp,
 };
 use std::{
     fs::{self, File},
@@ -65,6 +65,21 @@ fn stored_manager(name: &str) -> (SessionManager, Arc<FakePty>, Arc<Store>, Path
     (manager, backend, store, data_dir)
 }
 
+fn manager_with_store(name: &str, store: Arc<Store>) -> (SessionManager, Arc<FakePty>, PathBuf) {
+    let data_dir = temp_dir(name);
+    let backend = Arc::new(FakePty::new());
+    let config = SessionManagerConfig {
+        machine_id: MachineId("test-machine".into()),
+        data_dir: data_dir.clone(),
+        scrollback_lines: 3,
+        clock: Arc::new(|| Timestamp(1_790_000_000_000)),
+    };
+    let manager =
+        SessionManager::with_store(backend.clone(), config, AuditLog::new(&data_dir), store)
+            .unwrap();
+    (manager, backend, data_dir)
+}
+
 fn request() -> CreateSession {
     CreateSession {
         shell: Some("/bin/sh".into()),
@@ -106,6 +121,242 @@ async fn wait_for_scrollback(manager: &SessionManager, id: SessionId, expected: 
     })
     .await
     .unwrap();
+}
+
+#[tokio::test]
+async fn continuation_creates_a_distinct_safe_session_without_replaying_commands() {
+    let (manager, fake, store, data_dir) = stored_manager("continue-safe");
+    let mut create = request();
+    create.title = Some("Stable title".into());
+    let source = manager.create(create).await.unwrap();
+    fake.output(source.id, b"untrusted-secret-output\r\n")
+        .unwrap();
+    wait_for_scrollback(&manager, source.id, "untrusted-secret-output").await;
+    fake.exit(source.id, 0).unwrap();
+    wait_for_state(&manager, source.id, SessionState::Completed).await;
+    let before = store.session(source.id).unwrap().unwrap();
+
+    let descendant = manager.continue_session(source.id).await.unwrap();
+
+    assert_ne!(descendant.id, source.id);
+    assert_eq!(descendant.continued_from, Some(source.id));
+    assert_eq!(descendant.origin, SessionOrigin::Ui);
+    assert_eq!(descendant.capture, CaptureLevel::Full);
+    assert_eq!(descendant.title.as_deref(), Some("Stable title"));
+    assert_eq!(descendant.shell, "/bin/sh");
+    assert_eq!(descendant.cwd, "/tmp");
+    assert_eq!(descendant.current_command, None);
+    assert_eq!(descendant.exit_code, None);
+    assert_eq!(fake.size(descendant.id).unwrap(), (80, 24));
+    assert!(fake.input(descendant.id).unwrap().is_empty());
+    assert!(!descendant
+        .title
+        .as_deref()
+        .unwrap_or_default()
+        .contains("secret"));
+    assert!(!data_dir.join("audit.jsonl").exists());
+    assert_eq!(store.session(source.id).unwrap().unwrap(), before);
+    assert_eq!(
+        store.direct_successor(source.id).unwrap().unwrap().id,
+        descendant.id
+    );
+
+    fake.exit(descendant.id, 0).unwrap();
+    wait_for_state(&manager, descendant.id, SessionState::Completed).await;
+    let replay = manager.replay_output(descendant.id, 0, 1024).unwrap();
+    assert!(replay.bytes.is_empty());
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn simultaneous_continuations_return_one_successor() {
+    let (manager, fake, store, data_dir) = stored_manager("continue-concurrent");
+    let source = manager.create(request()).await.unwrap();
+    fake.exit(source.id, 3).unwrap();
+    wait_for_state(&manager, source.id, SessionState::Failed).await;
+
+    let first_manager = manager.clone();
+    let second_manager = manager.clone();
+    let (first, second) = tokio::join!(
+        first_manager.continue_session(source.id),
+        second_manager.continue_session(source.id)
+    );
+    let first = first.unwrap();
+    let second = second.unwrap();
+
+    assert_eq!(first.id, second.id);
+    assert_eq!(store.ordered_lineage(source.id).unwrap().len(), 2);
+    assert_eq!(manager.list().unwrap().len(), 2);
+    fake.exit(first.id, 0).unwrap();
+    wait_for_state(&manager, first.id, SessionState::Completed).await;
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn persisted_finished_session_can_continue_after_restart_with_safe_metadata() {
+    let store = Arc::new(Store::open_in_memory().unwrap());
+    let mut source = Session::new(
+        SessionId(40),
+        MachineId("test-machine".into()),
+        "/bin/zsh",
+        "/work/project",
+        Timestamp(100),
+    );
+    source.title = None;
+    source.project_id = Some("project-a".into());
+    source
+        .transition(SessionState::Idle, Timestamp(101))
+        .unwrap();
+    source
+        .transition(SessionState::Interrupted, Timestamp(200))
+        .unwrap();
+    store.insert_session(&source).unwrap();
+    let (manager, fake, data_dir) = manager_with_store("continue-restart", store.clone());
+
+    let descendant = manager.continue_session(source.id).await.unwrap();
+
+    assert_eq!(descendant.title.as_deref(), Some("Session 40"));
+    assert_eq!(descendant.project_id, source.project_id);
+    assert_eq!(descendant.shell, source.shell);
+    assert_eq!(descendant.cwd, source.cwd);
+    assert_eq!(store.ordered_lineage(source.id).unwrap().len(), 2);
+    fake.exit(descendant.id, 0).unwrap();
+    wait_for_state(&manager, descendant.id, SessionState::Completed).await;
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn continuation_rejects_live_and_reduced_capture_sources_before_spawn() {
+    let (manager, fake, _store, data_dir) = stored_manager("continue-reject");
+    let live = manager.create(request()).await.unwrap();
+    let live_error = manager.continue_session(live.id).await.unwrap_err();
+    assert!(live_error.to_string().contains("Idle"));
+    assert!(matches!(
+        fake.spawn_request(SessionId(live.id.0 + 1)),
+        Err(PtyError::UnknownSession(_))
+    ));
+    fake.exit(live.id, 0).unwrap();
+    wait_for_state(&manager, live.id, SessionState::Completed).await;
+
+    let reduced_store = Arc::new(Store::open_in_memory().unwrap());
+    let mut reduced = Session::new(
+        SessionId(8),
+        MachineId("test-machine".into()),
+        "/bin/sh",
+        "/work",
+        Timestamp(1),
+    );
+    reduced.origin = SessionOrigin::ShellHook;
+    reduced.capture = CaptureLevel::Commands;
+    reduced
+        .transition(SessionState::Idle, Timestamp(2))
+        .unwrap();
+    reduced
+        .transition(SessionState::Interrupted, Timestamp(3))
+        .unwrap();
+    reduced_store.insert_session(&reduced).unwrap();
+    let (reduced_manager, reduced_fake, reduced_dir) =
+        manager_with_store("continue-reduced", reduced_store);
+    let reduced_error = reduced_manager
+        .continue_session(reduced.id)
+        .await
+        .unwrap_err();
+    assert!(reduced_error.to_string().contains("COMMANDS"));
+    assert!(matches!(
+        reduced_fake.spawn_request(SessionId(9)),
+        Err(PtyError::UnknownSession(_))
+    ));
+
+    fs::remove_dir_all(data_dir).unwrap();
+    assert!(!reduced_dir.exists());
+}
+
+#[tokio::test]
+async fn continuation_store_failure_kills_staged_pty_and_leaves_no_log_or_handle() {
+    let store = Arc::new(Store::open_in_memory().unwrap());
+    let mut source = Session::new(
+        SessionId(1),
+        MachineId("test-machine".into()),
+        "/bin/sh",
+        "/work",
+        Timestamp(1),
+    );
+    source.transition(SessionState::Idle, Timestamp(2)).unwrap();
+    source
+        .transition(SessionState::Completed, Timestamp(3))
+        .unwrap();
+    source.exit_code = Some(0);
+    store.insert_session(&source).unwrap();
+    let (manager, fake, data_dir) = manager_with_store("continue-store-failure", store.clone());
+    // The manager reserved ID 2 at construction. A competing persisted row
+    // forces the real SQLite insert to fail after the PTY has been staged.
+    store
+        .insert_session(&Session::new(
+            SessionId(2),
+            MachineId("test-machine".into()),
+            "/bin/sh",
+            "/other",
+            Timestamp(10),
+        ))
+        .unwrap();
+
+    assert!(manager.continue_session(source.id).await.is_err());
+    assert_eq!(fake.operation_counts(SessionId(2)).unwrap().kills, 1);
+    assert!(matches!(
+        manager.session(SessionId(2)),
+        Err(SessionManagerError::UnknownSession(_))
+    ));
+    assert!(!data_dir.join("sessions/2.log.zst").exists());
+    assert_eq!(store.session(source.id).unwrap().unwrap(), source);
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[derive(Debug)]
+struct FailingPty;
+
+impl PtyBackend for FailingPty {
+    fn spawn(&self, request: &PtySpawnRequest) -> Result<daemon::pty::SpawnedPty, PtyError> {
+        Err(PtyError::Operation {
+            operation: "spawn",
+            session_id: request.session_id,
+            message: "injected failure".into(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn continuation_pty_failure_leaves_source_and_store_unchanged() {
+    let data_dir = temp_dir("continue-pty-failure");
+    let store = Arc::new(Store::open_in_memory().unwrap());
+    let mut source = Session::new(
+        SessionId(1),
+        MachineId("test-machine".into()),
+        "/bin/sh",
+        "/work",
+        Timestamp(1),
+    );
+    source.transition(SessionState::Idle, Timestamp(2)).unwrap();
+    source
+        .transition(SessionState::Interrupted, Timestamp(3))
+        .unwrap();
+    store.insert_session(&source).unwrap();
+    let manager = SessionManager::with_store(
+        Arc::new(FailingPty),
+        SessionManagerConfig {
+            machine_id: MachineId("test-machine".into()),
+            data_dir: data_dir.clone(),
+            scrollback_lines: 3,
+            clock: Arc::new(|| Timestamp(10)),
+        },
+        AuditLog::new(&data_dir),
+        store.clone(),
+    )
+    .unwrap();
+
+    assert!(manager.continue_session(source.id).await.is_err());
+    assert_eq!(store.sessions().unwrap(), vec![source]);
+    assert!(!data_dir.join("sessions/2.log.zst").exists());
+    fs::remove_dir_all(data_dir).unwrap();
 }
 
 #[tokio::test]

@@ -88,6 +88,12 @@ impl AppState {
                     Err(error) => error_action(error),
                 }
             }
+            ClientRequest::ContinueSession { session_id } => {
+                match self.sessions.continue_session(session_id).await {
+                    Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),
+                    Err(error) => error_action(error),
+                }
+            }
             ClientRequest::Attach { session_id } => match self.sessions.attach(session_id) {
                 Ok(attachment) => WsAction::Attach {
                     session_id,

@@ -52,6 +52,30 @@ pub enum SessionManagerError {
     /// This manager was constructed without persistent storage.
     #[error("persistent command history is unavailable")]
     StoreUnavailable,
+    /// A Session cannot be continued from its current capture level.
+    #[error("Session {session_id} capture level {capture} cannot be continued; FULL required")]
+    ContinuationCapture {
+        /// Source Session.
+        session_id: SessionId,
+        /// Rejected capture.
+        capture: CaptureLevel,
+    },
+    /// A Session cannot be continued while its PTY is live.
+    #[error("Session {session_id} is in state {state:?} and cannot be continued")]
+    ContinuationState {
+        /// Source Session.
+        session_id: SessionId,
+        /// Rejected state.
+        state: SessionState,
+    },
+    /// Persisted safe metadata cannot start a descendant.
+    #[error("Session {session_id} has invalid continuation {field}")]
+    ContinuationMetadata {
+        /// Source Session.
+        session_id: SessionId,
+        /// Invalid metadata field.
+        field: &'static str,
+    },
     /// A capture level does not permit a PTY operation.
     #[error("capture level {capture} cannot {operation}")]
     CaptureDenied {

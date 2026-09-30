@@ -2,6 +2,7 @@
 
 mod adopt;
 mod capture;
+mod continuation;
 mod error;
 mod external;
 mod external_lifecycle;
@@ -144,6 +145,8 @@ struct SessionManagerInner {
     observations: broadcast::Sender<DaemonMessage>,
     /// Serializes external shell registration so concurrent reports create one Session.
     registration: Mutex<()>,
+    /// Serializes continuation so a source can never branch in one daemon.
+    continuation: tokio::sync::Mutex<()>,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -204,6 +207,7 @@ impl SessionManager {
                 probe: ProcessProbe::unavailable(),
                 observations: broadcast::channel(256).0,
                 registration: Mutex::new(()),
+                continuation: tokio::sync::Mutex::new(()),
             }),
         }
     }

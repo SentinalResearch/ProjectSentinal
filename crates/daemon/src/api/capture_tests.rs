@@ -20,6 +20,7 @@ use std::{
         Arc,
     },
 };
+use store::Store;
 
 static NEXT_DIR: AtomicU64 = AtomicU64::new(1);
 
@@ -36,7 +37,7 @@ fn state() -> (AppState, Arc<FakePty>, PathBuf) {
         NEXT_DIR.fetch_add(1, Ordering::Relaxed)
     ));
     let fake = Arc::new(FakePty::new());
-    let manager = SessionManager::new(
+    let manager = SessionManager::with_store(
         fake.clone(),
         SessionManagerConfig {
             machine_id: MachineId("test-machine".into()),
@@ -45,7 +46,9 @@ fn state() -> (AppState, Arc<FakePty>, PathBuf) {
             clock: Arc::new(|| Timestamp(1_790_000_000_000)),
         },
         AuditLog::new(&data_dir),
-    );
+        Arc::new(Store::open_in_memory().unwrap()),
+    )
+    .unwrap();
     let machine = Machine {
         id: MachineId("test-machine".into()),
         name: "Test Machine".into(),
@@ -167,5 +170,54 @@ async fn full_capture_ui_session_keeps_attach_resize_and_input() {
     let audit = std::fs::read_to_string(data_dir.join("audit.jsonl")).unwrap();
     assert!(!audit.contains("ls\\r") && audit.contains("\"byte_count\":3"));
     fake.exit(id, 0).unwrap();
+    std::fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
+async fn continue_request_is_idempotent_and_connection_stays_usable() {
+    let (state, fake, data_dir) = state();
+    let source_id = create_ui_session(&state).await;
+    fake.exit(source_id, 0).unwrap();
+    tokio::time::timeout(std::time::Duration::from_millis(100), async {
+        loop {
+            if state.sessions.session(source_id).unwrap().state == SessionState::Completed {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+
+    let first = match dispatch(
+        &state,
+        ClientRequest::ContinueSession {
+            session_id: source_id,
+        },
+    )
+    .await
+    {
+        WsAction::Reply(DaemonMessage::SessionUpdated { session }) => session,
+        _ => panic!("expected continued SESSION_UPDATED"),
+    };
+    let second = match dispatch(
+        &state,
+        ClientRequest::ContinueSession {
+            session_id: source_id,
+        },
+    )
+    .await
+    {
+        WsAction::Reply(DaemonMessage::SessionUpdated { session }) => session,
+        _ => panic!("expected idempotent SESSION_UPDATED"),
+    };
+
+    assert_eq!(first.id, second.id);
+    assert_eq!(first.continued_from, Some(source_id));
+    assert!(matches!(
+        dispatch(&state, ClientRequest::ListSessions).await,
+        WsAction::Reply(DaemonMessage::Sessions { sessions }) if sessions.len() == 2
+    ));
+    fake.exit(first.id, 0).unwrap();
     std::fs::remove_dir_all(data_dir).unwrap();
 }

@@ -3,8 +3,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use protocol::{
-    Command, CommandId, Event, EventId, EventKind, MachineId, Session, SessionId, SessionState,
-    Timestamp,
+    CaptureLevel, Command, CommandId, Event, EventId, EventKind, MachineId, Session, SessionId,
+    SessionState, Timestamp,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 use store::{RawMetricSample, Store};
@@ -63,7 +63,7 @@ fn command(id: u64, session_id: u64, text: &str, at: i64) -> Command {
 #[test]
 fn migrations_from_empty_database_enable_wal_and_create_every_table() {
     let store = Store::open_in_memory().unwrap();
-    assert_eq!(store.schema_version().unwrap(), 1);
+    assert_eq!(store.schema_version().unwrap(), 2);
     assert_eq!(store.journal_mode().unwrap(), "memory");
     for table in [
         "machines",
@@ -309,7 +309,7 @@ fn pre_1b_session_json_loads_with_safe_defaults_and_updates_without_migration() 
     assert_eq!(loaded.capture, protocol::CaptureLevel::Full);
     assert_eq!(loaded.pid, None);
     store.update_session(&loaded).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 1);
+    assert_eq!(store.schema_version().unwrap(), 2);
     drop(store);
     std::fs::remove_file(path).unwrap();
 }
@@ -364,4 +364,234 @@ fn restart_interrupts_only_daemon_owned_sessions_and_lists_the_rest_as_live() {
         SessionState::Interrupted
     );
     assert_eq!(store.live_sessions().unwrap(), vec![hooked]);
+}
+
+fn finished_session(id: u64) -> Session {
+    let mut value = session(id, SessionState::Idle);
+    value
+        .transition(SessionState::Completed, Timestamp(200))
+        .unwrap();
+    value.exit_code = Some(0);
+    value
+}
+
+fn continuation(id: u64, predecessor: u64) -> Session {
+    let mut value = session(id, SessionState::Idle);
+    value.continued_from = Some(SessionId(predecessor));
+    value
+}
+
+#[test]
+fn lineage_is_queryable_from_every_generation_and_has_one_successor() {
+    let store = Store::open_in_memory().unwrap();
+    store.insert_session(&finished_session(1)).unwrap();
+    let mut second = continuation(2, 1);
+    store.insert_continuation(SessionId(1), &second).unwrap();
+    second
+        .transition(SessionState::Completed, Timestamp(300))
+        .unwrap();
+    second.exit_code = Some(0);
+    store.update_session(&second).unwrap();
+    let third = continuation(3, 2);
+    store.insert_continuation(SessionId(2), &third).unwrap();
+
+    assert_eq!(store.predecessor(SessionId(1)).unwrap(), None);
+    assert_eq!(
+        store.predecessor(SessionId(2)).unwrap().unwrap().id,
+        SessionId(1)
+    );
+    assert_eq!(
+        store.direct_successor(SessionId(1)).unwrap().unwrap().id,
+        SessionId(2)
+    );
+    assert_eq!(
+        store
+            .ordered_lineage(SessionId(2))
+            .unwrap()
+            .iter()
+            .map(|value| value.id.0)
+            .collect::<Vec<_>>(),
+        vec![1, 2, 3]
+    );
+    assert_eq!(
+        store.latest_generation(SessionId(1)).unwrap().id,
+        SessionId(3)
+    );
+
+    let error = store
+        .insert_continuation(SessionId(1), &continuation(4, 1))
+        .unwrap_err();
+    assert!(error.to_string().contains("successor Session #2"));
+}
+
+#[test]
+fn continuation_rejects_missing_self_cross_machine_live_and_reduced_sources() {
+    let store = Store::open_in_memory().unwrap();
+    let missing = store
+        .insert_continuation(SessionId(99), &continuation(2, 99))
+        .unwrap_err();
+    assert!(missing.to_string().contains("session 99"));
+
+    let mut self_reference = continuation(3, 3);
+    let self_error = store
+        .insert_continuation(SessionId(3), &self_reference)
+        .unwrap_err();
+    assert!(self_error.to_string().contains("itself"));
+
+    store.insert_session(&finished_session(1)).unwrap();
+    self_reference.continued_from = Some(SessionId(1));
+    self_reference.machine_id = MachineId("another-machine".into());
+    let cross_machine = store
+        .insert_continuation(SessionId(1), &self_reference)
+        .unwrap_err();
+    assert!(cross_machine.to_string().contains("another-machine"));
+
+    store
+        .insert_session(&session(10, SessionState::Idle))
+        .unwrap();
+    let live = store
+        .insert_continuation(SessionId(10), &continuation(11, 10))
+        .unwrap_err();
+    assert!(live.to_string().contains("Idle"));
+
+    let mut reduced = finished_session(20);
+    reduced.origin = protocol::SessionOrigin::ShellHook;
+    reduced.capture = CaptureLevel::Commands;
+    reduced.exit_code = None;
+    store.insert_session(&reduced).unwrap();
+    let reduced_error = store
+        .insert_continuation(SessionId(20), &continuation(21, 20))
+        .unwrap_err();
+    assert!(reduced_error.to_string().contains("COMMANDS"));
+}
+
+#[test]
+fn session_updates_cannot_change_the_authoritative_lineage_column() {
+    let store = Store::open_in_memory().unwrap();
+    store.insert_session(&finished_session(1)).unwrap();
+    let mut child = continuation(2, 1);
+    store.insert_continuation(SessionId(1), &child).unwrap();
+
+    child.continued_from = None;
+    let error = store.update_session(&child).unwrap_err();
+    assert!(error.to_string().contains("lineage"));
+    assert_eq!(
+        store.session(SessionId(2)).unwrap().unwrap().continued_from,
+        Some(SessionId(1))
+    );
+}
+
+#[test]
+fn version_one_database_migrates_without_resetting_legacy_sessions() {
+    let path = std::env::temp_dir().join(format!(
+        "terminal-agent-store-lineage-migration-{}-{}.sqlite3",
+        std::process::id(),
+        NEXT_DATABASE.fetch_add(1, Ordering::Relaxed)
+    ));
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE schema_version (version INTEGER PRIMARY KEY NOT NULL);\
+             INSERT INTO schema_version(version) VALUES (1);",
+        )
+        .unwrap();
+    connection
+        .execute_batch(include_str!("../migrations/001_initial.sql"))
+        .unwrap();
+    let legacy = r#"{"id":1,"machine_id":"test-machine","project_id":null,"title":null,"shell":"/bin/sh","cwd":"/work","state":"COMPLETED","current_command":null,"origin":"UI","capture":"FULL","pid":null,"process_started_at":null,"exit_code":0,"log":null,"created_at":100,"updated_at":200}"#;
+    connection
+        .execute(
+            "INSERT INTO sessions(id,state,updated_at,json) VALUES (1,'COMPLETED',200,?1)",
+            [legacy],
+        )
+        .unwrap();
+    drop(connection);
+
+    let store = Store::open(&path).unwrap();
+    assert_eq!(store.schema_version().unwrap(), 2);
+    assert_eq!(
+        store.session(SessionId(1)).unwrap().unwrap().continued_from,
+        None
+    );
+    drop(store);
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn malformed_persisted_cycles_and_missing_ancestors_do_not_loop() {
+    let path = std::env::temp_dir().join(format!(
+        "terminal-agent-store-malformed-lineage-{}-{}.sqlite3",
+        std::process::id(),
+        NEXT_DATABASE.fetch_add(1, Ordering::Relaxed)
+    ));
+    let store = Store::open(&path).unwrap();
+    store.insert_session(&finished_session(1)).unwrap();
+    store.insert_session(&finished_session(2)).unwrap();
+    drop(store);
+
+    let mut first = finished_session(1);
+    first.continued_from = Some(SessionId(2));
+    let mut second = finished_session(2);
+    second.continued_from = Some(SessionId(1));
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute(
+            "UPDATE sessions SET continued_from=2, json=?1 WHERE id=1",
+            [serde_json::to_string(&first).unwrap()],
+        )
+        .unwrap();
+    connection
+        .execute(
+            "UPDATE sessions SET continued_from=1, json=?1 WHERE id=2",
+            [serde_json::to_string(&second).unwrap()],
+        )
+        .unwrap();
+    drop(connection);
+
+    let store = Store::open(&path).unwrap();
+    let cycle = store.ordered_lineage(SessionId(1)).unwrap_err();
+    assert!(cycle.to_string().contains("cycle"));
+    drop(store);
+
+    second.continued_from = Some(SessionId(999));
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", "OFF")
+        .unwrap();
+    connection
+        .execute(
+            "UPDATE sessions SET continued_from=999, json=?1 WHERE id=2",
+            [serde_json::to_string(&second).unwrap()],
+        )
+        .unwrap();
+    drop(connection);
+    let store = Store::open(&path).unwrap();
+    let missing = store.ordered_lineage(SessionId(2)).unwrap_err();
+    assert!(missing.to_string().contains("missing Session #999"));
+    drop(store);
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn mismatched_json_and_lineage_column_is_rejected_on_read() {
+    let path = std::env::temp_dir().join(format!(
+        "terminal-agent-store-lineage-drift-{}-{}.sqlite3",
+        std::process::id(),
+        NEXT_DATABASE.fetch_add(1, Ordering::Relaxed)
+    ));
+    let store = Store::open(&path).unwrap();
+    store.insert_session(&finished_session(1)).unwrap();
+    store.insert_session(&finished_session(2)).unwrap();
+    drop(store);
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute("UPDATE sessions SET continued_from=1 WHERE id=2", [])
+        .unwrap();
+    drop(connection);
+
+    let store = Store::open(&path).unwrap();
+    let error = store.session(SessionId(2)).unwrap_err();
+    assert!(error.to_string().contains("lineage mismatch"));
+    drop(store);
+    std::fs::remove_file(path).unwrap();
 }
