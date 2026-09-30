@@ -57,6 +57,10 @@ export interface TerminalPaneProps {
   /** The key bar's Ctrl-C key always opens a confirm dialog — it never sends the byte directly (rule 5). */
   onRequestInterrupt?: () => void;
   onDimensionsChange?: (cols: number, rows: number) => void;
+  /** Force a historical generation read-only even if persisted state is malformed. */
+  forceReadOnly?: boolean;
+  /** Maximum decompressed saved bytes this pane may fetch. */
+  replayLimitBytes?: number;
   className?: string;
 }
 
@@ -83,6 +87,8 @@ export function TerminalPane({
   onAttachedChange,
   onRequestInterrupt,
   onDimensionsChange,
+  forceReadOnly = false,
+  replayLimitBytes,
   className,
 }: TerminalPaneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -92,7 +98,8 @@ export function TerminalPane({
   const seenEventCount = useRef(0);
   const [replayWarning, setReplayWarning] = useState<string | null>(null);
   const [replayError, setReplayError] = useState<string | null>(null);
-  const readOnly = isReadOnlyTerminalState(session.state);
+  const [replayTruncated, setReplayTruncated] = useState(false);
+  const readOnly = forceReadOnly || isReadOnlyTerminalState(session.state);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -165,12 +172,16 @@ export function TerminalPane({
     let cancelled = false;
     setReplayWarning(null);
     setReplayError(null);
+    setReplayTruncated(false);
     void dataAdapter
       .replayOutput(sessionId, (chunk) => {
         if (!cancelled) terminal.write(chunk);
-      })
+      }, replayLimitBytes === undefined ? undefined : { maxBytes: replayLimitBytes })
       .then((result) => {
-        if (!cancelled) setReplayWarning(result.warning ?? null);
+        if (!cancelled) {
+          setReplayWarning(result.warning ?? null);
+          setReplayTruncated(result.truncated ?? false);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) setReplayError(error instanceof Error ? error.message : "Saved output could not be loaded.");
@@ -178,7 +189,7 @@ export function TerminalPane({
     return () => {
       cancelled = true;
     };
-  }, [readOnly, sessionId, terminal]);
+  }, [readOnly, replayLimitBytes, sessionId, terminal]);
 
   // Mock mode: seed scrollback from the session's events, then replay only newly
   // appended ones as they arrive (LiveDataContext keeps `session.events` growing).
@@ -200,7 +211,7 @@ export function TerminalPane({
   // Mock mode: local line buffering — bytes typed into the terminal become one
   // sendInput() call per line (Enter), mirroring how a real shell prompt behaves.
   useEffect(() => {
-    if (!isMockData || !terminal) return;
+    if (!isMockData || !terminal || readOnly) return;
     const disposable = terminal.onData((data) => {
       for (const ch of data) {
         const code = ch.charCodeAt(0);
@@ -266,6 +277,11 @@ export function TerminalPane({
         aria-readonly={readOnly}
       />
       {replayWarning && <p className={styles.replayWarning} role="alert">Saved output warning: {replayWarning}</p>}
+      {replayTruncated && (
+        <p className={styles.replayWarning} role="status">
+          Output truncated in this view; the remaining saved output was not deleted.
+        </p>
+      )}
       {replayError && <p className={styles.replayWarning} role="alert">{replayError}</p>}
       {showKeyBar && !readOnly && (
         <div className={styles.keyBar} aria-label="Terminal keys">

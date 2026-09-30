@@ -67,17 +67,21 @@ describe("SessionDetailPage", () => {
     expect(screen.getByTestId("terminal-host")).toHaveAttribute("aria-readonly", "true");
   });
 
-  it("continues a finished Session under a distinct ID without its old Command", async () => {
+  it("continues once into persisted-looking history with isolated read-only output", async () => {
     renderSession("/app/sessions/pytest");
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "pytest" });
 
-    await user.click(screen.getByRole("button", { name: "Continue in new Session" }));
+    await user.dblClick(screen.getByRole("button", { name: "Continue in new Session" }));
 
-    expect(await screen.findByRole("heading", { name: "pytest (continued)" })).toBeInTheDocument();
-    expect(screen.queryByText("pytest tests/")).not.toBeInTheDocument();
-    expect(screen.getByText(/New Session ID:/)).toHaveTextContent(/New Session ID: session-\d+/);
-    expect(screen.getByTestId("terminal-host")).toHaveAttribute("aria-readonly", "false");
+    expect(await screen.findByText("Generation 2 of 2", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "pytest" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("pytest tests/")).not.toBeInTheDocument());
+    expect(screen.getByText(/Session pytest ended — continued as Session session-/)).toBeInTheDocument();
+    const terminals = screen.getAllByTestId("terminal-host");
+    expect(terminals).toHaveLength(2);
+    expect(terminals[0]).toHaveAttribute("aria-readonly", "true");
+    expect(terminals[1]).toHaveAttribute("aria-readonly", "false");
   });
 
   it("renders the waiting panel with y/n for a WAITING session", async () => {

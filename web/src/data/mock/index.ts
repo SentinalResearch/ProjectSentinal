@@ -49,8 +49,34 @@ export const mockAdapter: DataAdapter = {
     return { ...session };
   },
 
+  async continueSession(sessionId) {
+    await delay(undefined);
+    const existing = store.sessions.find((session) => session.continuedFrom === sessionId);
+    if (existing) return { ...existing };
+    const source = findSession(sessionId);
+    const id = `session-${Date.now()}`;
+    const session: Session = {
+      id,
+      machine: source.machine,
+      name: source.name,
+      project: source.project,
+      cwd: source.cwd,
+      shell: source.shell,
+      state: "IDLE",
+      origin: "UI",
+      capture: "FULL",
+      continuedFrom: source.id,
+      createdAt: Date.now(),
+      runningFor: "0s",
+      events: [],
+    };
+    store.sessions.push(session);
+    updateSession(id, { state: "IDLE" });
+    return { ...session };
+  },
+
   async replayOutput() {
-    return {};
+    return { bytesRead: 0 };
   },
 
   async getRecipes() {
@@ -59,6 +85,7 @@ export const mockAdapter: DataAdapter = {
 
   async getHistory(filters?: HistoryFilters) {
     let entries = store.history;
+    if (filters?.sessionId) entries = entries.filter((h) => h.sessionId === filters.sessionId);
     if (filters?.machine) entries = entries.filter((h) => h.machine === filters.machine);
     if (filters?.project) entries = entries.filter((h) => h.project === filters.project);
     if (filters?.result === "ok") entries = entries.filter((h) => h.ok === true);

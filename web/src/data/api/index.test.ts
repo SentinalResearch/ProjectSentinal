@@ -186,6 +186,12 @@ class FakeSocket implements ApiSocket {
     if (request.type === "GET_MACHINE") payload = { type: "MACHINE", machine };
     else if (request.type === "LIST_SESSIONS") payload = { type: "SESSIONS", sessions: [session] };
     else if (request.type === "CREATE_SESSION") payload = { type: "SESSION_UPDATED", session };
+    else if (request.type === "CONTINUE_SESSION") {
+      payload = {
+        type: "SESSION_UPDATED",
+        session: { ...session, id: 2, state: "IDLE", continued_from: request.session_id },
+      };
+    }
     else if (request.type === "KILL") {
       payload = { type: "SESSION_UPDATED", session: { ...session, state: "INTERRUPTED" } };
     } else if (request.type === "GET_HISTORY" || request.type === "SEARCH_COMMANDS") {
@@ -333,28 +339,17 @@ describe("apiAdapter authentication", () => {
     unsubscribe();
   });
 
-  it("continues with only safe Session metadata and no old Command", async () => {
+  it("continues through the dedicated idempotent daemon request", async () => {
     const { adapter, sockets } = setup();
     await adapter.auth.login("correct horse battery staple");
 
-    await adapter.createSession({
-      shell: "/bin/zsh",
-      cwd: "/safe/work",
-      title: "Training (continued)",
-      cols: 132,
-      rows: 42,
-    });
+    const continued = await adapter.continueSession("1");
 
     expect(sockets[0].requests.at(-1)).toEqual({
-      type: "CREATE_SESSION",
-      shell: "/bin/zsh",
-      cwd: "/safe/work",
-      cols: 132,
-      rows: 42,
-      origin: "UI",
-      title: "Training (continued)",
-      command: null,
+      type: "CONTINUE_SESSION",
+      session_id: 1,
     });
+    expect(continued).toMatchObject({ id: "2", continuedFrom: "1" });
   });
 
   it("pages authenticated saved output as bytes and reports decoder warnings", async () => {
@@ -369,6 +364,21 @@ describe("apiAdapter authentication", () => {
     expect(server.outputRequests).toHaveLength(2);
     expect(server.outputRequests[0].searchParams.get("offset")).toBe("0");
     expect(server.outputRequests[1].searchParams.get("offset")).toBe("6");
+  });
+
+  it("stops replay at the caller's total history budget", async () => {
+    const { adapter, server } = setup();
+    await adapter.auth.login("correct horse battery staple");
+    const chunks: Uint8Array[] = [];
+
+    const replay = await adapter.replayOutput("1", (chunk) => chunks.push(chunk), {
+      maxBytes: 6,
+    });
+
+    expect(new TextDecoder().decode(chunks[0])).toBe("saved ");
+    expect(replay).toMatchObject({ bytesRead: 6, truncated: true });
+    expect(server.outputRequests).toHaveLength(1);
+    expect(server.outputRequests[0].searchParams.get("limit")).toBe("6");
   });
 
   it("never mistakes an unsolicited observation for a create or kill reply", async () => {
@@ -397,6 +407,9 @@ describe("apiAdapter authentication", () => {
       }),
     ]);
     expect(sockets[0].requests).toContainEqual({ type: "SEARCH_COMMANDS", query: "train", limit: 500 });
+
+    await adapter.getHistory({ sessionId: "1" });
+    expect(sockets[0].requests).toContainEqual({ type: "GET_HISTORY", session_id: 1, limit: 500 });
   });
 
   it("maps reduced-capture command, event, and metric observations", async () => {

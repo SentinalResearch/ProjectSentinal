@@ -13,6 +13,7 @@ import type {
 } from "./types";
 
 export interface HistoryFilters {
+  sessionId?: string;
   machine?: string;
   project?: string;
   result?: "ok" | "failed" | "running";
@@ -29,6 +30,12 @@ export interface CreateSessionOptions {
 
 export interface OutputReplayResult {
   warning?: string;
+  bytesRead: number;
+  truncated?: boolean;
+}
+
+export interface OutputReplayOptions {
+  maxBytes?: number;
 }
 
 export type LiveEvent =
@@ -56,9 +63,11 @@ export interface DataAdapter {
   getMachines(): Promise<Machine[]>;
   getSessions(): Promise<Session[]>;
   createSession(options?: CreateSessionOptions): Promise<Session>;
+  continueSession(sessionId: string): Promise<Session>;
   replayOutput(
     sessionId: string,
     onChunk: (chunk: Uint8Array) => void,
+    options?: OutputReplayOptions,
   ): Promise<OutputReplayResult>;
   getRecipes(): Promise<Recipe[]>;
   getHistory(filters?: HistoryFilters): Promise<HistoryEntry[]>;

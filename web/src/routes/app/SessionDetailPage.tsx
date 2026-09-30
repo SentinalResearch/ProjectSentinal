@@ -1,11 +1,12 @@
-import { useCallback, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { CaptureBadge } from "../../components/CaptureBadge";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
+import { resolveSessionLineage } from "../../data/lineage";
 import type { Session } from "../../data/types";
 import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../data/capture";
 import {
@@ -16,43 +17,25 @@ import {
   sessionKind,
 } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
-import { TerminalPane } from "../../terminal/TerminalPane";
 import { isReadOnlyTerminalState } from "../../terminal/lifecycle";
 import { EventsList } from "./EventsList";
 import { HealthCard } from "./HealthCard";
 import { SessionTopBlock } from "./SessionTopBlock";
+import { SessionHistoryTerminals } from "./SessionHistoryTerminals";
+import { SessionCommands } from "./SessionCommands";
 import { ResourceBars } from "./ResourceBars";
 import styles from "./SessionDetailPage.module.css";
 
 const INTERRUPTIBLE = new Set(["RUNNING", "WAITING", "STALLED"]);
-const MAX_TITLE_BYTES = 256;
-
-function continuedTitle(name: string): string {
-  const suffix = " (continued)";
-  const encoder = new TextEncoder();
-  let base = name;
-  while (base.length > 0 && encoder.encode(`${base}${suffix}`).length > MAX_TITLE_BYTES) {
-    base = Array.from(base).slice(0, -1).join("");
-  }
-  return `${base || "Session"}${suffix}`;
-}
-
 /** design_handoff_sentinal/design/SentinalSession.dc.html */
 export function SessionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const { machines, sessions, loading } = useLiveData();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [attached, setAttached] = useState(false);
-  const [dimensions, setDimensions] = useState<{ cols: number; rows: number }>();
   const [continuing, setContinuing] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
-  const rememberDimensions = useCallback((cols: number, rows: number) => {
-    setDimensions((current) =>
-      current?.cols === cols && current.rows === rows ? current : { cols, rows },
-    );
-  }, []);
 
   const session = sessions.find((s) => s.id === id);
   const machine = session ? machines.find((m) => m.id === session.machine) : undefined;
@@ -71,6 +54,17 @@ export function SessionDetailPage() {
     );
   }
 
+  let lineage;
+  let lineageError: string | null = null;
+  try {
+    lineage = resolveSessionLineage(sessions, session.id);
+  } catch (error) {
+    lineageError = error instanceof Error ? error.message : "Session history is invalid.";
+    lineage = resolveSessionLineage([session], session.id);
+  }
+  const latest = lineage.latest;
+  const root = lineage.ordered[0];
+
   const kind = sessionKind(session);
   const interrupted = session.state === "INTERRUPTED";
   const capture = captureOf(session);
@@ -78,10 +72,10 @@ export function SessionDetailPage() {
   const unknownExit = exitUnknown(session);
   const hint = logHint(session);
   const readOnly = isReadOnlyTerminalState(session.state);
-  const canContinue = readOnly && capture === "FULL";
-  const continuation = location.state as { continuedFrom?: string } | null;
+  const canContinue = session.id === latest.id && readOnly && capture === "FULL";
   // Ctrl-C is terminal input: only offered when the daemon allows input.
-  const canInterrupt = capabilities.canSendInput && INTERRUPTIBLE.has(session.state);
+  const latestCapabilities = captureCapabilities(captureOf(latest));
+  const canInterrupt = latestCapabilities.canSendInput && INTERRUPTIBLE.has(latest.state);
   const hasHealth = Boolean(session.health);
   const healthLabel = interrupted ? "INTERRUPTED" : (session.health?.overall ?? "");
   const healthSlug = interrupted ? "interrupted" : healthColorSlug(session.health?.overall ?? "");
@@ -100,11 +94,11 @@ export function SessionDetailPage() {
 
   function confirmCtrlC() {
     setConfirmOpen(false);
-    if (session) void dataAdapter.sendSignal(session.id, "SIGINT");
+    void dataAdapter.sendSignal(latest.id, "SIGINT");
   }
 
   function answerPrompt(value: "y" | "n") {
-    if (session) void dataAdapter.sendInput(session.id, value);
+    void dataAdapter.sendInput(latest.id, value);
   }
 
   function rerun() {
@@ -119,15 +113,9 @@ export function SessionDetailPage() {
     setContinuing(true);
     setContinueError(null);
     try {
-      const created = await dataAdapter.createSession({
-        shell: source.shell,
-        cwd: source.cwd,
-        title: continuedTitle(source.name),
-        cols: dimensions?.cols,
-        rows: dimensions?.rows,
-      });
+      const created = await dataAdapter.continueSession(source.id);
       setContinuing(false);
-      navigate(`/app/sessions/${created.id}`, { state: { continuedFrom: source.id } });
+      navigate(`/app/sessions/${created.id}`);
     } catch (error) {
       setContinueError(error instanceof Error ? error.message : "Could not create a new Session.");
       setContinuing(false);
@@ -145,13 +133,16 @@ export function SessionDetailPage() {
           {machineName}
         </button>
         <span>/</span>
-        <span className={styles.breadcrumbName}>{session.name}</span>
+        <span className={styles.breadcrumbName}>{root.name}</span>
       </nav>
 
       <header className={styles.header}>
         <div className={styles.headerText}>
           <div className={styles.titleRow}>
-            <h1 className={styles.title}>{session.name}</h1>
+            <h1 className={styles.title}>{root.name}</h1>
+            <span className={styles.generationMarker}>
+              Generation {lineage.selectedIndex + 1} of {lineage.ordered.length}
+            </span>
             <StateTag state={session.state} exitUnknown={unknownExit} />
             <CaptureBadge capture={capture} />
             {hasHealth && (
@@ -186,9 +177,18 @@ export function SessionDetailPage() {
               type="button"
               className={styles.continueButton}
               disabled={continuing}
-              onClick={() => void continueInNewSession(session)}
+              onClick={() => void continueInNewSession(latest)}
             >
               {continuing ? "Creating Session…" : "Continue in new Session"}
+            </button>
+          )}
+          {session.id !== latest.id && (
+            <button
+              type="button"
+              className={styles.continueButton}
+              onClick={() => navigate(`/app/sessions/${latest.id}`)}
+            >
+              View latest Session
             </button>
           )}
         </div>
@@ -206,11 +206,7 @@ export function SessionDetailPage() {
           </strong>
         </div>
       )}
-      {continuation?.continuedFrom && (
-        <div className={styles.newSessionBanner} role="status">
-          New Session ID: {session.id} · continued from Session {continuation.continuedFrom}
-        </div>
-      )}
+      {lineageError && <p className={styles.continueError} role="alert">{lineageError}</p>}
       {continueError && <p className={styles.continueError} role="alert">{continueError}</p>}
 
       <SessionTopBlock
@@ -224,6 +220,7 @@ export function SessionDetailPage() {
           /* the terminal is always visible below; nothing to scroll to on this layout */
         }}
       />
+      <SessionCommands sessionId={session.id} />
       <ResourceBars metrics={session.metrics} />
 
       <div className={styles.body}>
@@ -244,12 +241,13 @@ export function SessionDetailPage() {
             )}
           </div>
           {capabilities.canAttach ? (
-            <TerminalPane
-              sessionId={session.id}
-              session={session}
+            <SessionHistoryTerminals
+              lineage={lineage}
+              selectedId={session.id}
+              machineName={machineName}
+              onSelect={(sessionId) => navigate(`/app/sessions/${sessionId}`)}
               onAttachedChange={setAttached}
               onRequestInterrupt={askCtrlC}
-              onDimensionsChange={rememberDimensions}
             />
           ) : (
             <p className={styles.terminalUnavailable} role="note">
@@ -267,8 +265,8 @@ export function SessionDetailPage() {
       <ConfirmDialog
         open={confirmOpen}
         overline={`INTERRUPT · ${machineName.toUpperCase()}`}
-        question={`Send Ctrl‑C to ${session.name}?`}
-        consequence={confirmConsequence(session, machineName)}
+        question={`Send Ctrl‑C to ${latest.name}?`}
+        consequence={confirmConsequence(latest, machineName)}
         confirmLabel="Send Ctrl‑C"
         onConfirm={confirmCtrlC}
         onCancel={() => setConfirmOpen(false)}

@@ -73,7 +73,7 @@ test("a Watch-created FULL session appears and attaches", async ({ page }) => {
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
-test("a finished Session replays read-only and continues under a new ID", async ({ page }) => {
+test("three Session generations survive reload with input only on the latest", async ({ page }) => {
   const sentFrames: unknown[] = [];
   page.on("websocket", (socket) => {
     socket.on("framesent", (event) => sentFrames.push(event.payload));
@@ -144,13 +144,61 @@ test("a finished Session replays read-only and continues under a new ID", async 
 
   await page.getByRole("button", { name: "Continue in new Session" }).click();
   await expect(page).toHaveURL(new RegExp(`/app/sessions/(?!${finished.id}$)\\d+$`));
-  const continuedId = Number(page.url().split("/").at(-1));
-  expect(continuedId).not.toBe(finished.id);
-  await expect(page.getByText(new RegExp(`New Session ID: ${continuedId}`))).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Finished record (continued)" })).toBeVisible();
+  const secondId = Number(page.url().split("/").at(-1));
+  expect(secondId).not.toBe(finished.id);
+  await expect(page.getByRole("heading", { name: "Finished record" })).toBeVisible();
+  await expect(page.getByText(`Session ${finished.id} ended — continued as Session ${secondId}`)).toBeVisible();
+  await expect(page.getByText("Generation 2 of 2", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("attached", { exact: true })).toBeVisible();
 
-  const createRequests = sentFrames
+  await page.reload();
+  await expect(page.getByText(`Session ${finished.id} ended — continued as Session ${secondId}`)).toBeVisible();
+
+  await page.evaluate(
+    (sessionId) =>
+      new Promise<void>((resolve, reject) => {
+        const socket = new WebSocket(`ws://${window.location.host}/api/v1/ws?token=test-token`);
+        socket.onerror = () => reject(new Error("websocket failed"));
+        socket.onopen = () =>
+          socket.send(JSON.stringify({ version: 1, payload: { type: "KILL", session_id: sessionId } }));
+        socket.onmessage = (message) => {
+          const envelope = JSON.parse(String(message.data));
+          if (envelope.payload.type === "ERROR") reject(new Error(envelope.payload.message));
+          if (envelope.payload.type === "SESSION_UPDATED" && envelope.payload.session?.state === "INTERRUPTED") {
+            socket.close();
+            resolve();
+          }
+        };
+      }),
+    secondId,
+  );
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Continue in new Session" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue in new Session" }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/sessions/(?!${secondId}$)\\d+$`));
+  const thirdId = Number(page.url().split("/").at(-1));
+  expect(new Set([finished.id, secondId, thirdId]).size).toBe(3);
+  await expect(page.getByText("Generation 3 of 3", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(`Session ${secondId} ended — continued as Session ${thirdId}`)).toBeVisible();
+
+  await page.reload();
+  const terminalHosts = page.getByTestId("terminal-host");
+  await expect(terminalHosts).toHaveCount(3);
+  await expect(terminalHosts.nth(0)).toHaveAttribute("aria-readonly", "true");
+  await expect(terminalHosts.nth(1)).toHaveAttribute("aria-readonly", "true");
+  await expect(terminalHosts.nth(2)).toHaveAttribute("aria-readonly", "false");
+
+  const binaryBeforeHistoricalInput = sentFrames.filter((frame) => typeof frame !== "string").length;
+  await terminalHosts.nth(0).click();
+  await page.keyboard.type("must remain history");
+  expect(sentFrames.filter((frame) => typeof frame !== "string")).toHaveLength(binaryBeforeHistoricalInput);
+
+  await terminalHosts.nth(2).click();
+  await page.keyboard.type("latest generation input");
+  await expect.poll(() => sentFrames.filter((frame) => typeof frame !== "string").length)
+    .toBeGreaterThan(binaryBeforeHistoricalInput);
+
+  const requests = sentFrames
     .filter((frame): frame is string => typeof frame === "string")
     .map((frame) => {
       try {
@@ -159,11 +207,10 @@ test("a finished Session replays read-only and continues under a new ID", async 
         return null;
       }
     })
-    .filter((payload) => payload?.type === "CREATE_SESSION");
-  expect(createRequests.at(-1)).toMatchObject({
-    type: "CREATE_SESSION",
-    origin: "UI",
-    cwd: "/tmp",
-    command: null,
-  });
+    .filter(Boolean);
+  expect(requests.filter((payload) => payload?.type === "CONTINUE_SESSION")).toEqual([
+    { type: "CONTINUE_SESSION", session_id: finished.id },
+    { type: "CONTINUE_SESSION", session_id: secondId },
+  ]);
+  expect(requests.filter((payload) => payload?.type === "CREATE_SESSION")).toHaveLength(1);
 });

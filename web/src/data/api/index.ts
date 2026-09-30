@@ -113,6 +113,11 @@ export function mapSession(session: WireSession): Session {
     capture: session.capture,
     exitCode: session.exit_code,
     log: session.log ?? undefined,
+    continuedFrom: session.continued_from === null || session.continued_from === undefined
+      ? undefined
+      : String(session.continued_from),
+    createdAt: session.created_at,
+    updatedAt: session.updated_at,
   };
 }
 
@@ -362,13 +367,29 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       if (message.type !== "SESSION_UPDATED") throw daemonError("missing created session");
       return mapSession(message.session);
     },
-    async replayOutput(sessionId, onChunk) {
+    async continueSession(sessionId) {
+      const sourceId = Number(sessionId);
+      const message = await transport.request(
+        { type: "CONTINUE_SESSION", session_id: sourceId },
+        (reply) =>
+          reply.type === "SESSION_UPDATED" &&
+          reply.session.capture === "FULL" &&
+          reply.session.continued_from === sourceId,
+      );
+      if (message.type !== "SESSION_UPDATED") throw daemonError("missing continued Session");
+      return mapSession(message.session);
+    },
+    async replayOutput(sessionId, onChunk, options = {}) {
       const token = storage.getItem(SESSION_TOKEN_KEY);
       if (!token) throw daemonError("missing browser session");
+      const maximum = Math.min(64 * 1024 * 1024, Math.max(1, Math.floor(options.maxBytes ?? 64 * 1024 * 1024)));
       let offset = 0;
+      let bytesRead = 0;
       let warning: string | undefined;
       for (let page = 0; page < 256; page += 1) {
-        const endpoint = `${authBaseUrl}/sessions/${encodeURIComponent(sessionId)}/output?offset=${offset}&limit=262144`;
+        const limit = Math.min(262144, maximum - bytesRead);
+        if (limit <= 0) return warning ? { warning, bytesRead, truncated: true } : { bytesRead, truncated: true };
+        const endpoint = `${authBaseUrl}/sessions/${encodeURIComponent(sessionId)}/output?offset=${offset}&limit=${limit}`;
         const response = await fetcher(endpoint, {
           headers: { authorization: `Bearer ${token}` },
         });
@@ -383,10 +404,15 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
           throw daemonError(message);
         }
         const chunk = new Uint8Array(await response.arrayBuffer());
+        if (chunk.length > limit) throw daemonError("saved output exceeded the requested page limit");
         if (chunk.length > 0) onChunk(chunk);
+        bytesRead += chunk.length;
         warning = response.headers.get("x-sentinal-output-warning") ?? warning;
         const complete = response.headers.get("x-sentinal-output-complete") === "true";
-        if (complete) return warning ? { warning } : {};
+        if (complete) return warning ? { warning, bytesRead } : { bytesRead };
+        if (bytesRead >= maximum) {
+          return warning ? { warning, bytesRead, truncated: true } : { bytesRead, truncated: true };
+        }
         const next = Number(response.headers.get("x-sentinal-output-next-offset"));
         if (!Number.isSafeInteger(next) || next <= offset) {
           throw daemonError("saved output returned an invalid continuation offset");
@@ -399,7 +425,11 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     async getHistory(filters = {}) {
       const request: ClientRequest = filters.query?.trim()
         ? { type: "SEARCH_COMMANDS", query: filters.query.trim(), limit: 500 }
-        : { type: "GET_HISTORY", session_id: null, limit: 500 };
+        : {
+            type: "GET_HISTORY",
+            session_id: filters.sessionId === undefined ? null : Number(filters.sessionId),
+            limit: 500,
+          };
       const message = await transport.request(request, (reply) => reply.type === "HISTORY");
       if (message.type !== "HISTORY") return [];
       const sessionsById = new Map((await getSessions()).map((session) => [session.id, session]));

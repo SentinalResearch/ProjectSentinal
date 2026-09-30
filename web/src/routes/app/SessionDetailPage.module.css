@@ -279,3 +279,123 @@
   color: var(--text-2);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+
+.generationMarker {
+  padding: 4px 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.generationNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+}
+
+.generationNav button {
+  min-width: 30px;
+  height: 28px;
+  border: 0;
+  color: var(--text-2);
+  background: var(--bg-3);
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.generationNav button[aria-current="page"] {
+  color: var(--bg-0);
+  background: var(--accent);
+}
+
+.generation {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.generationBoundary,
+.historyOmitted {
+  margin: 0;
+  padding: 9px 12px;
+  color: var(--text-2);
+  background: var(--bg-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.generationBoundary {
+  border-left: 3px solid var(--accent);
+}
+
+.generationHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.generationHeader strong {
+  color: var(--text-1);
+}
+
+.historyMachine {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.commandHistory {
+  padding: 14px 16px;
+  background: var(--bg-2);
+}
+
+.commandHistory h2 {
+  margin: 0 0 10px;
+  color: var(--text-3);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.commandHistory ol {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.commandHistory li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.commandHistory code {
+  overflow: hidden;
+  color: var(--text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commandHistoryError {
+  margin: 0;
+  color: var(--s-failed-fg);
+  font-size: 12px;
+}

@@ -84,6 +84,12 @@ export interface Session {
   shell?: string;
   /** Adopted process log, recorded but not tailed before 1b.D. */
   log?: SessionLog;
+  /** Direct predecessor in a persisted linear Session history. */
+  continuedFrom?: string;
+  /** Unix milliseconds when this generation was created. */
+  createdAt?: number;
+  /** Unix milliseconds when this generation last changed lifecycle state. */
+  updatedAt?: number;
 }
 
 export interface HistoryEntry {
