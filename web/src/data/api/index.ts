@@ -5,8 +5,11 @@ import type { Envelope } from "../../protocol/Envelope";
 import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { Session as WireSession } from "../../protocol/Session";
 import type { Command } from "../../protocol/Command";
+import type { Event as WireEvent } from "../../protocol/Event";
+import type { EventKind } from "../../protocol/EventKind";
+import type { Health } from "../../protocol/Health";
 import { NotImplemented, type DataAdapter, type LiveEvent } from "../adapter";
-import type { HistoryEntry, Machine, Session } from "../types";
+import type { HistoryEntry, Machine, Session, SessionEvent, SessionHealth } from "../types";
 import {
   AUTH_EXPIRED_EVENT,
   createAuthApi,
@@ -109,6 +112,7 @@ export function mapSession(session: WireSession): Session {
     details: session.shell,
     shell: session.shell,
     events: [],
+    health: session.health ? mapHealth(session.health) : undefined,
     origin: session.origin,
     capture: session.capture,
     exitCode: session.exit_code,
@@ -119,6 +123,59 @@ export function mapSession(session: WireSession): Session {
     createdAt: session.created_at,
     updatedAt: session.updated_at,
   };
+}
+
+function mapHealth(health: Health): SessionHealth {
+  return {
+    progress: health.progress === null ? undefined : `${Math.round(health.progress)}%`,
+    activity: health.activity,
+    resources: health.resources,
+    stability: health.stability,
+    errors: String(health.errors),
+    overall: health.overall.replaceAll("_", " "),
+    evidence: health.evidence,
+  };
+}
+
+function eventDetail(kind: EventKind): string {
+  switch (kind.type) {
+    case "COMMAND_STARTED": return kind.text;
+    case "COMMAND_FINISHED": return `exit ${kind.exit_code} · ${formatDuration(kind.duration_ms)}`;
+    case "PROCESS_STARTED": return `${kind.name} · pid ${kind.pid}`;
+    case "PROCESS_EXITED": return `pid ${kind.pid} · ${kind.exit_code === null ? "exit unknown" : `exit ${kind.exit_code}`}`;
+    case "PROGRESS_UPDATED": return `${kind.unit} ${kind.current}${kind.total === null ? "" : `/${kind.total}`}`;
+    case "WARNING_DETECTED":
+    case "ERROR_DETECTED": return kind.message;
+    case "RESOURCE_HIGH": return `${kind.resource} ${kind.percent.toFixed(1)}%`;
+    case "WAITING_FOR_INPUT": return kind.prompt ?? "waiting for input";
+    case "POSSIBLY_STALLED": return `quiet for ${formatDuration(kind.silent_for_ms)}`;
+    case "CHECKPOINT_CREATED": return kind.path;
+    case "SERVER_STARTED": return kind.url ?? (kind.port === null ? "server listening" : `port ${kind.port}`);
+  }
+}
+
+export function mapWatcherEvent(observed: WireEvent): SessionEvent {
+  return [new Date(observed.at).toLocaleTimeString(), observed.kind.type, eventDetail(observed.kind)];
+}
+
+export function watcherEventPatch(observed: WireEvent): Partial<Session> | undefined {
+  const kind = observed.kind;
+  if (kind.type === "PROGRESS_UPDATED" && kind.total !== null) {
+    return { progress: { current: kind.current, total: kind.total, unit: kind.unit } };
+  }
+  if (kind.type === "WAITING_FOR_INPUT") return { prompt: kind.prompt ?? undefined };
+  if (kind.type === "SERVER_STARTED") {
+    return { details: kind.url ?? (kind.port === null ? undefined : `Listening on port ${kind.port}`) };
+  }
+  return undefined;
+}
+
+function applyWatcherEvents(session: Session, events: WireEvent[]): Session {
+  let result = { ...session, events: events.map(mapWatcherEvent) };
+  for (const event of events) {
+    result = { ...result, ...watcherEventPatch(event) };
+  }
+  return result;
 }
 
 function relativeDate(startedAt: number): { date: string; daysAgo: number } {
@@ -289,13 +346,13 @@ class DaemonTransport {
       }
     } else if (message.type === "EVENT") {
       const observed = message.event;
-      const event: import("../types").SessionEvent = [
-        new Date(observed.at).toLocaleTimeString(),
-        observed.kind.type,
-        "",
-      ];
       for (const listener of this.listeners) {
-        listener({ type: "EVENT_APPENDED", sessionId: String(observed.session_id), event });
+        listener({
+          type: "EVENT_APPENDED",
+          sessionId: String(observed.session_id),
+          event: mapWatcherEvent(observed),
+          sessionPatch: watcherEventPatch(observed),
+        });
       }
     }
 
@@ -342,7 +399,16 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
 
   const getSessions = async (): Promise<Session[]> => {
     const message = await transport.request({ type: "LIST_SESSIONS" }, (reply) => reply.type === "SESSIONS");
-    return message.type === "SESSIONS" ? message.sessions.map(mapSession) : [];
+    if (message.type !== "SESSIONS") return [];
+    const sessions: Session[] = [];
+    for (const wire of message.sessions) {
+      const reply = await transport.request(
+        { type: "GET_EVENTS", session_id: wire.id, after: null, limit: 500 },
+        (candidate) => candidate.type === "EVENTS",
+      );
+      sessions.push(applyWatcherEvents(mapSession(wire), reply.type === "EVENTS" ? reply.events : []));
+    }
+    return sessions;
   };
 
   const auth = createAuthApi({ baseUrl: authBaseUrl, fetcher, storage, resetTransport: () => transport.reset() });

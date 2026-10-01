@@ -1,0 +1,30 @@
+---
+source: crates/watcher/tests/replay_logs.rs
+expression: "replay(\"tests/logs/training/tqdm.log\", \"torchrun train_model.py\")"
+---
+[
+    ProgressUpdated {
+        current: 10,
+        total: Some(
+            100,
+        ),
+        unit: "step",
+    },
+    ProgressUpdated {
+        current: 11,
+        total: Some(
+            100,
+        ),
+        unit: "step",
+    },
+    ProgressUpdated {
+        current: 12,
+        total: Some(
+            100,
+        ),
+        unit: "step",
+    },
+    CheckpointCreated {
+        path: "model-12.pt",
+    },
+]

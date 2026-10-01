@@ -5,6 +5,7 @@ import type { LiveEvent } from "./adapter";
 import type { Machine, Session } from "./types";
 import type { DaemonMessage } from "../protocol/DaemonMessage";
 import { DAEMON_MESSAGE_EVENT } from "../terminal/useRealTerminalSession";
+import { mapWatcherEvent, watcherEventPatch } from "./api";
 
 export interface LiveDataValue {
   machines: Machine[];
@@ -46,7 +47,15 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
           const idx = prev.findIndex((s) => s.id === event.session.id);
           if (idx < 0) return [...prev, event.session];
           const next = prev.slice();
-          next[idx] = { ...prev[idx], ...event.session, metrics: event.session.metrics ?? prev[idx].metrics };
+          next[idx] = {
+            ...prev[idx],
+            ...event.session,
+            events: prev[idx].events,
+            progress: event.session.progress ?? prev[idx].progress,
+            prompt: event.session.prompt ?? prev[idx].prompt,
+            details: prev[idx].details ?? event.session.details,
+            metrics: event.session.metrics ?? prev[idx].metrics,
+          };
           return next;
         });
       } else if (event.type === "MACHINE_UPDATED") {
@@ -59,7 +68,9 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
         });
       } else if (event.type === "EVENT_APPENDED") {
         setSessions((prev) =>
-          prev.map((s) => (s.id === event.sessionId ? { ...s, events: [...(s.events ?? []), event.event] } : s)),
+          prev.map((s) => (s.id === event.sessionId
+            ? { ...s, ...event.sessionPatch, events: [...(s.events ?? []), event.event] }
+            : s)),
         );
       } else if (event.type === "COMMAND_UPDATED") {
         setSessions((prev) => prev.map((session) =>
@@ -106,7 +117,11 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
       } else if (message.type === "EVENT") {
         const event = message.event;
         setSessions((prev) => prev.map((session) => session.id === String(event.session_id)
-          ? { ...session, events: [...(session.events ?? []), [new Date(event.at).toLocaleTimeString(), event.kind.type, ""]] }
+          ? {
+              ...session,
+              ...watcherEventPatch(event),
+              events: [...(session.events ?? []), mapWatcherEvent(event)],
+            }
           : session));
       }
     };

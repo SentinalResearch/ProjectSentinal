@@ -99,7 +99,7 @@ API:
 | Remote input metadata | yes | audit JSONL, without payload bytes |
 | Raw keystroke payload as its own log | no | must remain absent |
 | Password plaintext | no | only Argon2id hash is stored |
-| Explicit adopted log content | planned | PROCESS_LOG only, read-only source |
+| Explicit adopted log content | observed, not copied | PROCESS_LOG tails the same-user source read-only into bounded deterministic watchers |
 
 Commands may appear in PTY output because an interactive shell echoes them.
 Hidden prompts such as password entry disable echo and therefore do not
@@ -204,8 +204,12 @@ instead of creating a Session.
 - Only processes owned by the daemon's UID can be adopted, never
   `sentinald` itself; identity is PID + OS start time.
 - An explicit adopted log must be an absolute, readable regular file owned
-  by the daemon UID. The daemon records only its path until 1b.D enables
-  read-only tailing.
+  by the daemon UID. A live tail opens it read-only, reads at most 64 KiB per
+  poll, handles append/truncate/rotation, and sends ANSI-free bounded lines
+  only to deterministic watchers. It never writes to or signals the process.
+- Capture upgrades to `PROCESS_LOG` only after the tail opens. If a discovered
+  path is temporarily unavailable it remains `PROCESS`, and restart recovery
+  revalidates the file before restoring `PROCESS_LOG`.
 - Log discovery reads `/proc/<pid>/fd` links or runs `lsof` with a 2 s
   timeout, off the request path; it opens nothing belonging to the process.
 

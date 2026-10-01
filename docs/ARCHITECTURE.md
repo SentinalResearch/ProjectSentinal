@@ -60,6 +60,21 @@ sentinal/
 | Networking | Tailscale only | No public exposure |
 | AI | Separate process, suggest-only | Lower layers work without it |
 
+## Deterministic Event engine
+
+Each live Session owns a pure watcher engine. PTY or adopted-log bytes first
+pass through bounded ANSI-free line framing; structured Command boundaries,
+process-tree samples, and Metrics enter as typed observations. The always-on
+Generic adapter and at most one Command-matched adapter produce `EventKind`
+values. `sentinald` assigns Event IDs, persists them in SQLite, and broadcasts
+them to clients. The web rebuilds its bounded timeline with `GET_EVENTS` and
+never parses terminal text itself.
+
+Current adapters cover training, pytest, vLLM/llama.cpp, Cargo, and validated
+TOML rules in `~/.config/terminal-agent/adapters/`. Health is deterministic
+derived state with bounded evidence, stored on the Session and delivered by
+the existing `SESSION_UPDATED` message. No watcher path uses a model.
+
 ## Installation and Machine enrollment
 
 One owner-selected Machine may run the local control role in addition to its

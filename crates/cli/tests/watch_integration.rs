@@ -7,7 +7,7 @@
 
 use cli::client::DaemonClient;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
-use protocol::{ClientRequest, DaemonMessage, Session, SessionOrigin};
+use protocol::{ClientRequest, DaemonMessage, EventKind, Session, SessionOrigin};
 use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -172,13 +172,21 @@ async fn watch_integration() {
     ];
 
     // 1. Watch a long job from an ordinary terminal.
-    let job =
-        "echo job-start; i=0; while [ $i -lt 3000 ]; do echo tick-$i; i=$((i+1)); sleep 0.1; done";
+    let job = "training = True\nprint('job-start', flush=True)\nprint('Epoch 7/10 loss=0.42', flush=True)\nprint('Saving checkpoint model.pt', flush=True)\nimport time\nfor i in range(3000):\n print(f'tick-{i}', flush=True)\n time.sleep(0.1)";
     let mut watch_args = common.clone();
     watch_args.extend(
-        ["watch", "-t", "Integration Job", "--", "sh", "-c", job]
-            .iter()
-            .map(|arg| (*arg).to_string()),
+        [
+            "watch",
+            "-t",
+            "Integration Job",
+            "--",
+            "python3",
+            "-u",
+            "-c",
+            job,
+        ]
+        .iter()
+        .map(|arg| (*arg).to_string()),
     );
     let mut first = Terminal::spawn(&sentinal, &watch_args, &env);
     first.wait_for("tick-5");
@@ -190,6 +198,63 @@ async fn watch_integration() {
     assert_eq!(session.title.as_deref(), Some("Integration Job"));
     let pid = session.pid.expect("watch session has a root pid");
     let before_close = last_tick(&first.seen);
+
+    // The real PTY output is converted to persisted training Events and Health.
+    let mut event_client = DaemonClient::connect(&url, &token).await.unwrap();
+    let events = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let events = match event_client
+                .request(ClientRequest::GetEvents {
+                    session_id: Some(session.id),
+                    after: None,
+                    limit: 100,
+                })
+                .await
+                .unwrap()
+            {
+                DaemonMessage::Events { events } => events,
+                other => panic!("unexpected {other:?}"),
+            };
+            let progress = events.iter().any(|event| {
+                matches!(
+                    event.kind,
+                    EventKind::ProgressUpdated {
+                        current: 7,
+                        total: Some(10),
+                        ..
+                    }
+                )
+            });
+            let checkpoint = events
+                .iter()
+                .any(|event| matches!(event.kind, EventKind::CheckpointCreated { .. }));
+            if progress && checkpoint {
+                return events;
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(events.iter().any(|event| matches!(
+        event.kind,
+        EventKind::ProgressUpdated {
+            current: 7,
+            total: Some(10),
+            ..
+        }
+    )));
+    assert!(events
+        .iter()
+        .any(|event| matches!(event.kind, EventKind::CheckpointCreated { .. })));
+    let refreshed = sessions(&url, &token).await;
+    assert_eq!(
+        refreshed[0]
+            .health
+            .as_ref()
+            .and_then(|health| health.progress),
+        Some(70.0)
+    );
 
     // 2. Close the window: kill the client and drop its terminal.
     first.child.kill().unwrap();

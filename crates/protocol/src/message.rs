@@ -131,6 +131,15 @@ pub enum ClientRequest {
         /// Maximum number of commands to return.
         limit: u32,
     },
+    /// Query persisted Events, optionally restricted to one Session.
+    GetEvents {
+        /// Session to restrict results to; `None` returns machine-wide Events.
+        session_id: Option<SessionId>,
+        /// Return Events with IDs greater than this value.
+        after: Option<crate::EventId>,
+        /// Maximum number of Events, from 1 through 500.
+        limit: u32,
+    },
     /// Search command text using the daemon's full-text index.
     SearchCommands {
         /// Full-text query entered by the user.
@@ -181,6 +190,19 @@ impl ClientRequest {
             ClientRequest::ContinueSession { session_id } if session_id.0 == 0 => {
                 Err(ProtocolError::InvalidIdentifier {
                     field: "session_id",
+                })
+            }
+            ClientRequest::GetEvents {
+                session_id: Some(session_id),
+                ..
+            } if session_id.0 == 0 => Err(ProtocolError::InvalidIdentifier {
+                field: "session_id",
+            }),
+            ClientRequest::GetEvents { limit, .. } if !(1..=500).contains(limit) => {
+                Err(ProtocolError::InvalidQueryLimit {
+                    field: "events",
+                    actual: *limit,
+                    maximum: 500,
                 })
             }
             _ => Ok(()),
@@ -440,6 +462,11 @@ pub enum DaemonMessage {
         /// The event.
         event: Event,
     },
+    /// Bounded persisted Events ordered oldest first.
+    Events {
+        /// Events matching the request.
+        events: Vec<Event>,
+    },
     /// Current resource measurements for the machine.
     MachineMetrics {
         /// The machine measurements.
@@ -559,6 +586,38 @@ mod tests {
                 field: "session_id"
             })
         );
+    }
+
+    #[test]
+    fn event_queries_require_a_bounded_limit_and_valid_session() {
+        let valid = ClientRequest::GetEvents {
+            session_id: Some(SessionId(1)),
+            after: Some(crate::EventId(0)),
+            limit: 500,
+        };
+        assert_eq!(valid.validate(), Ok(()));
+
+        let zero = ClientRequest::GetEvents {
+            session_id: None,
+            after: None,
+            limit: 0,
+        };
+        assert!(matches!(
+            zero.validate(),
+            Err(ProtocolError::InvalidQueryLimit { actual: 0, .. })
+        ));
+
+        let bad_session = ClientRequest::GetEvents {
+            session_id: Some(SessionId(0)),
+            after: None,
+            limit: 1,
+        };
+        assert!(matches!(
+            bad_session.validate(),
+            Err(ProtocolError::InvalidIdentifier {
+                field: "session_id"
+            })
+        ));
     }
 
     #[test]

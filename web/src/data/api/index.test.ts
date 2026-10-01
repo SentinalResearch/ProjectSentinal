@@ -38,6 +38,23 @@ const session: WireSession = {
   log: null,
   created_at: 1_700_000_000_000,
   updated_at: 1_700_000_000_000,
+  health: {
+    progress: 70,
+    activity: "GOOD",
+    resources: "GOOD",
+    stability: "GOOD",
+    errors: 0,
+    overall: "HEALTHY",
+    evidence: ["progress reached 70.0%"],
+  },
+};
+
+const watcherEvent: import("../../protocol/Event").Event = {
+  id: 12,
+  session_id: 1,
+  command_id: 9,
+  at: 1_700_000_001_000,
+  kind: { type: "PROGRESS_UPDATED", current: 7, total: 10, unit: "epoch" },
 };
 
 const command: Command = {
@@ -196,6 +213,8 @@ class FakeSocket implements ApiSocket {
       payload = { type: "SESSION_UPDATED", session: { ...session, state: "INTERRUPTED" } };
     } else if (request.type === "GET_HISTORY" || request.type === "SEARCH_COMMANDS") {
       payload = { type: "HISTORY", commands: [command] };
+    } else if (request.type === "GET_EVENTS") {
+      payload = { type: "EVENTS", events: [watcherEvent] };
     } else {
       payload = { type: "ERROR", message: `unsupported test request ${request.type}` };
     }
@@ -308,6 +327,30 @@ describe("apiAdapter authentication", () => {
       expect.objectContaining({ id: "1", machine: "test-machine", name: "Session 1", state: "IDLE" }),
     ]);
     expect(sockets).toHaveLength(1);
+  });
+
+  it("loads persisted watcher Events and deterministic Health without parsing terminal text", async () => {
+    const { adapter, sockets } = setup();
+    await adapter.auth.login("correct horse battery staple");
+
+    await expect(adapter.getSessions()).resolves.toEqual([
+      expect.objectContaining({
+        progress: { current: 7, total: 10, unit: "epoch" },
+        health: expect.objectContaining({
+          progress: "70%",
+          activity: "GOOD",
+          overall: "HEALTHY",
+          evidence: ["progress reached 70.0%"],
+        }),
+        events: [expect.arrayContaining(["PROGRESS_UPDATED", "epoch 7/10"])],
+      }),
+    ]);
+    expect(sockets[0].requests).toContainEqual({
+      type: "GET_EVENTS",
+      session_id: 1,
+      after: null,
+      limit: 500,
+    });
   });
 
   it("returns remaining attempts for an invalid password", async () => {

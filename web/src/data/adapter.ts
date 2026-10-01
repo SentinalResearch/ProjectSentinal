@@ -43,7 +43,7 @@ export type LiveEvent =
   | { type: "SESSION_UPDATED"; session: Session }
   | { type: "COMMAND_UPDATED"; sessionId: string; command: string | undefined }
   | { type: "SESSION_METRICS"; sessionId: string; metrics: Session["metrics"] }
-  | { type: "EVENT_APPENDED"; sessionId: string; event: SessionEvent }
+  | { type: "EVENT_APPENDED"; sessionId: string; event: SessionEvent; sessionPatch?: Partial<Session> }
   | { type: "MACHINE_UPDATED"; machine: Machine }
   | { type: "NOTIFICATION"; notification: JournalNotification };
 

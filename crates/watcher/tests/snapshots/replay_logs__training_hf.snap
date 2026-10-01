@@ -1,0 +1,23 @@
+---
+source: crates/watcher/tests/replay_logs.rs
+expression: "replay(\"tests/logs/training/hf_trainer.log\", \"accelerate launch train.py\")"
+---
+[
+    ProgressUpdated {
+        current: 1,
+        total: Some(
+            2,
+        ),
+        unit: "epoch",
+    },
+    CheckpointCreated {
+        path: "output/checkpoint-500/model.safetensors",
+    },
+    ProgressUpdated {
+        current: 2,
+        total: Some(
+            2,
+        ),
+        unit: "epoch",
+    },
+]

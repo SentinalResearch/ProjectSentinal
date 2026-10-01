@@ -1,0 +1,17 @@
+---
+source: crates/watcher/tests/replay_logs.rs
+expression: "replay(\"tests/logs/cargo/build_error.log\", \"cargo build\")"
+---
+[
+    ProgressUpdated {
+        current: 1,
+        total: None,
+        unit: "crate",
+    },
+    ErrorDetected {
+        message: "error[E0308]: mismatched types",
+    },
+    ErrorDetected {
+        message: "error: could not compile `watcher` due to 1 previous error",
+    },
+]

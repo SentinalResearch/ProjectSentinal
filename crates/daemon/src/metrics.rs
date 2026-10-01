@@ -4,7 +4,7 @@ use protocol::{
     tree_totals, GpuMetrics, MachineMetrics, Process, ProcessState, Resource, SessionId,
     SessionMetrics, Timestamp,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use sysinfo::{ProcessStatus, System};
 
 const HIGH_PERCENT: f32 = 90.0;
@@ -88,6 +88,32 @@ impl MetricsSampler {
             sessions,
         }
     }
+}
+
+/// Return the root Process and all descendants without looping on bad parent links.
+pub fn process_tree(processes: &[Process], root: u32) -> Vec<Process> {
+    let mut included = HashSet::from([root]);
+    loop {
+        let before = included.len();
+        for process in processes {
+            if process
+                .parent_pid
+                .is_some_and(|parent| included.contains(&parent))
+            {
+                included.insert(process.pid);
+            }
+        }
+        if included.len() == before {
+            break;
+        }
+    }
+    let mut result = processes
+        .iter()
+        .filter(|process| included.contains(&process.pid))
+        .cloned()
+        .collect::<Vec<_>>();
+    result.sort_by_key(|process| process.pid);
+    result
 }
 
 /// One newly crossed resource threshold.
@@ -274,5 +300,33 @@ mod tests {
         assert!(debounce.observe(&[(Resource::Vram, 96.0)]).is_empty());
         assert!(debounce.observe(&[(Resource::Vram, 96.0)]).is_empty());
         assert_eq!(debounce.observe(&[(Resource::Vram, 96.0)]).len(), 1);
+    }
+
+    #[test]
+    fn process_tree_is_bounded_when_parent_links_cycle() {
+        let make = |pid, parent_pid| Process {
+            pid,
+            parent_pid,
+            name: format!("p{pid}"),
+            cmdline: Vec::new(),
+            state: ProcessState::Running,
+            cpu_percent: 0.0,
+            rss_bytes: 0,
+            gpu_mem_bytes: None,
+            started_at: Timestamp(0),
+        };
+        let tree = process_tree(
+            &[
+                make(1, Some(2)),
+                make(2, Some(1)),
+                make(3, Some(2)),
+                make(9, None),
+            ],
+            1,
+        );
+        assert_eq!(
+            tree.iter().map(|process| process.pid).collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
     }
 }

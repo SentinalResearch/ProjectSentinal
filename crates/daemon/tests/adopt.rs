@@ -348,14 +348,14 @@ async fn an_exited_process_ends_with_unknown_exit_and_no_fabricated_command() {
 // ---- logs ------------------------------------------------------------------
 
 #[tokio::test]
-async fn an_explicit_log_is_recorded_but_capture_stays_process() {
+async fn an_explicit_log_upgrades_capture_and_emits_training_progress() {
     let h = harness();
     let log = h.data_dir.join("train.log");
-    fs::write(&log, "epoch 1\n").unwrap();
+    fs::write(&log, "Epoch 1/10 loss=0.9\n").unwrap();
     let path = log.display().to_string();
     let session = h
         .manager
-        .adopt_process(TARGET, None, Some(path.clone()))
+        .adopt_process(TARGET, Some("Training".into()), Some(path.clone()))
         .unwrap();
     assert_eq!(
         session.log,
@@ -364,7 +364,24 @@ async fn an_explicit_log_is_recorded_but_capture_stays_process() {
             source: LogSource::Explicit
         })
     );
-    assert_eq!(session.capture, CaptureLevel::Process);
+    assert_eq!(session.capture, CaptureLevel::ProcessLog);
+    eventually(|| {
+        h.store
+            .events(Some(session.id), None, 20)
+            .unwrap()
+            .iter()
+            .any(|event| {
+                matches!(
+                    event.kind,
+                    EventKind::ProgressUpdated {
+                        current: 1,
+                        total: Some(10),
+                        ..
+                    }
+                )
+            })
+    })
+    .await;
     // An explicit log skips discovery.
     tokio::task::yield_now().await;
     assert_eq!(h.spy.discover.load(Ordering::SeqCst), 0);

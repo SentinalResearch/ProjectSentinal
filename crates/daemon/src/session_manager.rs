@@ -123,6 +123,12 @@ struct SessionHandle {
     /// Global observation stream used by Sessions that cannot attach.
     observations: broadcast::Sender<DaemonMessage>,
     tracker: Mutex<CommandTracker>,
+    /// Deterministic Event and Health state for this Session.
+    watcher: Mutex<watcher::EventEngine>,
+    /// ANSI-free bounded line framing shared by PTY and log observations.
+    line_framer: Mutex<watcher::LineFramer>,
+    /// Shared allocator for watcher-produced Event IDs.
+    watcher_ids: TrackerIds,
     /// Rendered Watch initial Command, taken and typed at the first prompt.
     initial_command: Mutex<Option<Vec<u8>>>,
     /// Sequence bookkeeping for Commands reported by an external shell hook.
@@ -147,6 +153,8 @@ struct SessionManagerInner {
     registration: Mutex<()>,
     /// Serializes continuation so a source can never branch in one daemon.
     continuation: tokio::sync::Mutex<()>,
+    /// Validated user-defined watcher adapters cloned into each Session engine.
+    watcher_adapters: Vec<watcher::DeclarativeAdapter>,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -208,8 +216,18 @@ impl SessionManager {
                 observations: broadcast::channel(256).0,
                 registration: Mutex::new(()),
                 continuation: tokio::sync::Mutex::new(()),
+                watcher_adapters: Vec::new(),
             }),
         }
+    }
+
+    /// Install validated declarative adapters before this manager is shared.
+    pub fn with_watcher_adapters(mut self, adapters: Vec<watcher::DeclarativeAdapter>) -> Self {
+        match Arc::get_mut(&mut self.inner) {
+            Some(inner) => inner.watcher_adapters = adapters,
+            None => tracing::error!("watcher adapters must be set before the manager is shared"),
+        }
+        self
     }
 
     /// Return all sessions ordered by ID.

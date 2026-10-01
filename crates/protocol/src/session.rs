@@ -26,7 +26,9 @@
 //! - `INTERRUPTED`  — the session was killed (by the user or a signal)
 //! - `DISCONNECTED` — state unknown because the daemon is unreachable
 
-use crate::{CommandId, MachineId, ProjectId, ProtocolError, SessionId, SessionLog, Timestamp};
+use crate::{
+    CommandId, Health, MachineId, ProjectId, ProtocolError, SessionId, SessionLog, Timestamp,
+};
 use serde::{Deserialize, Serialize};
 
 /// How a Session entered Sentinal.
@@ -270,12 +272,15 @@ pub struct Session {
     /// Known shell exit code; absent means running or outcome unknown.
     #[serde(default)]
     pub exit_code: Option<i32>,
-    /// Log file of an adopted process, if one is known (not yet tailed in 1b.C).
+    /// Read-only log file of an adopted process, if one is known.
     #[serde(default)]
     pub log: Option<SessionLog>,
     /// Direct predecessor in a linear continuation history, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub continued_from: Option<SessionId>,
+    /// Latest deterministic watcher Health, if observations have produced one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<Health>,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -307,6 +312,7 @@ impl Session {
             exit_code: None,
             log: None,
             continued_from: None,
+            health: None,
             created_at: at,
             updated_at: at,
         }
@@ -347,6 +353,9 @@ impl Session {
         }
         if self.continued_from == Some(self.id) {
             return Err(ProtocolError::SelfContinuation(self.id));
+        }
+        if let Some(health) = &self.health {
+            health.validate()?;
         }
         if let Some(exit_code) = self.exit_code {
             let valid_exit = matches!(
@@ -591,6 +600,7 @@ mod tests {
         assert_eq!(session.process_started_at, None);
         assert_eq!(session.exit_code, None);
         assert_eq!(session.continued_from, None);
+        assert_eq!(session.health, None);
         assert_eq!(session.validate(), Ok(()));
     }
 

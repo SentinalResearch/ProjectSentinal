@@ -40,6 +40,12 @@ export type DaemonMessage = {
    */
   event: Event;
 } | {
+  "type": "EVENTS";
+  /**
+   * Events matching the request.
+   */
+  events: Array<Event>;
+} | {
   "type": "MACHINE_METRICS";
   /**
    * The machine measurements.

@@ -734,6 +734,52 @@ async fn shell_signals_persist_even_a_command_without_output() {
 }
 
 #[tokio::test]
+async fn unterminated_training_output_persists_watcher_events_and_session_health() {
+    let (manager, fake, store, data_dir) = stored_manager("watcher-training");
+    let session = manager.create(request()).await.unwrap();
+
+    fake.output(
+        session.id,
+        b"\x1b]7420;cmd=cHl0aG9uIHRyYWluLnB5\x07\x1b]133;B\x07Epoch 7/10 loss=0.42",
+    )
+    .unwrap();
+    wait_for_scrollback(&manager, session.id, "Epoch 7/10").await;
+    fake.exit(session.id, 0).unwrap();
+
+    let events = tokio::time::timeout(Duration::from_millis(100), async {
+        loop {
+            let events = store.events(Some(session.id), None, 20).unwrap();
+            if events.iter().any(|event| {
+                matches!(
+                    event.kind,
+                    protocol::EventKind::ProgressUpdated {
+                        current: 7,
+                        total: Some(10),
+                        ..
+                    }
+                )
+            }) {
+                return events;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(events
+        .iter()
+        .any(|event| matches!(event.kind, protocol::EventKind::ProgressUpdated { .. })));
+    let stored = store.session(session.id).unwrap().unwrap();
+    assert_eq!(
+        stored.health.as_ref().and_then(|health| health.progress),
+        Some(70.0)
+    );
+
+    wait_for_state(&manager, session.id, SessionState::Completed).await;
+    fs::remove_dir_all(data_dir).unwrap();
+}
+
+#[tokio::test]
 async fn attached_client_receives_metrics_and_resource_events() {
     let (manager, fake, store, data_dir) = stored_manager("metric-stream");
     let session = manager.create(request()).await.unwrap();
@@ -742,17 +788,44 @@ async fn attached_client_receives_metrics_and_resource_events() {
         session_id: session.id,
         at: Timestamp(1_790_000_000_100),
         totals: ProcessTotals {
-            cpu_percent: 96.0,
+            cpu_percent: 1.0,
             rss_bytes: 512,
             gpu_mem_bytes: 256,
         },
     };
 
-    manager.publish_metrics(metrics.clone()).unwrap();
-    assert!(matches!(
-        attachment.structured.recv().await.unwrap(),
-        DaemonMessage::SessionMetrics { metrics: received } if received == metrics
-    ));
+    manager
+        .publish_metrics_with_resources(
+            metrics.clone(),
+            watcher::MetricsObservation {
+                cpu_percent: 1.0,
+                gpu_percent: Some(96.0),
+                ram_percent: Some(50.0),
+                vram_percent: Some(25.0),
+            },
+        )
+        .unwrap();
+    let received_metrics = tokio::time::timeout(Duration::from_millis(100), async {
+        loop {
+            if let DaemonMessage::SessionMetrics { metrics } =
+                attachment.structured.recv().await.unwrap()
+            {
+                return metrics;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(received_metrics, metrics);
+    assert_eq!(
+        manager
+            .session(session.id)
+            .unwrap()
+            .health
+            .unwrap()
+            .resources,
+        protocol::HealthLevel::Critical
+    );
 
     manager
         .publish_resource_high(
@@ -762,10 +835,21 @@ async fn attached_client_receives_metrics_and_resource_events() {
             Timestamp(1_790_000_000_100),
         )
         .unwrap();
+    let event = tokio::time::timeout(Duration::from_millis(100), async {
+        loop {
+            if let DaemonMessage::Event { event } = attachment.structured.recv().await.unwrap() {
+                return event;
+            }
+        }
+    })
+    .await
+    .unwrap();
     assert!(matches!(
-        attachment.structured.recv().await.unwrap(),
-        DaemonMessage::Event { event }
-            if matches!(event.kind, protocol::EventKind::ResourceHigh { resource: Resource::Cpu, percent: 96.0 })
+        event.kind,
+        protocol::EventKind::ResourceHigh {
+            resource: Resource::Cpu,
+            percent: 96.0
+        }
     ));
     assert_eq!(store.events_since(protocol::EventId(0)).unwrap().len(), 1);
 

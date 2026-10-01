@@ -51,8 +51,8 @@ export function sessionKind(session: Session): SessionKind {
 
 /** Port a session's command is serving on, if any (`vllm serve ... --port 8000` → "8000"). */
 export function extractPort(session: Session): string | null {
-  const command = session.command ?? "";
-  const match = /--port[ =](\d+)/.exec(command) ?? /:(\d{2,5})\b/.exec(command);
+  const source = `${session.command ?? ""} ${session.details ?? ""}`;
+  const match = /--port[ =](\d+)/.exec(source) ?? /:(\d{2,5})\b/.exec(source) ?? /port (\d{2,5})\b/i.exec(source);
   return match ? match[1] : null;
 }
 
@@ -66,13 +66,17 @@ const EVENT_COLORS: Record<string, EventColor> = {
   COMMAND_STARTED: { square: "var(--text-1)", text: "var(--text-1)" },
   INPUT_SENT: { square: "var(--text-1)", text: "var(--text-1)" },
   PROGRESS: { square: "var(--line-strong)", text: "var(--text-2)" },
+  PROGRESS_UPDATED: { square: "var(--line-strong)", text: "var(--text-2)" },
   CHECKPOINT_CREATED: { square: "var(--accent-fg)", text: "var(--accent-fg)" },
   RESOURCE_HIGH: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
   WARNING: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
+  WARNING_DETECTED: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
   INPUT_REQUESTED: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
   STALL_SUSPECTED: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
+  POSSIBLY_STALLED: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
   COMMAND_FAILED: { square: "var(--s-failed)", text: "var(--s-failed-fg)" },
   ERROR: { square: "var(--s-failed)", text: "var(--s-failed-fg)" },
+  ERROR_DETECTED: { square: "var(--s-failed)", text: "var(--s-failed-fg)" },
   COMMAND_INTERRUPTED: { square: "var(--s-interrupted)", text: "var(--s-interrupted-fg)" },
   INTERRUPTED: { square: "var(--s-interrupted)", text: "var(--s-interrupted-fg)" },
 };
@@ -89,6 +93,7 @@ export function healthColorSlug(overall: string): string {
   const upper = overall.toUpperCase();
   if (upper === "HEALTHY") return "running";
   if (upper === "WAITING") return "waiting";
+  if (upper === "WARNING") return "waiting";
   if (upper === "FAILED") return "failed";
   if (upper.includes("STALL")) return "stalled";
   if (upper === "INTERRUPTED") return "interrupted";

@@ -17,6 +17,7 @@ futures-util.workspace = true
 portable-pty.workspace = true
 protocol = { path = "../protocol" }
 store = { path = "../store" }
+watcher = { path = "../watcher" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

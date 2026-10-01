@@ -1,0 +1,30 @@
+---
+source: crates/watcher/tests/replay_logs.rs
+expression: "replay(\"tests/logs/training/lightning.log\", \"python train.py\")"
+---
+[
+    ProgressUpdated {
+        current: 1,
+        total: Some(
+            3,
+        ),
+        unit: "epoch",
+    },
+    ProgressUpdated {
+        current: 2,
+        total: Some(
+            3,
+        ),
+        unit: "epoch",
+    },
+    CheckpointCreated {
+        path: "checkpoints/epoch=2-val_loss=0.552.ckpt",
+    },
+    ProgressUpdated {
+        current: 3,
+        total: Some(
+            3,
+        ),
+        unit: "epoch",
+    },
+]

@@ -1,0 +1,19 @@
+---
+source: crates/watcher/tests/replay_logs.rs
+expression: "replay(\"tests/logs/pytest/fail.log\", \"python -m pytest tests/\")"
+---
+[
+    ProgressUpdated {
+        current: 3,
+        total: Some(
+            3,
+        ),
+        unit: "test",
+    },
+    ErrorDetected {
+        message: "pytest failed tests/test_api.py::test_rejects_bad_token",
+    },
+    ErrorDetected {
+        message: "pytest summary: 2 passed, 1 failed",
+    },
+]

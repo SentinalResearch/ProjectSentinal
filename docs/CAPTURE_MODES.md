@@ -150,18 +150,13 @@ Sentinal is not the parent, completion is displayed as “Ended · exit code
 unknown.” It must not manufacture success or failure.
 
 An explicit `--log` path must be absolute, readable, a regular file, and
-owned by the daemon user. Until 1b.D, only this metadata is recorded and the
-file is not tailed.
+owned by the daemon user. Otherwise redirected stdout/stderr are detected
+after adoption, off the request path (Linux `/proc/<pid>/fd/{1,2}`; macOS
+`lsof -a -p PID -d 1,2 -Fftn` with a 2 s timeout). Pipes, sockets, devices,
+deleted files, and non-regular files are ignored; failure leaves no active
+tail and capture stays `PROCESS`.
 
-In 1b.C a log path is recorded as metadata only (`Session.log`, approved
-additive field): `--log` must be an absolute, readable regular file, and
-otherwise redirected stdout/stderr are detected after adoption, off the
-request path (Linux `/proc/<pid>/fd/{1,2}`; macOS `lsof -a -p PID -d 1,2
--Fftn` with a 2 s timeout). Pipes, sockets, devices, deleted files, and
-non-regular files are ignored; failure leaves no log. Capture stays
-`PROCESS` and interfaces say "log detected; tailing not enabled yet".
-
-From 1b.D, a log upgrades capture to `PROCESS_LOG`. The tail is read-only
+An active log upgrades capture to `PROCESS_LOG`. The tail is read-only
 and handles append, partial lines, truncation, rotation, temporary absence,
 and bounded buffering. Lines enter the same deterministic watcher pipeline
 as PTY output.

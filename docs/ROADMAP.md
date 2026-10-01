@@ -110,12 +110,12 @@ The normative capability and safety rules live in `docs/CAPTURE_MODES.md`.
 - [x] Detect redirected stdout/stderr off the prompt hot path where the OS supports it
 
 ### 1b.D — Adopted log tail and UI completion (lands with Milestone 3)
-- [ ] Read-only tail handles append, truncate, rotation, partial lines, and bounded buffering
-- [ ] Feed tailed bytes through the deterministic watcher pipeline
-- [ ] Upgrade adopted capture from `PROCESS` to `PROCESS_LOG` when a log is active
-- [ ] Show a capture badge and one-line limitation on every Session surface
-- [ ] Hide attach/input/kill actions when the capture level cannot support them
-- [ ] Offer “Watch fully next time” from reduced-capture Sessions
+- [x] Read-only tail handles append, truncate, rotation, partial lines, and bounded buffering
+- [x] Feed tailed bytes through the deterministic watcher pipeline
+- [x] Upgrade adopted capture from `PROCESS` to `PROCESS_LOG` when a log is active
+- [x] Show a capture badge and one-line limitation on every Session surface
+- [x] Hide attach/input/kill actions when the capture level cannot support them
+- [x] Offer “Watch fully next time” from reduced-capture Sessions
 
 ### 1b release gates
 - [x] Real daemon data is the default; mock fixtures require explicit demo mode
@@ -183,11 +183,14 @@ three retained outputs as one ordered history, and interact only with the
 latest live generation.
 
 ## Milestone 3 — Events + watcher (v0.3)
-- [ ] Event engine (raw observations → `Event`)
-- [ ] Generic watcher (idle, waiting for input, possibly stalled)
-- [ ] Adapters: training, pytest, vLLM
-- [ ] Declarative TOML regex adapters
-- [ ] Complete Milestone 1b.D adopted-log ingestion and watcher coverage
+- [x] Event engine (raw observations → persisted and live `Event` values)
+- [x] Generic watcher (waiting for input, possibly stalled, errors, warnings)
+- [x] Adapters: training, pytest, vLLM/llama.cpp, and Cargo
+- [x] Declarative TOML regex adapters with bounded deterministic loading
+- [x] Deterministic `Health` contract, persistence, evidence, and web card
+- [x] Bounded persisted Event replay and real web Event timeline/progress
+- [x] Saved-log snapshots, rate-limit tests, and synthetic Health/resource coverage
+- [x] Complete Milestone 1b.D adopted-log ingestion and watcher coverage
 
 ## Milestone 4.0 — Secure Machine enrollment
 - [ ] Complete the mandatory pairing threat-model and wire-format review before implementation

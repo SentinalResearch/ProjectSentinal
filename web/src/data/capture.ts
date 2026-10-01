@@ -73,11 +73,11 @@ export function captureExplanation(capture: CaptureLevel): string | null {
     case "FULL":
       return null;
     case "COMMANDS":
-      return "COMMANDS capture: Sentinal records this shell's Commands and Metrics. There is no terminal output, input, resize, or kill.";
+      return "COMMANDS capture: Sentinal records this shell's Commands and Metrics. There is no terminal output, input, resize, or kill. Use `sentinal watch` for FULL capture next time.";
     case "PROCESS_LOG":
-      return "PROCESS_LOG capture: Sentinal reads this process's log and Metrics only. There is no terminal, input, resize, or kill.";
+      return "PROCESS_LOG capture: Sentinal reads this process's log and Metrics only. There is no terminal, input, resize, or kill. Use `sentinal watch` for FULL capture next time.";
     case "PROCESS":
-      return "PROCESS capture: Sentinal observes this process's Metrics and lifecycle only. There is no output, input, resize, or kill.";
+      return "PROCESS capture: Sentinal observes this process's Metrics and lifecycle only. There is no output, input, resize, or kill. Use `sentinal watch` for FULL capture next time.";
   }
 }
 
@@ -93,7 +93,7 @@ const LOG_SOURCES = {
   STDOUT_AND_STDERR: "stdout and stderr",
 } as const;
 
-/** "Log detected" hint while a known log is not being tailed yet (before 1b.D). */
+/** "Log detected" hint while a known log cannot currently be tailed. */
 export function logHint(session: Session): string | null {
   if (!session.log || captureOf(session) === "PROCESS_LOG") return null;
   return `Log detected: ${session.log.path} (${LOG_SOURCES[session.log.source]}) — tailing not enabled yet.`;

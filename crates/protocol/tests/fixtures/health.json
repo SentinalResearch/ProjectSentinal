@@ -1,0 +1,12 @@
+{
+  "progress": 68.0,
+  "activity": "GOOD",
+  "resources": "WARNING",
+  "stability": "GOOD",
+  "errors": 1,
+  "overall": "WARNING",
+  "evidence": [
+    "epoch 68 of 100",
+    "VRAM stayed above 90%"
+  ]
+}

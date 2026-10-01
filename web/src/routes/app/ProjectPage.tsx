@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { MockBadge } from "../../components/MockBadge";
+import { CaptureBadge } from "../../components/CaptureBadge";
 import { StateTag } from "../../components/StateTag";
 import { exitUnknown } from "../../data/capture";
 import { dataAdapter } from "../../data";
@@ -80,7 +81,10 @@ export function ProjectPage() {
               const machine = machines.find((m) => m.id === s.machine);
               return (
                 <button key={s.id} type="button" className={styles.sessionRow} onClick={() => navigate(`/app/sessions/${s.id}`)}>
-                  <StateTag state={s.state} size="sm" exitUnknown={exitUnknown(s)} />
+                  <span className={styles.sessionTags}>
+                    <StateTag state={s.state} size="sm" exitUnknown={exitUnknown(s)} />
+                    <CaptureBadge capture={s.capture ?? "FULL"} />
+                  </span>
                   <span className={styles.sessionMain}>
                     <span className={styles.sessionName}>{s.name}</span>
                     {s.command && <span className={`${styles.sessionCommand} mono`}>{s.command}</span>}

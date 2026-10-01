@@ -1,9 +1,9 @@
 //! Persisted command queries and structured metric/event publication.
 
-use super::{lock_session, SessionManager, SessionManagerError};
+use super::{lock_session, tasks, SessionManager, SessionManagerError};
 use protocol::{
-    CaptureLevel, Command, DaemonMessage, Event, EventKind, MachineMetrics, Resource, SessionId,
-    SessionMetrics, Timestamp,
+    CaptureLevel, Command, DaemonMessage, Event, EventId, EventKind, MachineMetrics, Process,
+    Resource, SessionId, SessionMetrics, Timestamp,
 };
 use store::{RawMetricSample, Store};
 use tokio::sync::broadcast;
@@ -29,6 +29,18 @@ impl SessionManager {
             .map_err(Into::into)
     }
 
+    /// Return a bounded persisted Event page.
+    pub fn events(
+        &self,
+        session_id: Option<SessionId>,
+        after: Option<EventId>,
+        limit: u32,
+    ) -> Result<Vec<Event>, SessionManagerError> {
+        self.store()?
+            .events(session_id, after, limit)
+            .map_err(Into::into)
+    }
+
     /// Return live Session root PIDs for process-tree aggregation.
     pub fn process_roots(&self) -> Result<Vec<(SessionId, u32)>, SessionManagerError> {
         let sessions = self
@@ -50,9 +62,47 @@ impl SessionManager {
         Ok(roots)
     }
 
+    /// Feed one Session process tree into its deterministic Event engine.
+    pub fn publish_processes(
+        &self,
+        session_id: SessionId,
+        at: Timestamp,
+        processes: Vec<Process>,
+    ) -> Result<(), SessionManagerError> {
+        let handle = self.handle(session_id)?;
+        tasks::apply_observation(
+            session_id,
+            &handle,
+            self.inner.store.as_deref(),
+            watcher::Observation {
+                at,
+                kind: watcher::ObservationKind::ProcessSample(watcher::ProcessObservation {
+                    processes,
+                }),
+            },
+        );
+        Ok(())
+    }
+
     /// Persist and broadcast current metrics to clients attached to the Session.
     pub fn publish_metrics(&self, metrics: SessionMetrics) -> Result<(), SessionManagerError> {
-        let handle = self.handle(metrics.session_id)?;
+        let observation = watcher::MetricsObservation {
+            cpu_percent: metrics.totals.cpu_percent,
+            gpu_percent: None,
+            ram_percent: None,
+            vram_percent: None,
+        };
+        self.publish_metrics_with_resources(metrics, observation)
+    }
+
+    /// Persist metrics and feed complete resource percentages to the Event engine.
+    pub fn publish_metrics_with_resources(
+        &self,
+        metrics: SessionMetrics,
+        resources: watcher::MetricsObservation,
+    ) -> Result<(), SessionManagerError> {
+        let session_id = metrics.session_id;
+        let handle = self.handle(session_id)?;
         if let Some(store) = &self.inner.store {
             store.insert_raw_metric(&RawMetricSample {
                 session_id: Some(metrics.session_id),
@@ -66,11 +116,21 @@ impl SessionManager {
             })?;
         }
         let reduced = lock_session(&handle)?.capture != CaptureLevel::Full;
+        let observation = watcher::Observation {
+            at: metrics.at,
+            kind: watcher::ObservationKind::MetricsSample(resources),
+        };
         let message = DaemonMessage::SessionMetrics { metrics };
         if reduced {
             self.observe_reduced(message.clone());
         }
         let _ = handle.structured.send(message);
+        tasks::apply_observation(
+            session_id,
+            &handle,
+            self.inner.store.as_deref(),
+            observation,
+        );
         Ok(())
     }
 
@@ -152,6 +212,13 @@ impl SessionManager {
         if session.capture != CaptureLevel::Full {
             self.observe_reduced(message);
         }
+        tasks::apply_health_event(
+            session_id,
+            &handle,
+            self.inner.store.as_deref(),
+            at,
+            &event.kind,
+        );
         Ok(event)
     }
 

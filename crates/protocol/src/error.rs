@@ -147,6 +147,30 @@ pub enum ProtocolError {
     #[error("Session {0} cannot continue itself")]
     SelfContinuation(SessionId),
 
+    /// A Health progress percentage was not finite or outside 0–100.
+    #[error("health progress {0} must be finite and between 0 and 100")]
+    InvalidHealthProgress(f32),
+
+    /// A Health snapshot contained too many evidence entries.
+    #[error("health evidence has {actual} entries; maximum is {maximum}")]
+    TooManyHealthEvidence {
+        /// Evidence entries supplied.
+        actual: usize,
+        /// Maximum accepted entries.
+        maximum: usize,
+    },
+
+    /// A bounded request limit was zero or too large.
+    #[error("{field} limit {actual} must be between 1 and {maximum}")]
+    InvalidQueryLimit {
+        /// Query field containing the limit.
+        field: &'static str,
+        /// Rejected limit.
+        actual: u32,
+        /// Maximum supported limit.
+        maximum: u32,
+    },
+
     /// The JSON could not be parsed into the expected type.
     #[error("invalid JSON: {0}")]
     Json(String),

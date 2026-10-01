@@ -13,6 +13,7 @@
 //! - [`session_log`] — log metadata for adopted processes
 //! - [`command_line`] — rendering structured Watch argv as quoted shell input
 //! - [`event`]    — structured things that happened (the system's common language)
+//! - [`health`]   — deterministic current Session assessment
 //! - [`recipe`]   — reusable command templates
 //! - [`process`]  — OS processes and aggregate resource use
 //! - [`metric`]   — machine and session resource measurements
@@ -25,6 +26,7 @@ pub mod command;
 pub mod command_line;
 pub mod error;
 pub mod event;
+pub mod health;
 pub mod ids;
 pub mod local;
 pub mod machine;
@@ -44,6 +46,9 @@ pub use command::{Command, CommandClass, CommandStatus};
 pub use command_line::{render_command_line, ShellDialect, MAX_RENDERED_COMMAND_BYTES};
 pub use error::ProtocolError;
 pub use event::{Event, EventKind, Resource, Severity};
+pub use health::{
+    Health, HealthLevel, HealthOverall, MAX_HEALTH_EVIDENCE, MAX_HEALTH_EVIDENCE_BYTES,
+};
 pub use ids::{CommandId, EventId, MachineId, ProjectId, SessionId};
 pub use machine::{Gpu, Machine, MachineStatus, Os};
 pub use message::{

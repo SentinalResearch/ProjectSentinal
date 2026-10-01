@@ -1,0 +1,14 @@
+---
+source: crates/watcher/tests/replay_logs.rs
+expression: "replay(\"tests/logs/server/vllm.log\", \"vllm serve Qwen/Qwen3-8B\")"
+---
+[
+    ServerStarted {
+        port: Some(
+            8000,
+        ),
+        url: Some(
+            "http://0.0.0.0:8000",
+        ),
+    },
+]

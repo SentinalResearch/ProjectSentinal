@@ -297,8 +297,8 @@ This terminal: inside Sentinal Session 12
 Registers an existing same-user process read-only as `ADOPTED` / `PROCESS`
 over the private local socket.
 
-- `adopt PID [-t TITLE]` adopts one process; `--log PATH` records a readable
-  regular log file (tailing lands in 1b.D).
+- `adopt PID [-t TITLE]` adopts one process; `--log PATH` read-only tails a
+  same-user regular log through deterministic watchers and uses PROCESS_LOG.
 - `adopt --pick` lists your processes (newest first, excluding itself, its
   shell, and `sentinald`) and adopts only after you type a list number or
   PID; Enter or `q` adopts nothing.

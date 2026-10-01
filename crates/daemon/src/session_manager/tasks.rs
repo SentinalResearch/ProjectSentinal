@@ -6,7 +6,7 @@ use crate::{
     pty::PtyError,
     tracker::TrackerUpdate,
 };
-use protocol::{DaemonMessage, SessionId, SessionState};
+use protocol::{DaemonMessage, Event, EventKind, SessionId, SessionState};
 use std::{
     io::{Read, Write},
     path::PathBuf,
@@ -56,8 +56,10 @@ pub(super) fn spawn_reader(
                                 tracing::error!(session = session_id.0, "scrollback lock poisoned");
                             }
                         }
+                        apply_output(session_id, &handle, store.as_deref(), &trailing, clock());
                         let _ = handle.output.send(trailing);
                     }
+                    finish_output(session_id, &handle, store.as_deref(), clock());
                     return;
                 }
                 Ok(count) => count,
@@ -94,6 +96,7 @@ pub(super) fn spawn_reader(
                 prompt_ready |= signal == ShellSignal::PromptStart;
                 let _ = apply_signal(session_id, &handle, store.as_deref(), signal, clock());
             }
+            apply_output(session_id, &handle, store.as_deref(), bytes, clock());
             if prompt_ready {
                 type_initial_command(session_id, &handle);
             }
@@ -198,7 +201,190 @@ pub(super) fn apply_signal(
             let _ = handle.observations.send(message);
         }
     }
+    if let (Some(command), Some(event)) = (&update.command, &update.event) {
+        let kind = match event.kind {
+            EventKind::CommandStarted { .. } => {
+                Some(watcher::ObservationKind::CommandStarted(command.clone()))
+            }
+            EventKind::CommandFinished { .. } => {
+                Some(watcher::ObservationKind::CommandFinished(command.clone()))
+            }
+            _ => None,
+        };
+        if let Some(kind) = kind {
+            apply_observation(session_id, handle, store, watcher::Observation { at, kind });
+        }
+    }
     Some(update)
+}
+
+pub(super) fn apply_output(
+    session_id: SessionId,
+    handle: &SessionHandle,
+    store: Option<&Store>,
+    bytes: &[u8],
+    at: protocol::Timestamp,
+) {
+    let lines = match handle.line_framer.lock() {
+        Ok(mut framer) => framer.push(bytes),
+        Err(_) => {
+            tracing::error!(session = session_id.0, "watcher line-framer lock poisoned");
+            return;
+        }
+    };
+    for line in lines {
+        apply_observation(
+            session_id,
+            handle,
+            store,
+            watcher::Observation::output(at, line),
+        );
+    }
+}
+
+fn finish_output(
+    session_id: SessionId,
+    handle: &SessionHandle,
+    store: Option<&Store>,
+    at: protocol::Timestamp,
+) {
+    let line = match handle.line_framer.lock() {
+        Ok(mut framer) => framer.finish(),
+        Err(_) => {
+            tracing::error!(session = session_id.0, "watcher line-framer lock poisoned");
+            return;
+        }
+    };
+    if let Some(line) = line {
+        apply_observation(
+            session_id,
+            handle,
+            store,
+            watcher::Observation::output(at, line),
+        );
+    }
+}
+
+pub(super) fn apply_observation(
+    session_id: SessionId,
+    handle: &SessionHandle,
+    store: Option<&Store>,
+    observation: watcher::Observation,
+) {
+    let update = match handle.watcher.lock() {
+        Ok(mut engine) => engine.observe(&observation),
+        Err(_) => {
+            tracing::error!(session = session_id.0, "watcher engine lock poisoned");
+            return;
+        }
+    };
+    let (session, command_id, health_changed, reduced) = match handle.session.lock() {
+        Ok(mut session) => {
+            let health_changed = session.health.as_ref() != Some(&update.health);
+            if health_changed {
+                session.health = Some(update.health);
+            }
+            (
+                session.clone(),
+                session.current_command,
+                health_changed,
+                session.capture != protocol::CaptureLevel::Full,
+            )
+        }
+        Err(_) => {
+            tracing::error!(
+                session = session_id.0,
+                "Session lock poisoned during watcher update"
+            );
+            return;
+        }
+    };
+    let events = update
+        .events
+        .into_iter()
+        .map(|kind| Event {
+            id: handle.watcher_ids.event(),
+            session_id,
+            command_id,
+            at: observation.at,
+            kind,
+        })
+        .collect::<Vec<_>>();
+    if let Some(store) = store {
+        for event in &events {
+            if let Err(error) = store.insert_event(event) {
+                tracing::error!(session = session_id.0, %error, "failed to persist watcher Event");
+            }
+        }
+        if health_changed {
+            if let Err(error) = store.update_session(&session) {
+                tracing::error!(session = session_id.0, %error, "failed to persist Session Health");
+            }
+        }
+    }
+    for event in events {
+        let message = DaemonMessage::Event { event };
+        let _ = handle.structured.send(message.clone());
+        if reduced {
+            let _ = handle.observations.send(message);
+        }
+    }
+    if health_changed {
+        let message = DaemonMessage::SessionUpdated { session };
+        let _ = handle.structured.send(message.clone());
+        if reduced {
+            let _ = handle.observations.send(message);
+        }
+    }
+}
+
+pub(super) fn apply_health_event(
+    session_id: SessionId,
+    handle: &SessionHandle,
+    store: Option<&Store>,
+    at: protocol::Timestamp,
+    event: &EventKind,
+) {
+    let health = match handle.watcher.lock() {
+        Ok(mut engine) => engine.observe_existing_event(at, event),
+        Err(_) => {
+            tracing::error!(session = session_id.0, "watcher engine lock poisoned");
+            return;
+        }
+    };
+    let (session, changed, reduced) = match handle.session.lock() {
+        Ok(mut session) => {
+            let changed = session.health.as_ref() != Some(&health);
+            if changed {
+                session.health = Some(health);
+            }
+            (
+                session.clone(),
+                changed,
+                session.capture != protocol::CaptureLevel::Full,
+            )
+        }
+        Err(_) => {
+            tracing::error!(
+                session = session_id.0,
+                "Session lock poisoned during Health update"
+            );
+            return;
+        }
+    };
+    if !changed {
+        return;
+    }
+    if let Some(store) = store {
+        if let Err(error) = store.update_session(&session) {
+            tracing::error!(session = session_id.0, %error, "failed to persist Session Health");
+        }
+    }
+    let message = DaemonMessage::SessionUpdated { session };
+    let _ = handle.structured.send(message.clone());
+    if reduced {
+        let _ = handle.observations.send(message);
+    }
 }
 
 pub(super) fn spawn_exit_monitor(

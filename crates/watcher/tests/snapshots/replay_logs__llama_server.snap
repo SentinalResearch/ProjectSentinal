@@ -1,0 +1,14 @@
+---
+source: crates/watcher/tests/replay_logs.rs
+expression: "replay(\"tests/logs/server/llama.log\", \"llama-server -m model.gguf\")"
+---
+[
+    ServerStarted {
+        port: Some(
+            8080,
+        ),
+        url: Some(
+            "http://127.0.0.1:8080",
+        ),
+    },
+]

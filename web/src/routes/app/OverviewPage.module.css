@@ -208,6 +208,10 @@
 
 .rowTagCell {
   padding-left: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
 }
 
 .rowName {

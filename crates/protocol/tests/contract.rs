@@ -12,7 +12,7 @@
 
 use protocol::{
     AuthChangePasswordRequest, AuthFailure, AuthLoginRequest, AuthSession, AuthSessionInfo,
-    AuthSetupRequest, AuthStatus, ClientRequest, Command, DaemonMessage, Envelope, Event,
+    AuthSetupRequest, AuthStatus, ClientRequest, Command, DaemonMessage, Envelope, Event, Health,
     LocalRequest, LocalResponse, Machine, MachineMetrics, Process, Recipe, Session, SessionMetrics,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -54,6 +54,11 @@ fn machine_contract() {
 #[test]
 fn session_contract() {
     assert_round_trip::<Session>(&load("session.json"), "session.json");
+}
+
+#[test]
+fn health_contract() {
+    assert_round_trip::<Health>(&load("health.json"), "health.json");
 }
 
 #[test]
@@ -218,6 +223,7 @@ fn every_client_request_has_a_fixture() {
         "RESIZE",
         "KILL",
         "GET_HISTORY",
+        "GET_EVENTS",
         "SEARCH_COMMANDS",
     ];
     let requests = load("client_requests.json");
@@ -244,6 +250,7 @@ fn every_daemon_message_has_a_fixture() {
         "SESSION_UPDATED",
         "COMMAND_UPDATED",
         "EVENT",
+        "EVENTS",
         "MACHINE_METRICS",
         "SESSION_METRICS",
         "HISTORY",

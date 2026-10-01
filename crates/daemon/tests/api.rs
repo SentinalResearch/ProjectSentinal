@@ -16,8 +16,8 @@ use daemon::{
 };
 use protocol::{
     AuthFailure, AuthFailureCode, AuthSession, AuthSessionInfo, AuthStatus, ClientRequest, Command,
-    CommandId, DaemonMessage, Envelope, Machine, MachineId, MachineStatus, Os, SessionId,
-    Timestamp,
+    CommandId, DaemonMessage, Envelope, Event, EventId, EventKind, Machine, MachineId,
+    MachineStatus, Os, SessionId, Timestamp,
 };
 use std::{
     net::SocketAddr,
@@ -123,6 +123,40 @@ async fn history_and_full_text_search_return_stored_commands() {
     assert!(
         matches!(search, WsAction::Reply(DaemonMessage::History { commands }) if commands.len() == 1 && commands[0].text == "python train.py")
     );
+}
+
+#[tokio::test]
+async fn event_replay_is_filtered_bounded_and_oldest_first() {
+    let (state, store) = state_with_store();
+    for (id, session_id) in [(1, 7), (2, 8), (3, 7)] {
+        store
+            .insert_event(&Event {
+                id: EventId(id),
+                session_id: SessionId(session_id),
+                command_id: None,
+                at: Timestamp(id as i64),
+                kind: EventKind::WarningDetected {
+                    message: format!("event {id}"),
+                },
+            })
+            .unwrap();
+    }
+    let action = state
+        .dispatch_text(
+            &Envelope::new(ClientRequest::GetEvents {
+                session_id: Some(SessionId(7)),
+                after: Some(EventId(1)),
+                limit: 1,
+            })
+            .encode()
+            .unwrap(),
+        )
+        .await;
+    assert!(matches!(
+        action,
+        WsAction::Reply(DaemonMessage::Events { events })
+            if events.iter().map(|event| event.id).collect::<Vec<_>>() == vec![EventId(3)]
+    ));
 }
 
 #[tokio::test]

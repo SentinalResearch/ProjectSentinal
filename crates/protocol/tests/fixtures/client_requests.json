@@ -8,5 +8,6 @@
   { "version": 1, "payload": { "type": "RESIZE", "session_id": 128, "cols": 80, "rows": 24 } },
   { "version": 1, "payload": { "type": "KILL", "session_id": 128 } },
   { "version": 1, "payload": { "type": "GET_HISTORY", "session_id": 128, "limit": 100 } },
+  { "version": 1, "payload": { "type": "GET_EVENTS", "session_id": 128, "after": 3, "limit": 100 } },
   { "version": 1, "payload": { "type": "SEARCH_COMMANDS", "query": "train", "limit": 50 } }
 ]

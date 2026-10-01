@@ -126,6 +126,14 @@ impl AppState {
                     Err(error) => error_action(error),
                 }
             }
+            ClientRequest::GetEvents {
+                session_id,
+                after,
+                limit,
+            } => match self.sessions.events(session_id, after, limit.min(500)) {
+                Ok(events) => WsAction::Reply(DaemonMessage::Events { events }),
+                Err(error) => error_action(error),
+            },
             ClientRequest::SearchCommands { query, limit } => {
                 match self.sessions.search_commands(&query, limit.min(1_000)) {
                     Ok(commands) => WsAction::Reply(DaemonMessage::History { commands }),

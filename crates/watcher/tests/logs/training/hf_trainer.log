@@ -1,0 +1,6 @@
+***** Running training *****
+  Num Epochs = 2
+{'loss': 1.142, 'learning_rate': 5e-05, 'epoch': 0.5}
+Epoch 1/2 loss=0.921 val_loss=0.880
+Saving checkpoint to output/checkpoint-500/model.safetensors
+Epoch 2/2 loss=0.702 val_loss=0.650

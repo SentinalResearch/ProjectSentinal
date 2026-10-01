@@ -13,6 +13,8 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `rusqlite` (`bundled`) | store | Local SQLite persistence with a consistent bundled SQLite/FTS5 build |
 | `sysinfo` | daemon | Cross-platform CPU, RAM, and process-tree sampling |
 | `nvml-wrapper` (optional) | daemon | NVIDIA utilization, VRAM, temperature, and per-process GPU memory |
+| `regex` | watcher | Deterministic built-in and declarative output matching |
+| `insta` (dev) | watcher | Reviewable Event snapshots from saved real-world logs |
 
 ## Approved for later milestones
 
@@ -25,8 +27,6 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `tracing`, `tracing-subscriber` | 1 | Logging |
 | `clap` | 1 | CLI argument parsing |
 | `zstd` | 1 | Compress scrollback logs |
-| `regex` | 3 | Watcher adapters |
-| `insta` (dev) | 3 | Snapshot tests for watcher output |
 | `ts-rs` | 0 | Generate TypeScript types from protocol |
 | `toml` | 1 | Parse daemon TOML for daemon startup and installed CLI address discovery |
 | `tokio-tungstenite` | 1 | WebSocket client transport for `ta` |

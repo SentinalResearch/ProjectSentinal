@@ -190,6 +190,32 @@ fn events_since_returns_only_later_ids() {
 }
 
 #[test]
+fn event_page_filters_session_after_and_limit_oldest_first() {
+    let store = Store::open_in_memory().unwrap();
+    for (id, session_id) in [(1, 1), (2, 2), (3, 1), (4, 1)] {
+        store
+            .insert_event(&Event {
+                id: EventId(id),
+                session_id: SessionId(session_id),
+                command_id: None,
+                at: Timestamp(id as i64),
+                kind: EventKind::WarningDetected {
+                    message: format!("event {id}"),
+                },
+            })
+            .unwrap();
+    }
+
+    let page = store
+        .events(Some(SessionId(1)), Some(EventId(1)), 2)
+        .unwrap();
+    assert_eq!(
+        page.iter().map(|event| event.id).collect::<Vec<_>>(),
+        vec![EventId(3), EventId(4)]
+    );
+}
+
+#[test]
 fn downsampling_averages_expired_raw_metrics_and_keeps_recent_samples() {
     let store = Store::open_in_memory().unwrap();
     for (at, cpu, ram) in [

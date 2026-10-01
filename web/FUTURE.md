@@ -12,11 +12,11 @@ visible `MOCK` label. `just network` always forces API mode.
 |---|---|---|---|
 | Machines list | Overview, Settings | partial | `VITE_DATA=api` shows the connected daemon's real Machine; multi-machine aggregation waits for Roadmap M4 |
 | Sessions list + live state | Overview, Session detail | real (M1) | `VITE_DATA=api` lists, creates, and polls real Sessions; daemon-pushed lifecycle events can replace polling later |
-| Capture origin/badge/capabilities | Every Session surface | planned (priority M1b) | Protocol origin/capture fields, capability enforcement, badges, reduced-capture explanations, and hidden unsupported actions |
-| Watch / external shell / auto-wrap / adopted Sessions | Overview, Session detail | planned (priority M1b) | Private local ingress and the four modes in `docs/CAPTURE_MODES.md`; adopted log progress completes with M3 watchers |
+| Capture origin/badge/capabilities | Every Session surface | real (M1b) | Badges and explanations mirror daemon-enforced capabilities; reduced capture offers FULL Watch guidance |
+| Watch / external shell / auto-wrap / adopted Sessions | Overview, Session detail | real (M1b/M3) | All four ingress modes are real; readable adopted logs become PROCESS_LOG and feed deterministic watchers |
 | Terminal attach (input/output) | Session detail | real (M1) | `TerminalPane` mounts xterm.js and `useRealTerminalSession` attaches over the authenticated binary WebSocket; the Playwright smoke test covers the fake-daemon path |
-| Health card (progress/activity/resources/stability/errors) | Session detail | mock | Daemon: watcher + Event engine (Roadmap M3) |
-| Event journal | Session detail, Project | mock | Daemon: Event engine (M3) |
+| Health card (progress/activity/resources/stability/errors) | Session detail | real (M3) | Persisted deterministic Health with bounded evidence; richer adapter scalars can be added without AI |
+| Event journal | Session detail, Project | real (M3) | Bounded persisted replay plus live Event broadcasts; project view combines Session timelines |
 | Command history + search | History | real (M2) | API mode reads persisted Commands from SQLite and sends search terms through FTS5 |
 | Resource metrics (CPU/RAM/GPU/VRAM) | Session detail | real (M2) | API mode streams per-Session process-tree totals; NVIDIA utilization/VRAM requires the daemon's `nvidia` feature, while watcher-derived loss remains M3 |
 | Recipes (list + run) | Recipes | mock | Daemon: recipe files + launch API (M4) |

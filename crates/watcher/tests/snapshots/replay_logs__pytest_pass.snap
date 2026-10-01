@@ -1,0 +1,13 @@
+---
+source: crates/watcher/tests/replay_logs.rs
+expression: "replay(\"tests/logs/pytest/pass.log\", \"pytest tests/\")"
+---
+[
+    ProgressUpdated {
+        current: 3,
+        total: Some(
+            3,
+        ),
+        unit: "test",
+    },
+]

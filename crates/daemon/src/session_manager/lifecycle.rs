@@ -212,6 +212,12 @@ impl SessionManager {
                 cwd.to_string_lossy(),
                 self.inner.tracker_ids.clone(),
             )),
+            watcher: Mutex::new(watcher::EventEngine::new(
+                None,
+                self.inner.watcher_adapters.clone(),
+            )),
+            line_framer: Mutex::new(watcher::LineFramer::default()),
+            watcher_ids: self.inner.tracker_ids.clone(),
             initial_command: Mutex::new(initial_command),
             shell_reports: Mutex::default(),
             attached: Arc::new(AtomicBool::new(false)),

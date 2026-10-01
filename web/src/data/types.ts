@@ -82,7 +82,7 @@ export interface Session {
   exitCode?: number | null;
   /** Executable used for this Session's shell; never a command line. */
   shell?: string;
-  /** Adopted process log, recorded but not tailed before 1b.D. */
+  /** Adopted process log; active tails use PROCESS_LOG capture. */
   log?: SessionLog;
   /** Direct predecessor in a persisted linear Session history. */
   continuedFrom?: string;

@@ -117,6 +117,13 @@
   background: var(--bg-1);
 }
 
+.sessionTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
 .sessionMain {
   display: flex;
   flex-direction: column;

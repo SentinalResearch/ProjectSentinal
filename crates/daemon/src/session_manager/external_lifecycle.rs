@@ -37,6 +37,17 @@ impl SessionManager {
                 continue;
             }
             if self.same_process(&session) {
+                let adopted_tail = if session.origin == SessionOrigin::Adopted {
+                    session
+                        .log
+                        .as_ref()
+                        .and_then(|log| super::adopt::open_tail(log).ok())
+                } else {
+                    None
+                };
+                if session.origin == SessionOrigin::Adopted && adopted_tail.is_none() {
+                    session.capture = CaptureLevel::Process;
+                }
                 // A Command running across the restart cannot be finished later.
                 let running_process = session.origin == SessionOrigin::Adopted;
                 if running_process && session.state == SessionState::Disconnected {
@@ -52,6 +63,9 @@ impl SessionManager {
                 let session_id = session.id;
                 let shell_hook = session.origin == SessionOrigin::ShellHook;
                 self.insert_external(session)?;
+                if let Some(tail) = adopted_tail {
+                    self.activate_log_tail(session_id, tail)?;
+                }
                 if shell_hook {
                     self.allow_initial_shell_sequence_gap(session_id)?;
                 }

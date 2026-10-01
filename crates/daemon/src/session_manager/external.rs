@@ -15,8 +15,8 @@ use crate::{
     tracker::CommandTracker,
 };
 use protocol::{
-    CaptureLevel, Command, DaemonMessage, Event, EventKind, Session, SessionId, SessionOrigin,
-    SessionState, Timestamp,
+    CaptureLevel, Command, CommandId, DaemonMessage, Event, EventKind, Session, SessionId,
+    SessionOrigin, SessionState, Timestamp,
 };
 use std::{
     collections::BTreeMap,
@@ -408,6 +408,21 @@ impl SessionManager {
     pub(super) fn insert_external(&self, session: Session) -> Result<(), SessionManagerError> {
         let id = session.id;
         let cwd = session.cwd.clone();
+        let watcher_command = (session.origin == SessionOrigin::Adopted).then(|| {
+            let hint = format!(
+                "{} {}",
+                session.shell,
+                session.title.as_deref().unwrap_or_default()
+            );
+            Command::start(
+                CommandId(0),
+                id,
+                session.machine_id.clone(),
+                hint,
+                session.cwd.clone(),
+                session.created_at,
+            )
+        });
         let (output, _) = broadcast::channel(1);
         let (structured, _) = broadcast::channel(64);
         let unsupported = move |operation| PtyError::Operation {
@@ -434,6 +449,12 @@ impl SessionManager {
                 cwd,
                 self.inner.tracker_ids.clone(),
             )),
+            watcher: Mutex::new(watcher::EventEngine::new(
+                watcher_command.as_ref(),
+                self.inner.watcher_adapters.clone(),
+            )),
+            line_framer: Mutex::new(watcher::LineFramer::default()),
+            watcher_ids: self.inner.tracker_ids.clone(),
             initial_command: Mutex::new(None),
             shell_reports: Mutex::default(),
             attached: Arc::new(std::sync::atomic::AtomicBool::new(false)),

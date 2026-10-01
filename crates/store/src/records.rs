@@ -97,25 +97,24 @@ impl Store {
 
     /// Return Events with IDs greater than `after`, ordered oldest first.
     pub fn events_since(&self, after: EventId) -> Result<Vec<Event>, StoreError> {
+        self.events(None, Some(after), u32::MAX)
+    }
+
+    /// Return a bounded Event page, optionally filtered by Session and ID.
+    pub fn events(
+        &self,
+        session: Option<SessionId>,
+        after: Option<EventId>,
+        limit: u32,
+    ) -> Result<Vec<Event>, StoreError> {
         let connection = self.lock()?;
         let mut statement = connection.prepare(
-            "SELECT id, session_id, command_id, at, kind_json FROM events WHERE id>?1 ORDER BY id",
+            "SELECT id, session_id, command_id, at, kind_json FROM events
+             WHERE (?1 IS NULL OR session_id=?1) AND id>?2 ORDER BY id LIMIT ?3",
         )?;
-        let rows = statement.query_map([to_sql_id(after.0)?], |row| {
-            let kind_json: String = row.get(4)?;
-            let kind: EventKind = serde_json::from_str(&kind_json).map_err(json_to_sql)?;
-            Ok(Event {
-                id: EventId(from_sql_id(row.get(0)?)?),
-                session_id: SessionId(from_sql_id(row.get(1)?)?),
-                command_id: row
-                    .get::<_, Option<i64>>(2)?
-                    .map(from_sql_id)
-                    .transpose()?
-                    .map(CommandId),
-                at: Timestamp(row.get(3)?),
-                kind,
-            })
-        })?;
+        let session = session.map(|id| to_sql_id(id.0)).transpose()?;
+        let after = to_sql_id(after.unwrap_or(EventId(0)).0)?;
+        let rows = statement.query_map(params![session, after, limit], event_from_row)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 }
@@ -149,6 +148,22 @@ fn command_from_row(row: &Row<'_>) -> rusqlite::Result<Command> {
         finished_at: row.get::<_, Option<i64>>(6)?.map(Timestamp),
         exit_code: row.get(7)?,
         class,
+    })
+}
+
+fn event_from_row(row: &Row<'_>) -> rusqlite::Result<Event> {
+    let kind_json: String = row.get(4)?;
+    let kind: EventKind = serde_json::from_str(&kind_json).map_err(json_to_sql)?;
+    Ok(Event {
+        id: EventId(from_sql_id(row.get(0)?)?),
+        session_id: SessionId(from_sql_id(row.get(1)?)?),
+        command_id: row
+            .get::<_, Option<i64>>(2)?
+            .map(from_sql_id)
+            .transpose()?
+            .map(CommandId),
+        at: Timestamp(row.get(3)?),
+        kind,
     })
 }
 

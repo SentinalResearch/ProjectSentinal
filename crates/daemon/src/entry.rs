@@ -1,12 +1,13 @@
 //! Startup and serving for the `sentinald` daemon (and its `tad` alias).
 
 use crate::{
+    adapter_config::{load_adapters, AdapterConfigError},
     api::{router, AppState},
     audit::AuditLog,
     auth::{load_or_create_token, AuthError, AuthManager},
     config::{ConfigError, DaemonConfig},
     local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
-    metrics::{MetricsSampler, ResourceDebouncer},
+    metrics::{process_tree, MetricsSampler, ResourceDebouncer},
     package_service::{package_router, PackageService, PackageServiceError},
     process_probe::ProcessProbe,
     pty::{FakePty, PtyBackend, RealPty},
@@ -87,6 +88,9 @@ pub enum DaemonError {
     /// The package server task panicked or was cancelled.
     #[error("package service task failed: {0}")]
     PackageTask(tokio::task::JoinError),
+    /// Declarative watcher adapters could not be loaded safely.
+    #[error(transparent)]
+    Adapters(#[from] AdapterConfigError),
 }
 
 /// Load configuration, start every listener, and serve until SIGINT/SIGTERM.
@@ -134,6 +138,7 @@ pub async fn run() -> Result<(), DaemonError> {
         Arc::new(RealPty)
     };
     let daemon_uid = current_uid(&config.local_socket)?;
+    let watcher_adapters = load_adapters(&home.join(".config/terminal-agent/adapters"))?;
     let sessions = SessionManager::with_store(
         backend,
         SessionManagerConfig::system(
@@ -144,6 +149,7 @@ pub async fn run() -> Result<(), DaemonError> {
         AuditLog::new(&config.data_dir),
         store.clone(),
     )?
+    .with_watcher_adapters(watcher_adapters)
     .with_process_probe(ProcessProbe::system(daemon_uid));
     // FULL Sessions were interrupted above; reduced-capture ones are resumed
     // only when their root process identity still matches.
@@ -312,6 +318,7 @@ fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {
             };
             let at = now();
             let snapshot = sampler.sample(at, &roots);
+            let root_by_session = roots.into_iter().collect::<HashMap<_, _>>();
             let ram_total = snapshot.machine.ram_total_bytes;
             let gpu_percent = snapshot
                 .machine
@@ -326,24 +333,33 @@ fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {
                 tracing::warn!(%error, "failed to publish Machine metrics");
             }
             for metrics in snapshot.sessions {
-                let mut values = vec![(Resource::Cpu, metrics.totals.cpu_percent)];
-                if ram_total > 0 {
-                    values.push((
-                        Resource::Ram,
-                        (metrics.totals.rss_bytes as f64 / ram_total as f64 * 100.0) as f32,
-                    ));
+                if let Some(root) = root_by_session.get(&metrics.session_id) {
+                    if let Err(error) = sessions.publish_processes(
+                        metrics.session_id,
+                        at,
+                        process_tree(&snapshot.processes, *root),
+                    ) {
+                        tracing::warn!(session = metrics.session_id.0, %error, "failed to publish process observation");
+                    }
                 }
-                if metrics.totals.gpu_mem_bytes > 0 {
-                    if let Some(percent) = gpu_percent {
-                        values.push((Resource::Gpu, percent));
-                    }
-                    if vram_total > 0 {
-                        values.push((
-                            Resource::Vram,
-                            (metrics.totals.gpu_mem_bytes as f64 / vram_total as f64 * 100.0)
-                                as f32,
-                        ));
-                    }
+                let ram_percent = (ram_total > 0)
+                    .then(|| (metrics.totals.rss_bytes as f64 / ram_total as f64 * 100.0) as f32);
+                let session_gpu_percent = (metrics.totals.gpu_mem_bytes > 0)
+                    .then_some(gpu_percent)
+                    .flatten();
+                let vram_percent =
+                    (metrics.totals.gpu_mem_bytes > 0 && vram_total > 0).then(|| {
+                        (metrics.totals.gpu_mem_bytes as f64 / vram_total as f64 * 100.0) as f32
+                    });
+                let mut values = vec![(Resource::Cpu, metrics.totals.cpu_percent)];
+                if let Some(percent) = ram_percent {
+                    values.push((Resource::Ram, percent));
+                }
+                if let Some(percent) = session_gpu_percent {
+                    values.push((Resource::Gpu, percent));
+                }
+                if let Some(percent) = vram_percent {
+                    values.push((Resource::Vram, percent));
                 }
                 let crossings = debouncers
                     .entry(metrics.session_id)
@@ -359,7 +375,13 @@ fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {
                         tracing::warn!(session = metrics.session_id.0, %error, "failed to publish resource event");
                     }
                 }
-                if let Err(error) = sessions.publish_metrics(metrics) {
+                let resources = watcher::MetricsObservation {
+                    cpu_percent: metrics.totals.cpu_percent,
+                    gpu_percent: session_gpu_percent,
+                    ram_percent,
+                    vram_percent,
+                };
+                if let Err(error) = sessions.publish_metrics_with_resources(metrics, resources) {
                     tracing::warn!(%error, "failed to publish Session metrics");
                 }
             }

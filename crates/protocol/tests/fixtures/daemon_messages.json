@@ -19,6 +19,9 @@
   { "version": 1, "payload": { "type": "EVENT", "event": {
       "id": 3, "session_id": 128, "command_id": 8192, "at": 1790000600000,
       "kind": { "type": "PROGRESS_UPDATED", "current": 37, "total": 100, "unit": "epoch" } } } },
+  { "version": 1, "payload": { "type": "EVENTS", "events": [{
+      "id": 3, "session_id": 128, "command_id": 8192, "at": 1790000600000,
+      "kind": { "type": "PROGRESS_UPDATED", "current": 37, "total": 100, "unit": "epoch" } }] } },
   { "version": 1, "payload": { "type": "MACHINE_METRICS", "metrics": {
       "at": 1790000600000, "cpu_percent": 42.5,
       "ram_used_bytes": 34359738368, "ram_total_bytes": 68719476736,

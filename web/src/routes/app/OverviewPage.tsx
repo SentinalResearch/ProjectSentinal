@@ -2,6 +2,7 @@ import type { KeyboardEvent, MouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { MockBadge } from "../../components/MockBadge";
+import { CaptureBadge } from "../../components/CaptureBadge";
 import { StateTag } from "../../components/StateTag";
 import { exitUnknown } from "../../data/capture";
 import { dataAdapter } from "../../data";
@@ -102,6 +103,7 @@ export function OverviewPage() {
                 >
                   <div className={styles.needsCardTop}>
                     <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
+                    <CaptureBadge capture={session.capture ?? "FULL"} />
                     <span className={styles.needsMachine}>{machine?.name ?? session.machine}</span>
                   </div>
                   <div className={styles.needsBody}>
@@ -158,6 +160,7 @@ export function OverviewPage() {
               <button key={session.id} type="button" className={styles.row} onClick={() => open(session.id)}>
                 <span className={styles.rowTagCell}>
                   <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
+                  <CaptureBadge capture={session.capture ?? "FULL"} />
                 </span>
                 <span className={styles.rowName}>
                   <span className={styles.rowNameText}>{session.name}</span>
