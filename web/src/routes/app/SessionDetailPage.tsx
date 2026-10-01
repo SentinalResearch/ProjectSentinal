@@ -9,6 +9,8 @@ import { dataAdapter } from "../../data";
 import { resolveSessionLineage } from "../../data/lineage";
 import type { Session } from "../../data/types";
 import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../data/capture";
+import { ReducedCapturePanel } from "./ReducedCapturePanel";
+import type { CaptureLevel } from "../../protocol/CaptureLevel";
 import {
   confirmConsequence,
   formatSessionDuration,
@@ -28,6 +30,14 @@ import styles from "./SessionDetailPage.module.css";
 
 const INTERRUPTIBLE = new Set(["RUNNING", "WAITING", "STALLED"]);
 /** design_handoff_sentinal/design/SentinalSession.dc.html */
+/** What the main section shows for each capture level. */
+const SECTION_LABELS: Record<CaptureLevel, string> = {
+  FULL: "TERMINAL",
+  COMMANDS: "COMMANDS",
+  PROCESS_LOG: "LOG",
+  PROCESS: "METRICS",
+};
+
 export function SessionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -144,7 +154,7 @@ export function SessionDetailPage() {
               Generation {lineage.selectedIndex + 1} of {lineage.ordered.length}
             </span>
             <StateTag state={session.state} exitUnknown={unknownExit} />
-            <CaptureBadge capture={capture} />
+            <CaptureBadge capture={capture} origin={session.origin} />
             {hasHealth && (
               <span
                 className={styles.healthOutline}
@@ -157,6 +167,11 @@ export function SessionDetailPage() {
           </div>
           {session.command && <span className={styles.command}>{session.command}</span>}
           <span className={styles.meta}>{meta}</span>
+          {capture !== "FULL" && (
+            <span className={styles.captureLine} role="note">
+              {captureExplanation(capture)}
+            </span>
+          )}
           {hint && <span className={styles.logHint}>{hint}</span>}
         </div>
         <div className={styles.actions}>
@@ -214,19 +229,20 @@ export function SessionDetailPage() {
         kind={kind}
         interrupted={interrupted}
         lastCheckpoint={lastCheckpointPath(session)}
+        canSendInput={capabilities.canSendInput}
         onAnswer={answerPrompt}
         onRerun={rerun}
         onShowOutput={() => {
           /* the terminal is always visible below; nothing to scroll to on this layout */
         }}
       />
-      <SessionCommands sessionId={session.id} />
-      <ResourceBars metrics={session.metrics} />
+      {capture !== "COMMANDS" && <SessionCommands sessionId={session.id} />}
+      {capture !== "PROCESS" && <ResourceBars metrics={session.metrics} />}
 
       <div className={styles.body}>
         <section className={styles.terminalSection}>
           <div className={styles.terminalHeader}>
-            <span className={styles.terminalLabel}>TERMINAL</span>
+            <span className={styles.terminalLabel}>{SECTION_LABELS[capture]}</span>
             <span className={`${styles.terminalPath} mono`}>
               {machineName} · {session.cwd ?? "~"}
             </span>
@@ -250,9 +266,7 @@ export function SessionDetailPage() {
               onRequestInterrupt={askCtrlC}
             />
           ) : (
-            <p className={styles.terminalUnavailable} role="note">
-              {captureExplanation(capture)}
-            </p>
+            <ReducedCapturePanel session={session} showSummary={false} />
           )}
         </section>
 

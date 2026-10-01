@@ -1,4 +1,5 @@
 import type { CaptureLevel } from "../protocol/CaptureLevel";
+import type { SessionOrigin } from "../protocol/SessionOrigin";
 import type { Session } from "./types";
 
 /**
@@ -67,18 +68,29 @@ export function captureCapabilities(capture: CaptureLevel): CaptureCapabilities 
   return CAPABILITIES[capture];
 }
 
-/** One-line explanation of what is unavailable, for reduced capture. */
-export function captureExplanation(capture: CaptureLevel): string | null {
-  switch (capture) {
-    case "FULL":
-      return null;
-    case "COMMANDS":
-      return "COMMANDS capture: Sentinal records this shell's Commands and Metrics. There is no terminal output, input, resize, or kill. Use `sentinal watch` for FULL capture next time.";
-    case "PROCESS_LOG":
-      return "PROCESS_LOG capture: Sentinal reads this process's log and Metrics only. There is no terminal, input, resize, or kill. Use `sentinal watch` for FULL capture next time.";
-    case "PROCESS":
-      return "PROCESS capture: Sentinal observes this process's Metrics and lifecycle only. There is no output, input, resize, or kill. Use `sentinal watch` for FULL capture next time.";
-  }
+const EXPLANATIONS: Record<CaptureLevel, string> = {
+  FULL: "Terminal and Commands captured.",
+  COMMANDS: "Commands and Metrics only — no terminal.",
+  PROCESS_LOG: "Read-only log and Metrics — no terminal input.",
+  PROCESS: "Metrics only.",
+};
+
+/** One concise line saying what Sentinal captures, and what it cannot do. */
+export function captureExplanation(capture: CaptureLevel): string {
+  return EXPLANATIONS[capture];
+}
+
+const ORIGINS: Record<SessionOrigin, string> = {
+  UI: "UI",
+  WATCH: "WATCH",
+  SHELL_HOOK: "SHELL HOOK",
+  AUTO_WRAP: "AUTO-WRAP",
+  ADOPTED: "ADOPTED",
+};
+
+/** Display name of how a Session entered Sentinal; absent means UI. */
+export function originLabel(origin: SessionOrigin | undefined): string {
+  return ORIGINS[origin ?? "UI"];
 }
 
 /** An ended Session whose exit status Sentinal could not know (external processes). */
@@ -93,8 +105,31 @@ const LOG_SOURCES = {
   STDOUT_AND_STDERR: "stdout and stderr",
 } as const;
 
-/** "Log detected" hint while a known log cannot currently be tailed. */
+/** Whether a known log is being read, or was found but cannot be read. */
 export function logHint(session: Session): string | null {
-  if (!session.log || captureOf(session) === "PROCESS_LOG") return null;
-  return `Log detected: ${session.log.path} (${LOG_SOURCES[session.log.source]}) — tailing not enabled yet.`;
+  if (!session.log) return null;
+  const where = `${session.log.path} (${LOG_SOURCES[session.log.source]})`;
+  return captureOf(session) === "PROCESS_LOG"
+    ? `Watching ${where}, read-only.`
+    : `Log found at ${where}, but Sentinal cannot read it.`;
+}
+
+/** POSIX single-quote `value` so a shell reads it as one literal word. */
+export function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
+
+/**
+ * A copyable `sentinal watch` line for next time, built only from the
+ * Session's cwd and title — never from Commands or output — and withheld
+ * when that metadata contains control characters.
+ */
+export function watchHint(session: Session): string | null {
+  if (captureOf(session) === "FULL" || !session.cwd) return null;
+  if (CONTROL.test(session.cwd) || CONTROL.test(session.name)) return null;
+  const cwd = session.cwd.startsWith("~/") ? `~/${shellQuote(session.cwd.slice(2))}` : shellQuote(session.cwd);
+  return `cd ${cwd} && sentinal watch -t ${shellQuote(session.name)}`;
 }

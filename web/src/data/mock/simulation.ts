@@ -55,7 +55,8 @@ export const simulationScenarios: SimulationScenario[] = [
   {
     id: "capture-limits",
     name: "Capture limits",
-    description: "Read-only adopted processes, including an ended process whose exit code is unknown.",
+    description:
+      "Reduced-capture Sessions: a hooked shell, a tailed log, and adopted processes, including one whose exit code is unknown.",
   },
   {
     id: "offline-worker",
@@ -132,7 +133,7 @@ function buildScenario(id: SimulationScenarioId): MockStoreSnapshot {
   }
 
   if (id === "capture-limits") {
-    const sessions = sessionsFor(snapshot, (session) => session.origin === "ADOPTED");
+    const sessions = sessionsFor(snapshot, (session) => (session.capture ?? "FULL") !== "FULL");
     const machines = machinesForSessions(snapshot, sessions);
     return {
       ...snapshot,

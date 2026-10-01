@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const tempBase = process.platform === "darwin" ? "/private/tmp" : realpathSync(tmpdir());
-const testRoot = join(tempBase, `sentinal-e2e-${process.pid}-${Date.now()}`);
+// Workers re-evaluate this file; they must reuse the daemon's directory.
+const testRoot = process.env.SENTINAL_E2E_ROOT ?? join(tempBase, `sentinal-e2e-${process.pid}-${Date.now()}`);
+process.env.SENTINAL_E2E_ROOT = testRoot;
 const authFile = join(testRoot, "auth.json");
 const tokenFile = join(testRoot, "token");
 const daemonConfig = join(testRoot, "daemon.toml");
@@ -24,6 +26,9 @@ writeFileSync(
   { mode: 0o600 },
 );
 
+// Specs that adopt a real process reach the daemon's private local socket.
+process.env.SENTINAL_E2E_SOCKET = join(testRoot, "run", "sentinald.sock");
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -32,6 +37,11 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",
   },
+  projects: [
+    // The smoke spec performs first-run owner setup; later specs sign in.
+    { name: "smoke", testMatch: "session-smoke.spec.ts" },
+    { name: "adopted", testMatch: "adopted-log.spec.ts", dependencies: ["smoke"] },
+  ],
   webServer: [
     {
       command:

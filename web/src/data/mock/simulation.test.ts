@@ -44,7 +44,9 @@ describe("mock user-testing simulation", () => {
 
     applyScenario("capture-limits");
     expect(store.sessions.length).toBeGreaterThan(0);
-    expect(store.sessions.every((session) => session.capture === "PROCESS")).toBe(true);
+    expect(new Set(store.sessions.map((session) => session.capture))).toEqual(
+      new Set(["COMMANDS", "PROCESS_LOG", "PROCESS"]),
+    );
   });
 
   it("rejects an unknown preset without changing the current data", () => {

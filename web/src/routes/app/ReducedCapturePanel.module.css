@@ -1,0 +1,72 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  background: var(--bg-1);
+}
+
+.explanation {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+
+.explanation strong {
+  margin-right: 6px;
+  color: var(--text-1);
+  letter-spacing: 0.04em;
+}
+
+.logPath {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.waiting {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.watchHint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.overline {
+  flex-basis: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.watchCommand {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--text-1);
+  background: var(--bg-0);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow-wrap: anywhere;
+}
+
+.copyButton {
+  height: 32px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  background: transparent;
+  border: 0;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+  cursor: pointer;
+}

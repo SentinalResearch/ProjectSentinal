@@ -83,7 +83,7 @@ export function ProjectPage() {
                 <button key={s.id} type="button" className={styles.sessionRow} onClick={() => navigate(`/app/sessions/${s.id}`)}>
                   <span className={styles.sessionTags}>
                     <StateTag state={s.state} size="sm" exitUnknown={exitUnknown(s)} />
-                    <CaptureBadge capture={s.capture ?? "FULL"} />
+                    <CaptureBadge capture={s.capture ?? "FULL"} origin={s.origin} />
                   </span>
                   <span className={styles.sessionMain}>
                     <span className={styles.sessionName}>{s.name}</span>

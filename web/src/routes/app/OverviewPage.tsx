@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { MockBadge } from "../../components/MockBadge";
 import { CaptureBadge } from "../../components/CaptureBadge";
 import { StateTag } from "../../components/StateTag";
-import { exitUnknown } from "../../data/capture";
+import { captureCapabilities, captureOf, exitUnknown } from "../../data/capture";
 import { dataAdapter } from "../../data";
 import { formatSessionDuration, formatSessionFact, needsAttention } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
@@ -103,7 +103,7 @@ export function OverviewPage() {
                 >
                   <div className={styles.needsCardTop}>
                     <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
-                    <CaptureBadge capture={session.capture ?? "FULL"} />
+                    <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />
                     <span className={styles.needsMachine}>{machine?.name ?? session.machine}</span>
                   </div>
                   <div className={styles.needsBody}>
@@ -113,20 +113,24 @@ export function OverviewPage() {
                   {session.state === "WAITING" && session.prompt && (
                     <div className={styles.promptRow}>
                       <span className={styles.promptText}>{session.prompt}</span>
-                      <button
-                        type="button"
-                        className={styles.promptKey}
-                        onClick={(e) => answer(e, session.id, "y")}
-                      >
-                        y
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.promptKey}
-                        onClick={(e) => answer(e, session.id, "n")}
-                      >
-                        n
-                      </button>
+                      {captureCapabilities(captureOf(session)).canSendInput && (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.promptKey}
+                            onClick={(e) => answer(e, session.id, "y")}
+                          >
+                            y
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.promptKey}
+                            onClick={(e) => answer(e, session.id, "n")}
+                          >
+                            n
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -160,7 +164,7 @@ export function OverviewPage() {
               <button key={session.id} type="button" className={styles.row} onClick={() => open(session.id)}>
                 <span className={styles.rowTagCell}>
                   <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
-                  <CaptureBadge capture={session.capture ?? "FULL"} />
+                  <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />
                 </span>
                 <span className={styles.rowName}>
                   <span className={styles.rowNameText}>{session.name}</span>

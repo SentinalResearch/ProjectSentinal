@@ -8,6 +8,8 @@ export interface SessionTopBlockProps {
   kind: SessionKind;
   interrupted: boolean;
   lastCheckpoint: string | null;
+  /** False for reduced capture: no answer, re-run, or output controls. */
+  canSendInput: boolean;
   onAnswer: (value: "y" | "n") => void;
   onRerun: () => void;
   onShowOutput: () => void;
@@ -24,6 +26,7 @@ export function SessionTopBlock({
   kind,
   interrupted,
   lastCheckpoint,
+  canSendInput,
   onAnswer,
   onRerun,
   onShowOutput,
@@ -120,14 +123,16 @@ export function SessionTopBlock({
           </span>
         </div>
         <span className={styles.failedSummary}>{summary}</span>
-        <div className={styles.failedActions}>
-          <Button variant="primary" onClick={onRerun}>
-            Run again
-          </Button>
-          <Button variant="secondary" onClick={onShowOutput}>
-            Show output
-          </Button>
-        </div>
+        {canSendInput && (
+          <div className={styles.failedActions}>
+            <Button variant="primary" onClick={onRerun}>
+              Run again
+            </Button>
+            <Button variant="secondary" onClick={onShowOutput}>
+              Show output
+            </Button>
+          </div>
+        )}
       </section>
     );
   }
@@ -141,17 +146,21 @@ export function SessionTopBlock({
           </span>
           <span className={styles.waitingPrompt}>{session.prompt}</span>
           <span className={styles.waitingCaption}>
-            Default is N. Your answer is typed into the terminal followed by Enter.
+            {canSendInput
+              ? "Default is N. Your answer is typed into the terminal followed by Enter."
+              : "Sentinal has no terminal input for this Session. Answer where the process runs."}
           </span>
         </div>
-        <div className={styles.yn}>
-          <button type="button" className={styles.ynKey} onClick={() => onAnswer("y")}>
-            y
-          </button>
-          <button type="button" className={styles.ynKey} onClick={() => onAnswer("n")}>
-            n
-          </button>
-        </div>
+        {canSendInput && (
+          <div className={styles.yn}>
+            <button type="button" className={styles.ynKey} onClick={() => onAnswer("y")}>
+              y
+            </button>
+            <button type="button" className={styles.ynKey} onClick={() => onAnswer("n")}>
+              n
+            </button>
+          </div>
+        )}
       </section>
     );
   }

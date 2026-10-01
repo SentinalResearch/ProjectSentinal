@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 
 import { StateTag } from "../../components/StateTag";
 import { CaptureBadge } from "../../components/CaptureBadge";
-import { captureCapabilities, captureExplanation, captureOf, exitUnknown } from "../../data/capture";
+import { captureCapabilities, captureOf, exitUnknown } from "../../data/capture";
 import { formatSessionFact } from "../../data/format";
 import type { Machine, Session } from "../../data/types";
 import { TerminalPane } from "../../terminal/TerminalPane";
+import { ReducedCapturePanel } from "./ReducedCapturePanel";
 import styles from "./SplitPane.module.css";
 
 export interface SplitPaneProps {
@@ -40,7 +41,7 @@ export function SplitPane({ session, machine, active, gridRow, onFocus, onClose 
     >
       <div className={styles.head}>
         <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
-        <CaptureBadge capture={session.capture ?? "FULL"} />
+        <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />
         <span className={styles.name}>{session.name}</span>
         <span className={styles.fact}>
           {machine?.name ?? session.machine} · {formatSessionFact(session)}
@@ -61,9 +62,9 @@ export function SplitPane({ session, machine, active, gridRow, onFocus, onClose 
           className={styles.terminalWrap}
         />
       ) : (
-        <p className={styles.unavailable} role="note">
-          {captureExplanation(captureOf(session))}
-        </p>
+        <div className={styles.unavailable}>
+          <ReducedCapturePanel session={session} />
+        </div>
       )}
     </section>
   );

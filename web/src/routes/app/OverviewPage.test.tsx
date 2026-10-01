@@ -38,7 +38,7 @@ describe("OverviewPage", () => {
     // Running session, only in its machine's table (not in Needs you).
     expect(await screen.findByText("Qwen Training")).toBeInTheDocument();
     expect(screen.getByText("Needs you")).toBeInTheDocument();
-    expect(screen.getByText("Waiting for input")).toBeInTheDocument();
+    expect(screen.getAllByText("Waiting for input")).toHaveLength(2);
     // Machine name appears once in the sidebar and once as a group heading.
     expect((await screen.findAllByText("MacBook")).length).toBeGreaterThanOrEqual(2);
   });
@@ -47,10 +47,13 @@ describe("OverviewPage", () => {
     renderOverview();
     const user = userEvent.setup();
 
-    await screen.findByText("Waiting for input");
+    await screen.findAllByText("Waiting for input");
+    // The adopted PROCESS_LOG prompt has no terminal input, so only one card offers y/n.
     const yButtons = await screen.findAllByRole("button", { name: "y" });
+    expect(yButtons).toHaveLength(1);
     await user.click(yButtons[0]);
 
-    await waitFor(() => expect(screen.queryByText("Waiting for input")).not.toBeInTheDocument(), { timeout: 3000 });
+    await waitFor(() => expect(screen.getAllByText("Waiting for input")).toHaveLength(1), { timeout: 3000 });
+    expect(screen.queryByRole("button", { name: "y" })).not.toBeInTheDocument();
   });
 });

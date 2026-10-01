@@ -399,3 +399,8 @@
   color: var(--s-failed-fg);
   font-size: 12px;
 }
+
+.captureLine {
+  font-size: 13px;
+  color: var(--text-2);
+}

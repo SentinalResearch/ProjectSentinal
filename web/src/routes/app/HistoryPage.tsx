@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { CaptureBadge } from "../../components/CaptureBadge";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
@@ -230,7 +231,10 @@ export function HistoryPage() {
                 <span className={styles.tagCell}>
                   <StateTag state={state} size="sm" iconOnly />
                 </span>
-                <span className={`${styles.command} mono`}>{entry.command}</span>
+                <span className={`${styles.command} mono`}>
+                  {entry.command}
+                  {session && <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />}
+                </span>
                 <span className={styles.machineCell} style={{ color: machine?.status === "OFFLINE" ? "var(--text-3)" : "var(--text-2)" }}>
                   {machine?.name ?? "—"}
                 </span>

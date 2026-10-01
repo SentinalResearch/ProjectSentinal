@@ -98,14 +98,55 @@ describe("SessionDetailPage", () => {
     expect(screen.getByLabelText("PROCESS capture")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Live resources" })).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Log detected: /home/me/Projects/TIM/train.log (stdout and stderr) — tailing not enabled yet.",
-      ),
+      screen.getByText("Log found at /home/me/Projects/TIM/train.log (stdout and stderr), but Sentinal cannot read it."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("note")).toHaveTextContent("no output, input, resize, or kill");
+    expect(screen.getByRole("note")).toHaveTextContent("Metrics only.");
+    expect(screen.getByLabelText("Watch fully next time")).toHaveTextContent(
+      "cd ~/'Projects/TIM' && sentinal watch -t 'Existing training run'",
+    );
     expect(screen.queryByTestId("terminal-host")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ctrl‑C…" })).not.toBeInTheDocument();
     expect(screen.queryByText("PROCESS_LOG")).not.toBeInTheDocument();
+  });
+
+  it("shows a tailed PROCESS_LOG Session as read-only log events with no input controls", async () => {
+    renderSession("/app/sessions/adopted-log");
+
+    expect(await screen.findByRole("heading", { name: "Tailed fine-tune" })).toBeInTheDocument();
+    const badge = screen.getByLabelText("PROCESS_LOG capture");
+    expect(badge).toHaveTextContent("ADOPTED·PROCESS LOG");
+    expect(screen.getByRole("note")).toHaveTextContent("Read-only log and Metrics — no terminal input.");
+    expect(
+      screen.getByText("Watching /home/me/Projects/TIM/finetune.log (named with --log), read-only."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Watched log" })).toHaveTextContent("epoch 3/8");
+    // The prompt is shown, but Sentinal cannot answer it.
+    expect(screen.getAllByText("Overwrite checkpoint? [y/N]").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Answer where the process runs/)).toBeInTheDocument();
+    for (const name of ["y", "n", "Ctrl‑C…", "Run again", "Show output", "Continue in new Session"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("terminal-host")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Watch fully next time")).toHaveTextContent(
+      "cd ~/'Projects/TIM' && sentinal watch -t 'Tailed fine-tune'",
+    );
+  });
+
+  it("replaces the terminal with the Command view for a hooked COMMANDS shell", async () => {
+    renderSession("/app/sessions/hooked-shell");
+
+    expect(await screen.findByRole("heading", { name: "zsh (hooked)" })).toBeInTheDocument();
+    expect(screen.getByLabelText("COMMANDS capture")).toHaveTextContent("SHELL HOOK·COMMANDS");
+    expect(screen.getByRole("note")).toHaveTextContent("Commands and Metrics only — no terminal.");
+    expect(screen.queryByTestId("terminal-host")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ctrl‑C…" })).not.toBeInTheDocument();
+  });
+
+  it("labels an ordinary Session as UI · FULL with a terminal and no Watch hint", async () => {
+    renderSession("/app/sessions/qwen");
+
+    expect(await screen.findByLabelText("FULL capture")).toHaveTextContent("UI·FULL");
+    expect(screen.queryByLabelText("Watch fully next time")).not.toBeInTheDocument();
   });
 
   it("shows an ended adopted process as exit code unknown, never as success", async () => {

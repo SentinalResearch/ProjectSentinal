@@ -107,9 +107,9 @@ describe("SettingsPage", () => {
     await user.selectOptions(screen.getByLabelText("Scenario"), "needs-attention");
     await user.click(screen.getByRole("button", { name: "Apply scenario" }));
 
-    expect(await screen.findByText("3 Sessions · 2 Machines")).toBeInTheDocument();
-    expect(screen.getByText("3 need attention")).toBeInTheDocument();
+    expect(await screen.findByText("4 Sessions · 2 Machines")).toBeInTheDocument();
+    expect(screen.getByText("4 need attention")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reset mixed demo" }));
-    expect(await screen.findByText("8 Sessions · 3 Machines")).toBeInTheDocument();
+    expect(await screen.findByText("10 Sessions · 3 Machines")).toBeInTheDocument();
   });
 });

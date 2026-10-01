@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { CaptureBadge } from "../../components/CaptureBadge";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { useLiveData } from "../../data/LiveDataContext";
@@ -131,6 +132,7 @@ export function SplitViewPage() {
                     <button key={s.id} type="button" className={styles.addItem} onClick={() => addPane(s.id)}>
                       <StateTag state={s.state} size="sm" iconOnly />
                       <span className={styles.addItemName}>{s.name}</span>
+                      <CaptureBadge capture={s.capture ?? "FULL"} origin={s.origin} />
                       <span className={styles.addItemMachine}>{machine?.name ?? s.machine}</span>
                     </button>
                   );

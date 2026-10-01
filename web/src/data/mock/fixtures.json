@@ -182,6 +182,51 @@
       "capture": "PROCESS",
       "exitCode": null,
       "events": []
+    },
+    {
+      "id": "adopted-log",
+      "machine": "rtx",
+      "name": "Tailed fine-tune",
+      "command": "python finetune.py",
+      "cwd": "~/Projects/TIM",
+      "state": "WAITING",
+      "runningFor": "52m",
+      "origin": "ADOPTED",
+      "capture": "PROCESS_LOG",
+      "exitCode": null,
+      "prompt": "Overwrite checkpoint? [y/N]",
+      "log": {
+        "path": "/home/me/Projects/TIM/finetune.log",
+        "source": "EXPLICIT"
+      },
+      "metrics": {
+        "gpuPct": 64,
+        "vramGB": 11.0,
+        "vramTotalGB": 24
+      },
+      "events": [
+        [
+          "10:02",
+          "PROGRESS_UPDATED",
+          "epoch 3/8"
+        ],
+        [
+          "10:40",
+          "WAITING_FOR_INPUT",
+          "Overwrite checkpoint? [y/N]"
+        ]
+      ]
+    },
+    {
+      "id": "hooked-shell",
+      "machine": "mini",
+      "name": "zsh (hooked)",
+      "cwd": "~/code/sentinal",
+      "state": "IDLE",
+      "runningFor": "2h",
+      "origin": "SHELL_HOOK",
+      "capture": "COMMANDS",
+      "events": []
     }
   ],
   "history": [
