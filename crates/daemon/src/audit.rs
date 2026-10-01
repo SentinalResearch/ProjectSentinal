@@ -3,7 +3,7 @@
 use protocol::{SessionId, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::{
-    fs::{self, OpenOptions},
+    fs,
     io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -82,7 +82,7 @@ impl AuditLog {
             source,
         })?;
         line.push(b'\n');
-        let mut file = OpenOptions::new()
+        let mut file = crate::private_fs::private_file_options()
             .create(true)
             .append(true)
             .open(&self.path)

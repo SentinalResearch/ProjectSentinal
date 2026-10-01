@@ -15,15 +15,27 @@ use std::{
 };
 use store::Store;
 
+/// Compressed output log that the PTY reader appends to.
+pub(super) struct OutputLog {
+    /// Log path, for error messages.
+    pub(super) path: PathBuf,
+    /// Open owner-only log file.
+    pub(super) file: std::fs::File,
+}
+
 pub(super) fn spawn_reader(
     session_id: SessionId,
     mut reader: Box<dyn Read + Send>,
     handle: Arc<SessionHandle>,
-    log_path: PathBuf,
-    log_file: std::fs::File,
+    log: OutputLog,
+    mut osc: OscParser,
     store: Option<Arc<Store>>,
     clock: Clock,
 ) {
+    let OutputLog {
+        path: log_path,
+        file: log_file,
+    } = log;
     tokio::task::spawn_blocking(move || {
         let mut encoder = match zstd::stream::write::Encoder::new(log_file, 0) {
             Ok(encoder) => encoder.auto_finish(),
@@ -33,7 +45,6 @@ pub(super) fn spawn_reader(
             }
         };
         let mut buffer = [0_u8; 8192];
-        let mut osc = OscParser::new();
         loop {
             let count = match reader.read(&mut buffer) {
                 Ok(0) => {

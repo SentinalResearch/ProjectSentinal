@@ -5,6 +5,8 @@ use super::{
     SessionManagerError, AUTO_WRAP_ATTACH_GRACE,
 };
 use crate::{
+    osc::{new_nonce, OscParser, NONCE_ENV},
+    private_fs::{ensure_private_dir, private_file_options},
     pty::{PtySpawnRequest, SpawnedPty},
     scrollback::Scrollback,
     shell::{install_hooks, launch, ShellLaunch},
@@ -15,7 +17,7 @@ use protocol::{
     ShellDialect,
 };
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, File},
     io::Read,
     path::PathBuf,
     sync::{
@@ -31,6 +33,7 @@ struct PreparedSession {
     reader: Box<dyn Read + Send>,
     log_path: PathBuf,
     log_file: File,
+    osc_nonce: String,
 }
 
 #[derive(Clone, Copy)]
@@ -115,6 +118,9 @@ impl SessionManager {
         shell_launch
             .env
             .push(("SENTINAL_SESSION_ID".into(), id.0.to_string()));
+        // Only the hook learns this secret, so output cannot forge shell signals.
+        let osc_nonce = new_nonce().map_err(SessionManagerError::OscNonce)?;
+        shell_launch.env.push((NONCE_ENV.into(), osc_nonce.clone()));
         if request.origin == SessionOrigin::AutoWrap {
             shell_launch
                 .env
@@ -122,13 +128,13 @@ impl SessionManager {
         }
 
         let log_dir = self.inner.config.data_dir.join("sessions");
-        fs::create_dir_all(&log_dir).map_err(|source| SessionManagerError::File {
-            operation: "create directory for",
+        ensure_private_dir(&log_dir).map_err(|source| SessionManagerError::File {
+            operation: "create private directory for",
             path: log_dir.clone(),
             source,
         })?;
         let log_path = log_dir.join(format!("{}.log.zst", id.0));
-        let log_file = OpenOptions::new()
+        let log_file = private_file_options()
             .create_new(true)
             .append(true)
             .open(&log_path)
@@ -228,6 +234,7 @@ impl SessionManager {
             reader,
             log_path,
             log_file,
+            osc_nonce,
         })
     }
 
@@ -277,8 +284,11 @@ impl SessionManager {
             id,
             prepared.reader,
             prepared.handle.clone(),
-            prepared.log_path,
-            prepared.log_file,
+            tasks::OutputLog {
+                path: prepared.log_path,
+                file: prepared.log_file,
+            },
+            OscParser::new(prepared.osc_nonce),
             self.inner.store.clone(),
             self.inner.config.clock.clone(),
         );

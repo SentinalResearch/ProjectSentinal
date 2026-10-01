@@ -10,6 +10,8 @@ use protocol::{
 };
 use rusqlite::{Connection, OptionalExtension};
 use std::{
+    fs::{self, OpenOptions},
+    os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::Path,
     sync::{Mutex, MutexGuard},
 };
@@ -27,9 +29,27 @@ pub struct Store {
     pub(crate) connection: Mutex<Connection>,
 }
 
+/// Create the database file as `0600` and tighten an existing one, before
+/// SQLite opens it. SQLite gives its `-wal` and `-shm` files the same mode.
+fn restrict_to_owner(path: &Path) -> Result<(), StoreError> {
+    let file_error = |source| StoreError::File {
+        path: path.to_path_buf(),
+        source,
+    };
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .mode(0o600)
+        .open(path)
+        .map_err(file_error)?;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(file_error)
+}
+
 impl Store {
-    /// Open or create a database and run pending numbered migrations.
+    /// Open or create an owner-only database and run pending numbered migrations.
     pub fn open(path: &Path) -> Result<Self, StoreError> {
+        restrict_to_owner(path)?;
         let connection = Connection::open(path)?;
         Self::from_connection(connection)
     }

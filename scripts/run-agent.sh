@@ -80,7 +80,7 @@ main() {
 
   sentinal_require_port_available "$tailscale_ip" "$daemon_port"
   mkdir -p "$data_dir" "$config_dir"
-  chmod 700 "$config_dir"
+  chmod 700 "$config_dir" "$data_dir"
   (cd "$REPO_ROOT" && cargo build --locked -p daemon --bin sentinald)
 
   local target_dir="${CARGO_TARGET_DIR:-$REPO_ROOT/target}"

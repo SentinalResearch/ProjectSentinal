@@ -104,6 +104,9 @@ pub enum SessionManagerError {
         /// Rejected operation.
         operation: &'static str,
     },
+    /// The per-Session shell-integration nonce could not be generated.
+    #[error("failed to generate shell-integration nonce: {0}")]
+    OscNonce(crate::auth::AuthError),
     /// Persisted output does not exist for a known Session.
     #[error("saved output for Session {0} was not found")]
     OutputNotFound(SessionId),

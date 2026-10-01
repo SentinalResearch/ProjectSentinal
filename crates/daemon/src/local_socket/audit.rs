@@ -4,7 +4,7 @@ use super::LocalSocketError;
 use protocol::Timestamp;
 use serde::Serialize;
 use std::{
-    fs::{self, OpenOptions},
+    fs,
     io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -59,7 +59,7 @@ impl SecurityAudit {
             reason,
         })?;
         line.push(b'\n');
-        let mut file = OpenOptions::new()
+        let mut file = crate::private_fs::private_file_options()
             .create(true)
             .append(true)
             .open(&self.path)

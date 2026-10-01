@@ -49,6 +49,7 @@ async fn exercise(shell: &str) {
         })
         .await
         .unwrap();
+    answer_terminal_queries(&manager, session.id);
 
     manager
         .write_input(
@@ -99,6 +100,26 @@ async fn exercise(shell: &str) {
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// Reply to device-attribute and cursor-position queries like an attached
+/// browser terminal does; fish 4 waits seconds for them at every prompt.
+fn answer_terminal_queries(manager: &SessionManager, id: protocol::SessionId) {
+    let mut attachment = manager.attach(id).unwrap();
+    let manager = manager.clone();
+    tokio::spawn(async move {
+        while let Ok(bytes) = attachment.output.recv().await {
+            for (query, reply) in [
+                (&b"\x1b[0c"[..], &b"\x1b[?62;22c"[..]),
+                (b"\x1b[c", b"\x1b[?62;22c"),
+                (b"\x1b[6n", b"\x1b[1;1R"),
+            ] {
+                for _ in bytes.windows(query.len()).filter(|window| *window == query) {
+                    let _ = manager.write_input(id, reply, "test-terminal");
+                }
+            }
+        }
+    });
+}
+
 fn system_timestamp() -> Timestamp {
     let millis = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -122,5 +143,12 @@ async fn bash_command_tracking_integration() {
 #[tokio::test]
 #[ignore = "uses a real fish and PTY"]
 async fn fish_command_tracking_integration() {
-    exercise("/usr/bin/fish").await;
+    // fish is not a system shell; Homebrew puts it in /opt/homebrew/bin.
+    let fish = std::env::var_os("PATH")
+        .iter()
+        .flat_map(std::env::split_paths)
+        .map(|dir| dir.join("fish"))
+        .find(|path| path.is_file())
+        .unwrap_or_else(|| PathBuf::from("/usr/bin/fish"));
+    exercise(&fish.to_string_lossy()).await;
 }

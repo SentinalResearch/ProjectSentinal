@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 use std::{
-    fs::{self, OpenOptions},
+    fs,
     io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -76,7 +76,7 @@ impl PackageAudit {
         };
         let mut bytes = serde_json::to_vec(&record).map_err(|error| error.to_string())?;
         bytes.push(b'\n');
-        let mut file = OpenOptions::new()
+        let mut file = crate::private_fs::private_file_options()
             .create(true)
             .append(true)
             .open(&self.path)

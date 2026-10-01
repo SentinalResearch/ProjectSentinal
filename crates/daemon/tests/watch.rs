@@ -23,7 +23,6 @@ use std::{
 use store::Store;
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(1);
-const PROMPT: &[u8] = b"\x1b]133;A\x07% ";
 
 struct Harness {
     manager: SessionManager,
@@ -71,6 +70,21 @@ fn watch(command: Option<Vec<String>>) -> CreateSession {
         title: Some("Qwen Training".into()),
         command,
     }
+}
+
+/// A shell-integration signal tagged with the nonce the daemon gave this Session.
+fn signal(h: &Harness, id: SessionId, payload: &str) -> String {
+    let request = h.fake.spawn_request(id).unwrap();
+    let (_, nonce) = request
+        .env
+        .iter()
+        .find(|(key, _)| key == "SENTINAL_OSC_NONCE")
+        .unwrap();
+    format!("\x1b]{payload};sentinal={nonce}\x07")
+}
+
+fn prompt(h: &Harness, id: SessionId) -> Vec<u8> {
+    format!("{}% ", signal(h, id, "133;A")).into_bytes()
 }
 
 fn argv(values: &[&str]) -> Vec<String> {
@@ -157,7 +171,7 @@ async fn watch_session_records_origin_capture_title_cwd_pid_and_session_env() {
         .env
         .contains(&("COLORTERM".into(), "truecolor".into()));
     // A bare Watch never types anything into the shell.
-    h.fake.output(session.id, PROMPT).unwrap();
+    h.fake.output(session.id, &prompt(&h, session.id)).unwrap();
     sync(&h, session.id).await;
     assert!(h.fake.input(session.id).unwrap().is_empty());
     cleanup(h, session.id);
@@ -205,7 +219,7 @@ async fn hostile_initial_command_is_typed_once_as_quoted_data_after_prompt() {
     h.fake.output(session.id, b"loading rc files\r\n").unwrap();
     sync(&h, session.id).await;
     assert!(h.fake.input(session.id).unwrap().is_empty());
-    h.fake.output(session.id, PROMPT).unwrap();
+    h.fake.output(session.id, &prompt(&h, session.id)).unwrap();
     wait_until(|| !h.fake.input(session.id).unwrap().is_empty()).await;
     let typed = h.fake.input(session.id).unwrap();
     assert_eq!(typed, expected.as_bytes());
@@ -215,10 +229,30 @@ async fn hostile_initial_command_is_typed_once_as_quoted_data_after_prompt() {
         .all(|byte| (0x20..0x7f).contains(byte)));
 
     // A later prompt never repeats the initial Command.
-    h.fake.output(session.id, PROMPT).unwrap();
+    h.fake.output(session.id, &prompt(&h, session.id)).unwrap();
     sync(&h, session.id).await;
     assert_eq!(h.fake.input(session.id).unwrap(), expected.as_bytes());
     cleanup(h, session.id);
+}
+
+#[tokio::test]
+async fn untagged_prompt_in_output_does_not_type_the_initial_command() {
+    let h = harness();
+    let command = argv(&["python", "long_job.py"]);
+    let session = h.manager.create(watch(Some(command))).await.unwrap();
+
+    // e.g. an rc file that `cat`s a file containing a raw prompt mark.
+    h.fake
+        .output(
+            session.id,
+            b"motd\x1b]133;A\x07\x1b]133;A;sentinal=guess\x07",
+        )
+        .unwrap();
+    sync(&h, session.id).await;
+    let typed = h.fake.input(session.id).unwrap();
+    cleanup(h, session.id);
+
+    assert!(typed.is_empty(), "typed {typed:?}");
 }
 
 #[tokio::test]
@@ -228,12 +262,20 @@ async fn initial_command_is_tracked_once_persisted_and_shell_returns_idle() {
     let text = render_command_line(&command, ShellDialect::Zsh).unwrap();
     let session = h.manager.create(watch(Some(command))).await.unwrap();
 
-    h.fake.output(session.id, PROMPT).unwrap();
+    h.fake.output(session.id, &prompt(&h, session.id)).unwrap();
     wait_until(|| !h.fake.input(session.id).unwrap().is_empty()).await;
     // The shell echoes and runs the typed line, then reports it through OSC.
     let run = format!(
-        "\x1b]7420;cmd={}\x07\x1b]133;B\x07\x1b]133;C\x07epoch 3/3 done\r\n\x1b]133;D;0\x07\x1b]133;A\x07% ",
-        base64(text.as_bytes())
+        "{}{}{}epoch 3/3 done\r\n{}{}% ",
+        signal(
+            &h,
+            session.id,
+            &format!("7420;cmd={}", base64(text.as_bytes()))
+        ),
+        signal(&h, session.id, "133;B"),
+        signal(&h, session.id, "133;C"),
+        signal(&h, session.id, "133;D;0"),
+        signal(&h, session.id, "133;A"),
     );
     h.fake.output(session.id, run.as_bytes()).unwrap();
     wait_until(|| {

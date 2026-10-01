@@ -22,6 +22,17 @@ and roadmap checkbox are complete.
   once and returned as a stable Session error, never a raw OS `EIO`.
 - PTY output is retained in compressed Session logs. Terminal output is
   untrusted and is never executed.
+- The daemon creates its data directory and `sessions/` as `0700`, and
+  Session logs, SQLite (with its WAL/SHM files), and audit logs as `0600`,
+  whatever the umask. An existing data directory or database that is wider is
+  tightened at startup.
+- Shell-integration signals (OSC 133 prompt/command marks and OSC 7420
+  command text and cwd) count only when tagged `;sentinal=<nonce>`. Each FULL
+  Session gets a fresh 128-bit nonce in `SENTINAL_OSC_NONCE`; the hook copies
+  it into a shell variable and unsets the variable (before user rc files on
+  zsh and bash; fish's `-C` runs after `config.fish`), so a program's output cannot forge Command history, exit codes, cwd, or the
+  Watch prompt report. A process the user starts in the same shell could
+  still read that shell's memory; that is inside the user's own trust boundary.
 
 `just network` is the combined development path for remote browser testing.
 `just agent` binds only the worker daemon; `just control WORKER_IP=...` binds
@@ -177,7 +188,8 @@ the CLI, turns it into shell input, and only through
 - the rendered line is capped at 1,000 bytes, below the 1,024-byte canonical
   input limit on macOS, so an early write can never be truncated into a
   different command;
-- it is typed exactly once, after the first `OSC 133;A` prompt report, and
+- it is typed exactly once, after the first nonce-tagged `OSC 133;A`
+  prompt report, and
   only for `WATCH` Sessions whose shell has Sentinal hooks. Terminal output
   never contributes to what is typed.
 

@@ -9,6 +9,7 @@ use crate::{
     local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{process_tree, MetricsSampler, ResourceDebouncer},
     package_service::{package_router, PackageService, PackageServiceError},
+    private_fs::ensure_private_dir,
     process_probe::ProcessProbe,
     pty::{FakePty, PtyBackend, RealPty},
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
@@ -16,7 +17,6 @@ use crate::{
 use protocol::{Machine, MachineId, MachineStatus, Os, Resource, Timestamp};
 use std::{
     collections::HashMap,
-    fs,
     future::IntoFuture,
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -43,8 +43,8 @@ pub enum DaemonError {
     /// The Session manager failed to start.
     #[error(transparent)]
     Session(#[from] SessionManagerError),
-    /// The data directory could not be created.
-    #[error("failed to create daemon data directory '{}': {source}", path.display())]
+    /// The data directory could not be created or made owner-only.
+    #[error("failed to create private daemon data directory '{}': {source}", path.display())]
     DataDirectory {
         /// Directory that could not be created.
         path: PathBuf,
@@ -116,7 +116,7 @@ pub async fn run() -> Result<(), DaemonError> {
         .unwrap_or_else(|| config.auth_file.clone());
     let auth = AuthManager::load(&auth_file, token)?;
     let machine = machine_description();
-    fs::create_dir_all(&config.data_dir).map_err(|source| DaemonError::DataDirectory {
+    ensure_private_dir(&config.data_dir).map_err(|source| DaemonError::DataDirectory {
         path: config.data_dir.clone(),
         source,
     })?;

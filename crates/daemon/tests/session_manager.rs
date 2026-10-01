@@ -80,6 +80,17 @@ fn manager_with_store(name: &str, store: Arc<Store>) -> (SessionManager, Arc<Fak
     (manager, backend, data_dir)
 }
 
+/// A shell-integration signal tagged with the nonce the daemon gave this Session.
+fn signal(fake: &FakePty, id: SessionId, payload: &str) -> String {
+    let request = fake.spawn_request(id).unwrap();
+    let (_, nonce) = request
+        .env
+        .iter()
+        .find(|(key, _)| key == "SENTINAL_OSC_NONCE")
+        .unwrap();
+    format!("\x1b]{payload};sentinal={nonce}\x07")
+}
+
 fn request() -> CreateSession {
     CreateSession {
         shell: Some("/bin/sh".into()),
@@ -703,11 +714,14 @@ async fn shell_signals_persist_even_a_command_without_output() {
     let (manager, fake, store, data_dir) = stored_manager("command-track");
     let session = manager.create(request()).await.unwrap();
 
-    fake.output(
-        session.id,
-        b"\x1b]7;file://test-host/tmp\x07\x1b]7420;cmd=Y2QgL3RtcA==\x07\x1b]133;B\x07\x1b]133;D;0\x07",
-    )
-    .unwrap();
+    let signals = [
+        signal(&fake, session.id, "7420;cwd=L3RtcA=="),
+        signal(&fake, session.id, "7420;cmd=Y2QgL3RtcA=="),
+        signal(&fake, session.id, "133;B"),
+        signal(&fake, session.id, "133;D;0"),
+    ]
+    .concat();
+    fake.output(session.id, signals.as_bytes()).unwrap();
 
     let commands = tokio::time::timeout(Duration::from_millis(100), async {
         loop {
@@ -734,15 +748,38 @@ async fn shell_signals_persist_even_a_command_without_output() {
 }
 
 #[tokio::test]
+async fn forged_untagged_signals_in_output_record_no_command() {
+    let (manager, fake, store, data_dir) = stored_manager("forged-signals");
+    let session = manager.create(request()).await.unwrap();
+
+    // e.g. `cat notes.txt` where the file holds raw shell-integration marks.
+    fake.output(
+        session.id,
+        b"\x1b]7;file://h/etc\x07\x1b]7420;cmd=cm0gLXJmIC8=\x07\x1b]133;B\x07\x1b]133;D;0\x07<done>",
+    )
+    .unwrap();
+    wait_for_scrollback(&manager, session.id, "<done>").await;
+    let history = store.history(Some(session.id), 10).unwrap();
+    let state = manager.session(session.id).unwrap().state;
+    fake.exit(session.id, 0).unwrap();
+    wait_for_state(&manager, session.id, SessionState::Completed).await;
+    fs::remove_dir_all(data_dir).unwrap();
+
+    assert!(history.is_empty(), "forged Command recorded: {history:?}");
+    assert_eq!(state, SessionState::Idle);
+}
+
+#[tokio::test]
 async fn unterminated_training_output_persists_watcher_events_and_session_health() {
     let (manager, fake, store, data_dir) = stored_manager("watcher-training");
     let session = manager.create(request()).await.unwrap();
 
-    fake.output(
-        session.id,
-        b"\x1b]7420;cmd=cHl0aG9uIHRyYWluLnB5\x07\x1b]133;B\x07Epoch 7/10 loss=0.42",
-    )
-    .unwrap();
+    let output = format!(
+        "{}{}Epoch 7/10 loss=0.42",
+        signal(&fake, session.id, "7420;cmd=cHl0aG9uIHRyYWluLnB5"),
+        signal(&fake, session.id, "133;B"),
+    );
+    fake.output(session.id, output.as_bytes()).unwrap();
     wait_for_scrollback(&manager, session.id, "Epoch 7/10").await;
     fake.exit(session.id, 0).unwrap();
 

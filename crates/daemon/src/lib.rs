@@ -13,6 +13,7 @@ pub mod log_tail;
 pub mod metrics;
 pub mod osc;
 pub mod package_service;
+pub mod private_fs;
 pub mod process_probe;
 pub mod pty;
 pub mod scrollback;

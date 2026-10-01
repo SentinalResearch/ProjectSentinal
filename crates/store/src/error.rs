@@ -8,6 +8,14 @@ pub enum StoreError {
     /// SQLite rejected an operation.
     #[error("SQLite store operation failed: {0}")]
     Sql(#[from] rusqlite::Error),
+    /// The database file could not be created or made owner-only.
+    #[error("failed to secure SQLite database '{}': {source}", path.display())]
+    File {
+        /// Database path.
+        path: std::path::PathBuf,
+        /// Filesystem error.
+        source: std::io::Error,
+    },
     /// Persisted JSON could not be encoded or decoded.
     #[error("store JSON operation failed: {0}")]
     Json(#[from] serde_json::Error),
