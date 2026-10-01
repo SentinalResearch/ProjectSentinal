@@ -253,7 +253,7 @@ pub(super) fn apply_output(
     }
 }
 
-fn finish_output(
+pub(super) fn finish_output(
     session_id: SessionId,
     handle: &SessionHandle,
     store: Option<&Store>,

@@ -28,11 +28,17 @@ use std::{
 };
 use store::Store;
 
-const OWNER: u32 = 501;
 const TARGET: u32 = 7_001;
 const STARTED: Timestamp = Timestamp(1_789_000_000_000);
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
+
+/// The test runner's UID, which owns the temp log files these tests create.
+fn owner() -> u32 {
+    fs::metadata(std::env::current_exe().unwrap())
+        .unwrap()
+        .uid()
+}
 
 type Table = Arc<Mutex<HashMap<u32, ProcessIdentity>>>;
 
@@ -63,13 +69,13 @@ fn harness_with(discovered: Option<SessionLog>, details: ProcessDetails) -> Harn
         TARGET,
         ProcessIdentity {
             started_at: STARTED,
-            uid: OWNER,
+            uid: owner(),
         },
     )])));
     let spy = Arc::new(Spy::default());
     let (lookup, spy_identify, spy_details, spy_discover) =
         (table.clone(), spy.clone(), spy.clone(), spy.clone());
-    let probe = ProcessProbe::new(OWNER, move |pid| {
+    let probe = ProcessProbe::new(owner(), move |pid| {
         spy_identify.identify.fetch_add(1, Ordering::SeqCst);
         lookup.lock().unwrap().get(&pid).copied()
     })
@@ -109,6 +115,7 @@ fn python_details() -> ProcessDetails {
         name: Some("python3".into()),
         exe: Some("/usr/bin/python3".into()),
         cwd: Some("/work/TIM".into()),
+        command: None,
     }
 }
 
@@ -188,7 +195,7 @@ async fn invalid_targets_are_rejected_with_named_errors_and_create_nothing() {
                 pid,
                 ProcessIdentity {
                     started_at: STARTED,
-                    uid: OWNER,
+                    uid: owner(),
                 },
             );
         }
@@ -241,7 +248,7 @@ async fn a_reused_pid_never_inherits_the_old_session() {
         TARGET,
         ProcessIdentity {
             started_at: Timestamp(STARTED.0 + 5_000),
-            uid: OWNER,
+            uid: owner(),
         },
     );
     let new = h.manager.adopt_process(TARGET, None, None).unwrap();
@@ -314,6 +321,54 @@ async fn handcrafted_remote_control_requests_all_fail_and_only_reads_happen() {
     // Adoption used only the probe's read methods.
     assert!(h.spy.identify.load(Ordering::SeqCst) >= 1);
     assert_eq!(h.spy.details.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn handcrafted_control_requests_fail_for_process_log_sessions_too() {
+    let h = harness();
+    let log = h.data_dir.join("job.log");
+    fs::write(&log, "started\n").unwrap();
+    let session = h
+        .manager
+        .adopt_process(TARGET, None, Some(log.display().to_string()))
+        .unwrap();
+    assert_eq!(session.capture, CaptureLevel::ProcessLog);
+    let app = app(&h);
+    for request in [
+        ClientRequest::Attach {
+            session_id: session.id,
+        },
+        ClientRequest::Resize {
+            session_id: session.id,
+            cols: 10,
+            rows: 10,
+        },
+        ClientRequest::Kill {
+            session_id: session.id,
+        },
+    ] {
+        let action = app
+            .dispatch_text(&Envelope::new(request.clone()).encode().unwrap())
+            .await;
+        assert!(
+            matches!(action, WsAction::Reply(DaemonMessage::Error { ref message }) if message.contains("PROCESS_LOG")),
+            "{request:?} was not rejected"
+        );
+    }
+    let input = h
+        .manager
+        .write_input(session.id, b"y\r", "100.64.0.9:1")
+        .unwrap_err();
+    assert!(input.to_string().contains("PROCESS_LOG"), "{input}");
+    assert!(
+        !h.data_dir.join("audit.jsonl").exists(),
+        "no input was audited"
+    );
+    assert_eq!(
+        fs::read(&log).unwrap(),
+        b"started\n",
+        "the log is untouched"
+    );
 }
 
 // ---- exit ------------------------------------------------------------------
@@ -491,7 +546,7 @@ async fn restart_keeps_a_verified_adopted_process_running() {
     .unwrap()
     .with_process_probe({
         let table = h.table.clone();
-        ProcessProbe::new(OWNER, move |pid| table.lock().unwrap().get(&pid).copied())
+        ProcessProbe::new(owner(), move |pid| table.lock().unwrap().get(&pid).copied())
     });
     restarted.recover_external_sessions(live).unwrap();
     let recovered = restarted.session(session.id).unwrap();

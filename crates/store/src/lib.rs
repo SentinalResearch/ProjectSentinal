@@ -2,6 +2,7 @@
 
 mod error;
 mod lineage;
+mod log_cursors;
 mod metrics;
 mod records;
 
@@ -17,11 +18,13 @@ use std::{
 };
 
 pub use error::StoreError;
+pub use log_cursors::StoredLogCursor;
 pub use metrics::{MinuteMetric, RawMetricSample};
 
 const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("../migrations/001_initial.sql")),
     (2, include_str!("../migrations/002_session_lineage.sql")),
+    (3, include_str!("../migrations/003_log_cursors.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.

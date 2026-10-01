@@ -5,7 +5,7 @@
 //! touches the target.
 
 use crate::hook_report::{exchange, socket_path};
-use protocol::{local::SOCKET_ENV, LocalRequest, LocalResponse, Session};
+use protocol::{local::SOCKET_ENV, CaptureLevel, LocalRequest, LocalResponse, Session};
 use std::{
     io::{BufRead, Write},
     path::{Path, PathBuf},
@@ -253,15 +253,24 @@ pub fn describe(pid: u32, session: &Session) -> String {
         .title
         .clone()
         .unwrap_or_else(|| format!("pid {pid}"));
+    let observed = if session.capture == CaptureLevel::ProcessLog {
+        "its log (read-only), Metrics, and lifecycle; no terminal input"
+    } else {
+        "Metrics and lifecycle, no output or input"
+    };
     let mut text = format!(
-        "Adopted pid {pid} ({name}) as Session {} [ADOPTED · PROCESS].\nSentinal only observes it: Metrics and lifecycle, no output or input. When it ends, its exit code will be unknown.",
-        session.id.0
+        "Adopted pid {pid} ({name}) as Session {} [ADOPTED · {}].\nSentinal only observes {observed}. When it ends, its exit code will be unknown.",
+        session.id.0, session.capture
     );
     if let Some(log) = &session.log {
-        text.push_str(&format!(
-            "\nLog recorded: {} (tailing not enabled yet).",
-            log.path
-        ));
+        text.push_str(&if session.capture == CaptureLevel::ProcessLog {
+            format!("\nWatching {} read-only.", log.path)
+        } else {
+            format!(
+                "\nLog {} is not being read; Sentinal reports Metrics only.",
+                log.path
+            )
+        });
     }
     text
 }

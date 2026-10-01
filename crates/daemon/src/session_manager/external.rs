@@ -130,7 +130,7 @@ impl SessionManager {
         if let Some(store) = &self.inner.store {
             store.insert_session(&session)?;
         }
-        self.insert_external(session.clone())?;
+        self.insert_external(session.clone(), None)?;
         self.observe_reduced(DaemonMessage::SessionUpdated {
             session: session.clone(),
         });
@@ -405,15 +405,25 @@ impl SessionManager {
         .and_then(|update| update.command)
     }
 
-    pub(super) fn insert_external(&self, session: Session) -> Result<(), SessionManagerError> {
+    /// Track a reduced-capture Session; `argv` (adopted only) selects its watcher adapter.
+    pub(super) fn insert_external(
+        &self,
+        session: Session,
+        argv: Option<Vec<String>>,
+    ) -> Result<(), SessionManagerError> {
         let id = session.id;
         let cwd = session.cwd.clone();
+        let capture = session.capture;
         let watcher_command = (session.origin == SessionOrigin::Adopted).then(|| {
-            let hint = format!(
-                "{} {}",
-                session.shell,
-                session.title.as_deref().unwrap_or_default()
-            );
+            // argv selects the same adapter a FULL Session running it would
+            // get; it stays in memory only (it can contain secrets).
+            let hint = argv.map(|argv| argv.join(" ")).unwrap_or_else(|| {
+                format!(
+                    "{} {}",
+                    session.shell,
+                    session.title.as_deref().unwrap_or_default()
+                )
+            });
             Command::start(
                 CommandId(0),
                 id,
@@ -449,15 +459,20 @@ impl SessionManager {
                 cwd,
                 self.inner.tracker_ids.clone(),
             )),
-            watcher: Mutex::new(watcher::EventEngine::new(
-                watcher_command.as_ref(),
-                self.inner.watcher_adapters.clone(),
-            )),
+            watcher: Mutex::new(
+                watcher::EventEngine::new(
+                    watcher_command.as_ref(),
+                    self.inner.watcher_adapters.clone(),
+                )
+                .with_capture(capture),
+            ),
             line_framer: Mutex::new(watcher::LineFramer::default()),
             watcher_ids: self.inner.tracker_ids.clone(),
             initial_command: Mutex::new(None),
             shell_reports: Mutex::default(),
             attached: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            log_tail: Mutex::new(None),
+            adopted_tree: Mutex::default(),
         });
         self.inner
             .sessions

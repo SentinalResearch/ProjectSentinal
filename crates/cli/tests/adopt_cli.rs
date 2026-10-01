@@ -92,14 +92,24 @@ fn the_summary_is_honest_about_capture_and_exit_code() {
     let text = describe(800, &adopted(None));
     assert!(text.contains("Session 7 [ADOPTED · PROCESS]"));
     assert!(text.contains("exit code will be unknown"));
-    let with_log = describe(
-        800,
-        &adopted(Some(SessionLog {
-            path: "/work/train.log".into(),
-            source: LogSource::Explicit,
-        })),
+    let log = Some(SessionLog {
+        path: "/work/train.log".into(),
+        source: LogSource::Explicit,
+    });
+    let unreadable = describe(800, &adopted(log.clone()));
+    assert!(unreadable.contains("[ADOPTED · PROCESS]"));
+    assert!(unreadable.contains("Log /work/train.log is not being read"));
+
+    let mut tailed = adopted(log);
+    tailed.capture = CaptureLevel::ProcessLog;
+    let text = describe(800, &tailed);
+    assert!(text.contains("Session 7 [ADOPTED · PROCESS_LOG]"), "{text}");
+    assert!(
+        text.contains("Watching /work/train.log read-only"),
+        "{text}"
     );
-    assert!(with_log.contains("tailing not enabled yet"));
+    assert!(text.contains("exit code will be unknown"));
+    assert!(!text.contains("no output"), "{text}");
 }
 
 // ---- the real binary against a fake local socket ---------------------------

@@ -26,6 +26,7 @@ pub mod command;
 pub mod command_line;
 pub mod error;
 pub mod event;
+pub mod evidence;
 pub mod health;
 pub mod ids;
 pub mod local;

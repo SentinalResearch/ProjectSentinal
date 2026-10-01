@@ -4,19 +4,15 @@
 //! Metrics through the process-tree root, and watches liveness. It never
 //! signals, traces, reparents, reprioritizes, or opens the process's streams.
 
-use super::{lock_session, tasks, SessionManager, SessionManagerError};
-use crate::log_tail::LogTail;
+use super::{adopted_log::open_tail, lock_session, SessionManager, SessionManagerError};
 use protocol::{
     CaptureLevel, DaemonMessage, LogSource, Session, SessionId, SessionLog, SessionOrigin,
     SessionState,
 };
 use std::{os::unix::fs::MetadataExt, path::Path};
 
-const LOG_TAIL_READ_BYTES: usize = 64 * 1024;
-const LOG_TAIL_POLL: std::time::Duration = std::time::Duration::from_millis(50);
-
 impl SessionManager {
-    /// Adopt `pid` read-only; `log_path` is recorded for 1b.D, not tailed.
+    /// Adopt `pid` read-only, tailing `log_path` (or a discovered log) when usable.
     pub fn adopt_process(
         &self,
         pid: u32,
@@ -35,7 +31,10 @@ impl SessionManager {
         let log = log_path
             .map(|path| explicit_log(&path, owner_uid))
             .transpose()?;
-        let tail = log.as_ref().map(open_tail).transpose()?;
+        let tail = log
+            .as_ref()
+            .map(|log| open_tail(log, owner_uid, None))
+            .transpose()?;
         let _registration =
             self.inner
                 .registration
@@ -88,10 +87,10 @@ impl SessionManager {
         if let Some(store) = &self.inner.store {
             store.insert_session(&session)?;
         }
-        self.insert_external(session.clone())?;
+        self.insert_external(session.clone(), details.command)?;
         session = self.session(id)?;
-        if let Some(tail) = tail {
-            self.activate_log_tail(id, tail)?;
+        if let (Some(tail), Some(log)) = (tail, &session.log) {
+            self.activate_log_tail(id, tail, &log.clone())?;
             session = self.session(id)?;
         }
         self.observe_reduced(DaemonMessage::SessionUpdated {
@@ -124,23 +123,13 @@ impl SessionManager {
         id: SessionId,
         log: SessionLog,
     ) -> Result<(), SessionManagerError> {
-        let tail = match open_tail(&log) {
-            Ok(tail) => Some(tail),
-            Err(error) => {
-                tracing::warn!(session = id.0, %error, "discovered log is not readable");
-                None
-            }
-        };
         let handle = self.handle(id)?;
         let session = {
             let mut session = lock_session(&handle)?;
             if session.state.is_finished() || session.log.is_some() {
                 return Ok(());
             }
-            session.log = Some(log);
-            if tail.is_some() {
-                session.capture = CaptureLevel::ProcessLog;
-            }
+            session.log = Some(log.clone());
             session.validate()?;
             session.clone()
         };
@@ -153,101 +142,11 @@ impl SessionManager {
         let _ = handle
             .structured
             .send(DaemonMessage::SessionUpdated { session });
-        if let Some(tail) = tail {
-            self.spawn_log_tail(id, tail);
+        match self.open_session_tail(id, &log) {
+            Ok(tail) => self.activate_log_tail(id, tail, &log),
+            Err(error) => self.warn_log_unavailable(id, &log, &error),
         }
-        Ok(())
     }
-
-    pub(super) fn activate_log_tail(
-        &self,
-        id: SessionId,
-        tail: LogTail,
-    ) -> Result<(), SessionManagerError> {
-        let handle = self.handle(id)?;
-        let session = {
-            let mut session = lock_session(&handle)?;
-            session.capture = CaptureLevel::ProcessLog;
-            session.validate()?;
-            session.clone()
-        };
-        if let Some(store) = &self.inner.store {
-            store.update_session(&session)?;
-        }
-        self.observe_reduced(DaemonMessage::SessionUpdated {
-            session: session.clone(),
-        });
-        let _ = handle
-            .structured
-            .send(DaemonMessage::SessionUpdated { session });
-        self.spawn_log_tail(id, tail);
-        Ok(())
-    }
-
-    fn spawn_log_tail(&self, id: SessionId, mut tail: LogTail) {
-        let manager = self.clone();
-        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
-            tracing::warn!(
-                session = id.0,
-                "cannot start adopted log tail without a Tokio runtime"
-            );
-            return;
-        };
-        runtime.spawn(async move {
-            loop {
-            let handle = match manager.handle(id) {
-                Ok(handle) => handle,
-                Err(error) => {
-                    tracing::warn!(session = id.0, %error, "adopted log tail lost its Session");
-                    return;
-                }
-            };
-            match lock_session(&handle) {
-                Ok(session) if session.state.is_finished() => return,
-                Ok(_) => {}
-                Err(error) => {
-                    tracing::warn!(session = id.0, %error, "adopted log tail cannot inspect Session");
-                    return;
-                }
-            }
-            match tail.poll() {
-                Ok(chunk) => {
-                    if chunk.reset {
-                        match handle.line_framer.lock() {
-                            Ok(mut framer) => framer.reset(),
-                            Err(_) => {
-                                tracing::warn!(session = id.0, "adopted log line-framer lock poisoned");
-                                return;
-                            }
-                        }
-                    }
-                    if !chunk.bytes.is_empty() {
-                        tasks::apply_output(
-                            id,
-                            &handle,
-                            manager.inner.store.as_deref(),
-                            &chunk.bytes,
-                            (manager.inner.config.clock)(),
-                        );
-                    }
-                }
-                Err(error) => {
-                    tracing::debug!(session = id.0, %error, "adopted log temporarily unavailable");
-                }
-            }
-                tokio::time::sleep(LOG_TAIL_POLL).await;
-            }
-        });
-    }
-}
-
-pub(super) fn open_tail(log: &SessionLog) -> Result<LogTail, SessionManagerError> {
-    LogTail::open(log.path.clone().into(), LOG_TAIL_READ_BYTES).map_err(|error| {
-        SessionManagerError::InvalidLog {
-            path: log.path.clone(),
-            reason: error.to_string(),
-        }
-    })
 }
 
 /// Accept an explicit log only as an absolute, readable regular file.

@@ -26,6 +26,10 @@ pub struct ProcessDetails {
     pub exe: Option<String>,
     /// Current working directory.
     pub cwd: Option<String>,
+    /// Argument vector, used in memory only to select a watcher adapter.
+    ///
+    /// It can contain secrets, so it is never persisted or sent to clients.
+    pub command: Option<Vec<String>>,
 }
 
 type IdentifyFn = dyn Fn(u32) -> Option<ProcessIdentity> + Send + Sync;
@@ -124,7 +128,8 @@ impl ProcessProbe {
                 true,
                 ProcessRefreshKind::nothing()
                     .with_exe(UpdateKind::OnlyIfNotSet)
-                    .with_cwd(UpdateKind::Always),
+                    .with_cwd(UpdateKind::Always)
+                    .with_cmd(UpdateKind::OnlyIfNotSet),
             );
             let Some(process) = system.process(pid) else {
                 return ProcessDetails::default();
@@ -137,6 +142,14 @@ impl ProcessProbe {
                 name: Some(process.name().to_string_lossy().into_owned()).filter(|n| !n.is_empty()),
                 exe: path(process.exe()),
                 cwd: path(process.cwd()),
+                command: Some(
+                    process
+                        .cmd()
+                        .iter()
+                        .map(|argument| argument.to_string_lossy().into_owned())
+                        .collect::<Vec<_>>(),
+                )
+                .filter(|argv| !argv.is_empty()),
             }
         })
         .with_log_discovery(crate::log_discovery::discover)
@@ -174,6 +187,13 @@ mod tests {
         let probe = ProcessProbe::unavailable();
         assert_eq!(probe.owner_uid(), None);
         assert_eq!(probe.identify(std::process::id()), None);
+    }
+
+    #[test]
+    fn system_probe_reports_this_process_argv() {
+        let probe = ProcessProbe::system(0);
+        let argv = probe.details(std::process::id()).command.unwrap();
+        assert!(!argv.is_empty());
     }
 
     #[test]

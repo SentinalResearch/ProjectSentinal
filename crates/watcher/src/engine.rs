@@ -5,7 +5,7 @@ use crate::{
     training::TrainingAdapter, AdapterState, DeclarativeAdapter, GenericAdapter, HealthTracker,
     Observation, ObservationKind, WatcherAdapter,
 };
-use protocol::{Command, DurationMs, EventKind, Health, Timestamp};
+use protocol::{CaptureLevel, Command, DurationMs, EventKind, Health, HealthOverall, Timestamp};
 use std::collections::BTreeMap;
 
 const DEFAULT_STALL_MS: u64 = 10 * 60 * 1_000;
@@ -30,6 +30,7 @@ pub struct EventEngine {
     health: HealthTracker,
     last_progress: Option<(Timestamp, Option<f32>)>,
     processes: BTreeMap<u32, String>,
+    capture: CaptureLevel,
 }
 
 impl EventEngine {
@@ -42,11 +43,23 @@ impl EventEngine {
             health: HealthTracker::new(),
             last_progress: None,
             processes: BTreeMap::new(),
+            capture: CaptureLevel::Full,
         };
         if let Some(command) = command {
             engine.select(command);
         }
         engine
+    }
+
+    /// Limit Events and Health to what `capture` can observe (FULL by default).
+    pub fn with_capture(mut self, capture: CaptureLevel) -> Self {
+        self.capture = capture;
+        self
+    }
+
+    /// Change the capture level, e.g. when an adopted log tail starts or stops.
+    pub fn set_capture(&mut self, capture: CaptureLevel) {
+        self.capture = capture;
     }
 
     /// Convert one observation into Events, Health, and adapter state.
@@ -55,6 +68,7 @@ impl EventEngine {
             self.select(command);
             self.last_progress = None;
         }
+        let capture = self.capture;
         let mut events = self.process_events(observation);
         events.extend(self.generic.observe(observation));
         if let Some(adapter) = &mut self.selected {
@@ -62,9 +76,11 @@ impl EventEngine {
         }
         events = deduplicate(events)
             .into_iter()
+            .filter(|event| capture.supports_evidence(event))
             .filter(|event| self.allow_event(observation.at, event))
             .collect();
         let health = self.health.observe(observation, &events);
+        let health = bound(capture, health);
         let adapter_state = self.selected.as_ref().map(|adapter| adapter.state());
         EngineUpdate {
             events,
@@ -75,13 +91,19 @@ impl EventEngine {
 
     /// Apply an Event produced outside watcher adapters to deterministic Health.
     pub fn observe_existing_event(&mut self, at: Timestamp, event: &EventKind) -> Health {
-        self.health.observe(
+        let supported = self.capture.supports_evidence(event);
+        let health = self.health.observe(
             &Observation {
                 at,
                 kind: ObservationKind::Tick,
             },
-            std::slice::from_ref(event),
-        )
+            if supported {
+                std::slice::from_ref(event)
+            } else {
+                &[]
+            },
+        );
+        bound(self.capture, health)
     }
 
     fn process_events(&mut self, observation: &Observation) -> Vec<EventKind> {
@@ -153,6 +175,14 @@ impl EventEngine {
         }
         allowed
     }
+}
+
+/// Without exit-status evidence, error lines are a warning, never a failure.
+fn bound(capture: CaptureLevel, mut health: Health) -> Health {
+    if health.overall == HealthOverall::Failed && !capture.supports_failure_evidence() {
+        health.overall = HealthOverall::Warning;
+    }
+    health
 }
 
 fn deduplicate(events: Vec<EventKind>) -> Vec<EventKind> {

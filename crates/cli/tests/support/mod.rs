@@ -23,6 +23,9 @@ use tokio::{
 
 /// Prompt text every test shell prints, used to detect a finished Command.
 pub const PROMPT: &str = "SNTL-PROMPT> ";
+/// Printed once per finished Command by fish, which redraws its prompt
+/// several times per line, so prompts cannot be counted there.
+const DONE: &str = "SNTL-DONE";
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
 
@@ -217,7 +220,7 @@ impl ShellTerm {
             "fish" => {
                 command.args(["--no-config", "-i", "-C"]);
                 command.arg(format!(
-                    "set -g fish_greeting; function fish_prompt; printf '%s' '{PROMPT}'; end; '{sentinal}' hook fish | source"
+                    "set -g fish_greeting; function fish_prompt; printf '%s' '{PROMPT}'; end; function __sntl_done --on-event fish_postexec; printf '{DONE}\\n'; end; '{sentinal}' hook fish | source"
                 ));
             }
             other => panic!("unsupported shell {other}"),
@@ -387,8 +390,31 @@ impl ShellTerm {
         self.writer.write_all(line.as_bytes()).unwrap();
         self.writer.write_all(b"\r").unwrap();
         self.writer.flush().unwrap();
-        self.wait_prompt(self.prompts + 1);
+        if self.name == "fish" {
+            self.wait_done(before);
+        } else {
+            self.wait_prompt(self.prompts + 1);
+        }
         (self.seen[before..].to_string(), started.elapsed())
+    }
+
+    /// Wait for fish's per-Command marker and the prompt drawn after it.
+    fn wait_done(&mut self, from: usize) {
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            let after_done = self.seen[from..]
+                .find(&format!("{DONE}\r\n"))
+                .or_else(|| self.seen[from..].find(&format!("{DONE}\n")))
+                .map(|index| from + index + DONE.len());
+            if after_done.is_some_and(|index| self.seen[index..].contains(PROMPT)) {
+                return;
+            }
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            match self.output.recv_timeout(remaining) {
+                Ok(bytes) => self.seen.push_str(&String::from_utf8_lossy(&bytes)),
+                Err(_) => panic!("fish: no finished Command; saw:\n{}", self.seen),
+            }
+        }
     }
 
     /// Exit the shell and reap it.

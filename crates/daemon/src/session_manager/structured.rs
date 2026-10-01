@@ -55,7 +55,14 @@ impl SessionManager {
         for handle in sessions.values() {
             if let Some(pid) = handle.root_pid {
                 if !lock_session(handle)?.state.is_finished() {
-                    roots.push((handle.id, pid));
+                    // An adopted root that exited is sampled through a survivor.
+                    let sampled = handle
+                        .adopted_tree
+                        .lock()
+                        .ok()
+                        .and_then(|tree| tree.sampling_root)
+                        .unwrap_or(pid);
+                    roots.push((handle.id, sampled));
                 }
             }
         }
@@ -70,6 +77,9 @@ impl SessionManager {
         processes: Vec<Process>,
     ) -> Result<(), SessionManagerError> {
         let handle = self.handle(session_id)?;
+        if lock_session(&handle)?.origin == protocol::SessionOrigin::Adopted {
+            self.record_descendants(&handle, &processes)?;
+        }
         tasks::apply_observation(
             session_id,
             &handle,

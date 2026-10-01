@@ -1,6 +1,7 @@
 //! Ownership and lifecycle management for persistent terminal sessions.
 
 mod adopt;
+mod adopted_log;
 mod capture;
 mod continuation;
 mod error;
@@ -135,6 +136,10 @@ struct SessionHandle {
     shell_reports: Mutex<external::ShellReports>,
     /// Set by the first successful attach.
     attached: Arc<AtomicBool>,
+    /// Active read-only tail of an adopted process's log.
+    log_tail: Mutex<Option<adopted_log::ActiveLogTail>>,
+    /// Descendants of an adopted process, which keep it alive after its root exits.
+    adopted_tree: Mutex<adopted_log::AdoptedTree>,
 }
 
 struct SessionManagerInner {
@@ -155,6 +160,8 @@ struct SessionManagerInner {
     continuation: tokio::sync::Mutex<()>,
     /// Validated user-defined watcher adapters cloned into each Session engine.
     watcher_adapters: Vec<watcher::DeclarativeAdapter>,
+    /// Whether adopted log tails poll on a background timer (tests drive them).
+    log_tail_polling: bool,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -217,8 +224,18 @@ impl SessionManager {
                 registration: Mutex::new(()),
                 continuation: tokio::sync::Mutex::new(()),
                 watcher_adapters: Vec::new(),
+                log_tail_polling: true,
             }),
         }
+    }
+
+    /// Disable background log-tail polling so tests can call `poll_log_tail`.
+    pub fn with_log_tail_polling(mut self, enabled: bool) -> Self {
+        match Arc::get_mut(&mut self.inner) {
+            Some(inner) => inner.log_tail_polling = enabled,
+            None => tracing::error!("log-tail polling must be set before the manager is shared"),
+        }
+        self
     }
 
     /// Install validated declarative adapters before this manager is shared.

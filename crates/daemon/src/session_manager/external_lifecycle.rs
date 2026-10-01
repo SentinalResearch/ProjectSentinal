@@ -17,10 +17,15 @@ impl SessionManager {
             if session.capture == CaptureLevel::Full || session.state.is_finished() {
                 continue;
             }
-            if !self.same_process(&session) {
-                self.end_external(&handle)?;
-                ended.push(session.id);
+            if self.same_process(&session) {
+                continue;
             }
+            // A `nohup`-style wrapper may exit while its child keeps writing.
+            if session.origin == SessionOrigin::Adopted && self.adopted_descendant_alive(&handle)? {
+                continue;
+            }
+            self.end_external(&handle)?;
+            ended.push(session.id);
         }
         ended.sort();
         Ok(ended)
@@ -37,15 +42,15 @@ impl SessionManager {
                 continue;
             }
             if self.same_process(&session) {
-                let adopted_tail = if session.origin == SessionOrigin::Adopted {
-                    session
-                        .log
-                        .as_ref()
-                        .and_then(|log| super::adopt::open_tail(log).ok())
-                } else {
-                    None
-                };
-                if session.origin == SessionOrigin::Adopted && adopted_tail.is_none() {
+                let adopted_log = session
+                    .log
+                    .clone()
+                    .filter(|_| session.origin == SessionOrigin::Adopted);
+                // Resume from the persisted cursor so the log is not replayed.
+                let adopted_tail = adopted_log
+                    .as_ref()
+                    .map(|log| self.open_session_tail(session.id, log));
+                if session.origin == SessionOrigin::Adopted {
                     session.capture = CaptureLevel::Process;
                 }
                 // A Command running across the restart cannot be finished later.
@@ -62,9 +67,20 @@ impl SessionManager {
                 }
                 let session_id = session.id;
                 let shell_hook = session.origin == SessionOrigin::ShellHook;
-                self.insert_external(session)?;
-                if let Some(tail) = adopted_tail {
-                    self.activate_log_tail(session_id, tail)?;
+                let argv = (session.origin == SessionOrigin::Adopted)
+                    .then(|| {
+                        session
+                            .pid
+                            .and_then(|pid| self.inner.probe.details(pid).command)
+                    })
+                    .flatten();
+                self.insert_external(session, argv)?;
+                match (adopted_tail, &adopted_log) {
+                    (Some(Ok(tail)), Some(log)) => self.activate_log_tail(session_id, tail, log)?,
+                    (Some(Err(error)), Some(log)) => {
+                        self.warn_log_unavailable(session_id, log, &error)?;
+                    }
+                    _ => {}
                 }
                 if shell_hook {
                     self.allow_initial_shell_sequence_gap(session_id)?;
@@ -91,6 +107,8 @@ impl SessionManager {
     }
 
     pub(super) fn end_external(&self, handle: &SessionHandle) -> Result<(), SessionManagerError> {
+        // Drain already-written log bytes before the Session is marked ended.
+        self.finish_log_tail(handle)?;
         let mut reports = lock_reports(handle)?;
         reports.forget_running();
         if let Ok(mut tracker) = handle.tracker.lock() {

@@ -227,6 +227,8 @@ impl SessionManager {
             initial_command: Mutex::new(initial_command),
             shell_reports: Mutex::default(),
             attached: Arc::new(AtomicBool::new(false)),
+            log_tail: Mutex::new(None),
+            adopted_tree: Mutex::default(),
         });
         Ok(PreparedSession {
             session,
