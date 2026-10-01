@@ -1,7 +1,8 @@
 # Milestone 1b progress — Any terminal into Sentinal
 
-Status: Milestone 1b.E complete 2026-09-29; 1b.D remains scheduled with
-Milestone 3 and 1c remains the next deployment slice.
+Status: Milestone 1b.D complete 2026-10-01 on macOS. The 1b release is
+blocked only on the Linux row of the real-shell matrix (no Linux host was
+available); every other 1b release gate passes.
 
 ## Pre-Milestone 3 audit remediation
 
@@ -72,10 +73,54 @@ Milestone 3 and 1c remains the next deployment slice.
 - [x] Hook performance/fail-open behavior — injected transport tests plus recorded Linux/macOS benchmark
 - [x] Auto-wrap guards and 300 ms fallback — table-driven unit tests and manual IDE/SSH smoke matrix (manual IDE/SSH matrix not yet run)
 - [x] Read-only adoption and unknown exit — fake process table, same-user tests, Linux/macOS integration (Linux pending)
-- [ ] Rotation-safe log tail — temp-file append/truncate/rotate/partial-line behavior tests
-- [ ] Capture-aware web UI — Testing Library coverage for badges and forbidden actions (1b.C: detail/split badge, unknown exit, read-only terminal area, log hint; completion in 1b.D)
-- [ ] Privacy review — inspect SQLite, audit JSONL, PTY logs, and adopted-log metadata
-- [ ] Full verification — `just check`, Playwright, ignored integration suite, platform matrix
+- [x] Rotation-safe log tail — temp-file append/truncate/rotate/partial-line behavior tests
+- [x] Capture-aware web UI — Testing Library coverage for badges and forbidden actions
+- [x] Privacy review — `privacy_audit_integration` scans SQLite, WAL, audit JSONL, and decompressed PTY logs
+- [ ] Full verification — `just check`, Playwright, ignored integration suite, platform matrix (Linux row pending)
+
+## 1b.D verification (2026-10-01, macOS 27.0 arm64, zsh 5.9 / bash 3.2.57 / fish 4.9.3)
+
+- Log tail (`crates/daemon/tests/log_tail.rs`, 24 tests): bounded line-aligned
+  initial tail, append, partial line, CR progress, truncate, copy-truncate,
+  rename rotation with old-handle drain, same-size replacement,
+  missing/recreated file, final drain, long line, backlog skip, invalid UTF-8
+  with the file untouched, symlink/type/owner refusal, unreadable
+  replacement, open handle surviving chmod, and cursor resume/mismatch.
+- Lifecycle (`crates/daemon/tests/adopted_log.rs`, 11 tests, no sleeps):
+  argv selects the same adapter as FULL, log lines never become Commands,
+  error lines warn without Failed Health, symlink swap falls back to
+  `PROCESS` with a warning, backlog warning, unreadable discovered log,
+  final drain with unknown exit, surviving descendant, and restart resume,
+  replacement, and missing-log fallback.
+- Store cursor persistence (`crates/store/tests/log_cursors.rs`) and schema
+  migration 3 (`log_cursors`).
+- Watcher (`crates/watcher/tests/capture_evidence.rs`): all seven saved
+  training/pytest/server fixtures produce identical Events for
+  PROCESS_LOG and FULL; evidence matrix in `crates/protocol/src/evidence.rs`.
+- API security: attach/resize/kill and input are rejected for PROCESS_LOG as
+  well as PROCESS, with nothing audited and the log untouched.
+- Web: badge for every origin/capture pair, concise explanations, replacement
+  panels, hidden y/n/Run again/Ctrl-C (Overview and detail), and a quoted
+  Watch hint built only from cwd and title (89 Vitest tests).
+- Playwright (4 tests): a real adopted writer on a 390 px phone viewport shows
+  `ADOPTED · PROCESS LOG`, the limitation, live epoch Events, the Watch
+  hint, no terminal or input controls, and no horizontal scroll.
+- `log_tail_integration`: a real writer appends, truncates, and rename-rotates
+  its log and ends on an unterminated line; epochs 1–7 arrive exactly once
+  and the Session ends `COMPLETED` with an unknown exit code (3/3 runs).
+- `privacy_audit_integration`: a hidden `read -rs` password typed over the
+  remote input path is absent from every data-directory file (SQLite, WAL,
+  audit logs, decompressed Session log); input is audited by byte count, and
+  every data file is owner-only. A control run with the secret echoed is
+  detected in the Session log, proving the scan works.
+- Ignored suite on macOS: every integration test passes, including the real
+  zsh/bash/fish hook tracking, external hook, Watch, auto-wrap, adopt, log
+  tail, and privacy tests. The fish harnesses now find Homebrew fish and
+  handle fish 4's terminal queries and prompt redraws.
+  `tailnet_bootstrap_integration` was not run: it needs an explicit
+  confirmation and a published real Tailnet release.
+- Not run: the Linux row (no Linux host or container runtime was available;
+  `pop-os` was offline).
 
 ## 1b.0 verification (2026-09-28, macOS)
 

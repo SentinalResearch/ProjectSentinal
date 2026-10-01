@@ -32,7 +32,7 @@ fixtures. Simulation Settings exist only when Vite started with
 | First run | Empty-state clarity and what the user tries to do first |
 | Needs attention | Whether waiting, failure, and stalled work are distinguishable |
 | Healthy training | Progress/resource comprehension and live change visibility |
-| Capture limits | Whether users understand why adopted processes are read-only |
+| Capture limits | Whether users understand why hooked shells, tailed logs, and adopted processes are read-only |
 | Offline worker | Offline wording, retained state, and recovery expectations |
 
 Playback can be paused, run every five seconds, run every second, or advanced

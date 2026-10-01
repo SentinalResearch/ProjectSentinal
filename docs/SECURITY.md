@@ -26,6 +26,11 @@ and roadmap checkbox are complete.
   Session logs, SQLite (with its WAL/SHM files), and audit logs as `0600`,
   whatever the umask. An existing data directory or database that is wider is
   tightened at startup.
+- Adopted log tails open one read-only handle, refuse symlinks, non-regular
+  files, and files owned by another user, and verify the opened handle is the
+  file the path names. Unsafe changes stop the tail with a warning. An
+  adopted process's argv is used in memory to choose a watcher adapter and
+  is never persisted or sent to clients.
 - Shell-integration signals (OSC 133 prompt/command marks and OSC 7420
   command text and cwd) count only when tagged `;sentinal=<nonce>`. Each FULL
   Session gets a fresh 128-bit nonce in `SENTINAL_OSC_NONCE`; the hook copies

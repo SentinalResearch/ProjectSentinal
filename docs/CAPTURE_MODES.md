@@ -156,10 +156,50 @@ after adoption, off the request path (Linux `/proc/<pid>/fd/{1,2}`; macOS
 deleted files, and non-regular files are ignored; failure leaves no active
 tail and capture stays `PROCESS`.
 
-An active log upgrades capture to `PROCESS_LOG`. The tail is read-only
-and handles append, partial lines, truncation, rotation, temporary absence,
-and bounded buffering. Lines enter the same deterministic watcher pipeline
-as PTY output.
+An active log upgrades capture to `PROCESS_LOG` only once the tail is open.
+Lines enter the same deterministic watcher pipeline as PTY output, with the
+same adapter a FULL Session running that argv would get (argv is read from
+the process table, used in memory only, and never stored or sent to
+clients). Log lines are never Commands and never instructions.
+
+Log tail policy (`crates/daemon/src/log_tail.rs`):
+
+- **Read-only.** One read-only handle; the tail never creates, truncates,
+  chmods, renames, locks, or writes the file.
+- **Initial tail.** Without a cursor, reading starts at most 64 KiB before
+  the end, moved forward past the first partial line. History before that is
+  not replayed.
+- **Restart.** The read position (device, inode, offset) is saved in SQLite at
+  most once a second. After a daemon restart the tail resumes there if the
+  file identity matches and is long enough; otherwise it uses the initial
+  tail. At most about one second of lines can repeat after a crash.
+- **Rotation.** Append, partial lines, CR progress, truncation and
+  copy-truncate (size below the offset: restart at 0), rename rotation and
+  same-size replacement (new inode: drain the old handle first, then read the
+  new file from 0), and temporary absence (keep the old handle; read a
+  recreated file from 0) are handled deterministically. A truncate followed
+  by regrowth past the old offset between two 50 ms polls is indistinguishable
+  from an append; that is a known limit.
+- **Bounds.** At most 64 KiB per poll, 2 KiB per line (watcher framing,
+  invalid UTF-8 replaced lossily), and an 8 MiB unread backlog. Beyond the
+  backlog the tail skips to the bounded tail and records a structured
+  `WARNING_DETECTED` Event.
+- **Safety.** At open and on every change the path must be a regular file
+  (never a symlink) owned by the daemon user, and the opened handle must be
+  the file the path names. A symlink, type or owner change, or an unreadable
+  replacement stops the tail, downgrades capture to `PROCESS`, and records a
+  warning. A discovered log that cannot be opened stays `PROCESS` with a
+  warning.
+- **End.** When the adopted root and every remembered descendant (PID plus
+  start time, from Metrics samples) have exited, already-written bytes —
+  including an unterminated last line — are drained, then the tail stops.
+  A surviving descendant keeps the Session live and becomes its Metrics root.
+
+Evidence follows capture (`CaptureLevel::supports_evidence` in
+`crates/protocol/src/evidence.rs`): reduced capture never emits or notifies
+output-derived Events it could not see, and only FULL and COMMANDS can know
+failure. A PROCESS_LOG error line is an `ERROR_DETECTED` Event, but Health
+stays at most `WARNING`, and an adopted process only ever “ended”.
 
 Adopt resolves the target before any change: the PID must be non-zero,
 alive, owned by the daemon user, not `sentinald` itself, and not already

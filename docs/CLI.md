@@ -294,11 +294,13 @@ This terminal: inside Sentinal Session 12
 
 ### `adopt`
 
-Registers an existing same-user process read-only as `ADOPTED` / `PROCESS`
+Registers an existing same-user process read-only as `ADOPTED` / `PROCESS`, or `PROCESS_LOG` once its log is tailed,
 over the private local socket.
 
 - `adopt PID [-t TITLE]` adopts one process; `--log PATH` read-only tails a
-  same-user regular log through deterministic watchers and uses PROCESS_LOG.
+  same-user regular log through deterministic watchers and prints
+  `[ADOPTED · PROCESS_LOG]`. A log that is recorded but not read is reported
+  as such, with Metrics only.
 - `adopt --pick` lists your processes (newest first, excluding itself, its
   shell, and `sentinald`) and adopts only after you type a list number or
   PID; Enter or `q` adopts nothing.
