@@ -184,7 +184,9 @@ async fn adopt(
         LocalResponse::Error { message, .. } => {
             Err(format!("sentinald refused to adopt pid {pid}: {message}"))
         }
-        LocalResponse::Command { .. } => Err("sentinald sent an unexpected reply".into()),
+        LocalResponse::Command { .. }
+        | LocalResponse::Identity { .. }
+        | LocalResponse::Connection { .. } => Err("sentinald sent an unexpected reply".into()),
     }
 }
 

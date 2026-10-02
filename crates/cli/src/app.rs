@@ -1,8 +1,9 @@
 //! Command dispatch shared by the `sentinal` binary and its `ta` alias.
 
 use crate::{
-    args::{AutoAction, Cli, Command},
+    args::{AutoAction, Cli, Command, ConnectionAction, IdentityAction},
     client::{terminal_size, AttachEnd, ClientError, DaemonClient},
+    connect_command::{self, CodeSource},
     daemon_url::{self, DaemonUrlError},
     watch::{create_session, plan_watch, WatchContext, WatchError, WatchPlan, SESSION_ENV},
 };
@@ -67,6 +68,44 @@ async fn dispatch(
                 cli.url.unwrap_or_default()
             };
             return Ok(crate::auto_command::run(action, &url, cli.token_file, out, err).await);
+        }
+        Command::Connect {
+            control_url,
+            name,
+            code_stdin,
+        } => {
+            return Ok(exit_code(
+                connect(&control_url, name.as_deref(), code_stdin, out, err).await,
+            ))
+        }
+        Command::Connection {
+            action: ConnectionAction::Status { json },
+        } => {
+            let Some(socket) = connect_command::default_socket() else {
+                return Err(AppError::MissingHome);
+            };
+            return Ok(exit_code(
+                connect_command::status(&socket, json, out, err).await,
+            ));
+        }
+        Command::Disconnect => {
+            let Some(socket) = connect_command::default_socket() else {
+                return Err(AppError::MissingHome);
+            };
+            return Ok(exit_code(
+                connect_command::disconnect(&socket, out, err).await,
+            ));
+        }
+        Command::Identity {
+            action: IdentityAction::Reset { yes },
+        } => {
+            let Some(socket) = connect_command::default_socket() else {
+                return Err(AppError::MissingHome);
+            };
+            let mut input = std::io::stdin().lock();
+            return Ok(exit_code(
+                connect_command::identity_reset(&socket, yes, &mut input, out, err).await,
+            ));
         }
         Command::Adopt {
             pid,
@@ -142,7 +181,11 @@ async fn dispatch(
         | Command::Update { .. }
         | Command::Hook { .. }
         | Command::Auto { .. }
-        | Command::Adopt { .. } => {}
+        | Command::Adopt { .. }
+        | Command::Connect { .. }
+        | Command::Connection { .. }
+        | Command::Disconnect
+        | Command::Identity { .. } => {}
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -224,4 +267,76 @@ fn print_unexpected(err: &mut dyn Write, message: DaemonMessage) {
         DaemonMessage::Error { message } => writeln!(err, "sentinal: error: {message}"),
         other => writeln!(err, "sentinal: unexpected daemon response: {other:?}"),
     };
+}
+
+fn exit_code(code: i32) -> ExitCode {
+    ExitCode::from(u8::try_from(code).unwrap_or(1))
+}
+
+/// Read the code from a hidden prompt (terminal required) or `--code-stdin`.
+async fn connect(
+    control_url: &str,
+    name: Option<&str>,
+    code_stdin: bool,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
+    let Some(socket) = connect_command::default_socket() else {
+        let _ = writeln!(err, "sentinal: HOME is not set; set SENTINAL_SOCKET");
+        return connect_command::exit::LOCAL_DAEMON;
+    };
+    let mut stdin = std::io::stdin().lock();
+    if code_stdin {
+        let mut unused = NoTerminal;
+        return connect_command::connect(
+            &socket,
+            control_url,
+            name,
+            CodeSource::Stdin,
+            &mut unused,
+            &mut stdin,
+            out,
+            err,
+        )
+        .await;
+    }
+    let tty = std::io::stdin()
+        .is_terminal()
+        .then(connect_command::Tty::open)
+        .and_then(Result::ok);
+    let Some(mut tty) = tty else {
+        let _ = writeln!(
+            err,
+            "sentinal: the pairing code needs a terminal or --code-stdin"
+        );
+        return connect_command::exit::USAGE;
+    };
+    connect_command::connect(
+        &socket,
+        control_url,
+        name,
+        CodeSource::Prompt,
+        &mut tty,
+        &mut stdin,
+        out,
+        err,
+    )
+    .await
+}
+
+/// `--code-stdin` never touches a terminal.
+struct NoTerminal;
+
+impl connect_command::HiddenTerminal for NoTerminal {
+    fn set_echo(&mut self, _on: bool) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn read_byte(&mut self) -> std::io::Result<Option<u8>> {
+        Ok(None)
+    }
+
+    fn write_text(&mut self, _text: &str) -> std::io::Result<()> {
+        Ok(())
+    }
 }

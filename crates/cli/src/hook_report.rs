@@ -214,6 +214,8 @@ fn kind_of(response: &LocalResponse) -> String {
     match response {
         LocalResponse::Session { .. } => "SESSION".into(),
         LocalResponse::Command { .. } => "COMMAND".into(),
+        LocalResponse::Identity { .. } => "IDENTITY".into(),
+        LocalResponse::Connection { .. } => "CONNECTION".into(),
         LocalResponse::Error { code, .. } => format!("ERROR {code:?}"),
     }
 }

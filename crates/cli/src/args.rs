@@ -100,11 +100,62 @@ pub enum Command {
         #[arg(short = 't', long)]
         title: Option<String>,
     },
+    /// Connect this already-installed Machine to an owner-selected control Machine.
+    ///
+    /// Create a one-time code in the control's Settings → Machines → Add
+    /// Machine, then type it at the hidden prompt. The code is never accepted
+    /// on the command line.
+    Connect {
+        /// Control origin, e.g. https://sentinal-control.<tailnet>.ts.net.
+        control_url: String,
+        /// Display name to propose (defaults to the hostname).
+        #[arg(long)]
+        name: Option<String>,
+        /// Read the pairing code from one stdin line instead of a hidden prompt.
+        #[arg(long)]
+        code_stdin: bool,
+    },
+    /// Show or manage this Machine's control link.
+    Connection {
+        /// Connection operation.
+        #[command(subcommand)]
+        action: ConnectionAction,
+    },
+    /// Remove this Machine's control link (the Machine ID is kept).
+    Disconnect,
+    /// Manage this Machine's immutable identity.
+    Identity {
+        /// Identity operation.
+        #[command(subcommand)]
+        action: IdentityAction,
+    },
     /// Report Commands from ordinary zsh, bash, or fish terminals (COMMANDS capture).
     Hook {
         /// Hook operation.
         #[command(subcommand)]
         action: HookAction,
+    },
+}
+
+/// `sentinal connection` operations.
+#[derive(Debug, Subcommand)]
+pub enum ConnectionAction {
+    /// Show whether this Machine is connected to a control.
+    Status {
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// `sentinal identity` operations.
+#[derive(Debug, Subcommand)]
+pub enum IdentityAction {
+    /// Replace a corrupt or unwanted Machine ID with a new one.
+    Reset {
+        /// Skip the confirmation prompt.
+        #[arg(long)]
+        yes: bool,
     },
 }
 
