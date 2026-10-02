@@ -59,6 +59,7 @@ fn state() -> (AppState, Arc<FakePty>, PathBuf) {
         gpus: vec![],
         status: MachineStatus::Online,
         last_seen: Timestamp(1_790_000_000_000),
+        role: None,
     };
     let auth = AuthManager::load(&data_dir.join("auth.json"), "token".into()).unwrap();
     (AppState::new(manager, machine, auth), fake, data_dir)

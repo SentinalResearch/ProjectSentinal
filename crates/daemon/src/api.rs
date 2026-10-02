@@ -1,13 +1,16 @@
 //! Axum HTTP and WebSocket API for daemon clients.
 
-mod auth_routes;
+pub mod auth_routes;
 #[cfg(test)]
 mod capture_tests;
 mod output;
 
 use crate::{
     auth::AuthManager,
+    control::{routes::ControlRoutes, ControlService},
     framing::{decode_terminal_frame, encode_terminal_frame},
+    link::LinkManager,
+    origin::OriginPolicy,
     session_manager::{Attachment, CreateSession, SessionManager},
 };
 use axum::{
@@ -35,16 +38,69 @@ pub struct AppState {
     /// Description returned by the machine endpoint.
     pub machine: Machine,
     auth: AuthManager,
+    control: Option<ControlService>,
+    link: Option<LinkManager>,
+    origins: OriginPolicy,
+    behind_tailscale_serve: bool,
 }
 
 impl AppState {
     /// Build API state with persistent single-user authentication.
+    ///
+    /// No browser origin is allowed until [`AppState::with_origins`] says so.
     pub fn new(sessions: SessionManager, machine: Machine, auth: AuthManager) -> Self {
         AppState {
             sessions,
             machine,
             auth,
+            control: None,
+            link: None,
+            origins: OriginPolicy::new(&[], false)
+                .unwrap_or_else(|_| unreachable!("empty list is valid")),
+            behind_tailscale_serve: false,
         }
+    }
+
+    /// Exact browser origins allowed on every route.
+    pub fn with_origins(mut self, origins: OriginPolicy) -> Self {
+        self.origins = origins;
+        self
+    }
+
+    /// Enable the control role.
+    pub fn with_control(mut self, control: Option<ControlService>) -> Self {
+        self.control = control;
+        self
+    }
+
+    /// Attach this daemon's worker link.
+    pub fn with_link(mut self, link: LinkManager) -> Self {
+        self.link = Some(link);
+        self
+    }
+
+    /// Trust `Tailscale-User-Login` from loopback peers (Tailscale Serve).
+    pub fn with_tailscale_serve(mut self, enabled: bool) -> Self {
+        self.behind_tailscale_serve = enabled;
+        self
+    }
+
+    /// Who is logging in: the Tailscale user behind Serve, else the peer IP.
+    pub(crate) fn client_key(
+        &self,
+        headers: &axum::http::HeaderMap,
+        address: SocketAddr,
+    ) -> String {
+        if self.behind_tailscale_serve && address.ip().is_loopback() {
+            if let Some(login) = headers
+                .get("tailscale-user-login")
+                .and_then(|value| value.to_str().ok())
+                .filter(|login| !login.is_empty() && login.len() <= 256)
+            {
+                return format!("tailscale:{login}");
+            }
+        }
+        address.ip().to_string()
     }
 
     /// Decode, validate, and dispatch one WebSocket text frame.
@@ -184,11 +240,36 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/ws", any(websocket))
         .route_layer(middleware::from_fn_with_state(state.clone(), authorize));
 
+    let control = ControlRoutes::new(
+        state.control.clone(),
+        state.auth.clone(),
+        state.behind_tailscale_serve,
+    )
+    .router();
+    let origins = state.origins.clone();
     Router::new()
         .route("/api/v1/health", get(health))
+        .route("/api/v1/link/identity", get(link_identity))
         .merge(auth_routes::routes())
         .merge(protected)
         .with_state(state)
+        .merge(control)
+        .layer(middleware::from_fn_with_state(
+            origins,
+            crate::origin::enforce,
+        ))
+}
+
+/// The control proves its link: its bearer must hash to the stored value.
+async fn link_identity(State(state): State<AppState>, request: Request) -> Response {
+    let identity = state.link.as_ref().and_then(|link| {
+        auth_routes::bearer_from_headers(request.headers())
+            .and_then(|bearer| link.verify_control_credential(bearer))
+    });
+    match identity {
+        Some(identity) => Json(identity).into_response(),
+        None => StatusCode::UNAUTHORIZED.into_response(),
+    }
 }
 
 async fn health() -> Json<Health> {

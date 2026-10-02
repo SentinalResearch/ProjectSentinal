@@ -5,6 +5,7 @@ mod lineage;
 mod log_cursors;
 mod metrics;
 mod records;
+pub mod registry;
 
 use protocol::{
     CaptureLevel, Event, EventId, EventKind, Machine, Session, SessionId, SessionState, Timestamp,
@@ -25,6 +26,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("../migrations/001_initial.sql")),
     (2, include_str!("../migrations/002_session_lineage.sql")),
     (3, include_str!("../migrations/003_log_cursors.sql")),
+    (4, include_str!("../migrations/004_machine_registry.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.

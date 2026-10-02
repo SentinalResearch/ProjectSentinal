@@ -6,15 +6,22 @@ use crate::{
     audit::AuditLog,
     auth::{load_or_create_token, AuthError, AuthManager},
     config::{ConfigError, DaemonConfig},
+    control::{ControlService, ControlSettings},
+    identity,
+    link::{LinkManager, LinkSettings},
     local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{process_tree, MetricsSampler, ResourceDebouncer},
+    origin::OriginPolicy,
     package_service::{package_router, PackageService, PackageServiceError},
     private_fs::ensure_private_dir,
     process_probe::ProcessProbe,
     pty::{FakePty, PtyBackend, RealPty},
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
 };
-use protocol::{Machine, MachineId, MachineStatus, Os, Resource, Timestamp};
+use protocol::{
+    link::LinkEndpoint, LocalRequest, Machine, MachineId, MachineRole, MachineStatus, Os, Resource,
+    Timestamp,
+};
 use std::{
     collections::HashMap,
     future::IntoFuture,
@@ -88,6 +95,15 @@ pub enum DaemonError {
     /// The package server task panicked or was cancelled.
     #[error("package service task failed: {0}")]
     PackageTask(tokio::task::JoinError),
+    /// Allowed browser origins were invalid.
+    #[error(transparent)]
+    Origins(#[from] crate::origin::OriginConfigError),
+    /// The control role needs a usable Machine identity.
+    #[error("the control role needs a valid Machine identity: {0}")]
+    Identity(String),
+    /// The control role could not start.
+    #[error(transparent)]
+    Control(#[from] crate::control::ControlError),
     /// Declarative watcher adapters could not be loaded safely.
     #[error(transparent)]
     Adapters(#[from] AdapterConfigError),
@@ -115,7 +131,22 @@ pub async fn run() -> Result<(), DaemonError> {
         .map(PathBuf::from)
         .unwrap_or_else(|| config.auth_file.clone());
     let auth = AuthManager::load(&auth_file, token)?;
-    let machine = machine_description();
+    let origins = OriginPolicy::new(&config.allowed_origins, config.development)?;
+    if config.allowed_origins.is_empty() {
+        tracing::warn!("allowed_origins is empty: browsers cannot use this daemon (CLI and worker links still can)");
+    }
+    let mut machine = machine_description();
+    let legacy_machine_id = machine.id.0.clone();
+    let identity = identity::load_or_create(&config.identity_file, now(), &legacy_machine_id);
+    match &identity {
+        Ok(identity) => machine.id = identity.machine_id.clone(),
+        Err(error) => {
+            tracing::error!(%error, "Machine identity unusable; Machine links are disabled")
+        }
+    }
+    if config.control.is_some() {
+        machine.role = Some(MachineRole::Control);
+    }
     ensure_private_dir(&config.data_dir).map_err(|source| DaemonError::DataDirectory {
         path: config.data_dir.clone(),
         source,
@@ -123,7 +154,54 @@ pub async fn run() -> Result<(), DaemonError> {
     let store = Arc::new(Store::open(
         &config.data_dir.join("terminal-agent.sqlite3"),
     )?);
+    if let Ok(identity) = &identity {
+        if let Some(legacy) = identity.legacy_machine_id.as_deref() {
+            let changed = store.rewrite_machine_id(legacy, &identity.machine_id)?;
+            if changed > 0 {
+                tracing::info!(changed, legacy, machine_id = %identity.machine_id, "moved history to the stable Machine ID");
+            }
+        }
+    }
     store.upsert_machine(&machine)?;
+    let control = match (&config.control, &identity) {
+        (Some(control), Ok(identity)) => Some(ControlService::open(
+            store.clone(),
+            ControlSettings {
+                public_url: control.public_url.clone(),
+                heartbeat_interval_ms: control.heartbeat_interval_ms,
+                development: config.development,
+                machine_id: identity.machine_id.clone(),
+                display_name: machine.name.clone(),
+                os: machine.os,
+                daemon_version: env!("CARGO_PKG_VERSION").into(),
+                secrets_file: config.control_credentials_file.clone(),
+                audit_dir: config.data_dir.clone(),
+            },
+            Arc::new(now),
+        )?),
+        (Some(_), Err(error)) => return Err(DaemonError::Identity(error.to_string())),
+        (None, _) => None,
+    };
+    let link = LinkManager::open(
+        LinkSettings {
+            link_file: config.link_file.clone(),
+            identity_file: config.identity_file.clone(),
+            identity: identity.map_err(|error| error.to_string()),
+            legacy_machine_id,
+            hostname: machine.name.clone(),
+            endpoint: LinkEndpoint {
+                address: config.bind.ip().to_string(),
+                port: config.bind.port(),
+                dns_name: None,
+            },
+            os: machine.os,
+            daemon_version: env!("CARGO_PKG_VERSION").into(),
+            development: config.development,
+            audit_dir: config.data_dir.clone(),
+            background: true,
+        },
+        Arc::new(now),
+    );
     let interrupted = store.interrupt_orphaned_sessions(now())?;
     if !interrupted.is_empty() {
         tracing::info!(
@@ -159,8 +237,26 @@ pub async fn run() -> Result<(), DaemonError> {
     let local_socket =
         UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
     let handler_sessions = sessions.clone();
-    let handler: LocalHandler = Arc::new(move |request| handler_sessions.handle_local(request));
-    let state = AppState::new(sessions, machine, auth);
+    let handler_link = link.clone();
+    let handler: LocalHandler = Arc::new(move |request| {
+        let sessions = handler_sessions.clone();
+        let link = handler_link.clone();
+        Box::pin(async move {
+            match request {
+                LocalRequest::GetIdentity
+                | LocalRequest::ConnectControl { .. }
+                | LocalRequest::ConnectionStatus
+                | LocalRequest::DisconnectControl
+                | LocalRequest::ResetIdentity => link.handle_local(request).await,
+                other => sessions.handle_local(other),
+            }
+        })
+    });
+    let state = AppState::new(sessions, machine, auth)
+        .with_origins(origins)
+        .with_control(control)
+        .with_link(link)
+        .with_tailscale_serve(config.behind_tailscale_serve);
     let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
     let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx, handler));
     let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
@@ -406,6 +502,7 @@ fn machine_description() -> Machine {
         gpus: vec![],
         status: MachineStatus::Online,
         last_seen: now(),
+        role: None,
     }
 }
 

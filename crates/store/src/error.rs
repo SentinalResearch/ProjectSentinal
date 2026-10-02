@@ -129,6 +129,14 @@ pub enum StoreError {
         /// Maximum traversable generations.
         maximum: usize,
     },
+    /// A registry column held an unknown value.
+    #[error("stored registry {field} '{value}' is invalid")]
+    InvalidRegistryValue {
+        /// Column.
+        field: &'static str,
+        /// Stored value.
+        value: String,
+    },
     /// SQLite contained a negative identifier.
     #[error("stored Session identifier {value} is invalid")]
     InvalidStoredId {

@@ -44,7 +44,7 @@ async fn exchange(
             peer_uid,
             audit,
             &socket_path,
-            &*unavailable_handler(),
+            &unavailable_handler(),
         )
         .await
     });

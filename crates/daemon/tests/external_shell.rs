@@ -4,7 +4,7 @@
 
 use daemon::{
     audit::AuditLog,
-    local_socket::{handle_connection, SecurityAudit},
+    local_socket::{handle_connection, sync_handler, SecurityAudit},
     process_probe::{ProcessIdentity, ProcessProbe},
     pty::FakePty,
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
@@ -518,10 +518,8 @@ async fn local(h: &Harness, request: LocalRequest) -> LocalResponse {
     let audit = SecurityAudit::new(&h.data_dir);
     let path = h.data_dir.join("run/sentinald.sock");
     let task = tokio::spawn(async move {
-        handle_connection(server, OWNER, Some(OWNER), audit, &path, &move |request| {
-            manager.handle_local(request)
-        })
-        .await
+        let handler = sync_handler(move |request| manager.handle_local(request));
+        handle_connection(server, OWNER, Some(OWNER), audit, &path, &handler).await
     });
     let body = Envelope::new(request).encode().unwrap();
     client

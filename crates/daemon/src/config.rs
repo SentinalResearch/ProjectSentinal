@@ -25,6 +25,18 @@ pub struct PackageServiceConfig {
     pub max_artifact_bytes: u64,
 }
 
+/// Configuration of the owner-selected control Machine role.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ControlConfig {
+    /// Origin workers and owners use, e.g. `https://sentinal-control.<tailnet>.ts.net`.
+    pub public_url: String,
+    /// Heartbeat interval sent to workers (shorter values are development-only).
+    pub heartbeat_interval_ms: u64,
+}
+
+/// Default worker heartbeat interval.
+pub const DEFAULT_HEARTBEAT_INTERVAL_MS: u64 = 30_000;
+
 /// Configuration used to start the daemon.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DaemonConfig {
@@ -42,6 +54,20 @@ pub struct DaemonConfig {
     pub local_socket: PathBuf,
     /// Optional private package service for unpaired workers.
     pub packages: Option<PackageServiceConfig>,
+    /// Immutable Machine identity file.
+    pub identity_file: PathBuf,
+    /// This worker's control link (secrets, owner-only).
+    pub link_file: PathBuf,
+    /// Control-side secrets: pairing key and credentials presented to workers.
+    pub control_credentials_file: PathBuf,
+    /// Exact browser origins allowed on HTTP and WebSocket routes.
+    pub allowed_origins: Vec<String>,
+    /// Development mode: plain-HTTP origins and control URLs, short heartbeats.
+    pub development: bool,
+    /// The API is published by Tailscale Serve, which sets `Tailscale-User-Login`.
+    pub behind_tailscale_serve: bool,
+    /// Present when this daemon is the owner-selected control Machine.
+    pub control: Option<ControlConfig>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -53,6 +79,24 @@ struct RawConfig {
     auth_file: Option<PathBuf>,
     local_socket: Option<PathBuf>,
     packages: Option<RawPackageConfig>,
+    identity_file: Option<PathBuf>,
+    link_file: Option<PathBuf>,
+    control_credentials_file: Option<PathBuf>,
+    #[serde(default)]
+    allowed_origins: Vec<String>,
+    #[serde(default)]
+    development: bool,
+    #[serde(default)]
+    behind_tailscale_serve: bool,
+    control: Option<RawControlConfig>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RawControlConfig {
+    #[serde(default)]
+    enabled: bool,
+    public_url: Option<String>,
+    heartbeat_interval_ms: Option<u64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -112,6 +156,15 @@ pub enum ConfigError {
         /// Validation failure.
         reason: &'static str,
     },
+    /// An allowed origin was unsafe or malformed.
+    #[error(transparent)]
+    InvalidOrigin(#[from] crate::origin::OriginConfigError),
+    /// The control section was enabled without a valid public URL.
+    #[error("invalid [control] public_url: {0}")]
+    InvalidControlUrl(String),
+    /// A control heartbeat interval outside the allowed range.
+    #[error("invalid [control] heartbeat_interval_ms {0}; production requires 30000..=300000")]
+    InvalidHeartbeat(u64),
     /// The package artifact limit was outside the supported range.
     #[error("invalid package max_artifact_bytes {0}; expected 1..={DEFAULT_MAX_ARTIFACT_BYTES}")]
     InvalidPackageSize(u64),
@@ -172,6 +225,9 @@ impl DaemonConfig {
             cfg!(target_os = "macos"),
         );
         let packages = parse_package_config(raw.packages)?;
+        crate::origin::OriginPolicy::new(&raw.allowed_origins, raw.development)?;
+        let control = parse_control_config(raw.control, raw.development)?;
+        let config_dir = home.join(".config/terminal-agent");
 
         Ok(DaemonConfig {
             bind,
@@ -185,8 +241,55 @@ impl DaemonConfig {
                 .unwrap_or_else(|| home.join(".config/terminal-agent/auth.json")),
             local_socket,
             packages,
+            identity_file: raw
+                .identity_file
+                .unwrap_or_else(|| config_dir.join("machine-id.json")),
+            link_file: raw
+                .link_file
+                .unwrap_or_else(|| config_dir.join("link.json")),
+            control_credentials_file: raw
+                .control_credentials_file
+                .unwrap_or_else(|| config_dir.join("machine-credentials.json")),
+            allowed_origins: raw.allowed_origins,
+            development: raw.development,
+            behind_tailscale_serve: raw.behind_tailscale_serve,
+            control,
         })
     }
+}
+
+fn parse_control_config(
+    raw: Option<RawControlConfig>,
+    development: bool,
+) -> Result<Option<ControlConfig>, ConfigError> {
+    let Some(raw) = raw.filter(|value| value.enabled) else {
+        return Ok(None);
+    };
+    let policy = if development {
+        protocol::link::ControlUrlPolicy::Development
+    } else {
+        protocol::link::ControlUrlPolicy::Production
+    };
+    let value = raw
+        .public_url
+        .ok_or_else(|| ConfigError::InvalidControlUrl("public_url is required".into()))?;
+    let public_url = protocol::link::validate_control_url(&value, policy)
+        .map_err(|error| ConfigError::InvalidControlUrl(error.to_string()))?;
+    let heartbeat_interval_ms = raw
+        .heartbeat_interval_ms
+        .unwrap_or(DEFAULT_HEARTBEAT_INTERVAL_MS);
+    let allowed = if development {
+        100..=300_000
+    } else {
+        30_000..=300_000
+    };
+    if !allowed.contains(&heartbeat_interval_ms) {
+        return Err(ConfigError::InvalidHeartbeat(heartbeat_interval_ms));
+    }
+    Ok(Some(ControlConfig {
+        public_url,
+        heartbeat_interval_ms,
+    }))
 }
 
 fn parse_package_config(

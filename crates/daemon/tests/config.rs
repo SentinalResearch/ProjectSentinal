@@ -191,3 +191,106 @@ fn disabled_package_section_does_not_require_service_fields() {
 
     assert!(config.packages.is_none());
 }
+
+// ---- Milestone 4.0 ------------------------------------------------------------
+
+#[test]
+fn enrollment_files_default_beside_the_token() {
+    let config = DaemonConfig::from_toml("", Path::new("/home/me")).unwrap();
+    assert_eq!(
+        config.identity_file,
+        Path::new("/home/me/.config/terminal-agent/machine-id.json")
+    );
+    assert_eq!(
+        config.link_file,
+        Path::new("/home/me/.config/terminal-agent/link.json")
+    );
+    assert_eq!(
+        config.control_credentials_file,
+        Path::new("/home/me/.config/terminal-agent/machine-credentials.json")
+    );
+    assert!(config.allowed_origins.is_empty(), "secure by default");
+    assert!(!config.development);
+    assert!(!config.behind_tailscale_serve);
+    assert!(config.control.is_none());
+}
+
+#[test]
+fn control_section_needs_a_valid_public_url() {
+    let config = DaemonConfig::from_toml(
+        "[control]\nenabled = true\npublic_url = \"https://sentinal-control.example.ts.net\"\n",
+        Path::new("/home/me"),
+    )
+    .unwrap();
+    let control = config.control.unwrap();
+    assert_eq!(
+        control.public_url,
+        "https://sentinal-control.example.ts.net"
+    );
+    assert_eq!(control.heartbeat_interval_ms, 30_000);
+
+    for bad in [
+        "[control]\nenabled = true\n",
+        "[control]\nenabled = true\npublic_url = \"http://100.64.0.1:7420\"\n",
+        "[control]\nenabled = true\npublic_url = \"https://evil.com\"\n",
+    ] {
+        assert!(
+            DaemonConfig::from_toml(bad, Path::new("/home/me")).is_err(),
+            "{bad}"
+        );
+    }
+}
+
+#[test]
+fn development_permits_http_control_urls_and_short_heartbeats() {
+    let config = DaemonConfig::from_toml(
+        "development = true\n[control]\nenabled = true\npublic_url = \"http://127.0.0.1:7421\"\nheartbeat_interval_ms = 500\n",
+        Path::new("/home/me"),
+    )
+    .unwrap();
+    assert_eq!(config.control.unwrap().heartbeat_interval_ms, 500);
+    let production = DaemonConfig::from_toml(
+        "[control]\nenabled = true\npublic_url = \"https://c.example.ts.net\"\nheartbeat_interval_ms = 500\n",
+        Path::new("/home/me"),
+    );
+    assert!(production.is_err(), "short heartbeats are development-only");
+}
+
+#[test]
+fn allowed_origins_are_exact_and_refuse_wildcards() {
+    let config = DaemonConfig::from_toml(
+        "allowed_origins = [\"https://sentinal-control.example.ts.net\"]\n",
+        Path::new("/home/me"),
+    )
+    .unwrap();
+    assert_eq!(
+        config.allowed_origins,
+        vec!["https://sentinal-control.example.ts.net".to_string()]
+    );
+    for bad in [
+        "*",
+        "null",
+        "https://*.example.ts.net",
+        "https://c.example.ts.net/",
+        "https://c.example.ts.net/path",
+        "https://user@c.example.ts.net",
+        "https://c.example.ts.net?x",
+        "c.example.ts.net",
+        "http://100.64.0.1:5173",
+    ] {
+        let text = format!("allowed_origins = [\"{bad}\"]\n");
+        assert!(
+            DaemonConfig::from_toml(&text, Path::new("/home/me")).is_err(),
+            "{bad}"
+        );
+    }
+    let development = DaemonConfig::from_toml(
+        "development = true\nallowed_origins = [\"http://100.64.0.1:5173\"]\n",
+        Path::new("/home/me"),
+    )
+    .unwrap();
+    assert_eq!(
+        development.allowed_origins,
+        vec!["http://100.64.0.1:5173".to_string()]
+    );
+}

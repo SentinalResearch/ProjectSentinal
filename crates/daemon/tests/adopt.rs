@@ -273,6 +273,7 @@ fn app(h: &Harness) -> AppState {
             gpus: vec![],
             status: MachineStatus::Online,
             last_seen: Timestamp(1),
+            role: None,
         },
         AuthManager::load(&h.data_dir.join("auth.json"), "t".into()).unwrap(),
     )

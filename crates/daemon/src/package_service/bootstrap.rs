@@ -134,7 +134,7 @@ set --
   --control-url "$control_url" --artifact-sha "$expected_sha" "$@"
 printf '%s\n' 'Sentinal worker installed and running'
 printf '%s\n' 'State: UNPAIRED'
-printf '%s\n' 'Next (available in Milestone 4.0):'
+printf '%s\n' 'Next: create a code in the control under Settings → Machines → Add Machine, then run:'
 printf '  sentinal connect %s\n' "$control_url"
 "#,
         manifest.release_version

@@ -58,6 +58,17 @@ impl SessionManager {
             } => self
                 .adopt_process(pid, title, log_path)
                 .map(|session| LocalResponse::Session { session }),
+            // Machine identity and control links belong to the link manager.
+            LocalRequest::GetIdentity
+            | LocalRequest::ConnectControl { .. }
+            | LocalRequest::ConnectionStatus
+            | LocalRequest::DisconnectControl
+            | LocalRequest::ResetIdentity => {
+                return LocalResponse::Error {
+                    code: LocalErrorCode::Unavailable,
+                    message: "Machine links are handled by the link manager".into(),
+                }
+            }
         };
         result.unwrap_or_else(|error| LocalResponse::Error {
             code: error_code(&error),

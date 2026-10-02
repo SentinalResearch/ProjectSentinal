@@ -74,6 +74,7 @@ fn test_state(name: &str, with_session: bool) -> (AppState, PathBuf) {
         gpus: vec![],
         status: MachineStatus::Online,
         last_seen: Timestamp(300),
+        role: None,
     };
     let auth = AuthManager::load(&data_dir.join("auth.json"), "correct-token".into()).unwrap();
     let state = AppState::new(manager, machine, auth);

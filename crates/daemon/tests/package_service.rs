@@ -223,6 +223,11 @@ async fn serves_manifest_install_script_and_exact_immutable_artifact() {
     assert!(script.contains("https://sentinal-control.example.ts.net"));
     assert!(script.contains(SHA));
     assert!(script.contains("State: UNPAIRED"));
+    assert!(script.contains("Settings → Machines → Add Machine"));
+    assert!(
+        !script.contains("--code"),
+        "installation never pairs or carries a code"
+    );
     assert!(!script.contains("token"));
     assert!(!script.contains("password"));
 

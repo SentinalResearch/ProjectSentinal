@@ -49,13 +49,11 @@ async fn auth_setup(
 async fn auth_login(
     State(state): State<AppState>,
     ConnectInfo(address): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(request): Json<AuthLoginRequest>,
 ) -> Response {
-    match state
-        .auth
-        .login(&address.ip().to_string(), &request.password)
-        .await
-    {
+    let client = state.client_key(&headers, address);
+    match state.auth.login(&client, &request.password).await {
         Ok(session) => Json(session).into_response(),
         Err(error) => failure_response(error),
     }
@@ -94,12 +92,24 @@ async fn auth_change_password(
         .change_password(token, &request.current_password, &request.new_password)
         .await
     {
-        Ok(session) => Json(session).into_response(),
+        Ok(session) => {
+            // Outstanding pairing codes were authorized by the old password.
+            if let Some(control) = &state.control {
+                if let Err(failure) = control.cancel_all_codes("PASSWORD_CHANGED") {
+                    tracing::warn!(
+                        ?failure,
+                        "failed to cancel pairing codes after a password change"
+                    );
+                }
+            }
+            Json(session).into_response()
+        }
         Err(error) => failure_response(error),
     }
 }
 
-pub(super) fn bearer_from_headers(headers: &HeaderMap) -> Option<&str> {
+/// The bearer token in an `Authorization: Bearer` header.
+pub fn bearer_from_headers(headers: &HeaderMap) -> Option<&str> {
     headers
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok())

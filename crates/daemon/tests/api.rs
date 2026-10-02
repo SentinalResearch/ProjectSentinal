@@ -66,6 +66,7 @@ fn state_with_store() -> (AppState, Arc<Store>) {
             gpus: vec![],
             status: MachineStatus::Online,
             last_seen: Timestamp(1_790_000_000_000),
+            role: None,
         },
         AuthManager::load(&data_dir.join("auth.json"), "correct-token".into()).unwrap(),
     );

@@ -158,7 +158,7 @@ impl UnixSocketServer {
                             peer_uid,
                             audit,
                             &path,
-                            &*handler,
+                            &handler,
                         ).await {
                             tracing::warn!(path = %path.display(), %error, "local ingress connection failed");
                         }
@@ -217,12 +217,25 @@ pub fn peer_uid(stream: &UnixStream, path: &Path) -> Option<u32> {
     }
 }
 
+/// Future answering one local request.
+pub type LocalReply = std::pin::Pin<Box<dyn std::future::Future<Output = LocalResponse> + Send>>;
+
 /// Answers one validated local request; never attaches, resizes, or sends input.
-pub type LocalHandler = std::sync::Arc<dyn Fn(LocalRequest) -> LocalResponse + Send + Sync>;
+pub type LocalHandler = std::sync::Arc<dyn Fn(LocalRequest) -> LocalReply + Send + Sync>;
+
+/// Wrap a synchronous answer as a local handler.
+pub fn sync_handler(
+    answer: impl Fn(LocalRequest) -> LocalResponse + Send + Sync + 'static,
+) -> LocalHandler {
+    std::sync::Arc::new(move |request| {
+        let response = answer(request);
+        Box::pin(async move { response })
+    })
+}
 
 /// A handler for listeners with no request support (every request is `UNAVAILABLE`).
 pub fn unavailable_handler() -> LocalHandler {
-    std::sync::Arc::new(|_| {
+    sync_handler(|_| {
         local_error(
             LocalErrorCode::Unavailable,
             "this local operation is not available",
@@ -237,7 +250,7 @@ pub async fn handle_connection(
     peer_uid: Option<u32>,
     audit: SecurityAudit,
     socket_path: &Path,
-    handler: &(dyn Fn(LocalRequest) -> LocalResponse + Send + Sync),
+    handler: &LocalHandler,
 ) -> Result<(), LocalSocketError> {
     if peer_uid != Some(expected_uid) {
         let reason = match peer_uid {
@@ -287,7 +300,7 @@ pub async fn handle_connection(
     let response = match std::str::from_utf8(&body) {
         Ok(json) => match Envelope::<LocalRequest>::decode(json) {
             Ok(envelope) => match envelope.payload.validate() {
-                Ok(()) => match handler(envelope.payload) {
+                Ok(()) => match handler(envelope.payload).await {
                     LocalResponse::Error { code, message } => local_error(code, message),
                     response => response,
                 },
