@@ -1,3 +1,5 @@
+import type { PairingCodeStatus } from "../../protocol/PairingCodeStatus";
+import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import raw from "./fixtures.json";
 import { config } from "../config";
 import type {
@@ -5,7 +7,6 @@ import type {
   HistoryEntry,
   JournalNotification,
   Machine,
-  MachineToken,
   NotificationRules,
   Recipe,
   Session,
@@ -109,14 +110,24 @@ export const store = {
   recipes: structuredClone(fixtures.recipes) as Recipe[],
   journal: fixtures.notifications.map((text, i): JournalNotification => ({ id: `n${i}`, text })),
   notificationRules: {} as NotificationRules,
-  tokens: fixtures.machines.map(
-    (m, i): MachineToken => ({
-      machineId: m.id,
-      machineName: m.name,
-      maskedToken: config.tokenMask.replace("xxxx", String(1000 + i)),
-      createdAt: ["Today", "3 days ago", "2 weeks ago"][i % 3] as string,
+  registry: fixtures.machines.map(
+    (m, i): RegistryMachine => ({
+      machine_id: m.id,
+      display_name: m.name,
+      role: i === 1 ? "CONTROL" : "WORKER",
+      status: m.status === "ONLINE" ? "ONLINE" : "OFFLINE",
+      last_seen: Date.now() - (m.status === "ONLINE" ? 5_000 : 14 * 60_000),
+      endpoint: i === 1 ? null : { address: `100.64.0.${10 + i}`, port: 7420, dns_name: null },
+      os: m.os === "Linux" ? "LINUX" : "MACOS",
+      daemon_version: "0.0.1",
+      capabilities: ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
+      credential:
+        i === 1
+          ? null
+          : { link_id: `lk_mock${i}`, created_at: Date.now() - 86_400_000, expires_at: Date.now() + 80 * 86_400_000, last_used_at: null },
     }),
   ),
+  pairingCodes: [] as PairingCodeStatus[],
   auth: {
     status: "signedOut",
     attempts: 0,
@@ -127,7 +138,7 @@ export const store = {
 /** Fixture-backed state that may be replaced by the user-testing harness. */
 export type MockStoreSnapshot = Pick<
   typeof store,
-  "machines" | "sessions" | "history" | "recipes" | "journal" | "notificationRules" | "tokens"
+  "machines" | "sessions" | "history" | "recipes" | "journal" | "notificationRules" | "registry"
 >;
 
 /** Return an isolated copy of the current fixture-backed product state. */
@@ -139,7 +150,7 @@ export function snapshotStore(): MockStoreSnapshot {
     recipes: store.recipes,
     journal: store.journal,
     notificationRules: store.notificationRules,
-    tokens: store.tokens,
+    registry: store.registry,
   });
 }
 
@@ -152,7 +163,7 @@ export function replaceStore(snapshot: MockStoreSnapshot): void {
   store.recipes = next.recipes;
   store.journal = next.journal;
   store.notificationRules = next.notificationRules;
-  store.tokens = next.tokens;
+  store.registry = next.registry;
   emit({
     type: "DATA_RESET",
     machines: structuredClone(store.machines),

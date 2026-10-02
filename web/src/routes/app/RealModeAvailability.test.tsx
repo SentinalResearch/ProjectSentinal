@@ -7,7 +7,7 @@ import { SettingsPage } from "./SettingsPage";
 
 const apiCalls = vi.hoisted(() => ({
   getRecipes: vi.fn(),
-  getMachineTokens: vi.fn(),
+  registryList: vi.fn(),
   getNotificationRules: vi.fn(),
   getNotificationJournal: vi.fn(),
 }));
@@ -16,7 +16,7 @@ vi.mock("../../data", () => ({
   isMockData: false,
   dataAdapter: {
     getRecipes: apiCalls.getRecipes,
-    getMachineTokens: apiCalls.getMachineTokens,
+    registry: { list: apiCalls.registryList },
     notifications: {
       getRules: apiCalls.getNotificationRules,
       getJournal: apiCalls.getNotificationJournal,
@@ -60,15 +60,15 @@ describe("real-data feature availability", () => {
     expect(apiCalls.getRecipes).not.toHaveBeenCalled();
   });
 
-  it("shows the connected Machine without pretending pairing and tokens work", () => {
+  it("shows the connected Machine and explains enrollment needs a control Machine", async () => {
+    const { RegistryError } = await import("../../data/adapter");
+    apiCalls.registryList.mockRejectedValue(new RegistryError("NOT_CONTROL", "this daemon is not a control Machine"));
     renderRoute("/app/settings/machines");
 
+    expect(await screen.findByText(/This daemon is not a control Machine/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Machines" })).toBeInTheDocument();
     expect(screen.getByText("Development Mac")).toBeInTheDocument();
-    expect(screen.getByText(/Pairing and token management are not available yet/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Pair new machine" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
-    expect(apiCalls.getMachineTokens).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Add Machine" })).not.toBeInTheDocument();
   });
 
   it("explains that Notifications are not implemented instead of loading forever", () => {

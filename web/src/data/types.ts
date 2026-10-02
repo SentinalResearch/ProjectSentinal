@@ -148,16 +148,4 @@ export interface AuthState {
   message?: string;
 }
 
-export interface PairingToken {
-  machineName: string;
-  token: string;
-  command: string;
-  expiresAt: number;
-}
 
-export interface MachineToken {
-  machineId: string;
-  machineName: string;
-  maskedToken: string;
-  createdAt: string;
-}

@@ -1,12 +1,14 @@
+import type { LinkFailureCode } from "../protocol/LinkFailureCode";
+import type { PairingCode } from "../protocol/PairingCode";
+import type { PairingCodeStatus } from "../protocol/PairingCodeStatus";
+import type { RegistryMachine } from "../protocol/RegistryMachine";
 import type {
   AuthState,
   HistoryEntry,
   JournalNotification,
   Machine,
-  MachineToken,
   NotificationRuleSet,
   NotificationRules,
-  PairingToken,
   Recipe,
   Session,
   SessionEvent,
@@ -47,6 +49,17 @@ export type LiveEvent =
   | { type: "MACHINE_UPDATED"; machine: Machine }
   | { type: "NOTIFICATION"; notification: JournalNotification };
 
+/** A refused registry request, carrying the daemon's stable failure code. */
+export class RegistryError extends Error {
+  constructor(
+    readonly code: LinkFailureCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "RegistryError";
+  }
+}
+
 export class NotImplemented extends Error {
   constructor(method: string) {
     super(`${method} is not implemented by the real data adapter yet`);
@@ -80,10 +93,19 @@ export interface DataAdapter {
 
   runRecipe(recipeId: string, params: Record<string, string>, machineId: string): Promise<{ sessionId: string }>;
 
-  pairMachine(machineName: string): Promise<PairingToken>;
-  rotateToken(machineId: string): Promise<MachineToken>;
-  revokeToken(machineId: string): Promise<void>;
-  getMachineTokens(): Promise<MachineToken[]>;
+  /**
+   * The control Machine's registry. Throws `RegistryError` with code
+   * `NOT_CONTROL` when the daemon is not a control Machine.
+   */
+  registry: {
+    list(): Promise<RegistryMachine[]>;
+    /** One-time code; the code is returned only here and must stay in memory. */
+    createCode(): Promise<PairingCode>;
+    codeStatus(codeId: string): Promise<PairingCodeStatus>;
+    cancelCode(codeId: string): Promise<void>;
+    rename(machineId: string, displayName: string): Promise<RegistryMachine>;
+    revoke(machineId: string): Promise<void>;
+  };
 
   auth: {
     getState(): Promise<AuthState>;

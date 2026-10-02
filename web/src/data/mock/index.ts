@@ -1,6 +1,6 @@
 import { config } from "../config";
-import type { DataAdapter, HistoryFilters, LiveEvent } from "../adapter";
-import type { AuthState, NotificationRuleSet, PairingToken, Session } from "../types";
+import { RegistryError, type DataAdapter, type HistoryFilters, type LiveEvent } from "../adapter";
+import type { AuthState, NotificationRuleSet, Session } from "../types";
 import { acquireLiveUpdates, resolvePrompt } from "./live";
 import { delay, emit, findSession, store, subscribe as subscribeStore, updateSession, appendEvent } from "./store";
 
@@ -143,47 +143,81 @@ export const mockAdapter: DataAdapter = {
     return { sessionId: id };
   },
 
-  async pairMachine(machineName: string) {
-    await delay(undefined, 300, 600);
-    const token = `sa_${Math.random().toString(36).slice(2, 10)}`;
-    const pairing: PairingToken = {
-      machineName,
-      token,
-      command: config.pairCommand.replace("<TOKEN>", token),
-      expiresAt: Date.now() + config.pairTokenTtlMs,
-    };
-    setTimeout(() => {
-      const id = machineName.toLowerCase().replace(/\s+/g, "-");
-      if (store.machines.some((m) => m.id === id)) return;
-      const machine = { id, name: machineName, os: "Linux" as const, hardware: "Paired machine", status: "ONLINE" as const };
-      store.machines.push(machine);
-      store.tokens.push({
-        machineId: id,
-        machineName,
-        maskedToken: config.tokenMask.replace("xxxx", String(Math.floor(Math.random() * 9000) + 1000)),
-        createdAt: "Today",
-      });
-      emit({ type: "MACHINE_UPDATED", machine });
-    }, CONNECT_DELAY_MS);
-    return pairing;
-  },
+  registry: {
+    async list() {
+      return delay(structuredClone(store.registry));
+    },
 
-  async rotateToken(machineId: string) {
-    await delay(undefined, 300, 600);
-    const entry = store.tokens.find((t) => t.machineId === machineId);
-    if (!entry) throw new Error(`no token for machine '${machineId}'`);
-    entry.maskedToken = config.tokenMask.replace("xxxx", String(Math.floor(Math.random() * 9000) + 1000));
-    entry.createdAt = "Today";
-    return { ...entry };
-  },
+    async createCode() {
+      await delay(undefined, 200, 400);
+      const symbols = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+      const raw = Array.from({ length: 10 }, () => symbols[Math.floor(Math.random() * 32)]).join("");
+      const code_id = `pc_mock${Date.now()}`;
+      const expires_at = Date.now() + 10 * 60_000;
+      store.pairingCodes.push({ code_id, state: "WAITING", expires_at, machine_id: null });
+      // Mock only: pretend a worker typed the code a few seconds later.
+      setTimeout(() => {
+        const pending = store.pairingCodes.find((entry) => entry.code_id === code_id);
+        if (!pending || pending.state !== "WAITING") return;
+        const machine_id = `01MOCK${Date.now().toString(36).toUpperCase().padStart(20, "0")}`.slice(0, 26);
+        pending.state = "CONNECTED";
+        pending.machine_id = machine_id;
+        store.registry.push({
+          machine_id,
+          display_name: "New worker",
+          role: "WORKER",
+          status: "ONLINE",
+          last_seen: Date.now(),
+          endpoint: { address: "100.64.0.42", port: 7420, dns_name: null },
+          os: "LINUX",
+          daemon_version: "0.0.1",
+          capabilities: ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
+          credential: { link_id: `lk_${code_id}`, created_at: Date.now(), expires_at: Date.now() + 90 * 86_400_000, last_used_at: Date.now() },
+        });
+        const machine = { id: machine_id, name: "New worker", os: "Linux" as const, hardware: "Connected worker", status: "ONLINE" as const };
+        store.machines.push(machine);
+        emit({ type: "MACHINE_UPDATED", machine });
+      }, CONNECT_DELAY_MS);
+      return {
+        code_id,
+        code: `${raw.slice(0, 5)}-${raw.slice(5)}`,
+        expires_at,
+        connect_command: "sentinal connect https://sentinal-control.example.ts.net",
+      };
+    },
 
-  async revokeToken(machineId: string) {
-    await delay(undefined, 300, 600);
-    store.tokens = store.tokens.filter((t) => t.machineId !== machineId);
-  },
+    async codeStatus(codeId: string) {
+      const entry = store.pairingCodes.find((code) => code.code_id === codeId);
+      if (!entry) throw new RegistryError("NOT_FOUND", "unknown pairing code");
+      if (entry.state === "WAITING" && Date.now() >= entry.expires_at) entry.state = "EXPIRED";
+      return delay({ ...entry }, 50, 100);
+    },
 
-  async getMachineTokens() {
-    return delay(store.tokens.map((t) => ({ ...t })));
+    async cancelCode(codeId: string) {
+      const entry = store.pairingCodes.find((code) => code.code_id === codeId && code.state === "WAITING");
+      if (!entry) throw new RegistryError("NOT_FOUND", "no outstanding pairing code with that ID");
+      entry.state = "CANCELLED";
+    },
+
+    async rename(machineId: string, displayName: string) {
+      await delay(undefined, 150, 300);
+      const name = displayName.trim();
+      if (!name || name.length > 64) throw new RegistryError("INVALID_REQUEST", "display_name must be 1 to 64 characters");
+      const entry = store.registry.find((machine) => machine.machine_id === machineId);
+      if (!entry) throw new RegistryError("NOT_FOUND", "unknown Machine");
+      entry.display_name = name;
+      return structuredClone(entry);
+    },
+
+    async revoke(machineId: string) {
+      await delay(undefined, 150, 300);
+      const entry = store.registry.find((machine) => machine.machine_id === machineId);
+      if (!entry) throw new RegistryError("NOT_FOUND", "unknown Machine");
+      if (entry.role === "CONTROL") throw new RegistryError("INVALID_REQUEST", "the control Machine cannot be revoked");
+      entry.status = "REVOKED";
+      entry.credential = null;
+      entry.endpoint = null;
+    },
   },
 
   auth: {

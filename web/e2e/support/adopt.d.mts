@@ -5,3 +5,16 @@ export interface AdoptedWriter {
 }
 
 export function adoptTrainingWriter(title: string, epochs: number): AdoptedWriter;
+
+/** Result of one `sentinal` run. */
+export interface SentinalRun {
+  status: number;
+  stdout: string;
+  stderr: string;
+}
+
+export function sentinal(socket: string, args: string[], input?: string): SentinalRun;
+
+export function linkSecrets(root: string): string[];
+
+export function e2eEnv(name: string): string;

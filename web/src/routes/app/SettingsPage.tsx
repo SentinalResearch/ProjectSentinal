@@ -6,7 +6,6 @@ import { isMockData } from "../../data";
 import { AccountTab } from "./AccountTab";
 import { MachinesTab } from "./MachinesTab";
 import { NotificationsTab } from "./NotificationsTab";
-import { PairMachineDialog } from "./PairMachineDialog";
 import { SimulationTab } from "./SimulationTab";
 import { settingsTabs, type SettingsTabKey } from "./settings-tabs";
 import styles from "./SettingsPage.module.css";
@@ -22,7 +21,6 @@ export function SettingsPage() {
   const { tab } = useParams<{ tab?: string }>();
   const navigate = useNavigate();
   const active = normalizeTab(tab);
-  const [pairOpen, setPairOpen] = useState(false);
 
   return (
     <div className={styles.page}>
@@ -53,14 +51,13 @@ export function SettingsPage() {
       <section className={styles.main}>
         <div className={styles.mainInner}>
           <MockBadge />
-          {active === "machines" && <MachinesTab onOpenPair={() => setPairOpen(true)} />}
+          {active === "machines" && <MachinesTab />}
           {active === "notifications" && <NotificationsTab />}
           {active === "account" && <AccountTab />}
           {active === "simulation" && isMockData && <SimulationTab />}
         </div>
       </section>
 
-      {isMockData && <PairMachineDialog open={pairOpen} onClose={() => setPairOpen(false)} />}
     </div>
   );
 }

@@ -34,10 +34,10 @@ describe("SettingsPage", () => {
 
   beforeEach(() => resetSimulation());
 
-  it("defaults to Machines & tokens and switches tabs", async () => {
+  it("defaults to Machines and switches tabs", async () => {
     renderSettings("/app/settings");
 
-    expect(await screen.findByRole("heading", { name: "Machines & tokens" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Machines" }, { timeout: 5000 })).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Notifications" }));
@@ -47,12 +47,12 @@ describe("SettingsPage", () => {
     expect(await screen.findByRole("heading", { name: "Account" }, { timeout: 5000 })).toBeInTheDocument();
   });
 
-  it("revoking a token requires the inline Revoke?/Revoke/Keep confirm step", async () => {
+  it("revoking a Machine requires the inline Revoke?/Revoke/Keep confirm step", async () => {
     renderSettings("/app/settings/machines");
     const user = userEvent.setup();
 
     // "RTX-PC" also appears in the sidebar's MACHINES section — wait for the settings
-    // table's own row (a separate async getMachineTokens() fetch from the sidebar's
+    // table's own row (a separate async registry.list() fetch from the sidebar's
     // own data) before scoping to it, so this doesn't race the sidebar's render.
     // Generous timeout: under the full suite's parallel xterm/WebGL-heavy test files,
     // this environment can be slow enough to exceed the 1000ms findBy default.
@@ -65,7 +65,6 @@ describe("SettingsPage", () => {
       },
       { timeout: 5000 },
     );
-    const table = row.parentElement as HTMLElement;
 
     await user.click(within(row).getByRole("button", { name: "Revoke…" }));
     expect(within(row).getByText("Revoke?")).toBeInTheDocument();
@@ -75,26 +74,31 @@ describe("SettingsPage", () => {
     expect(within(row).queryByText("Revoke?")).not.toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "Revoke…" })).toBeInTheDocument();
 
-    // Confirming actually removes the row.
+    // Confirming revokes the Machine; its row stays, marked Revoked, for history.
     await user.click(within(row).getByRole("button", { name: "Revoke…" }));
     await user.click(within(row).getByRole("button", { name: "Revoke" }));
-    await waitFor(() => expect(within(table).queryByText("RTX-PC")).not.toBeInTheDocument());
+    await waitFor(
+      () => {
+        const revoked = screen.getAllByText("RTX-PC").find((el) => el.closest(`.${styles.machineRow}`));
+        expect(within(revoked?.closest(`.${styles.machineRow}`) as HTMLElement).getByText("Revoked")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
-  it("pairing flow: naming a machine generates a token and command", async () => {
+  it("Add Machine shows a one-time code and a command without it", async () => {
     renderSettings("/app/settings/machines");
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Pair new machine" }, { timeout: 5000 }));
-    expect(screen.getByText("Name the machine")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Add Machine" }, { timeout: 5000 }));
 
-    const nameInput = screen.getByPlaceholderText("e.g. Office PC");
-    await user.type(nameInput, "Office PC");
-    await user.click(screen.getByRole("button", { name: "Generate pairing token" }));
-
-    expect(await screen.findByText("Run this on Office PC", {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByText(/sentinal-agent pair/)).toBeInTheDocument();
-    expect(screen.getByText(/expires in/)).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: "Add Machine" }, { timeout: 5000 });
+    const code = await within(dialog).findByText(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/, {}, { timeout: 5000 });
+    const command = within(dialog).getByText(/^sentinal connect https:/);
+    expect(command.textContent).not.toContain(code.textContent ?? "");
+    expect(within(dialog).getByText(/Expires in/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("offers repeatable mock-only simulation controls", async () => {

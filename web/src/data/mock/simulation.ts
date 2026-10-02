@@ -93,8 +93,8 @@ function machinesForSessions(snapshot: MockStoreSnapshot, sessions: Session[]) {
   return snapshot.machines.filter((machine) => ids.has(machine.id));
 }
 
-function tokensForMachines(snapshot: MockStoreSnapshot, machineIds: Set<string>) {
-  return snapshot.tokens.filter((token) => machineIds.has(token.machineId));
+function registryForMachines(snapshot: MockStoreSnapshot, machineIds: Set<string>) {
+  return snapshot.registry.filter((entry) => machineIds.has(entry.machine_id));
 }
 
 function buildScenario(id: SimulationScenarioId): MockStoreSnapshot {
@@ -104,7 +104,7 @@ function buildScenario(id: SimulationScenarioId): MockStoreSnapshot {
   if (id === "first-run") {
     const machine = snapshot.machines.find((entry) => entry.status === "ONLINE");
     const machines = machine ? [machine] : [];
-    return { ...snapshot, machines, sessions: [], history: [], journal: [], tokens: tokensForMachines(snapshot, new Set(machines.map((entry) => entry.id))) };
+    return { ...snapshot, machines, sessions: [], history: [], journal: [], registry: registryForMachines(snapshot, new Set(machines.map((entry) => entry.id))) };
   }
 
   if (id === "needs-attention") {
@@ -115,7 +115,7 @@ function buildScenario(id: SimulationScenarioId): MockStoreSnapshot {
       machines,
       sessions,
       history: snapshot.history.filter((entry) => entry.ok === false),
-      tokens: tokensForMachines(snapshot, new Set(machines.map((entry) => entry.id))),
+      registry: registryForMachines(snapshot, new Set(machines.map((entry) => entry.id))),
     };
   }
 
@@ -128,7 +128,7 @@ function buildScenario(id: SimulationScenarioId): MockStoreSnapshot {
       sessions,
       history: snapshot.history.filter((entry) => entry.sessionId === "qwen"),
       journal: [],
-      tokens: tokensForMachines(snapshot, new Set(machines.map((entry) => entry.id))),
+      registry: registryForMachines(snapshot, new Set(machines.map((entry) => entry.id))),
     };
   }
 
@@ -141,19 +141,19 @@ function buildScenario(id: SimulationScenarioId): MockStoreSnapshot {
       sessions,
       history: [],
       journal: [],
-      tokens: tokensForMachines(snapshot, new Set(machines.map((entry) => entry.id))),
+      registry: registryForMachines(snapshot, new Set(machines.map((entry) => entry.id))),
     };
   }
 
   const worker = snapshot.machines.find((machine) => machine.id === "rtx");
-  if (!worker) return { ...snapshot, machines: [], sessions: [], history: [], journal: [], tokens: [] };
+  if (!worker) return { ...snapshot, machines: [], sessions: [], history: [], journal: [], registry: [] };
   const machine = { ...worker, status: "OFFLINE" as const, lastSeen: "2m" };
   const sessions = sessionsFor(snapshot, (session) => session.machine === machine.id);
   return {
     ...snapshot,
     machines: [machine],
     sessions,
-    tokens: tokensForMachines(snapshot, new Set([machine.id])),
+    registry: registryForMachines(snapshot, new Set([machine.id])),
   };
 }
 

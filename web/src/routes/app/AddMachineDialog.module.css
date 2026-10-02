@@ -168,3 +168,30 @@
     height: 44px;
   }
 }
+
+.code {
+  font-size: 34px;
+  line-height: 40px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--text-1);
+  user-select: all;
+}
+
+.error {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--s-failed-fg);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.machineId {
+  font-size: 12.5px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}

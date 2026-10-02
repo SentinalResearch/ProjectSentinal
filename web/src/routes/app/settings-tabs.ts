@@ -6,7 +6,7 @@ export interface SettingsTab {
 }
 
 const BASE_TABS: readonly SettingsTab[] = [
-  { key: "machines", label: "Machines & tokens" },
+  { key: "machines", label: "Machines" },
   { key: "notifications", label: "Notifications" },
   { key: "account", label: "Account" },
 ];

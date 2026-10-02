@@ -19,6 +19,7 @@ import {
 } from "./auth";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
+import { createRegistryApi } from "./registry";
 
 const PROTOCOL_VERSION = 1;
 const SOCKET_OPEN = 1;
@@ -525,10 +526,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       );
     },
     runRecipe: () => unsupported("runRecipe"),
-    pairMachine: () => unsupported("pairMachine"),
-    rotateToken: () => unsupported("rotateToken"),
-    revokeToken: () => unsupported("revokeToken"),
-    getMachineTokens: () => unsupported("getMachineTokens"),
+    registry: createRegistryApi({ baseUrl: authBaseUrl, fetcher, storage }),
     auth,
     notifications: {
       getRules: () => unsupported("notifications.getRules"),

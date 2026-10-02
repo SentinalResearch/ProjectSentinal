@@ -1,6 +1,6 @@
 // Node-side helpers for adopting a real log-writing process in e2e specs.
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,4 +29,32 @@ export function adoptTrainingWriter(title, epochs) {
       rmSync(dir, { recursive: true, force: true });
     },
   };
+}
+
+/** Run a `sentinal` subcommand against one daemon's local socket. */
+export function sentinal(socket, args, input) {
+  execFileSync("cargo", ["build", "--quiet", "-p", "cli", "--bin", "sentinal"], { cwd: repo, stdio: "inherit" });
+  try {
+    const stdout = execFileSync(join(repo, "target", "debug", "sentinal"), args, {
+      env: { ...process.env, SENTINAL_SOCKET: socket },
+      input,
+      encoding: "utf8",
+    });
+    return { status: 0, stdout, stderr: "" };
+  } catch (error) {
+    return { status: error.status ?? 1, stdout: String(error.stdout ?? ""), stderr: String(error.stderr ?? "") };
+  }
+}
+
+/** Secret values a worker holds in its link file, for leak checks. */
+export function linkSecrets(root) {
+  const link = JSON.parse(readFileSync(join(root, "link.json"), "utf8"));
+  return [link.worker_credential, link.control_credential_sha256].filter(Boolean);
+}
+
+/** Environment value set by playwright.config.mjs. */
+export function e2eEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`playwright.config.mjs must set ${name}`);
+  return value;
 }
