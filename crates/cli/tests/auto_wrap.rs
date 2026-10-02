@@ -250,11 +250,18 @@ fn loaders_check_guards_before_running_and_exit_only_on_success() {
 static NEXT: AtomicU64 = AtomicU64::new(1);
 
 fn temp_home() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "sentinal-auto-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
+    // A private per-process parent: the rc installer rightly refuses a home
+    // whose parent is world-writable, as /tmp is on Linux.
+    let root = std::env::temp_dir().join(format!("sentinal-auto-{}", std::process::id()));
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&root)
+            .unwrap();
+    }
+    let dir = root.join(NEXT.fetch_add(1, Ordering::Relaxed).to_string());
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

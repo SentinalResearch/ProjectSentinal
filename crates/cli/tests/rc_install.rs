@@ -18,11 +18,18 @@ use std::{
 static NEXT: AtomicU64 = AtomicU64::new(1);
 
 fn temp() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "sentinal-rc-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
+    // A private per-process parent: the rc installer rightly refuses a home
+    // whose parent is world-writable, as /tmp is on Linux.
+    let root = std::env::temp_dir().join(format!("sentinal-rc-{}", std::process::id()));
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&root)
+            .unwrap();
+    }
+    let dir = root.join(NEXT.fetch_add(1, Ordering::Relaxed).to_string());
     fs::create_dir_all(&dir).unwrap();
     fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
     dir

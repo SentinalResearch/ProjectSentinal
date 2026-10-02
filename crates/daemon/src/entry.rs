@@ -507,15 +507,21 @@ fn machine_description() -> Machine {
 }
 
 fn machine_name() -> String {
-    std::env::var("HOSTNAME")
-        .ok()
-        .filter(|name| !name.trim().is_empty())
-        .or_else(|| {
-            std::fs::read_to_string(Path::new("/etc/hostname"))
-                .ok()
-                .map(|name| name.trim().to_string())
-                .filter(|name| !name.is_empty())
-        })
+    pick_hostname(
+        std::env::var("HOSTNAME").ok(),
+        std::fs::read_to_string(Path::new("/etc/hostname")).ok(),
+        sysinfo::System::host_name(),
+    )
+}
+
+/// First non-empty of `$HOSTNAME`, `/etc/hostname` (Linux), and the OS
+/// hostname (macOS has neither of the first two).
+pub fn pick_hostname(env: Option<String>, etc: Option<String>, system: Option<String>) -> String {
+    [env, etc, system]
+        .into_iter()
+        .flatten()
+        .map(|name| name.trim().to_string())
+        .find(|name| !name.is_empty())
         .unwrap_or_else(|| "terminal-agent-machine".into())
 }
 
@@ -547,4 +553,34 @@ fn now() -> Timestamp {
         .map(|duration| duration.as_millis())
         .unwrap_or(0);
     Timestamp(i64::try_from(millis).unwrap_or(i64::MAX))
+}
+
+#[cfg(test)]
+mod hostname_tests {
+    use super::pick_hostname;
+
+    #[test]
+    fn macos_falls_back_to_the_os_hostname() {
+        assert_eq!(
+            pick_hostname(None, None, Some("Mac-mini.local\n".into())),
+            "Mac-mini.local"
+        );
+        assert_eq!(
+            pick_hostname(Some(" ".into()), None, Some("mini".into())),
+            "mini"
+        );
+    }
+
+    #[test]
+    fn explicit_sources_win_and_nothing_gives_the_default() {
+        assert_eq!(
+            pick_hostname(Some("env".into()), Some("etc".into()), Some("os".into())),
+            "env"
+        );
+        assert_eq!(
+            pick_hostname(None, Some("pop-os\n".into()), Some("os".into())),
+            "pop-os"
+        );
+        assert_eq!(pick_hostname(None, None, None), "terminal-agent-machine");
+    }
 }

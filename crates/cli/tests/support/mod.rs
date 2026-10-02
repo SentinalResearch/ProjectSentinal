@@ -36,7 +36,15 @@ pub fn short_dir(tag: &str) -> PathBuf {
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
-    std::fs::create_dir_all(&dir).unwrap();
+    // Owner-only whatever the umask: sentinald refuses group-writable socket parents.
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&dir)
+            .unwrap();
+    }
     dir
 }
 
@@ -228,6 +236,16 @@ impl ShellTerm {
         command.env("HOME", home.display().to_string());
         command.env("TERM", "dumb");
         command.env_remove("SENTINAL_SESSION_ID");
+        // A local terminal: the runner's own SSH session must not trigger
+        // auto-wrap's non-interactive-SSH skip rule.
+        for name in [
+            "SSH_CONNECTION",
+            "SSH_CLIENT",
+            "SSH_TTY",
+            "SSH_ORIGINAL_COMMAND",
+        ] {
+            command.env_remove(name);
+        }
         command.env_remove("SENTINAL_DISABLE");
         command.cwd(&home);
         for (key, value) in env {
@@ -294,6 +312,16 @@ impl ShellTerm {
         command.env("HOME", home.display().to_string());
         command.env("TERM", "xterm-256color");
         command.env_remove("SENTINAL_SESSION_ID");
+        // A local terminal: the runner's own SSH session must not trigger
+        // auto-wrap's non-interactive-SSH skip rule.
+        for name in [
+            "SSH_CONNECTION",
+            "SSH_CLIENT",
+            "SSH_TTY",
+            "SSH_ORIGINAL_COMMAND",
+        ] {
+            command.env_remove(name);
+        }
         command.env_remove("SENTINAL_DISABLE");
         command.env_remove("SENTINAL_AUTO_GUARD");
         command.cwd(home);

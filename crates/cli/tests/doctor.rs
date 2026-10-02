@@ -107,6 +107,10 @@ fn doctor_reports_healthy_unpaired_install_without_connecting() {
 #[test]
 fn doctor_fails_clearly_when_worker_is_not_installed() {
     let root = TestDir::new();
+    // Tailscale may really be installed (it is in /usr/bin on Linux hosts).
+    let fake_bin = root.0.join("fake-bin");
+    fs::create_dir_all(&fake_bin).unwrap();
+    write_executable(&fake_bin.join("tailscale"), "#!/bin/sh\nexit 1\n");
     let output = Command::new(env!("CARGO_BIN_EXE_sentinal"))
         .args([
             "doctor",
@@ -115,7 +119,7 @@ fn doctor_fails_clearly_when_worker_is_not_installed() {
             "--config-dir",
             root.0.join("missing-config").to_str().unwrap(),
         ])
-        .env("PATH", "/usr/bin:/bin")
+        .env("PATH", format!("{}:/usr/bin:/bin", fake_bin.display()))
         .output()
         .unwrap();
 

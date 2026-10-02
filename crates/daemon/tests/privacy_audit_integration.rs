@@ -104,14 +104,16 @@ async fn privacy_audit_integration() {
         .await
         .unwrap();
 
+    // Type the secret only once echo is provably off: the marker is printed
+    // after `stty -echo` ran (slow rc files would otherwise race the input).
     manager
         .write_input(
             session.id,
-            b"read -rs pw; echo \"len=${#pw}\"\r",
+            b"stty -echo; echo ARMED-$((40+2)); read -r pw; stty echo; echo \"len=${#pw}\"\r",
             "100.64.0.2:1",
         )
         .unwrap();
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    wait_for_output(&manager, session.id, "ARMED-42").await;
     manager
         .write_input(session.id, format!("{CANARY}\r").as_bytes(), "100.64.0.2:1")
         .unwrap();

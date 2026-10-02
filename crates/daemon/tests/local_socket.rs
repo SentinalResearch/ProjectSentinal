@@ -28,6 +28,15 @@ fn temp_dir(name: &str) -> PathBuf {
         ))
 }
 
+/// Create directories owner-only, whatever the host umask (Ubuntu uses 002).
+fn private_dirs(path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+    use std::os::unix::fs::DirBuilderExt;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path)
+}
+
 async fn exchange(
     peer_uid: Option<u32>,
     expected_uid: u32,
@@ -161,7 +170,7 @@ async fn valid_but_unimplemented_local_operation_cannot_send_pty_input() {
 #[tokio::test]
 async fn listener_creates_private_parent_and_socket_and_removes_only_its_instance() {
     let data_dir = temp_dir("modes");
-    fs::create_dir_all(&data_dir).unwrap();
+    private_dirs(&data_dir).unwrap();
     let socket_path = data_dir.join("run/sentinald.sock");
     let server = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap();
 
@@ -183,7 +192,7 @@ async fn listener_creates_private_parent_and_socket_and_removes_only_its_instanc
 #[tokio::test]
 async fn listener_removes_safe_stale_socket_but_refuses_symlink() {
     let data_dir = temp_dir("stale");
-    fs::create_dir_all(data_dir.join("run")).unwrap();
+    private_dirs(data_dir.join("run")).unwrap();
     let socket_path = data_dir.join("run/sentinald.sock");
     let stale = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();
     drop(stale);
@@ -203,7 +212,7 @@ async fn listener_removes_safe_stale_socket_but_refuses_symlink() {
 #[tokio::test]
 async fn current_uid_matches_the_owner_of_files_this_process_creates() {
     let data_dir = temp_dir("uid");
-    fs::create_dir_all(&data_dir).unwrap();
+    private_dirs(&data_dir).unwrap();
     let owner = fs::metadata(&data_dir).unwrap().uid();
     assert_eq!(current_uid(&data_dir).unwrap(), owner);
     fs::remove_dir_all(data_dir).unwrap();
@@ -212,7 +221,7 @@ async fn current_uid_matches_the_owner_of_files_this_process_creates() {
 #[tokio::test]
 async fn listener_refuses_parent_owned_by_another_uid() {
     let data_dir = temp_dir("fp");
-    fs::create_dir_all(data_dir.join("run")).unwrap();
+    private_dirs(data_dir.join("run")).unwrap();
     let socket_path = data_dir.join("run/sentinald.sock");
     let other_uid = current_uid(&data_dir).unwrap().wrapping_add(1);
 
@@ -227,7 +236,7 @@ async fn listener_refuses_parent_owned_by_another_uid() {
 #[tokio::test]
 async fn stale_socket_owned_by_another_uid_is_refused_and_kept() {
     let data_dir = temp_dir("fs");
-    fs::create_dir_all(data_dir.join("run")).unwrap();
+    private_dirs(data_dir.join("run")).unwrap();
     let socket_path = data_dir.join("run/sentinald.sock");
     drop(std::os::unix::net::UnixListener::bind(&socket_path).unwrap());
     let other_uid = current_uid(&data_dir).unwrap().wrapping_add(1);
@@ -244,7 +253,7 @@ async fn stale_socket_owned_by_another_uid_is_refused_and_kept() {
 #[tokio::test]
 async fn listener_refuses_live_socket_regular_file_and_symlinked_parent() {
     let data_dir = temp_dir("rf");
-    fs::create_dir_all(data_dir.join("run")).unwrap();
+    private_dirs(data_dir.join("run")).unwrap();
     let socket_path = data_dir.join("run/sentinald.sock");
 
     let live = std::os::unix::net::UnixListener::bind(&socket_path).unwrap();
@@ -259,7 +268,7 @@ async fn listener_refuses_live_socket_regular_file_and_symlinked_parent() {
     assert_eq!(fs::read(&socket_path).unwrap(), b"not a socket");
 
     let real = data_dir.join("elsewhere");
-    fs::create_dir_all(&real).unwrap();
+    private_dirs(&real).unwrap();
     std::os::unix::fs::symlink(&real, data_dir.join("linked")).unwrap();
     let error = UnixSocketServer::bind(
         &data_dir.join("linked/sentinald.sock"),
@@ -275,7 +284,7 @@ async fn listener_refuses_live_socket_regular_file_and_symlinked_parent() {
 async fn listener_refuses_a_symlink_anywhere_in_the_parent_chain() {
     let data_dir = temp_dir("al");
     let real = data_dir.join("r");
-    fs::create_dir_all(real.join("n")).unwrap();
+    private_dirs(real.join("n")).unwrap();
     std::os::unix::fs::symlink(&real, data_dir.join("l")).unwrap();
     let socket_path = data_dir.join("l/n/s/s.sock");
 
@@ -289,7 +298,7 @@ async fn listener_refuses_a_symlink_anywhere_in_the_parent_chain() {
 #[tokio::test]
 async fn listener_refuses_a_non_sticky_world_writable_ancestor() {
     let data_dir = temp_dir("wa");
-    fs::create_dir_all(data_dir.join("base")).unwrap();
+    private_dirs(data_dir.join("base")).unwrap();
     fs::set_permissions(&data_dir, fs::Permissions::from_mode(0o777)).unwrap();
     let socket_path = data_dir.join("base/run/sentinald.sock");
 
@@ -304,7 +313,7 @@ async fn listener_refuses_a_non_sticky_world_writable_ancestor() {
 #[tokio::test]
 async fn shutdown_does_not_remove_a_socket_that_replaced_ours() {
     let data_dir = temp_dir("rp");
-    fs::create_dir_all(&data_dir).unwrap();
+    private_dirs(&data_dir).unwrap();
     let socket_path = data_dir.join("run/sentinald.sock");
     let server = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap();
 
@@ -324,7 +333,7 @@ async fn shutdown_does_not_remove_a_socket_that_replaced_ours() {
 #[ignore = "uses real Unix socket peer credentials"]
 async fn local_socket_integration() {
     let data_dir = temp_dir("it");
-    fs::create_dir_all(&data_dir).unwrap();
+    private_dirs(&data_dir).unwrap();
     let socket_path = data_dir.join("run/sentinald.sock");
     let server = UnixSocketServer::bind(&socket_path, SecurityAudit::new(&data_dir)).unwrap();
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);

@@ -100,9 +100,15 @@ async fn adopt_process_integration() {
         .into_iter()
         .find(|session| session.pid == Some(pid))
         .unwrap();
-    assert_eq!(
-        (session.origin, session.capture),
-        (SessionOrigin::Adopted, CaptureLevel::Process)
+    // The reply is PROCESS; background discovery may already have upgraded it.
+    assert_eq!(session.origin, SessionOrigin::Adopted);
+    assert!(
+        matches!(
+            session.capture,
+            CaptureLevel::Process | CaptureLevel::ProcessLog
+        ),
+        "{:?}",
+        session.capture
     );
     assert_eq!(session.state, SessionState::Running);
     assert_eq!(session.title.as_deref(), Some("Integration job"));
@@ -122,6 +128,16 @@ async fn adopt_process_integration() {
         });
     });
     let discovered = discovered.unwrap();
+    // A readable discovered log is tailed (1b.D), so capture becomes PROCESS_LOG.
+    tokio::task::block_in_place(|| {
+        wait_until("PROCESS_LOG capture", || {
+            let handle = tokio::runtime::Handle::current();
+            handle
+                .block_on(sessions(&daemon))
+                .into_iter()
+                .any(|s| s.id == session.id && s.capture == CaptureLevel::ProcessLog)
+        });
+    });
     assert_eq!(
         Path::new(&discovered.path).canonicalize().unwrap(),
         expected_log
