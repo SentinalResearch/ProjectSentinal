@@ -57,7 +57,7 @@ Reinstall preserves credentials and user data. Uninstall retains them by
 default; data deletion requires the exact resolved data path. Operational
 commands and backup boundaries are documented in `docs/SETUP.md`.
 
-## Package and planned enrollment boundaries
+## Package and enrollment boundaries
 
 Sentinal package delivery and Milestone 4.0 enrollment are intentionally
 separate security ceremonies:
@@ -65,9 +65,10 @@ separate security ceremonies:
 | Credential/state | Location | Purpose |
 |---|---|---|
 | Owner password hash | control Machine | Human login to the local control UI |
-| Machine token | each worker only | Local daemon bootstrap/CLI boundary; never enrollment |
-| Pairing code | hash on control; plaintext shown once | Short-lived, single-use connect authority |
-| Machine credential | one worker + control registry | Unique revocable post-pairing identity |
+| Machine token | each Machine only | Local daemon bootstrap/CLI boundary; refused for pairing routes |
+| Pairing code | HMAC on control; plaintext shown once | 50-bit, 10-minute, single-use connect authority |
+| Worker credential | plaintext on worker, SHA-256 on control | Worker → control heartbeat, refresh, disconnect |
+| Control credential | plaintext on control (`machine-credentials.json`), SHA-256 on worker | Control → worker identity (routing in 4.A) |
 | Browser Session | browser + control Machine | Owner UI access; contains no worker credential |
 
 The private package URL contains none of these secrets. Install/reinstall
@@ -78,8 +79,47 @@ authorization-neutral and separate from the editable display name.
 
 The control role remains owner-operated inside Tailscale. It may serve
 verified packages and hold the Machine registry, but it is not a required
-vendor cloud. Exact code entropy, credentials, origin checks, transport, and
-recovery remain subject to the mandatory Milestone 4.0 design approval.
+vendor cloud. The approved design is recorded in
+`docs/progress/milestone-4.0.md`; the enforced rules are:
+
+- **Codes.** Ten Crockford symbols (50 bits) from `/dev/urandom`, valid
+  until exactly 10 minutes after creation, stored only as
+  `HMAC-SHA256(pairing_key, code)` with the key in the owner-only
+  `machine-credentials.json`. One SQL statement consumes a code together
+  with the registry write, so two racing exchanges link exactly one worker.
+  Wrong, expired, used, and cancelled codes all answer `INVALID_CODE`.
+- **Limits.** At most 5 outstanding codes and 10 created per 10 minutes. The
+  20th wrong code in 10 minutes locks pairing (`PAIRING_LOCKED`) for the rest
+  of the window and cancels every outstanding code. A password change also
+  cancels them.
+- **Owner only.** Code creation, status, cancel, registry, rename, and revoke
+  require an owner browser Session; the Machine token gets `403`.
+- **Links.** Each exchange creates two directional 256-bit credentials. Each
+  side keeps the plaintext it presents and only a SHA-256 of the one it
+  verifies. Credentials expire after 90 days, refresh with 30 days left, and
+  the replaced worker credential works for 60 more seconds.
+- **Heartbeats.** The worker dials out every 30 s (±10 %). The control
+  requires a strictly increasing sequence, a clock within 5 minutes, and a
+  Tailscale endpoint (loopback only in development). A Machine is offline
+  after 90 s without one.
+- **Revocation** removes one Machine's links and control credential; its
+  next heartbeat gets `LINK_REVOKED` and the worker deletes its credentials.
+  Other Machines, browser Sessions, and local Sessions are untouched.
+- **Origins.** Every HTTP route and the WebSocket upgrade enforce an exact
+  `allowed_origins` list. Requests without `Origin` (CLI, worker links) are
+  allowed; `Origin: null` never is; an empty list admits no browser; `*`,
+  paths, and plain HTTP (outside development) are refused at startup.
+- **Tailscale Serve identity.** With `behind_tailscale_serve = true`, login
+  lockout keys on `Tailscale-User-Login` from loopback peers only, so one
+  tailnet user cannot lock out another; the header is ignored otherwise.
+- **Redaction.** Codes and credentials are a `Secret` type whose `Debug` and
+  `Display` print `[redacted]`. `pairing-audit.jsonl` (control) and
+  `link-audit.jsonl` (worker) are owner-only and record kind, IDs, peer, and
+  reason only. Tests sweep registry responses, audits, link files, CLI
+  output, and browser storage for planted secrets.
+- **Identity.** The Machine ID is a ULID created once by the daemon in
+  `machine-id.json` (0600) and never by install or update. A corrupt file is
+  reported, never overwritten; only `sentinal identity reset` replaces it.
 
 The implemented package boundary is intentionally narrower than the terminal
 API:

@@ -105,8 +105,10 @@ sentinal_toml_string() {
   printf '"%s"' "$value"
 }
 
+# Extra arguments after the sixth are written verbatim as additional TOML lines.
 sentinal_write_daemon_config() {
   local file="$1" bind="$2" data_dir="$3" token_file="$4" auth_file="$5" local_socket="$6"
+  shift 6
   {
     printf 'bind = %s\n' "$(sentinal_toml_string "$bind")"
     printf 'data_dir = %s\n' "$(sentinal_toml_string "$data_dir")"
@@ -114,6 +116,10 @@ sentinal_write_daemon_config() {
     printf 'token_file = %s\n' "$(sentinal_toml_string "$token_file")"
     printf 'auth_file = %s\n' "$(sentinal_toml_string "$auth_file")"
     printf 'local_socket = %s\n' "$(sentinal_toml_string "$local_socket")"
+    local line
+    for line in "$@"; do
+      printf '%s\n' "$line"
+    done
   } >"$file"
 }
 

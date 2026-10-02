@@ -78,27 +78,45 @@ unless exact-path data deletion is separately requested. Full prerequisites,
 service commands, paths, backup, and acceptance steps are in
 `docs/SETUP.md`.
 
-### Private install and planned `connect` flow
+### Private install and `connect` flow
 
 An owner-controlled Tailnet control Machine can serve a
 verified `install.sh` and versioned worker artifacts. Installation ends
 `UNPAIRED`; it never consumes a pairing code or registers the Machine.
 
-Milestone 4.0 then adds these commands:
+Enrollment is a separate, explicit step (Milestone 4.0):
 
 ```console
 sentinal connect CONTROL_URL [--name NAME]
 sentinal connect CONTROL_URL [--name NAME] --code-stdin
-sentinal connection status
+sentinal connection status [--json]
 sentinal disconnect
+sentinal identity reset [--yes]
 ```
 
-Interactive `connect` prompts for the one-time code with terminal echo
-disabled. There will be no `--code VALUE` option: pairing codes must not enter
-argv, URLs, environment variables, process listings, or shell history. A
-stable Machine ID survives rename, reconnect, reinstall, and update; the
-display name is owner-editable. These commands are **planned**, not available
-in the current binary.
+`connect` prints the Machine ID, then reads the one-time code from
+`/dev/tty` with echo, line editing, and signals off (Ctrl-C cancels and
+restores the terminal); a wrong code may be retyped up to 3 times. With
+`--code-stdin` it reads one line of at most 64 bytes. Before argument parsing,
+every `--code`, `--code=`, `--pairing-code`, `-c`, extra positional, and URL
+with a query, fragment, or credentials is refused without echoing it, so a
+code never enters argv, a URL, the environment, process listings, or shell
+history. The local daemon performs the HTTPS exchange.
+
+`CONTROL_URL` must be `https://<machine>.<tailnet>.ts.net`; plain
+`http://` to loopback or a Tailscale IPv4 address is accepted only by a
+daemon with `development = true`.
+
+| Command | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|---|
+| `connect` | connected | internal | usage, code in argv, no terminal | control unreachable or not a control | code rejected / pairing locked | already connected | `sentinald` unavailable or identity corrupt |
+| `connection status` | connected | not connected | usage | control unreachable | revoked | — | `sentinald` unavailable |
+| `disconnect` | removed (warns if the control was not told) | not connected | usage | — | — | — | `sentinald` unavailable |
+
+An already-connected Machine refuses `connect` (exit 5); run `sentinal
+disconnect` first. The Machine ID survives rename, disconnect, reconnect,
+reinstall, and update; only `identity reset` (after typing `RESET`, or
+`--yes`) replaces it.
 
 Package installation and maintenance commands available now are:
 
@@ -166,6 +184,10 @@ sentinal hook uninstall [zsh|bash|fish] [--rc PATH]
 sentinal auto on|off|status [zsh|bash|fish] [--rc PATH]
 sentinal adopt PID [--log PATH] [-t TITLE]
 sentinal adopt --pick
+sentinal connect CONTROL_URL [--name NAME] [--code-stdin]
+sentinal connection status [--json]
+sentinal disconnect
+sentinal identity reset [--yes]
 sentinal doctor [--prefix DIR] [--config-dir DIR]
 sentinal update [--check | --rollback VERSION] [--prefix DIR]
 ```

@@ -44,7 +44,11 @@ for command in \
 done
 
 require_text "$setup" '100.64.0.0/10'
-require_text "$setup" 'no Machine enrollment or aggregation'
+require_text "$setup" '## Enroll a worker'
+require_text "$setup" 'sentinal connect https://sentinal-control.TAILNET.ts.net'
+require_text "$setup" 'Pairing code: [hidden input]'
+require_text "$setup" 'allowed_origins'
+require_text "$setup" 'service startup pairs implicitly'
 require_text "$setup" 'FULL Sessions are interrupted'
 require_text "$setup" 'metadata only'
 require_text "$setup" 'Do not print or copy the token or password hash'

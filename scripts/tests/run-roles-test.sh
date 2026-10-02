@@ -51,6 +51,13 @@ assert_contains "$agent_output" "$test_root/data with spaces/run/sentinald.sock"
 assert_contains "$agent_output" 'cargo build --locked -p daemon --bin sentinald'
 assert_contains "$agent_output" 'SENTINAL_URL=ws://100.64.12.34:17420/api/v1/ws sentinal watch'
 assert_not_contains "$agent_output" 'VITE_DATA='
+assert_contains "$agent_output" 'development = true'
+assert_contains "$agent_output" 'allowed_origins = []'
+agent_with_control="$(run_dry "$agent_launcher" CONTROL_IP=100.90.80.70)"
+assert_contains "$agent_with_control" 'allowed_origins = ["http://100.90.80.70:14173"]'
+if output="$(SENTINAL_TAILSCALE_IP=100.64.0.1 "$agent_launcher" CONTROL_IP=192.168.1.5 --dry-run 2>&1)"; then
+  fail 'agent accepted a non-Tailscale CONTROL_IP'
+fi
 assert_not_contains "$agent_output" 'Starting Vite'
 
 control_output="$(run_dry "$control_launcher" WORKER_IP=100.90.80.70)"

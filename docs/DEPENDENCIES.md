@@ -15,6 +15,8 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `nvml-wrapper` (optional) | daemon | NVIDIA utilization, VRAM, temperature, and per-process GPU memory |
 | `regex` | watcher | Deterministic built-in and declarative output matching |
 | `insta` (dev) | watcher | Reviewable Event snapshots from saved real-world logs |
+| `sha2`, `hmac` | daemon | Machine-link credential hashes and keyed pairing-code hashes (4.0, approved 2026-10-02) |
+| `reqwest` (`rustls-tls`, `json`, no default features) | daemon | Worker-to-control HTTPS for pairing exchange, heartbeat, refresh, and disconnect (4.0, approved 2026-10-02) |
 
 ## Approved for later milestones
 

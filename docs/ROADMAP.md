@@ -193,15 +193,15 @@ latest live generation.
 - [x] Complete Milestone 1b.D adopted-log ingestion and watcher coverage
 
 ## Milestone 4.0 — Secure Machine enrollment
-- [ ] Complete the mandatory pairing threat-model and wire-format review before implementation
-- [ ] Generate short-lived, single-use pairing authority without exposing the Machine token to a browser or control service
-- [ ] Persist an immutable Machine ID separately from its owner-editable display name
-- [ ] `sentinal connect` pairs one installed worker through a hidden prompt/stdin and never accepts a pairing code in argv or a URL
-- [ ] Exchange the one-time code for a unique revocable Machine credential; the Machine token stays local
-- [ ] Persist the owner-controlled Machine registry, connection state, last seen, and per-Machine credential metadata locally
-- [ ] Rename, reconnect, disconnect, and revoke one Machine without reinstalling it or affecting another
-- [ ] Audit pairing creation, exchange, expiry, revocation, and failed attempts without logging secrets
-- [ ] Document HTTPS/Tailscale Serve and explicit allowed browser origins
+- [x] Complete the mandatory pairing threat-model and wire-format review before implementation
+- [x] Generate short-lived, single-use pairing authority without exposing the Machine token to a browser or control service
+- [x] Persist an immutable Machine ID separately from its owner-editable display name
+- [x] `sentinal connect` pairs one installed worker through a hidden prompt/stdin and never accepts a pairing code in argv or a URL
+- [x] Exchange the one-time code for a unique revocable Machine credential; the Machine token stays local
+- [x] Persist the owner-controlled Machine registry, connection state, last seen, and per-Machine credential metadata locally
+- [x] Rename, reconnect, disconnect, and revoke one Machine without reinstalling it or affecting another
+- [x] Audit pairing creation, exchange, expiry, revocation, and failed attempts without logging secrets
+- [x] Document HTTPS/Tailscale Serve and explicit allowed browser origins
 
 **Demo:** install a worker, choose Add Machine in the control UI, run
 `sentinal connect CONTROL_URL --name "RTX PC"`, enter the code at the hidden

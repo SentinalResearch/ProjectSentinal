@@ -61,7 +61,13 @@ main() {
 
   runtime_dir="$(mktemp -d "${TMPDIR:-/tmp}/sentinal-network.XXXXXX")"
   config_file="$runtime_dir/daemon.toml"
-  sentinal_write_daemon_config "$config_file" "$tailscale_ip:$daemon_port" "$data_dir" "$token_file" "$auth_file" "$local_socket"
+  # Development control: plain HTTP on the tailnet, only this UI's origin allowed.
+  sentinal_write_daemon_config "$config_file" "$tailscale_ip:$daemon_port" "$data_dir" "$token_file" "$auth_file" "$local_socket" \
+    "development = true" \
+    "allowed_origins = [\"http://$tailscale_ip:$web_port\"]" \
+    "[control]" \
+    "enabled = true" \
+    "public_url = \"http://$tailscale_ip:$daemon_port\""
 
   echo "Sentinal Tailscale development server"
   echo "Web UI:    http://$tailscale_ip:$web_port"
@@ -69,6 +75,7 @@ main() {
   echo "Health:     http://$tailscale_ip:$daemon_port/api/v1/health"
   echo "Token file: $token_file"
   echo "First setup: cat $(printf '%q' "$token_file")"
+  echo "Add a worker: Settings → Machines → Add Machine, then on the worker: sentinal connect http://$tailscale_ip:$daemon_port"
   echo "Stop both services with Ctrl-C."
 
   if [[ "$dry_run" == true ]]; then

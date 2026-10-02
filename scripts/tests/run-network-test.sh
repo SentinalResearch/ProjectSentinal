@@ -57,6 +57,10 @@ assert_contains "$dry_run" "Web UI:    http://100.64.12.34:14173"
 assert_contains "$dry_run" "Daemon API: http://100.64.12.34:17420"
 assert_contains "$dry_run" 'VITE_DAEMON_PROXY_TARGET=http://100.64.12.34:17420'
 assert_contains "$dry_run" 'VITE_DATA=api'
+assert_contains "$dry_run" 'development = true'
+assert_contains "$dry_run" 'allowed_origins = ["http://100.64.12.34:14173"]'
+assert_contains "$dry_run" '[control]'
+assert_contains "$dry_run" 'public_url = "http://100.64.12.34:17420"'
 assert_contains "$dry_run" "cd $repo_root/web &&"
 assert_contains "$dry_run" '/web/node_modules/.bin/vite --host 100.64.12.34 --port 14173 --strictPort'
 assert_not_contains "$dry_run" 'pnpm -C web dev'

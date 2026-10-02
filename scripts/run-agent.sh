@@ -10,8 +10,9 @@ daemon_pid=""
 runtime_dir=""
 
 usage() {
-  echo 'Usage: scripts/run-agent.sh [--dry-run]'
+  echo 'Usage: scripts/run-agent.sh [CONTROL_IP=100.x.y.z] [--dry-run]'
   echo "Starts only sentinald on this Machine's exact Tailscale IPv4 address."
+  echo "CONTROL_IP allows the browser UI served by \`just control\` on that Machine."
 }
 
 cleanup() {
@@ -33,14 +34,16 @@ cleanup() {
 signal_exit() { exit "$1"; }
 
 main() {
-  local dry_run=false
-  case "${1:-}" in
-    "") ;;
-    --dry-run) dry_run=true ;;
-    -h|--help) usage; return ;;
-    *) usage >&2; sentinal_die "unknown argument '$1'" ;;
-  esac
-  [[ $# -le 1 ]] || sentinal_die "expected at most one argument"
+  local dry_run=false control_ip="" argument
+  for argument in "$@"; do
+    case "$argument" in
+      --dry-run) dry_run=true ;;
+      CONTROL_IP=*) control_ip="${argument#CONTROL_IP=}" ;;
+      -h|--help) usage; return ;;
+      *) usage >&2; sentinal_die "unknown argument '$argument'" ;;
+    esac
+  done
+  [[ -z "$control_ip" ]] || sentinal_validate_tailscale_ipv4 "$control_ip"
   [[ -n "${HOME:-}" ]] || sentinal_die "HOME is not set"
 
   local tailscale_ip daemon_port data_dir config_dir token_file auth_file local_socket config_file
@@ -56,7 +59,11 @@ main() {
 
   runtime_dir="$(mktemp -d "${TMPDIR:-/tmp}/sentinal-agent.XXXXXX")"
   config_file="$runtime_dir/daemon.toml"
-  sentinal_write_daemon_config "$config_file" "$tailscale_ip:$daemon_port" "$data_dir" "$token_file" "$auth_file" "$local_socket"
+  local origins="[]"
+  [[ -z "$control_ip" ]] || origins="[\"http://$control_ip:${SENTINAL_WEB_PORT:-5173}\"]"
+  sentinal_write_daemon_config "$config_file" "$tailscale_ip:$daemon_port" "$data_dir" "$token_file" "$auth_file" "$local_socket" \
+    "development = true" \
+    "allowed_origins = $origins"
 
   echo "Sentinal worker Machine"
   echo "Daemon API:     http://$tailscale_ip:$daemon_port"
@@ -65,6 +72,8 @@ main() {
   echo "Token file:     $token_file"
   echo "Token bootstrap: cat $(printf '%q' "$token_file")"
   echo "Local Watch:    SENTINAL_URL=ws://$tailscale_ip:$daemon_port/api/v1/ws sentinal watch"
+  echo "Enroll:         sentinal connect http://CONTROL_IP:7420 (development control)"
+  [[ -n "$control_ip" ]] || echo "Browsers:       none allowed; pass CONTROL_IP=100.x.y.z to allow \`just control\` there"
   echo "Stop sentinald with Ctrl-C."
 
   if [[ "$dry_run" == true ]]; then

@@ -1,9 +1,11 @@
 # Setup and two-Machine acceptance
 
-Milestone 1c supports one selected worker Machine and one control Machine.
-The worker runs `sentinald`; the control Machine runs only the web UI and
-proxies `/api` to that worker over Tailscale. This is not a central control
-plane and there is no Machine enrollment or aggregation yet.
+Workers run `sentinald`. Since Milestone 4.0 one owner-selected control
+Machine also keeps a registry of enrolled workers: each worker is connected
+explicitly with `sentinal connect` and a one-time code, and gets a permanent
+Machine ID, an editable display name, and its own revocable credential. This
+is not a cloud service. Session aggregation across Machines arrives in 4.A;
+until then a browser sees the Sessions of the daemon it is signed in to.
 
 ## Prerequisites and Tailnet policy
 
@@ -143,12 +145,13 @@ ends with:
 ```text
 Sentinal worker installed and running
 State: UNPAIRED
-Next (available in Milestone 4.0):
+Next: create a code in the control under Settings → Machines → Add Machine, then run:
   sentinal connect https://sentinal-control.TAILNET.ts.net
 ```
 
-The `connect` line is a forward reference; enrollment is not present in this
-milestone. Inspect and update without pairing:
+Installation never pairs: no code or credential is in the script, the
+package, the service file, or the update path. Enroll the worker explicitly
+(see Enroll a worker). Inspect and update without pairing:
 
 ```console
 worker$ sentinal doctor
@@ -176,6 +179,83 @@ eight artifact streams may run concurrently. Ranges and arbitrary paths are
 refused. `<data_dir>/packages/package-audit.jsonl` contains only timestamp,
 route, release/target, status, and byte count—never headers, queries,
 credentials, or terminal data.
+
+## Enroll a worker
+
+### Make one Machine the control
+
+On the Machine you choose as control, add to its `daemon.toml`:
+
+```toml
+bind = "127.0.0.1:7420"                 # published only through Tailscale Serve
+behind_tailscale_serve = true           # lockout keys on Tailscale-User-Login
+allowed_origins = ["https://sentinal-control.TAILNET.ts.net"]
+
+[control]
+enabled = true
+public_url = "https://sentinal-control.TAILNET.ts.net"
+```
+
+Publish the API next to the package role and check it:
+
+```console
+control$ tailscale serve --bg --https=443 --set-path /api http://127.0.0.1:7420/api
+control$ tailscale serve status
+control$ curl --fail https://sentinal-control.TAILNET.ts.net/api/v1/health
+```
+
+`allowed_origins` lists exact browser origins. An empty list admits no
+browser at all (the CLI and worker links still work). `*`, `null`, paths,
+and plain-HTTP origins are refused unless `development = true`, which only
+the `just` launchers write.
+
+Tailnet ACL (grants) for the intended devices only:
+
+```json
+{"src": ["autogroup:owner"], "dst": ["tag:sentinal-control"], "ip": ["443"]},
+{"src": ["tag:sentinal-worker"], "dst": ["tag:sentinal-control"], "ip": ["443"]},
+{"src": ["tag:sentinal-control"], "dst": ["tag:sentinal-worker"], "ip": ["7420"]}
+```
+
+### Connect a worker
+
+1. In the control UI, open Settings → Machines → **Add Machine**. It shows a
+   one-time code (10 minutes, one use) and a command without the code.
+2. On the already-installed worker:
+
+   ```console
+   worker$ sentinal connect https://sentinal-control.TAILNET.ts.net --name "RTX PC"
+   Machine ID: 01J9Z3K8V6Q2T7M4X5C0RNB8DA
+   Pairing code: [hidden input]
+   Connected as RTX PC
+   ```
+
+   For automation, pipe the code instead: `sentinal connect URL --code-stdin`.
+   A code in argv, a URL, or the environment is always refused.
+3. The dialog switches to Connected and the Machine appears in the list.
+
+Manage it afterwards:
+
+```console
+worker$ sentinal connection status          # exit 0 connected, 1 not, 3 unreachable, 4 revoked
+worker$ sentinal disconnect                 # keeps the Machine ID
+worker$ sentinal identity reset             # only for a corrupt or unwanted ID
+```
+
+Rename and Revoke live in Settings → Machines and act on the Machine ID;
+display names may repeat. Revoking one Machine never affects another, the
+owner's browser Session, or the revoked Machine's local Sessions. A revoked
+or disconnected worker reconnects with a new code and keeps its ID and name.
+
+The Machine ID is created once, at the daemon's first start, in
+`~/.config/terminal-agent/machine-id.json` (mode 0600). Reinstall and update
+never replace it. If it is corrupt, the daemon keeps serving local Sessions,
+refuses Machine links, and `sentinal identity reset` replaces it explicitly.
+
+**Upgrading an existing install:** `daemon.toml` is preserved, so browsers
+are refused until you add `allowed_origins` (for the `just control` proxy in
+development: `development = true` and `allowed_origins =
+["http://CONTROL_IP:5173"]`).
 
 ## First start and authentication
 
@@ -360,9 +440,11 @@ command in `docs/progress/milestone-1c.md`.
 
 ## Current boundaries
 
-- The control UI targets one configured worker. There is no Machine
-  enrollment or aggregation, heartbeat routing, pairing flow, or central
-  server.
+- Machine enrollment, heartbeats, rename, and revocation are implemented;
+  Session aggregation and routing across Machines are Milestone 4.A. There is
+  no central or cloud server.
+- The browser UI is still served by the Vite development server; a
+  production UI build behind Tailscale Serve is not shipped yet.
 - The worker package is exactly `sentinald`, `sentinal`, and shell assets.
   There is no separate watcher-agent process; Milestone 3's watcher will be a
   deterministic library linked into `sentinald`.
@@ -373,19 +455,14 @@ command in `docs/progress/milestone-1c.md`.
 - Rich watcher-derived progress, health, errors, and adopted-log tailing remain
   later milestones. Real mode shows only data the current daemon supplies.
 
-## Planned seamless onboarding
+## Onboarding boundary
 
-The next deployment stages preserve a deliberate two-step boundary:
+Installation and enrollment stay two deliberate steps:
 
 ```text
 curl install → UNPAIRED worker
 sentinal connect → PAIRED Machine
 ```
 
-Milestone 1c.1 will serve verified worker packages from an owner-controlled
-Tailnet HTTPS URL. It will not embed a pairing code or Machine credential.
-Milestone 4.0 will add Settings → Machines → Add Machine and `sentinal
-connect`; the code is entered through a hidden prompt, and the resulting
-Machine appears under a stable ID plus editable display name. Until those
-milestones are complete, use the explicit one-worker commands documented
-above and do not treat the mock pairing screen as functional.
+The package carries no pairing code or Machine credential, and nothing in
+install, update, or service startup pairs implicitly.
