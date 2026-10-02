@@ -4,8 +4,12 @@
 //! Raw terminal bytes do **not** use these types; they go in binary frames.
 
 use crate::{
-    Command, Event, Machine, MachineMetrics, ProtocolError, Session, SessionId, SessionMetrics,
-    SessionOrigin, Timestamp,
+    link::{
+        normalize_pairing_code, validate_control_url, validate_display_name, ConnectionReport,
+        ControlUrlPolicy, Secret,
+    },
+    Command, Event, Machine, MachineId, MachineMetrics, ProtocolError, Session, SessionId,
+    SessionMetrics, SessionOrigin, Timestamp,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -264,6 +268,23 @@ pub enum LocalRequest {
         /// Optional explicit read-only log path.
         log_path: Option<String>,
     },
+    /// Return this daemon's immutable Machine ID.
+    GetIdentity,
+    /// Pair this daemon with a control Machine using a one-time code.
+    ConnectControl {
+        /// Control origin, e.g. `https://sentinal-control.example.ts.net`.
+        control_url: String,
+        /// One-time code typed by the owner; never logged.
+        pairing_code: Secret,
+        /// Proposed display name; the hostname when absent.
+        display_name: Option<String>,
+    },
+    /// Report this daemon's control link.
+    ConnectionStatus,
+    /// Remove this daemon's control link and tell the control when possible.
+    DisconnectControl,
+    /// Replace a corrupt or unwanted Machine identity with a new one.
+    ResetIdentity,
 }
 
 impl LocalRequest {
@@ -308,6 +329,24 @@ impl LocalRequest {
                 validate_optional_text("title", title.as_deref(), MAX_TITLE_BYTES)?;
                 validate_optional_text("log_path", log_path.as_deref(), MAX_PATH_BYTES)
             }
+            LocalRequest::ConnectControl {
+                control_url,
+                pairing_code,
+                display_name,
+            } => {
+                validate_control_url(control_url, ControlUrlPolicy::Development)
+                    .or_else(|_| validate_control_url(control_url, ControlUrlPolicy::Production))?;
+                normalize_pairing_code(pairing_code.expose())?;
+                display_name
+                    .as_deref()
+                    .map(validate_display_name)
+                    .transpose()?;
+                Ok(())
+            }
+            LocalRequest::GetIdentity
+            | LocalRequest::ConnectionStatus
+            | LocalRequest::DisconnectControl
+            | LocalRequest::ResetIdentity => Ok(()),
         }
     }
 }
@@ -330,6 +369,16 @@ pub enum LocalErrorCode {
     Unavailable,
     /// An internal operation failed safely.
     Internal,
+    /// The control rejected the pairing code, or pairing is locked.
+    CodeRejected,
+    /// The control could not be reached or is not a control.
+    ControlUnreachable,
+    /// This daemon already has a control link.
+    AlreadyConnected,
+    /// This daemon has no control link.
+    NotConnected,
+    /// The Machine identity file is unreadable or invalid.
+    IdentityCorrupt,
 }
 
 /// Replies emitted by the private local Unix socket.
@@ -347,6 +396,18 @@ pub enum LocalResponse {
     Command {
         /// Current Command state.
         command: Command,
+    },
+    /// This daemon's Machine identity.
+    Identity {
+        /// Immutable Machine ID.
+        machine_id: MachineId,
+        /// Hostname, the default display name.
+        hostname: String,
+    },
+    /// This daemon's control link.
+    Connection {
+        /// Link state without secrets.
+        connection: ConnectionReport,
     },
     /// Request failed without stopping the listener.
     Error {

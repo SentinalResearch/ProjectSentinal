@@ -171,6 +171,24 @@ pub enum ProtocolError {
         maximum: u32,
     },
 
+    /// A Machine display name broke the naming rules.
+    #[error("display_name {reason}")]
+    InvalidDisplayName {
+        /// Which rule failed (never repeats rejected control characters).
+        reason: &'static str,
+    },
+
+    /// A pairing code had the wrong shape; the code itself is never echoed.
+    #[error("pairing code must be 10 characters from the Sentinal code alphabet")]
+    InvalidPairingCode,
+
+    /// A control URL was not an accepted origin.
+    #[error("control URL {reason}")]
+    InvalidControlUrl {
+        /// Which rule failed.
+        reason: &'static str,
+    },
+
     /// The JSON could not be parsed into the expected type.
     #[error("invalid JSON: {0}")]
     Json(String),

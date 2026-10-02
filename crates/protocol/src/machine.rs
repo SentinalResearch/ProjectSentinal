@@ -1,6 +1,6 @@
 //! A computer running the terminal-agent daemon.
 
-use crate::{MachineId, Timestamp};
+use crate::{MachineId, MachineRole, Timestamp};
 use serde::{Deserialize, Serialize};
 
 /// Operating system family.
@@ -61,6 +61,9 @@ pub struct Machine {
     pub status: MachineStatus,
     /// Last time the daemon was heard from.
     pub last_seen: Timestamp,
+    /// Enrollment role, when this daemon takes part in a Machine registry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<MachineRole>,
 }
 
 impl Machine {
@@ -85,6 +88,7 @@ mod tests {
             gpus,
             status: MachineStatus::Online,
             last_seen: Timestamp(0),
+            role: None,
         }
     }
 

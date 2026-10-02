@@ -1,0 +1,128 @@
+{
+  "pairing_code": {
+    "code_id": "pc_01J9Z4A7",
+    "code": "7KQ4M-2XZ9C",
+    "expires_at": 1790900600000,
+    "connect_command": "sentinal connect https://sentinal-control.example.ts.net"
+  },
+  "pairing_code_statuses": [
+    { "code_id": "pc_01J9Z4A7", "state": "WAITING", "expires_at": 1790900600000, "machine_id": null },
+    { "code_id": "pc_01J9Z4A7", "state": "CONNECTED", "expires_at": 1790900600000, "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA" },
+    { "code_id": "pc_01J9Z4A8", "state": "EXPIRED", "expires_at": 1790900000000, "machine_id": null },
+    { "code_id": "pc_01J9Z4A9", "state": "CANCELLED", "expires_at": 1790900000000, "machine_id": null }
+  ],
+  "registry": {
+    "machines": [
+      {
+        "machine_id": "01J9Y0CTRL0000000000000000",
+        "display_name": "Mac mini",
+        "role": "CONTROL",
+        "status": "ONLINE",
+        "last_seen": 1790900500000,
+        "endpoint": null,
+        "os": "MACOS",
+        "daemon_version": "0.0.1",
+        "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
+        "credential": null
+      },
+      {
+        "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+        "display_name": "RTX PC",
+        "role": "WORKER",
+        "status": "OFFLINE",
+        "last_seen": 1790900590000,
+        "endpoint": { "address": "100.74.239.89", "port": 7420, "dns_name": "pop-os.example.ts.net" },
+        "os": "LINUX",
+        "daemon_version": "0.0.1",
+        "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
+        "credential": { "link_id": "lk_01J9Z4B2", "created_at": 1790900540000, "expires_at": 1798676540000, "last_used_at": 1790900590000 }
+      },
+      {
+        "machine_id": "01J9Z5AAAAAAAAAAAAAAAAAAAA",
+        "display_name": "RTX PC",
+        "role": "WORKER",
+        "status": "REVOKED",
+        "last_seen": null,
+        "endpoint": null,
+        "os": null,
+        "daemon_version": null,
+        "capabilities": [],
+        "credential": null
+      },
+      {
+        "machine_id": "01J9Z6BBBBBBBBBBBBBBBBBBBB",
+        "display_name": "Laptop",
+        "role": "WORKER",
+        "status": "DISCONNECTED",
+        "last_seen": 1790800000000,
+        "endpoint": null,
+        "os": "MACOS",
+        "daemon_version": "0.0.1",
+        "capabilities": ["SESSIONS"],
+        "credential": null
+      }
+    ]
+  },
+  "rename": { "display_name": "RTX 4090 box" },
+  "exchange_request": {
+    "pairing_code": "7KQ4M-2XZ9C",
+    "machine": {
+      "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+      "display_name": "RTX PC",
+      "os": "LINUX",
+      "daemon_version": "0.0.1",
+      "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"]
+    },
+    "endpoint": { "address": "100.74.239.89", "port": 7420, "dns_name": "pop-os.example.ts.net" },
+    "control_credential": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "exchange_response": {
+    "link_id": "lk_01J9Z4B2",
+    "control_machine_id": "01J9Y0CTRL0000000000000000",
+    "worker_credential": "2222222222222222222222222222222222222222222222222222222222222222",
+    "credential_expires_at": 1798676540000,
+    "display_name": "RTX PC",
+    "heartbeat_interval_ms": 30000
+  },
+  "heartbeat_request": {
+    "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+    "sequence": 42,
+    "sent_at": 1790900590000,
+    "endpoint": { "address": "100.74.239.89", "port": 7420, "dns_name": null },
+    "daemon_version": "0.0.1",
+    "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"]
+  },
+  "heartbeat_response": {
+    "status": "ACTIVE",
+    "display_name": "RTX PC",
+    "next_heartbeat_ms": 30000,
+    "refresh_due": false
+  },
+  "refresh_request": {
+    "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+    "control_credential": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "refresh_response": {
+    "worker_credential": "4444444444444444444444444444444444444444444444444444444444444444",
+    "credential_expires_at": 1806452540000
+  },
+  "disconnect_request": { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA" },
+  "identity": {
+    "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+    "control_machine_id": "01J9Y0CTRL0000000000000000"
+  },
+  "failures": [
+    { "code": "INVALID_CODE", "message": "that pairing code is not valid" },
+    { "code": "PAIRING_LOCKED", "message": "pairing is locked after too many wrong codes" },
+    { "code": "INVALID_MACHINE", "message": "machine_id is not a valid ULID" },
+    { "code": "NOT_CONTROL", "message": "this daemon is not a control Machine" },
+    { "code": "LINK_REVOKED", "message": "this Machine link was revoked" },
+    { "code": "STALE_SEQUENCE", "message": "heartbeat sequence 41 is not after 42" },
+    { "code": "ORIGIN_REJECTED", "message": "origin is not allowed" },
+    { "code": "UNAUTHORIZED", "message": "missing or invalid credential" },
+    { "code": "NOT_FOUND", "message": "unknown Machine" },
+    { "code": "RATE_LIMITED", "message": "too many pairing codes; try again later" },
+    { "code": "INVALID_REQUEST", "message": "display_name must be 1 to 64 characters" },
+    { "code": "INTERNAL", "message": "the control could not complete the request" }
+  ]
+}

@@ -9,4 +9,9 @@ export type LocalErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "UNAVAILABLE"
-  | "INTERNAL";
+  | "INTERNAL"
+  | "CODE_REJECTED"
+  | "CONTROL_UNREACHABLE"
+  | "ALREADY_CONNECTED"
+  | "NOT_CONNECTED"
+  | "IDENTITY_CORRUPT";

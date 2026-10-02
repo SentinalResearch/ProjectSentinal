@@ -1,0 +1,12 @@
+{
+  "id": "01J9Y0CTRL0000000000000000",
+  "name": "Mac mini",
+  "os": "MACOS",
+  "cpu": "Apple M4",
+  "cpu_cores": 10,
+  "ram_bytes": 17179869184,
+  "gpus": [],
+  "status": "ONLINE",
+  "last_seen": 1790900500000,
+  "role": "CONTROL"
+}

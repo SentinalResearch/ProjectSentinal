@@ -300,3 +300,156 @@ fn every_log_source_has_a_fixture_and_legacy_sessions_have_no_log() {
     let legacy: Session = serde_json::from_value(load("session_v1_legacy.json")).unwrap();
     assert_eq!(legacy.log, None);
 }
+
+// ---- Milestone 4.0: Machine enrollment -------------------------------------
+
+mod machine_link {
+    use super::*;
+    use protocol::link::{
+        LinkDisconnectRequest, LinkExchangeRequest, LinkExchangeResponse, LinkFailure,
+        LinkFailureCode, LinkHeartbeatRequest, LinkHeartbeatResponse, LinkIdentity,
+        LinkRefreshRequest, LinkRefreshResponse, PairingCode, PairingCodeState, PairingCodeStatus,
+        RegistryMachines, RegistryStatus, RenameMachineRequest,
+    };
+    use protocol::{LocalErrorCode, MachineRole};
+
+    fn section(name: &str) -> Value {
+        load("machine_link.json")[name].clone()
+    }
+
+    fn each<T: DeserializeOwned + Serialize>(name: &str) -> Vec<T> {
+        let Value::Array(items) = section(name) else {
+            panic!("{name} must be an array");
+        };
+        items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                assert_round_trip::<T>(item, &format!("{name}[{index}]"));
+                serde_json::from_value(item.clone()).unwrap()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn every_link_body_round_trips() {
+        assert_round_trip::<PairingCode>(&section("pairing_code"), "pairing_code");
+        assert_round_trip::<RegistryMachines>(&section("registry"), "registry");
+        assert_round_trip::<RenameMachineRequest>(&section("rename"), "rename");
+        assert_round_trip::<LinkExchangeRequest>(&section("exchange_request"), "exchange_request");
+        assert_round_trip::<LinkExchangeResponse>(
+            &section("exchange_response"),
+            "exchange_response",
+        );
+        assert_round_trip::<LinkHeartbeatRequest>(
+            &section("heartbeat_request"),
+            "heartbeat_request",
+        );
+        assert_round_trip::<LinkHeartbeatResponse>(
+            &section("heartbeat_response"),
+            "heartbeat_response",
+        );
+        assert_round_trip::<LinkRefreshRequest>(&section("refresh_request"), "refresh_request");
+        assert_round_trip::<LinkRefreshResponse>(&section("refresh_response"), "refresh_response");
+        assert_round_trip::<LinkDisconnectRequest>(
+            &section("disconnect_request"),
+            "disconnect_request",
+        );
+        assert_round_trip::<LinkIdentity>(&section("identity"), "identity");
+    }
+
+    #[test]
+    fn fixtures_cover_every_state_status_and_failure_code() {
+        let states: Vec<PairingCodeState> = each::<PairingCodeStatus>("pairing_code_statuses")
+            .into_iter()
+            .map(|status| status.state)
+            .collect();
+        assert_eq!(states, PairingCodeState::ALL.to_vec());
+
+        let registry: RegistryMachines = serde_json::from_value(section("registry")).unwrap();
+        let mut statuses: Vec<RegistryStatus> = registry
+            .machines
+            .iter()
+            .map(|machine| machine.status)
+            .collect();
+        statuses.sort_by_key(|status| format!("{status:?}"));
+        statuses.dedup();
+        assert_eq!(statuses.len(), RegistryStatus::ALL.len());
+        let roles: Vec<MachineRole> = registry
+            .machines
+            .iter()
+            .map(|machine| machine.role)
+            .collect();
+        assert!(roles.contains(&MachineRole::Control) && roles.contains(&MachineRole::Worker));
+
+        let codes: Vec<LinkFailureCode> = each::<LinkFailure>("failures")
+            .into_iter()
+            .map(|failure| failure.code)
+            .collect();
+        assert_eq!(codes, LinkFailureCode::ALL.to_vec());
+    }
+
+    #[test]
+    fn local_link_requests_and_responses_round_trip() {
+        let fixture = load("local_link.json");
+        for (index, item) in fixture["requests"].as_array().unwrap().iter().enumerate() {
+            assert_round_trip::<Envelope<LocalRequest>>(
+                item,
+                &format!("local_link.requests[{index}]"),
+            );
+        }
+        let mut errors = Vec::new();
+        for (index, item) in fixture["responses"].as_array().unwrap().iter().enumerate() {
+            assert_round_trip::<Envelope<LocalResponse>>(
+                item,
+                &format!("local_link.responses[{index}]"),
+            );
+            if let LocalResponse::Error { code, .. } =
+                serde_json::from_value::<Envelope<LocalResponse>>(item.clone())
+                    .unwrap()
+                    .payload
+            {
+                errors.push(code);
+            }
+        }
+        for code in [
+            LocalErrorCode::CodeRejected,
+            LocalErrorCode::ControlUnreachable,
+            LocalErrorCode::AlreadyConnected,
+            LocalErrorCode::NotConnected,
+            LocalErrorCode::IdentityCorrupt,
+        ] {
+            assert!(errors.contains(&code), "missing {code:?}");
+        }
+    }
+
+    #[test]
+    fn machine_role_is_optional_and_additive() {
+        assert_round_trip::<Machine>(&load("machine_control.json"), "machine_control.json");
+        let legacy: Machine = serde_json::from_value(load("machine.json")).unwrap();
+        assert_eq!(legacy.role, None);
+        assert!(serde_json::to_value(&legacy).unwrap().get("role").is_none());
+    }
+
+    #[test]
+    fn secrets_never_appear_in_debug_output() {
+        let exchange: LinkExchangeRequest =
+            serde_json::from_value(section("exchange_request")).unwrap();
+        let response: LinkExchangeResponse =
+            serde_json::from_value(section("exchange_response")).unwrap();
+        let code: PairingCode = serde_json::from_value(section("pairing_code")).unwrap();
+        let local: Envelope<LocalRequest> =
+            serde_json::from_value(load("local_link.json")["requests"][1].clone()).unwrap();
+        for debug in [
+            format!("{exchange:?}"),
+            format!("{response:?}"),
+            format!("{code:?}"),
+            format!("{local:?}"),
+        ] {
+            for secret in ["7KQ4M-2XZ9C", "1111111111", "2222222222"] {
+                assert!(!debug.contains(secret), "secret in {debug}");
+            }
+            assert!(debug.contains("[redacted]"), "{debug}");
+        }
+    }
+}

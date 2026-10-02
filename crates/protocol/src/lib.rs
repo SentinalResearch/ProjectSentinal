@@ -20,6 +20,7 @@
 //! - [`message`]  — what travels over the WebSocket, wrapped in an [`Envelope`]
 //! - [`local`]    — private local socket location
 //! - [`auth`]     — single-user password authentication over HTTP
+//! - [`link`]     — Machine enrollment, the control registry, and worker links
 
 pub mod auth;
 pub mod command;
@@ -29,6 +30,7 @@ pub mod event;
 pub mod evidence;
 pub mod health;
 pub mod ids;
+pub mod link;
 pub mod local;
 pub mod machine;
 pub mod message;
@@ -51,6 +53,7 @@ pub use health::{
     Health, HealthLevel, HealthOverall, MAX_HEALTH_EVIDENCE, MAX_HEALTH_EVIDENCE_BYTES,
 };
 pub use ids::{CommandId, EventId, MachineId, ProjectId, SessionId};
+pub use link::{MachineCapability, MachineRole, Secret};
 pub use machine::{Gpu, Machine, MachineStatus, Os};
 pub use message::{
     ClientRequest, DaemonMessage, Envelope, LocalErrorCode, LocalRequest, LocalResponse,

@@ -1,0 +1,22 @@
+{
+  "requests": [
+    { "version": 1, "payload": { "type": "GET_IDENTITY" } },
+    { "version": 1, "payload": { "type": "CONNECT_CONTROL", "control_url": "https://sentinal-control.example.ts.net", "pairing_code": "7KQ4M-2XZ9C", "display_name": "RTX PC" } },
+    { "version": 1, "payload": { "type": "CONNECT_CONTROL", "control_url": "https://sentinal-control.example.ts.net", "pairing_code": "7KQ4M-2XZ9C", "display_name": null } },
+    { "version": 1, "payload": { "type": "CONNECTION_STATUS" } },
+    { "version": 1, "payload": { "type": "DISCONNECT_CONTROL" } },
+    { "version": 1, "payload": { "type": "RESET_IDENTITY" } }
+  ],
+  "responses": [
+    { "version": 1, "payload": { "type": "IDENTITY", "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "hostname": "pop-os" } },
+    { "version": 1, "payload": { "type": "CONNECTION", "connection": { "state": "ACTIVE", "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "control_url": "https://sentinal-control.example.ts.net", "control_machine_id": "01J9Y0CTRL0000000000000000", "display_name": "RTX PC", "link_id": "lk_01J9Z4B2", "paired_at": 1790900540000, "last_heartbeat_at": 1790900590000, "message": null } } },
+    { "version": 1, "payload": { "type": "CONNECTION", "connection": { "state": "NOT_CONNECTED", "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "control_url": null, "control_machine_id": null, "display_name": null, "link_id": null, "paired_at": null, "last_heartbeat_at": null, "message": null } } },
+    { "version": 1, "payload": { "type": "CONNECTION", "connection": { "state": "CONTROL_UNREACHABLE", "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "control_url": "https://sentinal-control.example.ts.net", "control_machine_id": "01J9Y0CTRL0000000000000000", "display_name": "RTX PC", "link_id": "lk_01J9Z4B2", "paired_at": 1790900540000, "last_heartbeat_at": 1790900500000, "message": "3 heartbeats failed: connection refused" } } },
+    { "version": 1, "payload": { "type": "CONNECTION", "connection": { "state": "REVOKED", "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "control_url": "https://sentinal-control.example.ts.net", "control_machine_id": null, "display_name": "RTX PC", "link_id": null, "paired_at": null, "last_heartbeat_at": null, "message": "the control revoked this Machine" } } },
+    { "version": 1, "payload": { "type": "ERROR", "code": "CODE_REJECTED", "message": "that pairing code is not valid" } },
+    { "version": 1, "payload": { "type": "ERROR", "code": "CONTROL_UNREACHABLE", "message": "cannot reach https://sentinal-control.example.ts.net" } },
+    { "version": 1, "payload": { "type": "ERROR", "code": "ALREADY_CONNECTED", "message": "already connected to https://sentinal-control.example.ts.net" } },
+    { "version": 1, "payload": { "type": "ERROR", "code": "NOT_CONNECTED", "message": "this Machine is not connected" } },
+    { "version": 1, "payload": { "type": "ERROR", "code": "IDENTITY_CORRUPT", "message": "machine-id.json is not valid" } }
+  ]
+}
