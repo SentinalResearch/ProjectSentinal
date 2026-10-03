@@ -121,7 +121,10 @@ describe("MachinesTab (control registry)", () => {
     expect(writeText).toHaveBeenCalledWith("sentinal connect https://sentinal-control.example.ts.net");
     await user.click(within(dialog).getByRole("button", { name: "Copy code" }));
     expect(writeText).toHaveBeenLastCalledWith(CODE);
-    expect(within(dialog).getByRole("button", { name: "Code copied" })).toBeInTheDocument();
+    // Both buttons confirm independently; the code button no longer says "Copy code".
+    expect(within(dialog).queryByRole("button", { name: "Copy code" })).not.toBeInTheDocument();
+    expect(within(dialog).getAllByRole("button", { name: "Copied to clipboard" })).toHaveLength(2);
+    expect(within(dialog).getAllByRole("status").some((status) => status.textContent === "Copied to clipboard")).toBe(true);
 
     registry.codeStatus.mockResolvedValue(status("CONNECTED", workerB.machine_id));
     expect(await within(dialog).findByText(/Connected/)).toBeInTheDocument();

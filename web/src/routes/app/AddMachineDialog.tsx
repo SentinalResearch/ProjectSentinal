@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { CopyButton } from "../../components/CopyButton";
 import { dataAdapter } from "../../data";
 import { RegistryError } from "../../data/adapter";
 import type { PairingCode } from "../../protocol/PairingCode";
@@ -35,12 +36,10 @@ function formatClock(ms: number): string {
 export function AddMachineDialog({ onClose, onConnected, pollMs = 2000 }: AddMachineDialogProps) {
   const [phase, setPhase] = useState<Phase>({ kind: "creating" });
   const [now, setNow] = useState(() => Date.now());
-  const [copied, setCopied] = useState<"command" | "code" | null>(null);
   const outstanding = useRef<string | null>(null);
 
   const create = useCallback(async () => {
     setPhase({ kind: "creating" });
-    setCopied(null);
     try {
       const code = await dataAdapter.registry.createCode();
       outstanding.current = code.code_id;
@@ -101,16 +100,6 @@ export function AddMachineDialog({ onClose, onConnected, pollMs = 2000 }: AddMac
     [],
   );
 
-  /** Copy the command or the code; the code is never put anywhere else. */
-  async function copy(text: string, what: "command" | "code") {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(what);
-    } catch {
-      setCopied(null);
-    }
-  }
-
   return (
     <div className={styles.scrim}>
       <section className={styles.panel} role="dialog" aria-modal="true" aria-label="Add Machine">
@@ -147,20 +136,13 @@ export function AddMachineDialog({ onClose, onConnected, pollMs = 2000 }: AddMac
             </p>
             <code className={`${styles.commandBlock} mono`}>{phase.code.connect_command}</code>
             <div className={styles.actions}>
-              <button
-                type="button"
-                className={styles.copyBtn}
-                onClick={() => void copy(phase.code.connect_command, "command")}
-              >
-                {copied === "command" ? "Copied" : "Copy command"}
-              </button>
+              <CopyButton text={phase.code.connect_command} label="Copy command" />
             </div>
             <span className={styles.fieldLabel}>PAIRING CODE</span>
             <div className={styles.actions}>
               <span className={`${styles.code} mono`}>{phase.code.code}</span>
-              <button type="button" className={styles.copyBtn} onClick={() => void copy(phase.code.code, "code")}>
-                {copied === "code" ? "Code copied" : "Copy code"}
-              </button>
+              {/* The code goes only to the clipboard; it is never stored. */}
+              <CopyButton text={phase.code.code} label="Copy code" />
             </div>
             <div className={styles.ttlRow}>
               <span className={styles.ttlValue}>Expires in {formatClock(phase.code.expires_at - now)}</span>
