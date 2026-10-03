@@ -44,12 +44,32 @@ assert_contains "$stopped_output" "Turn Tailscale on"
 assert_not_contains_packages() {
   [[ "$1" != *"[packages]"* ]] || fail "dev config gained a [packages] section with no installed one"
 }
-no_packages="$(SENTINAL_TAILSCALE_IP=100.64.12.34 SENTINAL_DATA_DIR="$test_root/d0" \
-  SENTINAL_CONFIG_DIR="$test_root/empty-config" "$launcher" --dry-run 2>&1)"
+# Without an installed Serve URL: plain development control on the tailnet IP.
+no_packages="$({
+  SENTINAL_TAILSCALE_IP=100.64.12.34 \
+  SENTINAL_DAEMON_PORT=17420 \
+  SENTINAL_WEB_PORT=14173 \
+  SENTINAL_DATA_DIR="$test_root/data with spaces" \
+  SENTINAL_CONFIG_DIR="$test_root/empty-config" \
+  VITE_DATA=mock \
+    "$launcher" --dry-run
+} 2>&1)"
 assert_not_contains_packages "$no_packages"
+dry_run="$no_packages"
+assert_contains "$dry_run" 'bind = "100.64.12.34:17420"'
+assert_contains "$dry_run" "data_dir = \"$test_root/data with spaces\""
+assert_contains "$dry_run" "Web UI:    http://100.64.12.34:14173"
+assert_contains "$dry_run" "Daemon API: http://100.64.12.34:17420"
+assert_contains "$dry_run" 'VITE_DAEMON_PROXY_TARGET=http://100.64.12.34:17420'
+assert_contains "$dry_run" 'VITE_DATA=api'
+assert_contains "$dry_run" 'development = true'
+assert_contains "$dry_run" 'allowed_origins = ["http://100.64.12.34:14173"]'
+assert_contains "$dry_run" '[control]'
+assert_contains "$dry_run" 'public_url = "http://100.64.12.34:17420"'
 
-# An installed control config that serves worker packages keeps doing so
-# while `just network` runs (it uses the same port and directories).
+# With an installed control that has a Tailscale Serve URL: keep serving
+# packages, listen on loopback behind Serve, and advertise the HTTPS URL so
+# production workers can connect.
 mkdir -p "$test_root/config with spaces"
 cat > "$test_root/config with spaces/daemon.toml" <<'TOML'
 bind = "100.64.12.34:7420"
@@ -64,7 +84,7 @@ public_base_url = "https://control.example.ts.net"
 ignored = true
 TOML
 
-dry_run="$({
+serve_run="$({
   SENTINAL_TAILSCALE_IP=100.64.12.34 \
   SENTINAL_DAEMON_PORT=17420 \
   SENTINAL_WEB_PORT=14173 \
@@ -73,21 +93,18 @@ dry_run="$({
   VITE_DATA=mock \
     "$launcher" --dry-run
 } 2>&1)"
-
-assert_contains "$dry_run" 'bind = "100.64.12.34:17420"'
-assert_contains "$dry_run" "data_dir = \"$test_root/data with spaces\""
-assert_contains "$dry_run" "Web UI:    http://100.64.12.34:14173"
-assert_contains "$dry_run" "Daemon API: http://100.64.12.34:17420"
-assert_contains "$dry_run" 'VITE_DAEMON_PROXY_TARGET=http://100.64.12.34:17420'
-assert_contains "$dry_run" 'VITE_DATA=api'
-assert_contains "$dry_run" 'development = true'
-assert_contains "$dry_run" 'allowed_origins = ["http://100.64.12.34:14173"]'
-assert_contains "$dry_run" '[control]'
-assert_contains "$dry_run" '[packages]'
-assert_contains "$dry_run" 'directory = "/srv/sentinal/packages"'
-assert_contains "$dry_run" 'public_base_url = "https://control.example.ts.net"'
-[[ "$dry_run" != *"[other]"* ]] || fail "copied more than the [packages] section"
-assert_contains "$dry_run" 'public_url = "http://100.64.12.34:17420"'
+assert_contains "$serve_run" '[packages]'
+assert_contains "$serve_run" 'directory = "/srv/sentinal/packages"'
+assert_contains "$serve_run" 'public_base_url = "https://control.example.ts.net"'
+[[ "$serve_run" != *"[other]"* ]] || fail "copied more than the [packages] section"
+assert_contains "$serve_run" 'bind = "127.0.0.1:17420"'
+assert_contains "$serve_run" 'behind_tailscale_serve = true'
+assert_contains "$serve_run" 'public_url = "https://control.example.ts.net"'
+assert_contains "$serve_run" 'allowed_origins = ["http://100.64.12.34:14173", "https://control.example.ts.net"]'
+assert_contains "$serve_run" 'VITE_DAEMON_PROXY_TARGET=http://127.0.0.1:17420'
+assert_contains "$serve_run" "Web UI:    http://100.64.12.34:14173"
+assert_contains "$serve_run" 'Workers:    sentinal connect https://control.example.ts.net'
+assert_contains "$serve_run" 'tailscale serve --bg --https=443 --set-path /api http://127.0.0.1:17420/api'
 assert_contains "$dry_run" "cd $repo_root/web &&"
 assert_contains "$dry_run" '/web/node_modules/.bin/vite --host 100.64.12.34 --port 14173 --strictPort'
 assert_not_contains "$dry_run" 'pnpm -C web dev'

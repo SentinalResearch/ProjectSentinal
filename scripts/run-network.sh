@@ -61,30 +61,52 @@ main() {
 
   runtime_dir="$(mktemp -d "${TMPDIR:-/tmp}/sentinal-network.XXXXXX")"
   config_file="$runtime_dir/daemon.toml"
-  # Development control: plain HTTP on the tailnet, only this UI's origin allowed.
-  sentinal_write_daemon_config "$config_file" "$tailscale_ip:$daemon_port" "$data_dir" "$token_file" "$auth_file" "$local_socket" \
+
+  # An installed control with a Tailscale Serve URL ([packages].public_base_url)
+  # keeps serving worker packages, and its control API must sit behind Serve:
+  # Serve on macOS can only proxy to loopback, and production workers accept
+  # only an https://….ts.net control.
+  local installed_config="$config_dir/daemon.toml" serve_url=""
+  local daemon_host="$tailscale_ip" packages_section=""
+  if [[ -f "$installed_config" ]] && grep -Eq '^\[packages\][[:space:]]*$' "$installed_config"; then
+    packages_section="$(awk '/^\[packages\][[:space:]]*$/ {copy = 1; print; next} /^\[/ {copy = 0} copy' "$installed_config")"
+    serve_url="$(printf '%s\n' "$packages_section" | sed -n 's/^public_base_url[[:space:]]*=[[:space:]]*"\(https:\/\/[^"]*\)".*/\1/p' | head -1)"
+  fi
+  local origins="\"http://$tailscale_ip:$web_port\"" public_url="http://$tailscale_ip:$daemon_port" serve_lines=()
+  if [[ -n "$serve_url" ]]; then
+    daemon_host="127.0.0.1"
+    origins="$origins, \"$serve_url\""
+    public_url="$serve_url"
+    serve_lines=("behind_tailscale_serve = true")
+  fi
+  # Development control: plain-HTTP browser origin for this UI only.
+  sentinal_write_daemon_config "$config_file" "$daemon_host:$daemon_port" "$data_dir" "$token_file" "$auth_file" "$local_socket" \
     "development = true" \
-    "allowed_origins = [\"http://$tailscale_ip:$web_port\"]" \
+    ${serve_lines[@]+"${serve_lines[@]}"} \
+    "allowed_origins = [$origins]" \
     "[control]" \
     "enabled = true" \
-    "public_url = \"http://$tailscale_ip:$daemon_port\""
-  # Keep serving worker packages (install.sh, `sentinal update`) while this
-  # replaces the installed service: same port, directory, and public URL.
-  local installed_config="$config_dir/daemon.toml"
-  if [[ -f "$installed_config" ]] && grep -Eq '^\[packages\][[:space:]]*$' "$installed_config"; then
-    printf '\n' >>"$config_file"
-    awk '/^\[packages\][[:space:]]*$/ {copy = 1; print; next} /^\[/ {copy = 0} copy' \
-      "$installed_config" >>"$config_file"
+    "public_url = \"$public_url\""
+  if [[ -n "$packages_section" ]]; then
+    printf '\n%s\n' "$packages_section" >>"$config_file"
   fi
 
   echo "Sentinal Tailscale development server"
   echo "Web UI:    http://$tailscale_ip:$web_port"
-  echo "Daemon API: http://$tailscale_ip:$daemon_port"
-  echo "Health:     http://$tailscale_ip:$daemon_port/api/v1/health"
+  echo "Daemon API: http://$daemon_host:$daemon_port"
+  echo "Health:     http://$daemon_host:$daemon_port/api/v1/health"
   echo "Token file: $token_file"
   echo "First setup: cat $(printf '%q' "$token_file")"
-  echo "Add a worker: Settings → Machines → Add Machine, then on the worker: sentinal connect http://$tailscale_ip:$daemon_port"
-  grep -q '^\[packages\]' "$config_file" && echo "Packages:   served from the installed config (worker updates keep working)"
+  if [[ -n "$serve_url" ]]; then
+    echo "Packages:   served from the installed config (worker updates keep working)"
+    echo "Workers:    sentinal connect $serve_url   (code from Settings → Machines → Add Machine)"
+    if ! { tailscale serve status 2>/dev/null | grep -Fq "/api proxy http://127.0.0.1:$daemon_port/api"; }; then
+      echo "Publish the control API once (HTTPS for workers):"
+      echo "  tailscale serve --bg --https=443 --set-path /api http://127.0.0.1:$daemon_port/api"
+    fi
+  else
+    echo "Add a worker: Settings → Machines → Add Machine, then on the worker: sentinal connect http://$tailscale_ip:$daemon_port"
+  fi
   echo "Stop both services with Ctrl-C."
 
   if [[ "$dry_run" == true ]]; then
@@ -95,11 +117,11 @@ main() {
     echo "Commands:"
     echo "cargo build --locked -p daemon --bin sentinald"
     echo "TA_CONFIG=$(printf '%q' "$config_file") $REPO_ROOT/target/debug/sentinald"
-    echo "cd $(printf '%q' "$REPO_ROOT/web") && VITE_DATA=api VITE_DAEMON_PROXY_TARGET=http://$tailscale_ip:$daemon_port $(printf '%q' "$vite_bin") --host $tailscale_ip --port $web_port --strictPort"
+    echo "cd $(printf '%q' "$REPO_ROOT/web") && VITE_DATA=api VITE_DAEMON_PROXY_TARGET=http://$daemon_host:$daemon_port $(printf '%q' "$vite_bin") --host $tailscale_ip --port $web_port --strictPort"
     return
   fi
 
-  sentinal_require_port_available "$tailscale_ip" "$daemon_port"
+  sentinal_require_port_available "$daemon_host" "$daemon_port"
   sentinal_require_port_available "$tailscale_ip" "$web_port"
   mkdir -p "$data_dir" "$config_dir"
   chmod 700 "$config_dir" "$data_dir"
@@ -115,7 +137,7 @@ main() {
   (
     cd "$REPO_ROOT/web"
     export VITE_DATA=api
-    export VITE_DAEMON_PROXY_TARGET="http://$tailscale_ip:$daemon_port"
+    export VITE_DAEMON_PROXY_TARGET="http://$daemon_host:$daemon_port"
     exec "$vite_bin" --host "$tailscale_ip" --port "$web_port" --strictPort
   ) &
   web_pid=$!
