@@ -527,12 +527,33 @@ Verification:
 - Launchers write `development = true` and exact dev origins (`just network`
   is a development control; `just agent CONTROL_IP=` allows `just control`).
 
+Real multi-Machine runs (2026-10-02/03, Mac mini control, pop-os Linux worker):
+
+- Development mode over the tailnet (plain HTTP inside WireGuard): connect,
+  same-code reuse refused, control → worker `/link/identity` with the right
+  credential (wrong one 401), rename propagated by heartbeat, revoke seen by
+  the worker (exit 4, credential deleted), reconnect with a new code keeping
+  the Machine ID and owner name, disconnect. No code in any audit or log.
+- **Production mode through real Tailscale Serve HTTPS**
+  (`https://advanceds-mac-mini-1.tail17dafb.ts.net`, control bound to
+  loopback, worker without `development`): owner setup and code creation via
+  HTTPS, foreign `Origin` 403 and allowed origin 200, plain-HTTP control URL
+  refused by the worker (exit 2), connect succeeded, heartbeats kept it
+  ONLINE, the audit `peer` was the Tailscale login (`Tailscale-User-Login`),
+  revocation reached the worker within one 30 s heartbeat. The temporary
+  `/api` Serve mapping was removed afterwards and the Serve config verified
+  byte-identical to before.
+- Linux (pop-os, bash 5.2): 599 fast tests and the ignored integration suite
+  pass after making tests umask-, `/tmp`-, and SSH-session-independent.
+- Found and fixed: macOS daemons named themselves `terminal-agent-machine`
+  (no `$HOSTNAME`/`/etc/hostname`); they now use the OS hostname.
+
 Remaining coverage:
 
-- `enrollment_tailnet_integration` (ignored) needs a control behind real
-  Tailscale Serve and an owner-issued code; not run (no second host online,
-  and it would change this Machine's Serve configuration).
-- The Linux row was not run (no Linux host available).
+- zsh and fish are not installed on pop-os yet, so the Linux shell matrix has
+  bash only; the owner will install them.
+- The MacBook Pro could not be used (Remote Login off), so the two-worker
+  revoke-isolation run is covered by Playwright only, not real hosts.
 - Production HTTPS UI hosting is not shipped; browsers still use the Vite
   development server (security audit item #6).
 - Existing installs keep their `daemon.toml`; owners must add
