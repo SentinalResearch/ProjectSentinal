@@ -1,8 +1,7 @@
 # Milestone 1b progress — Any terminal into Sentinal
 
-Status: Milestone 1b.D complete 2026-10-01 on macOS. The 1b release is
-blocked only on the Linux row of the real-shell matrix (no Linux host was
-available); every other 1b release gate passes.
+Status: Milestone 1b complete 2026-10-03. Every release gate passes,
+including the real-shell matrix on macOS and Linux.
 
 ## Pre-Milestone 3 audit remediation
 
@@ -76,7 +75,7 @@ available); every other 1b release gate passes.
 - [x] Rotation-safe log tail — temp-file append/truncate/rotate/partial-line behavior tests
 - [x] Capture-aware web UI — Testing Library coverage for badges and forbidden actions
 - [x] Privacy review — `privacy_audit_integration` scans SQLite, WAL, audit JSONL, and decompressed PTY logs
-- [ ] Full verification — `just check`, Playwright, ignored integration suite, platform matrix (Linux row pending)
+- [x] Full verification — `just check`, Playwright, ignored integration suite, platform matrix
 
 ## 1b.D verification (2026-10-01, macOS 27.0 arm64, zsh 5.9 / bash 3.2.57 / fish 4.9.3)
 
@@ -259,3 +258,20 @@ next stage automatically.
   validated Linux fallback use `<data_dir>/run/sentinald.sock`.
 - `ta`/`tad` compatibility aliases remain through the 1b migration; the
   installed Sentinal names land in 1b.A.
+
+## Linux platform row (2026-10-03, pop-os x86_64, zsh 5.9 / bash 5.2.21 / fish 3.7.0)
+
+- 602 fast tests and all 16 ignored integration tests pass (real PTYs, real
+  `sentinald`, Watch, auto-wrap, adopt with `/proc` log discovery, log tail,
+  privacy audit, and zsh/bash/fish command tracking).
+- Hook overhead (`hook_benchmark`, added p95): zsh 0.68 ms, bash 1.06 ms,
+  fish 0.97 ms on Linux; zsh 1.62 ms, bash 2.77 ms, fish 1.33 ms on macOS.
+- Found and fixed: the zsh hook started its reporter as the shell's own
+  background job (`&!`); its exit could reach ZLE while the prompt was being
+  drawn, leaving zsh waiting for input with no prompt (reproduced in 5 of 6
+  runs of 300 prompts; 0 of 6 after the fix). It now starts through a
+  subshell like the bash hook. Regression test in `rc_install.rs`.
+- Tests made host-independent: owner-only temp roots (Ubuntu umask 002),
+  homes not directly in `/tmp`, a fake failing `tailscale` for doctor, SSH
+  session variables cleared in test terminals, and the adoption test waiting
+  for discovered-log tailing.

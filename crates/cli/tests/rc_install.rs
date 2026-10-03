@@ -271,3 +271,22 @@ fn a_binary_in_a_world_writable_directory_is_refused() {
     fs::set_permissions(&dir, fs::Permissions::from_mode(0o777)).unwrap();
     assert!(ensure_not_world_writable(&binary).is_err());
 }
+
+#[test]
+fn zsh_and_bash_hooks_start_the_reporter_outside_the_shells_job_table() {
+    // A reporter started as the interactive shell's own background job
+    // (`&!` in zsh) intermittently left zsh waiting for input with no prompt.
+    for shell in [HookShell::Zsh, HookShell::Bash] {
+        let script = render_hook(shell, Path::new("/usr/local/bin/sentinal")).unwrap();
+        let line = script
+            .lines()
+            .find(|line| line.contains("hook report"))
+            .unwrap()
+            .trim();
+        assert!(
+            line.starts_with("( ") && line.ends_with("& )"),
+            "{shell:?}: {line}"
+        );
+        assert!(!script.contains("&!"), "{shell:?}");
+    }
+}

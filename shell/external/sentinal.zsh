@@ -9,7 +9,10 @@ if [[ -o interactive && -z "${SENTINAL_SESSION_ID-}" && "${SENTINAL_DISABLE-}" !
 
   __sentinal_report() {
     [[ -n "${SENTINAL_SESSION_ID-}" || "${SENTINAL_DISABLE-}" == 1 ]] && return 0
-    SENTINAL_HOOK_TEXT="$__sentinal_text" @SENTINAL_BIN@ hook report "$@" --pid $$ --shell zsh --at "${EPOCHREALTIME-}" </dev/null >/dev/null 2>&1 &!
+    # Background through a subshell so the reporter is never this shell's
+    # job: its exit must not reach ZLE while the prompt is drawn (that can
+    # leave zsh waiting for input with no prompt shown). $$ stays this shell.
+    ( SENTINAL_HOOK_TEXT="$__sentinal_text" @SENTINAL_BIN@ hook report "$@" --pid $$ --shell zsh --at "${EPOCHREALTIME-}" </dev/null >/dev/null 2>&1 & )
   }
 
   __sentinal_preexec() {

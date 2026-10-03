@@ -59,7 +59,7 @@ async fn dispatch(
             check,
             rollback,
             prefix,
-        } => return Ok(crate::update::run(check, rollback, prefix)?),
+        } => return Ok(crate::update::run(check, rollback, prefix, out)?),
         Command::Hook { action } => return Ok(crate::hook_command::run(action, out, err).await),
         Command::Auto { action } => {
             let url = if matches!(&action, AutoAction::Enter { .. }) {

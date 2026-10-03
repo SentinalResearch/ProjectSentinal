@@ -99,7 +99,9 @@ pub fn run(
     check: bool,
     rollback: Option<String>,
     prefix: Option<PathBuf>,
+    out: &mut dyn std::io::Write,
 ) -> Result<ExitCode, UpdateError> {
+    let _ = writeln!(out, "sentinal {}", env!("CARGO_PKG_VERSION"));
     let prefix = match prefix {
         Some(prefix) => prefix,
         None => installed_prefix()?,
