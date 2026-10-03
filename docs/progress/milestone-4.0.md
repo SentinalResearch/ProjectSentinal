@@ -552,8 +552,12 @@ Remaining coverage:
 
 - zsh and fish are not installed on pop-os yet, so the Linux shell matrix has
   bash only; the owner will install them.
-- The MacBook Pro could not be used (Remote Login off), so the two-worker
-  revoke-isolation run is covered by Playwright only, not real hosts.
+- Two real workers (2026-10-03, development mode over the tailnet): pop-os
+  (Linux) and a MacBook Pro (macOS 26.6.2) enrolled under the same display
+  name with distinct IDs; the MacBook was renamed by ID and pop-os revoked.
+  pop-os reported REVOKED (exit 4) and its control credential got 401; the
+  MacBook stayed ACTIVE/ONLINE with its new name, its identity still
+  verified, and the owner's browser Session stayed valid.
 - Production HTTPS UI hosting is not shipped; browsers still use the Vite
   development server (security audit item #6).
 - Existing installs keep their `daemon.toml`; owners must add
