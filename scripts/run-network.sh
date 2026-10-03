@@ -68,6 +68,14 @@ main() {
     "[control]" \
     "enabled = true" \
     "public_url = \"http://$tailscale_ip:$daemon_port\""
+  # Keep serving worker packages (install.sh, `sentinal update`) while this
+  # replaces the installed service: same port, directory, and public URL.
+  local installed_config="$config_dir/daemon.toml"
+  if [[ -f "$installed_config" ]] && grep -Eq '^\[packages\][[:space:]]*$' "$installed_config"; then
+    printf '\n' >>"$config_file"
+    awk '/^\[packages\][[:space:]]*$/ {copy = 1; print; next} /^\[/ {copy = 0} copy' \
+      "$installed_config" >>"$config_file"
+  fi
 
   echo "Sentinal Tailscale development server"
   echo "Web UI:    http://$tailscale_ip:$web_port"
@@ -76,6 +84,7 @@ main() {
   echo "Token file: $token_file"
   echo "First setup: cat $(printf '%q' "$token_file")"
   echo "Add a worker: Settings → Machines → Add Machine, then on the worker: sentinal connect http://$tailscale_ip:$daemon_port"
+  grep -q '^\[packages\]' "$config_file" && echo "Packages:   served from the installed config (worker updates keep working)"
   echo "Stop both services with Ctrl-C."
 
   if [[ "$dry_run" == true ]]; then

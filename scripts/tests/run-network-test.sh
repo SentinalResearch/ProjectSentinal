@@ -41,6 +41,29 @@ fi
 assert_contains "$stopped_output" "Tailscale is not running"
 assert_contains "$stopped_output" "Turn Tailscale on"
 
+assert_not_contains_packages() {
+  [[ "$1" != *"[packages]"* ]] || fail "dev config gained a [packages] section with no installed one"
+}
+no_packages="$(SENTINAL_TAILSCALE_IP=100.64.12.34 SENTINAL_DATA_DIR="$test_root/d0" \
+  SENTINAL_CONFIG_DIR="$test_root/empty-config" "$launcher" --dry-run 2>&1)"
+assert_not_contains_packages "$no_packages"
+
+# An installed control config that serves worker packages keeps doing so
+# while `just network` runs (it uses the same port and directories).
+mkdir -p "$test_root/config with spaces"
+cat > "$test_root/config with spaces/daemon.toml" <<'TOML'
+bind = "100.64.12.34:7420"
+
+[packages]
+enabled = true
+listen = "127.0.0.1:7422"
+directory = "/srv/sentinal/packages"
+public_base_url = "https://control.example.ts.net"
+
+[other]
+ignored = true
+TOML
+
 dry_run="$({
   SENTINAL_TAILSCALE_IP=100.64.12.34 \
   SENTINAL_DAEMON_PORT=17420 \
@@ -60,6 +83,10 @@ assert_contains "$dry_run" 'VITE_DATA=api'
 assert_contains "$dry_run" 'development = true'
 assert_contains "$dry_run" 'allowed_origins = ["http://100.64.12.34:14173"]'
 assert_contains "$dry_run" '[control]'
+assert_contains "$dry_run" '[packages]'
+assert_contains "$dry_run" 'directory = "/srv/sentinal/packages"'
+assert_contains "$dry_run" 'public_base_url = "https://control.example.ts.net"'
+[[ "$dry_run" != *"[other]"* ]] || fail "copied more than the [packages] section"
 assert_contains "$dry_run" 'public_url = "http://100.64.12.34:17420"'
 assert_contains "$dry_run" "cd $repo_root/web &&"
 assert_contains "$dry_run" '/web/node_modules/.bin/vite --host 100.64.12.34 --port 14173 --strictPort'
