@@ -914,3 +914,39 @@ async fn machine_metrics_reach_clients_without_an_attachment() {
         DaemonMessage::MachineMetrics { metrics: received } if received == metrics
     ));
 }
+
+#[tokio::test]
+async fn shutdown_interrupts_every_live_pty_session_and_skips_finished_ones() {
+    let (manager, fake, store, data_dir) = stored_manager("shutdown");
+    let live_a = manager.create(request()).await.unwrap();
+    let live_b = manager.create(request()).await.unwrap();
+    let done = manager.create(request()).await.unwrap();
+    fake.exit(done.id, 0).unwrap();
+    wait_for_state(&manager, done.id, SessionState::Completed).await;
+
+    let interrupted = manager.shutdown();
+
+    assert_eq!(interrupted, 2);
+    for id in [live_a.id, live_b.id] {
+        assert_eq!(fake.operation_counts(id).unwrap().kills, 1, "{id}");
+        assert_eq!(
+            manager.session(id).unwrap().state,
+            SessionState::Interrupted
+        );
+        assert_eq!(
+            store.session(id).unwrap().unwrap().state,
+            SessionState::Interrupted
+        );
+    }
+    assert_eq!(fake.operation_counts(done.id).unwrap().kills, 0);
+    assert_eq!(
+        manager.session(done.id).unwrap().state,
+        SessionState::Completed
+    );
+    assert_eq!(
+        manager.shutdown(),
+        0,
+        "a second shutdown has nothing left to stop"
+    );
+    fs::remove_dir_all(data_dir).unwrap();
+}

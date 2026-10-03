@@ -131,6 +131,34 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Stop every live daemon-owned PTY before the daemon exits; returns how many.
+    ///
+    /// A restart interrupts FULL Sessions anyway (until Reliability R1), and a
+    /// live PTY reader would otherwise keep the process alive after SIGTERM.
+    /// Reduced-capture Sessions own no PTY and are left for restart recovery.
+    pub fn shutdown(&self) -> usize {
+        let Ok(handles) = self.handles() else {
+            tracing::error!("session map lock poisoned during shutdown");
+            return 0;
+        };
+        let mut interrupted = 0;
+        for handle in handles {
+            let live = lock_session(&handle).is_ok_and(|session| {
+                session.capture == protocol::CaptureLevel::Full && !session.state.is_finished()
+            });
+            if !live || handle.pty_closed.load(Ordering::SeqCst) {
+                continue;
+            }
+            match self.kill(handle.id) {
+                Ok(()) => interrupted += 1,
+                Err(error) => {
+                    tracing::warn!(session = handle.id.0, %error, "failed to stop Session at shutdown");
+                }
+            }
+        }
+        interrupted
+    }
+
     fn reconcile_child_exit(&self, handle: &SessionHandle) -> Result<(), SessionManagerError> {
         let Some(code) = (handle.try_wait)()? else {
             return Ok(());

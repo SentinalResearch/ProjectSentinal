@@ -252,6 +252,7 @@ pub async fn run() -> Result<(), DaemonError> {
             }
         })
     });
+    let shutdown_sessions = sessions.clone();
     let state = AppState::new(sessions, machine, auth)
         .with_origins(origins)
         .with_control(control)
@@ -326,6 +327,11 @@ pub async fn run() -> Result<(), DaemonError> {
         };
     let _ = server_shutdown.send(true);
     let _ = local_shutdown.send(true);
+    // End live PTYs so their blocking readers cannot keep the process alive.
+    let stopped = shutdown_sessions.shutdown();
+    if stopped > 0 {
+        tracing::info!(stopped, "interrupted live Sessions for shutdown");
+    }
     if !main_finished {
         let result = main_server.as_mut().await.map_err(DaemonError::Serve);
         if server_result.is_ok() {

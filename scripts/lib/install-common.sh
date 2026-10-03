@@ -188,7 +188,9 @@ sentinal_wait_for_launchd_bootout() {
     printf 'wait launchd bootout %s\n' "$service" >>"$SENTINAL_SERVICE_TEST_LOG"
     return
   fi
-  for attempt in {1..20}; do
+  # launchd sends SIGTERM, then SIGKILL after its 20 s exit timeout; wait past
+  # that so a slow (or pre-0.1.6, Session-holding) daemon cannot fail an update.
+  for attempt in {1..600}; do
     if ! launchctl print "$service" >/dev/null 2>&1; then
       return
     fi
