@@ -119,6 +119,9 @@ describe("MachinesTab (control registry)", () => {
     expect(command.textContent).not.toContain(CODE);
     await user.click(within(dialog).getByRole("button", { name: "Copy command" }));
     expect(writeText).toHaveBeenCalledWith("sentinal connect https://sentinal-control.example.ts.net");
+    await user.click(within(dialog).getByRole("button", { name: "Copy code" }));
+    expect(writeText).toHaveBeenLastCalledWith(CODE);
+    expect(within(dialog).getByRole("button", { name: "Code copied" })).toBeInTheDocument();
 
     registry.codeStatus.mockResolvedValue(status("CONNECTED", workerB.machine_id));
     expect(await within(dialog).findByText(/Connected/)).toBeInTheDocument();
