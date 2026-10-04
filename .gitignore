@@ -1,0 +1,25 @@
+# Operating-system and editor state
+.DS_Store
+*.swp
+*.swo
+
+# Rust and generated protocol output
+/target/
+/crates/protocol/bindings/
+
+# Frontend dependencies and test output
+/web/node_modules/
+/web/dist/
+/web/test-results/
+/web/playwright-report/
+
+# Reproducible release and media output
+/dist/
+/dist-*/
+/marketing/ad/out/
+
+# Machine-local environment and credentials
+.env
+.env.*
+!web/.env.demo
+!web/.env.test

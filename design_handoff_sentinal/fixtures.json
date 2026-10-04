@@ -1,0 +1,200 @@
+{
+  "machines": [
+    {
+      "id": "rtx",
+      "name": "RTX-PC",
+      "os": "Linux",
+      "hardware": "Ryzen 9, 64 GB, RTX 4090 24 GB",
+      "status": "ONLINE"
+    },
+    {
+      "id": "mini",
+      "name": "Mac Mini",
+      "os": "macOS",
+      "hardware": "M2 Pro, 32 GB",
+      "status": "ONLINE"
+    },
+    {
+      "id": "mbp",
+      "name": "MacBook",
+      "os": "macOS",
+      "hardware": "M3, 16 GB",
+      "status": "OFFLINE",
+      "lastSeen": "14m ago"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "qwen",
+      "machine": "rtx",
+      "name": "Qwen Training",
+      "command": "python train.py --config moe.yaml",
+      "project": "TIM",
+      "cwd": "~/Projects/TIM",
+      "state": "RUNNING",
+      "progress": {
+        "current": 68,
+        "total": 100,
+        "unit": "epoch"
+      },
+      "metrics": {
+        "loss": {
+          "from": 0.41,
+          "to": 0.37
+        },
+        "gpuPct": 96,
+        "vramGB": 21.4,
+        "vramTotalGB": 24
+      },
+      "runningFor": "1h31m",
+      "health": {
+        "progress": "68 %",
+        "activity": "GOOD",
+        "resources": "GOOD",
+        "stability": "GOOD",
+        "errors": "NONE",
+        "overall": "HEALTHY",
+        "evidence": [
+          "loss improving for 5 checks",
+          "GPU 96 %",
+          "last output 8s ago"
+        ]
+      },
+      "events": [
+        [
+          "12:42",
+          "COMMAND_STARTED",
+          "python train.py --config moe.yaml"
+        ],
+        [
+          "12:44",
+          "PROGRESS",
+          "epoch 1/100"
+        ],
+        [
+          "13:41",
+          "CHECKPOINT_CREATED",
+          "ckpt/epoch_37.pt"
+        ],
+        [
+          "13:58",
+          "RESOURCE_HIGH",
+          "VRAM 96.5 %"
+        ],
+        [
+          "14:02",
+          "WARNING",
+          "VRAM usage high"
+        ],
+        [
+          "14:13",
+          "PROGRESS",
+          "epoch 68/100"
+        ]
+      ]
+    },
+    {
+      "id": "vllm",
+      "machine": "rtx",
+      "name": "vLLM",
+      "command": "vllm serve Qwen/Qwen3-8B --port 8000",
+      "state": "RUNNING",
+      "details": "server on :8000, GPU idle between requests"
+    },
+    {
+      "id": "pytest",
+      "machine": "rtx",
+      "name": "pytest",
+      "command": "pytest tests/",
+      "project": "MentalAnimAItion",
+      "state": "FAILED",
+      "result": {
+        "passed": 182,
+        "failed": 3,
+        "duration": "42s",
+        "summary": "all 3 in molecule correspondence tests"
+      }
+    },
+    {
+      "id": "shell",
+      "machine": "rtx",
+      "name": "shell",
+      "command": "~/Projects/TIM",
+      "project": "TIM",
+      "state": "IDLE"
+    },
+    {
+      "id": "compression",
+      "machine": "mini",
+      "name": "Compression",
+      "state": "STALLED",
+      "details": "no output 14m, CPU 0 %",
+      "health": {
+        "overall": "POSSIBLY STALLED",
+        "confidence": 0.78
+      }
+    },
+    {
+      "id": "npm",
+      "machine": "mini",
+      "name": "npm install",
+      "command": "npm install",
+      "state": "WAITING",
+      "prompt": "Continue? [y/N]"
+    }
+  ],
+  "history": [
+    {
+      "ok": true,
+      "command": "cargo build",
+      "duration": "31s"
+    },
+    {
+      "ok": false,
+      "command": "pytest tests/",
+      "duration": "42s"
+    },
+    {
+      "ok": true,
+      "command": "python benchmark.py",
+      "duration": "18m"
+    },
+    {
+      "ok": null,
+      "command": "python train.py",
+      "duration": "running"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "qwen-vllm",
+      "name": "Qwen vLLM Server",
+      "category": "Servers",
+      "machine": "rtx",
+      "template": "vllm serve {model} --port {port} --max-model-len {context}",
+      "params": {
+        "model": "Qwen/Qwen3-8B",
+        "port": "8000",
+        "context": "32768"
+      }
+    }
+  ],
+  "notifications": [
+    "RTX-PC · pytest: failed — 3 failures in molecule correspondence tests",
+    "Mac Mini · npm install: waiting for input — Continue? [y/N]"
+  ],
+  "_assumptions": {
+    "note": "Values below were invented by the designer to make the prototype work. Confirm before shipping.",
+    "cargoBuildMachine": "MacBook",
+    "historyDates": [
+      "Today",
+      "Yesterday",
+      "3 days ago"
+    ],
+    "loginLock": "3 attempts → 5-minute lock",
+    "setupMinLength": 12,
+    "pairCommand": "sentinal-agent pair <TOKEN>",
+    "tokenMask": "sa_••••xxxx",
+    "pairTokenTTL": "10 minutes"
+  }
+}

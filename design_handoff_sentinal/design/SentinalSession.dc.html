@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="max-width:1320px; padding:28px 48px 64px; display:flex; flex-direction:column; gap:28px; animation:sn-in .25s ease-out">
+<nav style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-3)"><button onClick="{{ toMachine }}" style="border:0; background:transparent; padding:0; color:var(--text-2); font-size:13px; font-weight:600" style-hover="color:var(--text-1)">{{ s.machine }}</button><span>/</span><span style="color:var(--text-1)">{{ s.name }}</span></nav>
+
+<header style="display:flex; align-items:flex-start; gap:24px; flex-wrap:wrap; border-bottom:2px solid var(--text-1); padding-bottom:20px">
+<div style="flex:1; min-width:320px; display:flex; flex-direction:column; gap:10px">
+<div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap"><h1 style="margin:0; font-size:40px; line-height:42px; font-weight:800; letter-spacing:-0.035em">{{ s.name }}</h1><dc-import name="StateTag" state="{{ st }}" hint-size="100px,26px"></dc-import><sc-if value="{{ hasHealth }}"><span style="display:inline-flex; align-items:center; height:26px; padding:0 10px; box-shadow:inset 0 0 0 1.5px {{ hc }}; color:{{ hc }}; font-size:12px; font-weight:700; letter-spacing:0.04em">{{ healthLabel }}</span></sc-if></div>
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-2)">{{ s.cmd }}</span>
+<span style="font-size:13px; color:var(--text-3)">{{ meta }}</span>
+</div>
+<div style="display:flex; gap:8px; align-items:center">
+<button onClick="{{ toSplit }}" style="height:36px; padding:0 14px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:13px; font-weight:700" style-hover="border-color:var(--text-1)">Open in split view</button>
+<sc-if value="{{ canInterrupt }}"><button onClick="{{ askCtrlC }}" style="height:36px; padding:0 14px; border:1.5px solid var(--s-failed-fg); background:transparent; color:var(--s-failed-fg); font-size:13px; font-weight:700" style-hover="background:color-mix(in srgb, var(--s-failed-fg) 12%, transparent)">Ctrl‑C…</button></sc-if>
+</div>
+</header>
+
+<sc-if value="{{ isTraining }}">
+<section style="display:flex; flex-wrap:wrap; gap:24px 32px; align-items:flex-end">
+<div style="flex:1.4 1 300px; display:flex; flex-direction:column; gap:10px">
+<div style="display:flex; align-items:flex-end; gap:14px"><span style="font-size:88px; line-height:72px; font-weight:800; letter-spacing:-0.06em">68<span style="font-size:36px; letter-spacing:-0.02em">%</span></span><span style="font-size:13px; line-height:18px; color:var(--text-2); padding-bottom:4px">epoch 68/100<br>running 1h31m</span></div>
+<div style="position:relative; height:8px; background:var(--bg-2)"><div style="width:68%; height:100%; background:var(--s-running-fg)"></div><div style="position:absolute; inset:0; background:repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--bg-0) calc(10% - 1px) 10%)"></div></div>
+</div>
+<div style="flex:1 1 150px; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--line); padding-top:10px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">LOSS</span><span style="font-size:26px; line-height:28px; font-weight:700">0.37</span><span style="font-size:12px; color:var(--text-2)">from 0.41 · improving 5 checks</span></div>
+<div style="flex:1 1 150px; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--line); padding-top:10px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">GPU</span><span style="font-size:26px; line-height:28px; font-weight:700">96 %</span><div style="height:4px; background:var(--bg-2)"><div style="width:96%; height:100%; background:var(--text-1)"></div></div></div>
+<div style="flex:1 1 150px; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--line); padding-top:10px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">VRAM</span><span style="font-size:26px; line-height:28px; font-weight:700">21.4<span style="font-size:14px; font-weight:500; color:var(--text-2)"> / 24 GB</span></span><div style="position:relative; height:4px; background:var(--bg-2)"><div style="width:89%; height:100%; background:var(--text-1)"></div><div style="position:absolute; left:95%; top:-4px; width:2px; height:12px; background:var(--text-3)"></div></div></div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isFailed }}">
+<section style="display:flex; flex-direction:column; gap:14px; border-left:0; background:var(--bg-1); padding:20px 24px; box-shadow:inset 0 3px 0 var(--s-failed)">
+<span style="font-size:11px; font-weight:800; letter-spacing:0.08em; color:var(--s-failed-fg)">FAILURE SUMMARY</span>
+<div style="display:flex; align-items:baseline; gap:28px; flex-wrap:wrap"><span style="font-size:56px; line-height:52px; font-weight:800; letter-spacing:-0.04em; color:var(--s-failed-fg)">3 failed</span><span style="font-size:22px; font-weight:600; color:var(--text-2)">182 passed · 42s</span></div>
+<span style="font-size:16px; line-height:23px">All 3 failures are in the molecule correspondence tests.</span>
+<div style="display:flex; gap:8px"><button onClick="{{ rerun }}" style="height:36px; padding:0 14px; border:0; background:var(--accent); color:var(--on-accent); font-size:13px; font-weight:700">Run again</button><button onClick="{{ focusTerm }}" style="height:36px; padding:0 14px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:13px; font-weight:700" style-hover="border-color:var(--text-1)">Show output</button></div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isWaiting }}">
+<section style="display:flex; align-items:center; gap:32px; flex-wrap:wrap; background:var(--bg-1); padding:24px; box-shadow:inset 0 3px 0 var(--s-waiting)">
+<div style="flex:1; min-width:280px; display:flex; flex-direction:column; gap:8px"><span style="font-size:11px; font-weight:800; letter-spacing:0.08em; color:var(--s-waiting-fg)">WAITING FOR INPUT</span><span style="font-family:'JetBrains Mono',monospace; font-size:40px; line-height:48px; font-weight:500">Continue? [y/N]</span><span style="font-size:13px; color:var(--text-2)">Default is N. Your answer is typed into the terminal followed by Enter.</span></div>
+<div style="display:flex; gap:2px"><button onClick="{{ answerY }}" style="width:88px; height:72px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:700">y</button><button onClick="{{ answerN }}" style="width:88px; height:72px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:700">n</button></div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isStalled }}">
+<section style="display:flex; align-items:baseline; gap:32px; flex-wrap:wrap; background:var(--bg-1); padding:24px; box-shadow:inset 0 3px 0 var(--s-stalled)">
+<div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:11px; font-weight:800; letter-spacing:0.08em; color:var(--s-stalled-fg)">POSSIBLY STALLED · 78 % CONFIDENCE</span><span style="font-size:56px; line-height:52px; font-weight:800; letter-spacing:-0.04em">No output 14m</span></div>
+<span style="font-size:22px; font-weight:600; color:var(--text-2)">CPU 0 %</span>
+</section>
+</sc-if>
+
+<sc-if value="{{ isServer }}">
+<section style="display:flex; align-items:baseline; gap:32px; flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace; font-size:56px; line-height:56px; font-weight:500">:8000</span><span style="font-size:17px; color:var(--text-2)">Serving Qwen/Qwen3-8B · GPU idle between requests</span></section>
+</sc-if>
+
+<sc-if value="{{ isInterrupted }}">
+<section style="display:flex; align-items:center; justify-content:space-between; gap:16px; background:var(--bg-1); padding:16px 20px; box-shadow:inset 0 3px 0 var(--s-interrupted)"><span style="font-size:15px; font-weight:600">Interrupted with Ctrl‑C. Last checkpoint <span style="font-family:'JetBrains Mono',monospace; font-size:13px">ckpt/epoch_37.pt</span>.</span><button onClick="{{ undoDemo }}" style="height:32px; padding:0 12px; border:1px solid var(--line-strong); background:transparent; color:var(--text-2); font-size:12px; font-weight:600">Reset prototype</button></section>
+</sc-if>
+
+<div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start">
+<section style="flex:2 1 520px; display:flex; flex-direction:column; min-width:0">
+<div style="display:flex; align-items:center; gap:12px; height:40px; padding:0 12px; background:var(--bg-2)"><span style="font-size:12px; font-weight:700; letter-spacing:0.06em">TERMINAL</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0">{{ s.machine }} · {{ s.cwd }}</span><span style="margin-left:auto; display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-3)"><span style="width:6px; height:6px; background:var(--s-running)"></span>attached</span></div>
+<div ref="{{ termRef }}" onClick="{{ focusInput }}" style="height:440px; overflow:auto; background:var(--term-bg); color:var(--term-fg); padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:13px; line-height:19px; cursor:text">
+<sc-for list="{{ lines }}" as="l" hint-placeholder-count="6"><div style="white-space:pre-wrap; color:{{ l.c }}">{{ l.t }}</div></sc-for>
+<form onSubmit="{{ submitCmd }}" style="display:flex; gap:0; margin:0"><span style="white-space:pre">{{ promptStr }}</span><input ref="{{ inputRef }}" value="{{ cmd }}" onChange="{{ onCmd }}" spellcheck="false" autocomplete="off" style="flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--term-fg); font:inherit; padding:0; caret-color:#D4D4D0"></input></form>
+</div>
+<div style="display:flex; gap:2px; background:var(--line); border-top:2px solid var(--line)">
+<button onClick="{{ askCtrlC }}" style="flex:1.3; height:36px; border:0; background:var(--s-failed); color:var(--ink); font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700">Ctrl‑C</button>
+<sc-for list="{{ keys }}" as="k" hint-placeholder-count="4"><button onClick="{{ k.press }}" style="flex:1; height:36px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:12px" style-hover="background:var(--bg-2)">{{ k.label }}</button></sc-for>
+</div>
+</section>
+
+<aside style="flex:1 1 320px; min-width:0; display:flex; flex-direction:column; gap:32px">
+<sc-if value="{{ hasHealth }}">
+<div style="display:flex; flex-direction:column">
+<div style="display:flex; justify-content:space-between; align-items:center; background:{{ hFill }}; color:var(--ink); padding:9px 12px"><span style="font-size:11px; font-weight:800; letter-spacing:0.08em">HEALTH</span><span style="font-size:14px; font-weight:800">{{ healthLabel }}</span></div>
+<sc-for list="{{ health }}" as="x" hint-placeholder-count="6"><div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px"><span style="color:var(--text-2)">{{ x.k }}</span><span style="font-weight:700; color:{{ x.c }}">{{ x.v }}</span></div></sc-for>
+<span style="font-size:12px; line-height:17px; color:var(--text-2); padding-top:10px">{{ evidence }}</span>
+</div>
+</sc-if>
+<div style="display:flex; flex-direction:column">
+<div style="display:flex; justify-content:space-between; padding-bottom:8px; border-bottom:2px solid var(--text-1)"><span style="font-size:15px; font-weight:800">Events</span><span style="font-size:13px; color:var(--text-3)">{{ eventCount }}</span></div>
+<sc-for list="{{ events }}" as="e" hint-placeholder-count="5">
+<div style="display:grid; grid-template-columns:40px 10px minmax(0,1fr); gap:8px; align-items:start; padding:8px 0; border-bottom:1px solid var(--line)"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; line-height:17px; color:var(--text-3)">{{ e.t }}</span><span style="width:8px; height:8px; margin-top:4px; background:{{ e.c }}"></span><span style="display:flex; flex-direction:column; min-width:0"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; line-height:17px; font-weight:700; color:{{ e.tc }}">{{ e.type }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; line-height:17px; overflow-wrap:anywhere">{{ e.d }}</span></span></div>
+</sc-for>
+</div>
+</aside>
+</div>
+
+<sc-if value="{{ confirmOpen }}">
+<div onClick="{{ closeConfirm }}" style="position:fixed; inset:0; z-index:50; background:var(--scrim); display:flex; align-items:center; justify-content:center; padding:24px; animation:sn-in .15s ease-out">
+<div onClick="{{ stop }}" role="dialog" style="width:100%; max-width:460px; background:var(--bg-1); box-shadow:inset 0 4px 0 var(--s-failed), 0 24px 64px rgba(0,0,0,.45); padding:28px 24px 24px; display:flex; flex-direction:column; gap:18px">
+<div style="display:flex; flex-direction:column; gap:8px">
+<span style="font-size:11px; font-weight:800; letter-spacing:0.08em; color:var(--s-failed-fg)">INTERRUPT · {{ s.machineUpper }}</span>
+<span style="font-size:26px; line-height:30px; font-weight:800; letter-spacing:-0.02em">Send Ctrl‑C to {{ s.name }}?</span>
+<span style="font-size:14px; line-height:21px; color:var(--text-2); text-wrap:pretty">{{ consequence }}</span>
+</div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px"><button onClick="{{ closeConfirm }}" style="height:44px; border:1.5px solid var(--text-1); background:transparent; color:var(--text-1); font-size:14px; font-weight:700">Cancel</button><button onClick="{{ confirmCtrlC }}" style="height:44px; border:0; background:var(--s-failed); color:var(--ink); font-size:14px; font-weight:700">Send Ctrl‑C</button></div>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  termRef = React.createRef(); inputRef = React.createRef();
+  G = 'var(--s-running-fg)'; W = 'var(--s-waiting-fg)'; R = 'var(--s-failed-fg)'; O = 'var(--s-stalled-fg)'; T1 = 'var(--text-1)';
+  D = {
+    qwen: { name:'Qwen Training', machine:'RTX-PC', mid:'rtx', cmd:'python train.py --config moe.yaml', cwd:'~/Projects/TIM', project:'TIM', dur:'running 1h31m', state:'running', kind:'training',
+      health:['HEALTHY','running',[['Progress','68 %'],['Activity','GOOD'],['Resources','GOOD'],['Stability','GOOD'],['Errors','NONE'],['Overall','HEALTHY']],'loss improving for 5 checks · GPU 96 % · last output 8s ago'],
+      out:['$ python train.py --config moe.yaml','epoch 1/100  loss …','saved ckpt/epoch_37.pt','warning: VRAM usage high (96.5 %)','epoch 64/100  loss 0.41','epoch 65/100  loss 0.40','epoch 66/100  loss 0.39','epoch 67/100  loss 0.38','epoch 68/100  loss 0.37'],
+      ev:[['12:42','COMMAND_STARTED','python train.py --config moe.yaml','x'],['12:44','PROGRESS','epoch 1/100','p'],['13:41','CHECKPOINT_CREATED','ckpt/epoch_37.pt','i'],['13:58','RESOURCE_HIGH','VRAM 96.5 %','w'],['14:02','WARNING','VRAM usage high','w'],['14:13','PROGRESS','epoch 68/100','p']],
+      cons:'Stops python train.py on RTX-PC after 1h31m at epoch 68/100. Last checkpoint ckpt/epoch_37.pt.' },
+    vllm: { name:'vLLM', machine:'RTX-PC', mid:'rtx', cmd:'vllm serve Qwen/Qwen3-8B --port 8000', cwd:'~', project:'—', dur:'running', state:'running', kind:'server',
+      health:['HEALTHY','running',[['Progress','—'],['Activity','GOOD'],['Resources','GOOD'],['Stability','GOOD'],['Errors','NONE'],['Overall','HEALTHY']],'listening on :8000 · GPU idle between requests'],
+      out:['$ vllm serve Qwen/Qwen3-8B --port 8000','Serving on :8000'], ev:[['—','COMMAND_STARTED','vllm serve Qwen/Qwen3-8B --port 8000','x']],
+      cons:'Stops the vLLM server on :8000. Requests in flight will fail.' },
+    pytest: { name:'pytest', machine:'RTX-PC', mid:'rtx', cmd:'pytest tests/', cwd:'~/Projects/MentalAnimAItion', project:'MentalAnimAItion', dur:'42s', state:'failed', kind:'failed',
+      health:['FAILED','failed',[['Progress','100 %'],['Activity','EXITED'],['Resources','GOOD'],['Stability','—'],['Errors','3'],['Overall','FAILED']],'exit status non-zero · 3 failed · 182 passed'],
+      out:['$ pytest tests/','…','3 failed, 182 passed in 42s'], ev:[['—','COMMAND_STARTED','pytest tests/','x'],['—','COMMAND_FAILED','3 failed · 182 passed · 42s','e']], cons:'' },
+    shell: { name:'shell', machine:'RTX-PC', mid:'rtx', cmd:'~/Projects/TIM', cwd:'~/Projects/TIM', project:'TIM', dur:'idle', state:'idle', kind:'idle', health:null, out:[], ev:[], cons:'' },
+    npm: { name:'npm install', machine:'Mac Mini', mid:'mini', cmd:'npm install', cwd:'~', project:'—', dur:'waiting', state:'waiting', kind:'waiting',
+      health:['WAITING','waiting',[['Progress','—'],['Activity','PAUSED'],['Resources','GOOD'],['Stability','GOOD'],['Errors','NONE'],['Overall','WAITING']],'prompt detected: Continue? [y/N]'],
+      out:['$ npm install','Continue? [y/N]'], ev:[['—','COMMAND_STARTED','npm install','x'],['—','INPUT_REQUESTED','Continue? [y/N]','w']], cons:'Cancels npm install on Mac Mini at the prompt.' },
+    compression: { name:'Compression', machine:'Mac Mini', mid:'mini', cmd:'—', cwd:'~', project:'—', dur:'no output 14m', state:'stalled', kind:'stalled',
+      health:['POSSIBLY STALLED','stalled',[['Progress','—'],['Activity','NONE 14m'],['Resources','CPU 0 %'],['Stability','GOOD'],['Errors','NONE'],['Overall','STALLED']],'no output for 14m · CPU 0 % · confidence 78 %'],
+      out:[], ev:[['—','STALL_SUSPECTED','no output 14m · confidence 78 %','w']], cons:'Stops Compression on Mac Mini. It has produced no output for 14m.' }
+  };
+  state = { id:null, st:null, confirm:false, cmd:'', extra:[], extraEv:[], hist:-1 };
+  static getDerivedStateFromProps(p, s) { const id = (p.params && p.params.id) || 'qwen'; return s.id === id ? null : { id, st:null, extra:[], extraEv:[], cmd:'', confirm:false }; }
+  componentDidMount() { this.scroll(); this.onKey = e => { if (e.key === 'Escape' && this.state.confirm) this.setState({ confirm:false }); }; window.addEventListener('keydown', this.onKey); }
+  componentWillUnmount() { window.removeEventListener('keydown', this.onKey); }
+  componentDidUpdate() { this.scroll(); }
+  scroll() { const t = this.termRef.current; if (t) t.scrollTop = t.scrollHeight; }
+  now() { const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+  push(lines, ev, st) { this.setState(x => ({ extra: [...x.extra, ...lines], extraEv: ev ? [...x.extraEv, ev] : x.extraEv, st: st || x.st })); }
+  renderVals() {
+    const go = this.props.go || (() => {});
+    const s = this.D[this.state.id] || this.D.qwen;
+    const st = this.state.st || s.state;
+    const H = s.health;
+    const cmap = { GOOD:this.G, HEALTHY:this.G, NONE:this.T1, FAILED:this.R, '3':this.R, WAITING:this.W, PAUSED:this.W, STALLED:this.O, 'NONE 14m':this.O, 'CPU 0 %':this.O, EXITED:'var(--text-2)' };
+    const interrupted = st === 'interrupted';
+    const hLabel = interrupted ? 'INTERRUPTED' : H ? H[0] : '';
+    const hState = interrupted ? 'interrupted' : H ? H[1] : 'idle';
+    const evColor = { x:['var(--text-1)','var(--text-1)'], p:['var(--line-strong)','var(--text-2)'], i:['var(--accent-fg)','var(--accent-fg)'], w:['var(--s-waiting)','var(--s-waiting-fg)'], e:['var(--s-failed)','var(--s-failed-fg)'], s:['var(--s-interrupted)','var(--s-interrupted-fg)'] };
+    const events = [...s.ev, ...this.state.extraEv].map(([t,type,d,k]) => ({ t, type, d, c: evColor[k][0], tc: evColor[k][1] })).reverse();
+    const lineColor = t => /^\$ /.test(t) ? '#F2F2F0' : /warning/i.test(t) ? '#FFD000' : /failed/.test(t) ? '#FF3B2F' : /^\^C|KeyboardInterrupt/.test(t) ? '#FF5CA8' : '#D4D4D0';
+    const lines = [...s.out, ...this.state.extra].map(t => ({ t, c: lineColor(t) }));
+    const keyFor = label => () => { if (label === 'Tab') this.setState(x => ({ cmd: x.cmd + '  ' })); if (label === 'Esc') this.setState({ cmd:'' }); this.inputRef.current && this.inputRef.current.focus(); };
+    const answer = a => () => this.push([a], [this.now(), 'INPUT_SENT', a, 'x'], 'running');
+    const promptStr = (s.cwd || '~') + ' $ ';
+    return {
+      s: { ...s, machineUpper: s.machine.toUpperCase() }, st, termRef:this.termRef, inputRef:this.inputRef,
+      meta: [s.project !== '—' ? s.project : null, s.machine, s.dur].filter(Boolean).join(' · '),
+      hasHealth: !!H || interrupted, healthLabel: hLabel, hc: `var(--s-${hState}-fg)`, hFill: `var(--s-${hState})`,
+      health: (H ? H[2] : []).map(([k,v]) => ({ k, v: interrupted && k === 'Overall' ? 'INTERRUPTED' : v, c: interrupted && k === 'Overall' ? 'var(--s-interrupted-fg)' : (cmap[v] || this.T1) })),
+      evidence: interrupted ? 'Ctrl‑C sent from this browser · process exited' : (H ? H[3] : ''),
+      events, eventCount: events.length, lines, cmd: this.state.cmd, promptStr,
+      isTraining: s.kind === 'training' && !interrupted, isFailed: s.kind === 'failed' && st === 'failed', isWaiting: s.kind === 'waiting' && st === 'waiting', isStalled: s.kind === 'stalled' && !interrupted, isServer: s.kind === 'server' && !interrupted, isInterrupted: interrupted,
+      canInterrupt: ['running','waiting','stalled'].includes(st),
+      toMachine: () => go('app/overview', { machine: s.mid }), toSplit: () => go('app/split', { focus: this.state.id }),
+      askCtrlC: () => { if (['running','waiting','stalled'].includes(st)) this.setState({ confirm:true }); },
+      closeConfirm: () => this.setState({ confirm:false }), stop: e => e.stopPropagation(), confirmOpen: this.state.confirm,
+      consequence: s.cons || `Sends SIGINT to ${s.name} on ${s.machine}.`,
+      confirmCtrlC: () => { this.setState({ confirm:false }); this.push(['^C', s.kind === 'training' ? 'KeyboardInterrupt' : ''].filter(Boolean), [this.now(), 'INTERRUPTED', 'Ctrl‑C from browser', 's'], 'interrupted'); },
+      undoDemo: () => this.setState({ st:null, extra:[], extraEv:[] }),
+      answerY: answer('y'), answerN: answer('n'),
+      rerun: () => this.push(['$ pytest tests/', '…'], [this.now(), 'COMMAND_STARTED', 'pytest tests/', 'x'], 'running'),
+      focusTerm: () => { this.inputRef.current && this.inputRef.current.focus(); },
+      focusInput: () => { this.inputRef.current && this.inputRef.current.focus(); },
+      onCmd: e => this.setState({ cmd: e.target.value }),
+      submitCmd: e => { e.preventDefault(); const c = this.state.cmd; this.setState({ cmd:'' }); this.push([promptStr + c], c.trim() ? [this.now(), 'COMMAND_STARTED', c, 'x'] : null); },
+      keys: ['Esc','Tab','↑','↓'].map(label => ({ label, press: keyFor(label) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

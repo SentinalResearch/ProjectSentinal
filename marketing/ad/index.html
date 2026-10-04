@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sentinal — product ad</title>
+<style>
+@font-face { font-family: Archivo; font-weight: 400; src: url('../../web/node_modules/@fontsource/archivo/files/archivo-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: Archivo; font-weight: 600; src: url('../../web/node_modules/@fontsource/archivo/files/archivo-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: Archivo; font-weight: 700; src: url('../../web/node_modules/@fontsource/archivo/files/archivo-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: Archivo; font-weight: 800; src: url('../../web/node_modules/@fontsource/archivo/files/archivo-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url('../../web/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 500; src: url('../../web/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 700; src: url('../../web/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2') format('woff2'); }
+
+:root {
+  --bg-0:#0A0A0A; --bg-1:#111111; --bg-2:#1C1C1C; --text-1:#F2F2F0; --text-2:#A6A6A2; --text-3:#8A8A86;
+  --line:#262626; --line-strong:#6B6B67; --accent:#3D5AFE; --accent-fg:#8C9EFF; --ink:#0A0A0A;
+  --run:#29D35F; --wait:#FFD000; --done:#36C5E8; --fail:#FF3B2F; --intr:#FF5CA8; --idle:#9C9C98;
+  --term-bg:#0C0C0C; --term-fg:#D4D4D0;
+  --ui:'Archivo',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:1920px; height:1080px; overflow:hidden; background:var(--bg-0); color:var(--text-1); font-family:var(--ui); }
+#stage { position:relative; width:1920px; height:1080px; overflow:hidden; }
+#grid { position:absolute; inset:-80px; background-image:
+  linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size:80px 80px; opacity:.28; }
+#glow { position:absolute; width:1400px; height:1400px; border-radius:50%;
+  background:radial-gradient(circle, rgba(61,90,254,.20), rgba(61,90,254,0) 60%); }
+.scene { position:absolute; inset:0; opacity:0; }
+.mono { font-family:var(--mono); }
+
+/* chrome */
+#label { position:absolute; left:72px; top:56px; font:500 20px var(--mono); color:var(--text-3); letter-spacing:.08em; }
+#label b { color:var(--accent-fg); font-weight:500; }
+#corner { position:absolute; right:72px; top:48px; display:flex; align-items:center; gap:12px; font:700 26px var(--ui); }
+#caption { position:absolute; left:0; right:0; bottom:74px; text-align:center; font:700 50px var(--ui); letter-spacing:-.01em; }
+#caption em { font-style:normal; color:var(--accent-fg); }
+#progress { position:absolute; left:0; bottom:0; height:4px; background:var(--accent); }
+
+/* terminal */
+.term { position:absolute; background:var(--term-bg); border:1px solid var(--line); box-shadow:0 40px 120px rgba(0,0,0,.6); }
+.term .bar { height:44px; border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 18px; gap:10px; background:#111; }
+.term .dot { width:12px; height:12px; border-radius:50%; background:#2a2a2a; }
+.term .title { margin-left:14px; font:500 17px var(--mono); color:var(--text-3); }
+.term pre { padding:22px 26px; font:400 25px/1.55 var(--mono); color:var(--term-fg); white-space:pre-wrap; }
+.p { color:var(--run); } .c { color:var(--accent-fg); } .dim { color:var(--text-3); } .err { color:var(--fail); } .ok { color:var(--run); } .warn { color:var(--wait); }
+.cursor { display:inline-block; width:.6em; height:1.05em; vertical-align:-.15em; background:var(--term-fg); }
+
+/* code panel */
+.code { position:absolute; background:var(--bg-1); border:1px solid var(--line); padding:28px 32px; font:400 23px/1.6 var(--mono); color:var(--term-fg); white-space:pre; }
+.code .k { color:#C792EA; } .code .t { color:#82AAFF; } .code .s { color:#C3E88D; } .code .cm { color:var(--text-3); } .code .n { color:#F78C6C; }
+.code .hl { background:rgba(61,90,254,.22); box-shadow:-32px 0 0 rgba(61,90,254,.22), 32px 0 0 rgba(61,90,254,.22); }
+
+/* ui */
+.tag { display:inline-flex; align-items:center; gap:8px; height:34px; padding:0 13px 0 11px; font:700 17px var(--ui); color:var(--ink); letter-spacing:.02em; }
+.tag svg { width:15px; height:15px; }
+.badge { display:inline-flex; align-items:center; height:34px; padding:0 12px; font:600 15px var(--ui); color:var(--text-2); box-shadow:inset 0 0 0 1.5px var(--line-strong); letter-spacing:.05em; }
+.browser { position:absolute; background:var(--bg-0); border:1px solid var(--line-strong); box-shadow:0 60px 160px rgba(0,0,0,.7); overflow:hidden; }
+.browser .top { height:52px; background:#141414; border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 20px; gap:10px; }
+.browser .url { margin-left:24px; flex:1; height:32px; background:#0d0d0d; border:1px solid var(--line); display:flex; align-items:center; padding:0 16px; font:400 16px var(--mono); color:var(--text-2); }
+.side { position:absolute; left:0; top:52px; bottom:0; width:260px; border-right:1px solid var(--line); background:var(--bg-1); padding:26px 22px; }
+.side .brand { display:flex; align-items:center; gap:10px; font:700 22px var(--ui); margin-bottom:30px; }
+.side .nav { font:500 18px var(--ui); color:var(--text-2); line-height:2.3; }
+.side .nav .on { color:var(--text-1); }
+.side .mach { margin-top:26px; font:600 13px var(--ui); color:var(--text-3); letter-spacing:.12em; }
+.side .m { margin-top:10px; display:flex; align-items:center; gap:10px; font:500 18px var(--ui); }
+.sq { width:10px; height:10px; background:var(--run); display:inline-block; }
+.main { position:absolute; left:260px; right:0; top:52px; bottom:0; padding:30px 40px; }
+.crumb { font:500 17px var(--ui); color:var(--text-3); }
+.h1 { margin-top:14px; display:flex; align-items:center; gap:16px; font:800 50px var(--ui); letter-spacing:-.02em; }
+.meta { margin-top:10px; font:400 18px var(--ui); color:var(--text-2); }
+.rule { height:2px; background:var(--text-1); margin:22px 0 20px; }
+.bars { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--line); }
+.bars > div { padding:16px 18px; border-right:1px solid var(--line); }
+.bars > div:last-child { border-right:0; }
+.bars .l { display:flex; justify-content:space-between; font:500 14px var(--mono); color:var(--text-2); letter-spacing:.08em; }
+.bars .track { margin-top:12px; height:6px; background:var(--bg-2); }
+.bars .fill { height:6px; background:var(--text-1); }
+.prog { margin:0 0 18px; display:flex; align-items:center; gap:18px; font:600 18px var(--mono); }
+.prog .track { flex:1; height:10px; background:var(--bg-2); }
+.prog .fill { height:10px; background:var(--run); }
+.panel { border:1px solid var(--line); }
+.panel .ph { height:44px; display:flex; align-items:center; padding:0 16px; gap:14px; border-bottom:1px solid var(--line); font:700 15px var(--ui); letter-spacing:.06em; }
+.panel .ph span { font:400 14px var(--mono); color:var(--text-3); letter-spacing:0; }
+.events { font:400 16px/2.05 var(--mono); color:var(--text-2); padding:10px 16px; }
+.events b { font-weight:500; color:var(--text-1); }
+
+/* history */
+.hist { position:absolute; border:1px solid var(--line); background:var(--bg-0); }
+.hist .hrow { display:grid; grid-template-columns:54px 1fr 150px 120px; align-items:center; height:62px; padding:0 20px; border-bottom:1px solid var(--line); font:400 21px var(--mono); }
+.hist .head { height:50px; font:600 14px var(--ui); color:var(--text-3); letter-spacing:.12em; border-bottom:2px solid var(--text-1); }
+.hist .r { text-align:right; color:var(--text-2); }
+
+/* checklist */
+.check { display:flex; align-items:flex-start; gap:22px; font:600 38px var(--ui); letter-spacing:-.01em; }
+.check .box { flex:none; width:44px; height:44px; background:var(--accent); display:flex; align-items:center; justify-content:center; margin-top:2px; }
+.check small { display:block; margin-top:6px; font:400 22px var(--ui); color:var(--text-2); letter-spacing:0; }
+
+/* phone */
+.phone { position:absolute; width:430px; height:880px; border-radius:62px; background:#050505; border:2px solid #3a3a3a; box-shadow:0 0 0 10px #151515, 0 60px 140px rgba(0,0,0,.8); overflow:hidden; }
+.phone .notch { position:absolute; left:50%; top:14px; width:120px; height:34px; margin-left:-60px; border-radius:20px; background:#000; z-index:3; }
+.phone .scr { position:absolute; inset:0; padding:74px 20px 22px; background:var(--bg-0); }
+.pcard { border:1px solid var(--line); padding:18px 16px 16px; margin-bottom:14px; background:var(--bg-1); }
+.pcard .n { display:flex; justify-content:space-between; align-items:center; font:700 22px var(--ui); }
+.pcard .s { margin-top:8px; font:400 15px var(--mono); color:var(--text-2); }
+.toast { position:absolute; left:14px; right:14px; top:58px; background:rgba(28,28,28,.96); border:1px solid var(--line-strong); padding:14px 16px; z-index:2; }
+.soon { display:inline-flex; align-items:center; height:44px; padding:0 18px; background:var(--wait); color:var(--ink); font:800 20px var(--ui); letter-spacing:.12em; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="grid"></div>
+  <div id="glow"></div>
+
+  <!-- 1 · problem -->
+  <section class="scene" id="s1">
+    <div class="term" id="s1term" style="left:360px; top:190px; width:1200px; height:560px;">
+      <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="title">ssh rtx-pc — zsh</span></div>
+      <pre id="s1pre"></pre>
+    </div>
+  </section>
+
+  <!-- 2 · title -->
+  <section class="scene" id="s2">
+    <div style="position:absolute; left:0; right:0; top:330px; display:flex; flex-direction:column; align-items:center;">
+      <svg id="s2mark" width="170" height="170" viewBox="0 0 24 24" fill="none">
+        <path id="s2slash" d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square" stroke-dasharray="24" stroke-dashoffset="24"/>
+        <circle id="s2dot" cx="18" cy="18.5" r="3.4" fill="#3D5AFE"/>
+      </svg>
+      <div id="s2word" style="margin-top:34px; font:800 118px var(--ui); letter-spacing:-.035em;"></div>
+      <div id="s2tag" style="margin-top:14px; font:500 34px var(--ui); color:var(--text-2);">Persistent, observable terminal sessions.</div>
+    </div>
+  </section>
+
+  <!-- 3 · watch -->
+  <section class="scene" id="s3">
+    <div class="term" style="left:72px; top:130px; width:1060px; height:740px;">
+      <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="title">~/Projects/TIM — zsh</span></div>
+      <pre id="s3pre" style="font-size:23px;"></pre>
+    </div>
+    <div class="code" id="s3code" style="left:1172px; top:150px; width:680px; height:720px; font-size:20px;"></div>
+    <div id="s3key" style="position:absolute; left:440px; top:888px; display:flex; gap:10px; align-items:center; font:700 26px var(--mono);">
+      <span style="padding:8px 16px; border:2px solid var(--text-1);">Ctrl</span><span style="color:var(--text-2)">+</span><span style="padding:8px 16px; border:2px solid var(--text-1);">J</span>
+      <span style="margin-left:12px; font:600 22px var(--ui); color:var(--text-2);">detach</span>
+    </div>
+  </section>
+
+  <!-- 4 · reattach in browser -->
+  <section class="scene" id="s4">
+    <div class="browser" id="s4b" style="left:150px; top:120px; width:1620px; height:800px;">
+      <div class="top"><i class="dot" style="width:12px;height:12px;border-radius:50%;background:#2a2a2a"></i><i class="dot" style="width:12px;height:12px;border-radius:50%;background:#2a2a2a"></i><i class="dot" style="width:12px;height:12px;border-radius:50%;background:#2a2a2a"></i>
+        <div class="url">https://rtx-pc.your-tailnet.ts.net/app/sessions/12</div></div>
+      <div class="side">
+        <div class="brand"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"/><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"/></svg>Sentinal</div>
+        <div class="nav"><div class="on">▦ Overview</div><div>◫ Split view</div><div>↺ History</div><div>≡ Recipes</div></div>
+        <div class="mach">MACHINES</div>
+        <div class="m"><i class="sq"></i>rtx-pc <span style="margin-left:auto;color:var(--text-3)">3</span></div>
+        <div class="m"><i class="sq"></i>macbook <span style="margin-left:auto;color:var(--text-3)">1</span></div>
+      </div>
+      <div class="main">
+        <div class="crumb">rtx-pc / Qwen Training</div>
+        <div class="h1">Qwen Training
+          <span class="tag" style="background:var(--run)"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="4.5" fill="#0A0A0A"/></svg>RUNNING</span>
+          <span class="badge">FULL</span></div>
+        <div class="meta">TIM · rtx-pc · <span id="s4dur">1h 31m</span> · <span class="mono">python train.py --config moe.yaml</span></div>
+        <div class="rule"></div>
+        <div class="prog"><span id="s4epoch">epoch 68/100</span><div class="track"><div class="fill" id="s4pf"></div></div><span style="color:var(--text-2)">LOSS <span id="s4loss" style="color:var(--text-1)">0.37</span> ↓</span></div>
+        <div class="bars">
+          <div><div class="l"><span>CPU</span><span id="s4cpu">34 %</span></div><div class="track"><div class="fill" id="s4cpuf"></div></div></div>
+          <div><div class="l"><span>RAM</span><span>12.1 GB</span></div><div class="track"><div class="fill" style="width:38%"></div></div></div>
+          <div><div class="l"><span>GPU</span><span id="s4gpu">96 %</span></div><div class="track"><div class="fill" id="s4gpuf" style="background:var(--run)"></div></div></div>
+          <div><div class="l"><span>VRAM</span><span>21.4 / 24 GB</span></div><div class="track"><div class="fill" style="width:89%; background:var(--wait)"></div></div></div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 430px; gap:22px; margin-top:22px;">
+          <div class="panel"><div class="ph">TERMINAL<span>rtx-pc · ~/Projects/TIM</span><span style="margin-left:auto; color:var(--run)">● attached</span></div>
+            <pre id="s4term" style="height:300px; overflow:hidden; background:var(--term-bg); padding:14px 18px; font:400 18px/1.6 var(--mono); color:var(--term-fg);"></pre></div>
+          <div class="panel"><div class="ph">EVENTS</div><div class="events" id="s4events"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · commands -->
+  <section class="scene" id="s5">
+    <div class="term" style="left:72px; top:150px; width:900px; height:640px;">
+      <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="title">any terminal — zsh</span></div>
+      <pre id="s5pre" style="font-size:21px;"></pre>
+    </div>
+    <div class="hist" id="s5hist" style="left:1012px; top:150px; width:836px;"></div>
+    <div class="code" id="s5code" style="left:1012px; top:560px; width:836px; height:230px; font-size:19px;"></div>
+  </section>
+
+  <!-- 6 · adopt -->
+  <section class="scene" id="s6">
+    <div class="term" style="left:72px; top:170px; width:980px; height:560px;">
+      <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="title">macbook — zsh</span></div>
+      <pre id="s6pre" style="font-size:22px;"></pre>
+    </div>
+    <div id="s6card" style="position:absolute; left:1100px; top:170px; width:748px; border:1px solid var(--line); background:var(--bg-1); padding:34px;">
+      <div style="font:500 16px var(--ui); color:var(--text-3);">macbook / Nightly export</div>
+      <div style="margin-top:12px; display:flex; align-items:center; gap:14px; font:800 42px var(--ui); letter-spacing:-.02em;">Nightly export</div>
+      <div style="margin-top:16px; display:flex; gap:12px;" id="s6tags"></div>
+      <div id="s6meta" style="margin-top:14px; font:400 19px var(--ui); color:var(--text-2);"></div>
+      <div class="bars" style="margin-top:24px; grid-template-columns:1fr 1fr;">
+        <div><div class="l"><span>CPU</span><span id="s6cpu">182 %</span></div><div class="track"><div class="fill" id="s6cpuf"></div></div></div>
+        <div><div class="l"><span>RAM</span><span id="s6ram">3.1 GB</span></div><div class="track"><div class="fill" id="s6ramf"></div></div></div>
+      </div>
+      <div style="margin-top:22px; display:flex; gap:12px; font:600 18px var(--ui);">
+        <span style="padding:10px 16px; border:1px solid var(--line); color:var(--text-3); text-decoration:line-through;">Attach</span>
+        <span style="padding:10px 16px; border:1px solid var(--line); color:var(--text-3); text-decoration:line-through;">Ctrl‑C</span>
+        <span style="padding:10px 16px; border:1px solid var(--line); color:var(--text-3); text-decoration:line-through;">Kill</span>
+      </div>
+      <div style="margin-top:18px; font:400 18px/1.5 var(--ui); color:var(--text-2);">PROCESS capture: Sentinal observes Metrics and lifecycle only. There is no output, input, resize, or kill.</div>
+    </div>
+  </section>
+
+  <!-- 7 · private -->
+  <section class="scene" id="s7">
+    <div class="code" id="s7code" style="left:72px; top:190px; width:840px; height:560px; font-size:25px; padding:40px 40px;"></div>
+    <div id="s7list" style="position:absolute; left:980px; top:230px; width:880px; display:flex; flex-direction:column; gap:56px;"></div>
+  </section>
+
+  <!-- 8 · mobile -->
+  <section class="scene" id="s8">
+    <div style="position:absolute; left:130px; top:300px; width:900px;">
+      <div class="soon" id="s8soon">COMING SOON</div>
+      <div style="margin-top:30px; font:800 92px/1.02 var(--ui); letter-spacing:-.035em;">Your terminals,<br>in your pocket.</div>
+      <div style="margin-top:26px; font:500 30px/1.4 var(--ui); color:var(--text-2);">Progress, failures, and “it finished” —<br>without opening a laptop.</div>
+    </div>
+    <div class="phone" id="s8phone" style="left:1250px; top:100px;">
+      <div class="notch"></div>
+      <div class="toast" id="s8toast">
+        <div style="display:flex; align-items:center; gap:10px; font:700 16px var(--ui);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"/><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"/></svg>SENTINAL <span style="margin-left:auto; font:400 14px var(--ui); color:var(--text-3)">now</span></div>
+        <div style="margin-top:6px; font:700 19px var(--ui);">pytest finished · 3 failed</div>
+        <div style="margin-top:2px; font:400 15px var(--mono); color:var(--text-2);">tests/test_decoder.py::test_beam — 42 s</div>
+      </div>
+      <div class="scr">
+        <div style="display:flex; align-items:center; gap:10px; font:700 24px var(--ui); margin-bottom:18px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"/><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"/></svg>Sessions<span style="margin-left:auto; font:400 15px var(--ui); color:var(--text-3)">3 machines</span></div>
+        <div class="pcard"><div class="n">Qwen Training <span class="tag" style="height:26px; font-size:12px; background:var(--run)">RUNNING</span></div>
+          <div class="s" id="s8epoch">rtx-pc · epoch 74/100 · loss 0.35</div>
+          <div style="margin-top:10px; height:6px; background:var(--bg-2)"><div id="s8pf" style="height:6px; background:var(--run)"></div></div></div>
+        <div class="pcard" id="s8pytest"><div class="n">pytest <span class="tag" style="height:26px; font-size:12px; background:var(--wait)">RUNNING</span></div>
+          <div class="s">macbook · tests/ · 182 passed</div></div>
+        <div class="pcard"><div class="n">vLLM server <span class="tag" style="height:26px; font-size:12px; background:var(--run)">RUNNING</span></div>
+          <div class="s">rtx-pc · :8000 · GPU 61 %</div></div>
+        <div class="pcard"><div class="n">Nightly export <span class="tag" style="height:26px; font-size:12px; background:var(--idle)">ENDED</span></div>
+          <div class="s">macbook · exit code unknown</div></div>
+        <div class="pcard"><div class="n">api shell <span class="tag" style="height:26px; font-size:12px; background:var(--idle)">IDLE</span></div>
+          <div class="s">macbook · COMMANDS · last: git push ✓</div></div>
+        <div style="margin-top:22px; display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--line); padding-top:14px; font:600 13px var(--ui); color:var(--text-3); text-align:center; letter-spacing:.06em;">
+          <span style="color:var(--text-1)">SESSIONS</span><span>HISTORY</span><span>ALERTS</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · end -->
+  <section class="scene" id="s9">
+    <div style="position:absolute; left:0; right:0; top:250px; display:flex; flex-direction:column; align-items:center;">
+      <div style="display:flex; align-items:center; gap:30px;">
+        <svg width="120" height="120" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"/><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"/></svg>
+        <div style="font:800 128px var(--ui); letter-spacing:-.035em;">Sentinal</div>
+      </div>
+      <div style="margin-top:26px; font:500 38px var(--ui); color:var(--text-2);">Structured state first. Intelligence second.</div>
+      <div id="s9cmd" style="margin-top:64px; padding:22px 34px; border:2px solid var(--text-1); font:500 34px var(--mono);"></div>
+      <div style="margin-top:36px; font:500 22px var(--mono); color:var(--text-3); letter-spacing:.06em;">LOCAL-FIRST · TAILSCALE · ZSH / BASH / FISH · macOS + LINUX</div>
+    </div>
+  </section>
+
+  <div id="label"></div>
+  <div id="corner"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"/><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"/></svg>Sentinal</div>
+  <div id="caption"></div>
+  <div id="progress"></div>
+</div>
+
+<script>
+const DURATION = 59;
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, p) => a + (b - a) * p;
+const ease = (p) => 1 - Math.pow(1 - clamp(p), 3);
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** Characters of `text` typed by time t, starting at `start`, `cps` chars/second. */
+function typed(text, t, start, cps = 26) {
+  if (t < start) return '';
+  return text.slice(0, Math.floor((t - start) * cps));
+}
+const done = (text, start, cps = 26) => start + text.length / cps;
+const CURSOR = '<span class="cursor"></span>';
+const blink = (t) => (Math.floor(t * 2) % 2 === 0 ? CURSOR : '');
+
+/** Visible opacity of a scene spanning [a, b] with fades. */
+function sceneAlpha(t, a, b, fade = 0.45) {
+  return ease(seg(t, a, a + fade)) * (1 - ease(seg(t, b - fade, b)));
+}
+function show(id, t, a, b, rise = 24) {
+  const el = $(id);
+  const alpha = sceneAlpha(t, a, b);
+  el.style.opacity = alpha;
+  el.style.transform = `translateY(${(1 - ease(seg(t, a, a + 0.6))) * rise}px)`;
+  el.style.display = alpha > 0 ? 'block' : 'none';
+}
+
+const CAPTIONS = [
+  [0.4, 3.3, 'Long jobs live and die with <em>one terminal.</em>'],
+  [3.3, 4.9, 'Close the lid. Epoch 37 of 100 — <em>gone.</em>'],
+  [9.4, 15.0, 'Wrap any job with <em>one command.</em>'],
+  [15.0, 18.9, 'Detach. Close the laptop. <em>It keeps running.</em>'],
+  [19.5, 23.4, 'Reattach from any browser — <em>same process, same screen.</em>'],
+  [23.4, 26.9, 'Progress, loss, GPU and VRAM. <em>Live.</em>'],
+  [27.5, 31.6, 'Every command, exit code and duration.'],
+  [31.6, 35.9, 'From any zsh, bash or fish terminal — <em>a couple of ms per prompt.</em>'],
+  [36.5, 40.3, 'Already running? <em>Adopt it — read-only.</em>'],
+  [40.3, 42.9, 'It ended. Sentinal <em>won’t pretend to know how.</em>'],
+  [43.5, 48.9, '<em>Private by design.</em> Your machines, your tailnet.'],
+];
+const LABELS = [
+  [9, 19, '01', 'WATCH'], [19, 27, '02', 'REATTACH ANYWHERE'], [27, 36, '03', 'COMMANDS + METRICS'],
+  [36, 43, '04', 'ADOPT'], [43, 49, '05', 'PRIVATE BY DESIGN'], [49, 55, '06', 'MOBILE · COMING SOON'],
+];
+
+function renderChrome(t) {
+  $('grid').style.transform = `translate(${-(t * 6) % 80}px, ${-(t * 3) % 80}px)`;
+  $('glow').style.left = `${lerp(-300, 900, (Math.sin(t / 9) + 1) / 2)}px`;
+  $('glow').style.top = `${lerp(-500, 100, (Math.cos(t / 11) + 1) / 2)}px`;
+  $('progress').style.width = `${(t / DURATION) * 100}%`;
+
+  const cap = CAPTIONS.find(([a, b]) => t >= a && t < b);
+  const c = $('caption');
+  if (cap) {
+    c.innerHTML = cap[2];
+    c.style.opacity = sceneAlpha(t, cap[0], cap[1], 0.3);
+    c.style.transform = `translateY(${(1 - ease(seg(t, cap[0], cap[0] + 0.4))) * 16}px)`;
+  } else c.style.opacity = 0;
+
+  const label = LABELS.find(([a, b]) => t >= a && t < b);
+  const l = $('label');
+  if (label) { l.innerHTML = `<b>${label[2]}</b> · ${label[3]}`; l.style.opacity = sceneAlpha(t, label[0], label[1], 0.35); }
+  else l.style.opacity = 0;
+  $('corner').style.opacity = sceneAlpha(t, 9, 55, 0.5);
+}
+
+// ---- 1 · problem ------------------------------------------------------------
+function renderS1(t) {
+  show('s1', t, 0, 5);
+  const cmd = 'python train.py --epochs 100';
+  let out = `<span class="p">rtx-pc</span> <span class="c">~/TIM</span> $ ${esc(typed(cmd, t, 0.3, 30))}`;
+  const typedDone = done(cmd, 0.3, 30);
+  if (t < typedDone) out += blink(t);
+  const epochs = Math.min(37, Math.floor(seg(t, typedDone + 0.2, 3.2) * 37));
+  if (t >= typedDone + 0.2) {
+    out += '\n<span class="dim">loading Qwen-0.5B · RTX 4090 · 100 epochs</span>';
+    const shown = [];
+    for (let e = Math.max(1, epochs - 7); e <= epochs; e++) {
+      shown.push(`epoch ${String(e).padStart(3)}/100  loss ${(0.95 - e * 0.0145).toFixed(3)}  ${'█'.repeat(Math.round(e / 5))}`);
+    }
+    out += '\n' + shown.join('\n');
+  }
+  const term = $('s1term');
+  if (t >= 3.3) {
+    out = out.replace(/\n[^\n]*$/, '') + '\n<span class="err">client_loop: send disconnect: Broken pipe</span>\n<span class="err">[4242] killed by SIGHUP · 37/100 epochs lost</span>';
+    const k = seg(t, 3.3, 4.6);
+    term.style.filter = `grayscale(${k}) brightness(${1 - k * 0.45})`;
+    term.style.transform = `scale(${1 - k * 0.04})`;
+  } else { term.style.filter = 'none'; term.style.transform = 'none'; }
+  $('s1pre').innerHTML = out;
+}
+
+// ---- 2 · title --------------------------------------------------------------
+function renderS2(t) {
+  show('s2', t, 5, 9, 0);
+  $('s2slash').setAttribute('stroke-dashoffset', 24 * (1 - ease(seg(t, 5.2, 5.8))));
+  const pop = seg(t, 5.7, 6.1);
+  $('s2dot').setAttribute('r', 3.4 * (pop < 1 ? ease(pop) * 1.15 : 1));
+  $('s2word').textContent = typed('Sentinal', t, 6.0, 18);
+  $('s2tag').style.opacity = ease(seg(t, 6.8, 7.4));
+}
+
+// ---- 3 · watch --------------------------------------------------------------
+const WATCH = 'sentinal watch -t "Qwen Training" -- python train.py --config moe.yaml';
+function renderS3(t) {
+  show('s3', t, 9, 19);
+  const prompt = '<span class="p">macbook</span> <span class="c">~/Projects/TIM</span> $ ';
+  let out = prompt + esc(typed(WATCH, t, 9.4, 34));
+  const w = done(WATCH, 9.4, 34);
+  if (t < w) out += blink(t);
+  if (t >= w + 0.25) out += '\n<span class="dim">[sentinal] Session 12 · WATCH · FULL capture · pid 51877</span>';
+  const e = Math.floor(seg(t, w + 0.5, 15.0) * 14);
+  const lines = [];
+  for (let i = Math.max(1, e - 8); i <= e; i++) lines.push(`epoch ${String(i).padStart(3)}/100  loss ${(0.95 - i * 0.0145).toFixed(3)}  step ${i * 312}`);
+  if (lines.length) out += '\n' + lines.join('\n');
+  if (t >= 15.6) out += '\n<span class="ok">sentinal: detached from Session 12; it keeps running.</span>\n<span class="ok">Reattach with `sentinal attach 12`</span>';
+  const ls = 'sentinal ls';
+  if (t >= 16.3) {
+    out += '\n' + prompt + esc(typed(ls, t, 16.4, 20));
+    if (t >= done(ls, 16.4, 20) + 0.2) out += '\n12\tRunning\t~/Projects/TIM\t/bin/zsh' + '\n' + prompt + blink(t);
+  }
+  $('s3pre').innerHTML = out;
+
+  const hl = (i) => (t >= 12.2 && ((i >= 1 && i <= 6 && t < 14.6) || (i === 8 && t >= 14.6)) ? 'hl' : '');
+  const code = [
+    '<span class="cm">// what `watch` sends — structured argv,</span>',
+    '<span class="cm">// never re-parsed shell text</span>',
+    '<span class="t">ClientRequest</span>::<span class="t">CreateSession</span> {',
+    '    origin:  <span class="t">SessionOrigin</span>::<span class="t">Watch</span>,',
+    '    title:   <span class="t">Some</span>(<span class="s">"Qwen Training"</span>),',
+    '    command: <span class="t">Some</span>(<span class="k">vec!</span>[<span class="s">"python"</span>, <span class="s">"train.py"</span>,',
+    '                   <span class="s">"--config"</span>, <span class="s">"moe.yaml"</span>]),',
+    '    ..',
+    '}',
+    '',
+    '<span class="cm">// sentinald owns the PTY, so the job</span>',
+    '<span class="cm">// outlives your terminal, SSH, and lid.</span>',
+    '<span class="t">Session</span> { capture: <span class="t">CaptureLevel</span>::<span class="t">Full</span>,',
+    '          pid: <span class="t">Some</span>(<span class="n">51877</span>), .. }',
+  ];
+  const reveal = Math.floor(seg(t, 9.8, 12.6) * code.length);
+  $('s3code').innerHTML = code.map((line, i) => `<div class="${i === 2 || (i >= 3 && i <= 6) ? (t >= 12.2 && t < 15 ? 'hl' : '') : (i >= 10 && t >= 15 ? 'hl' : '')}" style="opacity:${i < reveal ? 1 : 0}">${line || '&nbsp;'}</div>`).join('');
+  hl(0);
+  const k = $('s3key');
+  const kp = seg(t, 14.9, 15.3);
+  k.style.opacity = t < 14.9 ? 0 : (t < 17.5 ? 1 : 1 - seg(t, 17.5, 18));
+  k.style.transform = `scale(${1 + (1 - ease(kp)) * 0.25})`;
+}
+
+// ---- 4 · reattach -----------------------------------------------------------
+function renderS4(t) {
+  show('s4', t, 19, 27, 60);
+  const b = $('s4b');
+  const rise = ease(seg(t, 19, 19.9));
+  b.style.transform = `translateY(${(1 - rise) * 140}px) scale(${0.96 + rise * 0.04})`;
+  const epoch = 68 + Math.floor(seg(t, 19.6, 26.8) * 6);
+  $('s4epoch').textContent = `epoch ${epoch}/100`;
+  $('s4pf').style.width = `${epoch}%`;
+  $('s4loss').textContent = (0.37 - (epoch - 68) * 0.004).toFixed(3);
+  $('s4dur').textContent = `1h ${31 + Math.floor((t - 19) / 2)}m`;
+  const gpu = Math.round(94 + 3 * Math.sin(t * 2.3));
+  const cpu = Math.round(33 + 6 * Math.sin(t * 1.7 + 1));
+  $('s4gpu').textContent = `${gpu} %`; $('s4gpuf').style.width = `${gpu}%`;
+  $('s4cpu').textContent = `${cpu} %`; $('s4cpuf').style.width = `${cpu}%`;
+  const lines = [];
+  for (let i = epoch - 9; i <= epoch; i++) lines.push(`epoch ${String(i).padStart(3)}/100  loss ${(0.37 - (i - 68) * 0.004).toFixed(3)}  lr 2.0e-4`);
+  $('s4term').textContent = lines.join('\n');
+  const ev = [
+    ['12:42', 'COMMAND_STARTED', 'python train.py'],
+    ['13:41', 'CHECKPOINT', 'ckpt/epoch_60.pt'],
+    ['13:58', 'RESOURCE_HIGH', 'VRAM 96.5 %'],
+    ['14:13', 'PROGRESS', `epoch ${epoch}/100`],
+    ['14:15', 'ATTACHED', 'from browser'],
+  ];
+  $('s4events').innerHTML = ev.map(([a, k, v], i) => `<div style="opacity:${t >= 19.8 + i * 0.35 ? 1 : 0}">${a}  <b style="color:${k === 'RESOURCE_HIGH' ? 'var(--wait)' : k === 'ATTACHED' ? 'var(--accent-fg)' : ''}">${k}</b>  ${v}</div>`).join('');
+}
+
+// ---- 5 · commands -----------------------------------------------------------
+function renderS5(t) {
+  show('s5', t, 27, 36);
+  const P = '<span class="p">macbook</span> <span class="c">~/api</span> $ ';
+  const steps = [
+    [27.4, 'sentinal hook install', ['<span class="ok">Installed the Sentinal zsh hook in ~/.zshrc</span>', '<span class="dim">(backup: ~/.zshrc.sentinal-backup-1790594780781)</span>']],
+    [29.4, 'cargo build --release', ['<span class="dim">   Compiling api v0.3.1</span>', '    Finished `release` in 12.4s']],
+    [30.9, 'cargo test', ['test result: <span class="err">FAILED</span>. 41 passed; 1 failed']],
+    [32.3, 'git push origin main', ['To github.com:acme/api.git   a41c9e2..7f02d11']],
+  ];
+  let out = '';
+  for (const [start, cmd, result] of steps) {
+    if (t < start) break;
+    out += (out ? '\n' : '') + P + esc(typed(cmd, t, start, 30));
+    if (t >= done(cmd, start, 30) + 0.25) out += '\n' + result.join('\n');
+  }
+  if (t >= 33.6) out += '\n' + P + blink(t);
+  $('s5pre').innerHTML = out;
+
+  const rows = [
+    [29.95, true, 'cargo build --release', '12.4 s', 'macbook'],
+    [31.4, false, 'cargo test', '41.2 s', 'macbook'],
+    [32.9, true, 'git push origin main', '1.9 s', 'macbook'],
+    [27.8, null, 'python train.py --config moe.yaml', 'running', 'rtx-pc'],
+    [27.8, true, 'python benchmark.py', '3 m 12 s', 'rtx-pc'],
+  ];
+  const visible = rows.filter((r) => t >= r[0]).sort((a, b) => b[0] - a[0]);
+  const icon = (ok) => ok === null ? '<span style="color:var(--run)">●</span>' : ok ? '<span class="ok">✓</span>' : '<span class="err">✗</span>';
+  $('s5hist').innerHTML = '<div class="hrow head"><span></span><span>COMMAND</span><span class="r">DURATION</span><span class="r">MACHINE</span></div>' +
+    visible.map((r) => `<div class="hrow" style="background:${t - r[0] < 0.5 && r[0] > 28 ? 'rgba(61,90,254,.18)' : 'transparent'}">${icon(r[1])}<span>${esc(r[2])}</span><span class="r">${r[3]}</span><span class="r">${r[4]}</span></div>`).join('');
+  const code = [
+    '<span class="cm">// reported by the hook over a private 0600 socket</span>',
+    '<span class="t">LocalRequest</span>::<span class="t">ShellCommandFinished</span> {',
+    '    session_id: <span class="n">23</span>, sequence: <span class="n">2</span>, exit_code: <span class="n">1</span>,',
+    '    finished_at: <span class="n">1790594781203</span>,',
+    '}   <span class="cm">// text, cwd, timing — never output or keystrokes</span>',
+  ];
+  $('s5code').innerHTML = code.map((l, i) => `<div style="opacity:${t >= 31.7 + i * 0.12 ? 1 : 0}">${l}</div>`).join('');
+}
+
+// ---- 6 · adopt --------------------------------------------------------------
+function renderS6(t) {
+  show('s6', t, 36, 43);
+  const P = '<span class="p">macbook</span> <span class="c">~</span> $ ';
+  const cmd = 'sentinal adopt 4242 -t "Nightly export"';
+  let out = P + esc(typed(cmd, t, 36.4, 30));
+  const d = done(cmd, 36.4, 30);
+  if (t < d) out += blink(t);
+  if (t >= d + 0.25) out += '\nAdopted pid 4242 (Nightly export) as Session 18\n<span class="c">[ADOPTED · PROCESS]</span>\n<span class="dim">Sentinal only observes it: Metrics and lifecycle,\nno output or input. When it ends, its exit code\nwill be unknown.</span>';
+  if (t >= d + 0.9) out += '\n' + P + blink(t);
+  $('s6pre').innerHTML = out;
+
+  const card = $('s6card');
+  card.style.opacity = ease(seg(t, d + 0.3, d + 0.8));
+  card.style.transform = `translateX(${(1 - ease(seg(t, d + 0.3, d + 0.9))) * 60}px)`;
+  const ended = t >= 40.2;
+  $('s6tags').innerHTML = ended
+    ? '<span class="tag" style="background:var(--idle)"><svg viewBox="0 0 14 14"><path d="M2.5 7h9" stroke="#0A0A0A" stroke-width="2"/></svg>ENDED</span><span class="badge">PROCESS</span>'
+    : '<span class="tag" style="background:var(--run)"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="4.5" fill="#0A0A0A"/></svg>RUNNING</span><span class="badge">PROCESS</span>';
+  $('s6meta').innerHTML = ended
+    ? 'macbook · 41m · <b style="color:var(--text-1)">Ended · exit code unknown</b>'
+    : 'macbook · 38m · python export.py --all';
+  const cpu = ended ? 0 : Math.round(170 + 20 * Math.sin(t * 2));
+  $('s6cpu').textContent = `${cpu} %`; $('s6cpuf').style.width = `${cpu / 4}%`;
+  $('s6ram').textContent = ended ? '0 GB' : '3.1 GB'; $('s6ramf').style.width = ended ? '0%' : '31%';
+}
+
+// ---- 7 · private ------------------------------------------------------------
+function renderS7(t) {
+  show('s7', t, 43, 49);
+  const code = [
+    '<span class="cm"># ~/.config/terminal-agent/daemon.toml</span>',
+    'bind = <span class="s">"100.64.0.42:7420"</span>  <span class="cm"># example tailnet IP</span>',
+    '',
+    '<span class="cm"># refused at startup:</span>',
+    '<span class="cm"># bind = "0.0.0.0:7420"</span>',
+    '',
+    '<span class="err">refusing unsafe daemon bind address</span>',
+    '<span class="err">\'0.0.0.0:7420\'; use localhost or a</span>',
+    '<span class="err">Tailscale IP</span>',
+  ];
+  $('s7code').innerHTML = code.map((l, i) => `<div style="opacity:${t >= 43.4 + i * 0.18 ? 1 : 0}">${l || '&nbsp;'}</div>`).join('');
+  const items = [
+    ['Runs on your machines.', 'Sessions, history, and logs stay on disks you own.'],
+    ['Tailscale only. Never 0.0.0.0.', 'One owner password + a per-machine token.'],
+    ['No keystroke recording.', 'Remote input is audited by size — never content.'],
+  ];
+  const tick = '<svg width="26" height="26" viewBox="0 0 14 14"><path d="M2.6 7.2l3 3 5.8-6.4" stroke="#fff" stroke-width="2" fill="none"/></svg>';
+  $('s7list').innerHTML = items.map(([a, b], i) => {
+    const p = ease(seg(t, 44 + i * 0.7, 44.5 + i * 0.7));
+    return `<div class="check" style="opacity:${p}; transform:translateX(${(1 - p) * 40}px)"><div class="box">${tick}</div><div>${a}<small>${b}</small></div></div>`;
+  }).join('');
+}
+
+// ---- 8 · mobile -------------------------------------------------------------
+function renderS8(t) {
+  show('s8', t, 49, 55);
+  const phone = $('s8phone');
+  const p = ease(seg(t, 49.2, 50.2));
+  phone.style.transform = `translateY(${(1 - p) * 180}px) rotate(${(1 - p) * 4}deg)`;
+  const epoch = 74 + Math.floor(seg(t, 49.5, 54.8) * 3);
+  $('s8epoch').textContent = `rtx-pc · epoch ${epoch}/100 · loss 0.35`;
+  $('s8pf').style.width = `${epoch}%`;
+  const toast = $('s8toast');
+  const tp = ease(seg(t, 51.3, 51.8));
+  toast.style.transform = `translateY(${(1 - tp) * -140}px)`;
+  toast.style.opacity = tp;
+  document.querySelector('#s8phone .scr').style.paddingTop = `${74 + tp * 104}px`;
+  const pc = $('s8pytest');
+  if (t >= 51.5) pc.innerHTML = '<div class="n">pytest <span class="tag" style="height:26px; font-size:12px; background:var(--fail)">FAILED</span></div><div class="s">macbook · 3 failed · 182 passed</div>';
+  else pc.innerHTML = '<div class="n">pytest <span class="tag" style="height:26px; font-size:12px; background:var(--run)">RUNNING</span></div><div class="s">macbook · tests/ · 182 passed</div>';
+  $('s8soon').style.transform = `scale(${1 + 0.04 * Math.sin(t * 4)})`;
+}
+
+// ---- 9 · end ----------------------------------------------------------------
+function renderS9(t) {
+  show('s9', t, 55, DURATION + 1, 20);
+  const cmd = 'sentinal watch -- <your long job>';
+  $('s9cmd').innerHTML = '<span class="p">$</span> ' + esc(typed(cmd, t, 55.8, 28)) + blink(t);
+}
+
+window.renderAt = function renderAt(t) {
+  renderChrome(t);
+  renderS1(t); renderS2(t); renderS3(t); renderS4(t); renderS5(t);
+  renderS6(t); renderS7(t); renderS8(t); renderS9(t);
+};
+window.DURATION = DURATION;
+
+// Live preview when opened directly in a browser.
+if (!navigator.webdriver) {
+  const t0 = performance.now();
+  (function loop() { window.renderAt(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })();
+}
+</script>
+</body>
+</html>

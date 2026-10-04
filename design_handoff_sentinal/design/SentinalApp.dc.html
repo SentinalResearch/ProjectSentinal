@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="height:100vh; display:flex; background:var(--bg-0); color:var(--text-1); overflow:hidden">
+<aside style="width:{{ sideW }}; flex:none; display:flex; flex-direction:column; background:var(--bg-1); border-right:1px solid var(--line); transition:width .18s ease; overflow:hidden">
+<div style="height:60px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 12px 0 16px">
+<button onClick="{{ markClick }}" title="{{ markTitle }}" style="display:flex; align-items:center; gap:10px; height:32px; border:0; background:transparent; color:var(--text-1); padding:0 0 0 2px"><dc-import name="SentinalMark" size="{{ 20 }}" hint-size="20px,20px"></dc-import><sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="font-size:16px; font-weight:800; letter-spacing:-0.02em">Sentinal</span></sc-if></button>
+<sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><button onClick="{{ toggleSide }}" title="Toggle sidebar" style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; border:0; background:transparent; color:var(--text-2)" style-hover="background:var(--bg-2); color:var(--text-1)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.75" y="2.75" width="12.5" height="10.5"></rect><path d="M6 3v10"></path></svg></button></sc-if>
+</div>
+<div style="display:flex; flex-direction:column; gap:6px; padding:4px 12px 12px">
+<button onClick="{{ toRecipes }}" style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:13px; font-weight:700; white-space:nowrap" style-hover="border-color:var(--text-1)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" style="flex:none"><path d="M8 3v10M3 8h10"></path></svg><sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span>New session</span></sc-if></button>
+<button onClick="{{ toHistory }}" style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border:0; background:var(--bg-2); color:var(--text-3); font-size:13px; white-space:nowrap" style-hover="color:var(--text-1)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex:none"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5l3 3"></path></svg><sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="flex:1; text-align:left">Search history</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px">⌘K</span></sc-if></button>
+</div>
+<nav style="flex:1; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; padding:0 12px 12px; gap:1px">
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+<button onClick="{{ n.go }}" title="{{ n.label }}" style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border:0; background:{{ n.bg }}; color:{{ n.fg }}; font-size:14px; font-weight:{{ n.fw }}; white-space:nowrap; text-align:left" style-hover="background:var(--bg-2); color:var(--text-1)">
+<span style="width:16px; height:16px; flex:none; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700">{{ n.glyph }}</span>
+<sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="flex:1">{{ n.label }}</span><sc-if value="{{ n.badge }}"><span style="min-width:20px; height:18px; padding:0 5px; display:flex; align-items:center; justify-content:center; background:var(--s-waiting); color:var(--ink); font-size:11px; font-weight:800">{{ n.badge }}</span></sc-if></sc-if>
+</button>
+</sc-for>
+<sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}">
+<div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding:20px 10px 6px">MACHINES</div>
+<sc-for list="{{ machines }}" as="m" hint-placeholder-count="3">
+<button onClick="{{ m.go }}" style="height:34px; display:flex; align-items:center; gap:10px; padding:0 10px; border:0; background:{{ m.bg }}; color:{{ m.fg }}; font-size:14px; font-weight:{{ m.fw }}; white-space:nowrap; text-align:left" style-hover="background:var(--bg-2)">
+<span style="width:8px; height:8px; flex:none; margin:0 4px; background:{{ m.dot }}; box-shadow:{{ m.ring }}"></span><span style="flex:1">{{ m.name }}</span><span style="font-size:12px; color:var(--text-3)">{{ m.meta }}</span>
+</button>
+</sc-for>
+<div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding:20px 10px 6px">PROJECTS</div>
+<sc-for list="{{ projects }}" as="p" hint-placeholder-count="2">
+<button onClick="{{ p.go }}" style="height:34px; display:flex; align-items:center; gap:10px; padding:0 10px; border:0; background:{{ p.bg }}; color:{{ p.fg }}; font-size:14px; font-weight:{{ p.fw }}; white-space:nowrap; text-align:left" style-hover="background:var(--bg-2)">
+<span style="width:16px; flex:none; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3); text-align:center">#</span><span style="flex:1; overflow:hidden; text-overflow:ellipsis">{{ p.name }}</span><span style="font-size:12px; color:var(--text-3)">{{ p.meta }}</span>
+</button>
+</sc-for>
+</sc-if>
+</nav>
+<div style="flex:none; border-top:1px solid var(--line); padding:8px 12px 12px; display:flex; flex-direction:column; gap:1px">
+<button onClick="{{ toSettings }}" title="Settings" style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border:0; background:{{ setBg }}; color:{{ setFg }}; font-size:14px; white-space:nowrap; text-align:left" style-hover="background:var(--bg-2); color:var(--text-1)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex:none"><path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"></path><rect x="9" y="3" width="3" height="3"></rect><rect x="4" y="10" width="3" height="3"></rect></svg><sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span>Settings</span></sc-if></button>
+<button onClick="{{ toggleTheme }}" title="Theme" style="height:36px; display:flex; align-items:center; gap:10px; padding:0 10px; border:0; background:transparent; color:var(--text-2); font-size:14px; white-space:nowrap; text-align:left" style-hover="background:var(--bg-2); color:var(--text-1)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex:none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor"></path></svg><sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span>{{ themeLabel }}</span></sc-if></button>
+<div style="display:flex; align-items:center; gap:10px; height:44px; padding:0 10px; margin-top:4px">
+<span style="width:24px; height:24px; flex:none; display:flex; align-items:center; justify-content:center; background:var(--text-1); color:var(--bg-0); font-size:12px; font-weight:800">A</span>
+<sc-if value="{{ expanded }}" hint-placeholder-val="{{ true }}"><span style="flex:1; font-size:14px; font-weight:600">admin</span><button onClick="{{ signOut }}" style="height:28px; padding:0 8px; border:0; background:transparent; color:var(--text-3); font-size:12px; font-weight:600" style-hover="color:var(--text-1)">Sign out</button></sc-if>
+</div>
+</div>
+</aside>
+
+<main style="flex:1; min-width:0; height:100%; overflow:auto; background:var(--bg-0)">
+<sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}"><dc-import name="SentinalOverview" go="{{ go }}" params="{{ params }}" hint-size="100%,100%"></dc-import></sc-if>
+<sc-if value="{{ isSession }}"><dc-import name="SentinalSession" go="{{ go }}" params="{{ params }}" hint-size="100%,100%"></dc-import></sc-if>
+<sc-if value="{{ isSplit }}"><dc-import name="SentinalSplit" go="{{ go }}" params="{{ params }}" hint-size="100%,100%"></dc-import></sc-if>
+<sc-if value="{{ isProject }}"><dc-import name="SentinalProject" go="{{ go }}" params="{{ params }}" hint-size="100%,100%"></dc-import></sc-if>
+<sc-if value="{{ isHistory }}"><dc-import name="SentinalHistory" go="{{ go }}" params="{{ params }}" hint-size="100%,100%"></dc-import></sc-if>
+<sc-if value="{{ isRecipes }}"><dc-import name="SentinalRecipes" go="{{ go }}" params="{{ params }}" hint-size="100%,100%"></dc-import></sc-if>
+<sc-if value="{{ isSettings }}"><dc-import name="SentinalSettings" go="{{ go }}" params="{{ params }}" sign-out="{{ signOut }}" expire="{{ expire }}" hint-size="100%,100%"></dc-import></sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { collapsed: typeof window !== 'undefined' && window.innerWidth < 1200 };
+  componentDidMount() {
+    this.narrow = window.innerWidth < 1200;
+    this.onResize = () => { const n = window.innerWidth < 1200; if (n !== this.narrow) { this.narrow = n; this.setState({ collapsed: n }); } };
+    window.addEventListener('resize', this.onResize);
+    this.onKey = e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.props.go && this.props.go('app/history'); } };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this.onKey); window.removeEventListener('resize', this.onResize); }
+  renderVals() {
+    const go = this.props.go || (() => {});
+    const scr = this.props.screen || 'overview';
+    const p = this.props.params || {};
+    const exp = !this.state.collapsed;
+    const act = on => ({ bg: on ? 'var(--bg-2)' : 'transparent', fg: on ? 'var(--text-1)' : 'var(--text-2)', fw: on ? 700 : 500 });
+    const nav = [
+      ['overview', 'Overview', '▦', 3], ['split', 'Split view', '◫', 0], ['history', 'History', '↺', 0], ['recipes', 'Recipes', '≡', 0]
+    ].map(([k, label, glyph, badge]) => ({ label, glyph, badge, go: () => go('app/' + k), ...act(scr === k && !(k === 'overview' && p.machine)) }));
+    const machines = [
+      { id: 'rtx', name: 'RTX-PC', meta: '4', dot: 'var(--s-running)', ring: 'none' },
+      { id: 'mini', name: 'Mac Mini', meta: '2', dot: 'var(--s-running)', ring: 'none' },
+      { id: 'mbp', name: 'MacBook', meta: 'offline', dot: 'transparent', ring: 'inset 0 0 0 1.5px var(--s-disconnected-fg)' }
+    ].map(m => { const a = act(scr === 'overview' && p.machine === m.id); return { ...m, ...a, fg: m.id === 'mbp' && !(p.machine === 'mbp') ? 'var(--text-3)' : a.fg, go: () => go('app/overview', { machine: m.id }) }; });
+    const projects = [{ id: 'tim', name: 'TIM', meta: '2' }, { id: 'maa', name: 'MentalAnimAItion', meta: '1' }]
+      .map(x => ({ ...x, ...act(scr === 'project' && (p.id || 'tim') === x.id), go: () => go('app/project', { id: x.id }) }));
+    const sa = act(scr === 'settings');
+    return {
+      sideW: exp ? '264px' : '57px', expanded: exp, toggleSide: () => this.setState({ collapsed: exp }),
+      markClick: exp ? () => go('app/overview') : () => this.setState({ collapsed: false }), markTitle: exp ? 'Overview' : 'Expand sidebar',
+      nav, machines, projects, setBg: sa.bg, setFg: sa.fg,
+      toOverview: () => go('app/overview'), toRecipes: () => go('app/recipes'), toHistory: () => go('app/history'), toSettings: () => go('app/settings'),
+      toggleTheme: this.props.toggleTheme, themeLabel: this.props.theme === 'light' ? 'Dark theme' : 'Light theme', signOut: this.props.signOut, expire: this.props.expire,
+      go, params: p,
+      isOverview: scr === 'overview', isSession: scr === 'session', isSplit: scr === 'split', isProject: scr === 'project', isHistory: scr === 'history', isRecipes: scr === 'recipes', isSettings: scr === 'settings'
+    };
+  }
+}
+</script>
+</body>
+</html>

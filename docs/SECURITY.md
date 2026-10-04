@@ -1,27 +1,42 @@
 # Security and privacy
 
-This document separates protections implemented today from Milestone 1b
-requirements. A planned guarantee is not considered active until its tests
-and roadmap checkbox are complete.
+This document separates implemented protections from known release gates. A
+planned guarantee is not considered active until its tests and roadmap
+checkbox are complete. The live remediation status is in `AUDIT_TRACKER.md`.
 
 ## Current remote boundary
 
 - The daemon accepts only loopback or Tailscale addresses and rejects
   `0.0.0.0`, `::`, and ordinary LAN addresses.
-- `/api/v1/health` is public; every other HTTP or WebSocket route requires a
-  bearer credential.
+- Route authentication is explicit by class: health and auth status/login are
+  public; first setup requires the local Machine token; terminal/data routes
+  accept an authorized Machine token or owner browser Session; registry and
+  pairing-management routes require an owner browser Session; pairing
+  exchange uses its single-use code; link heartbeat/refresh/disconnect and
+  worker identity use their directional link credentials.
 - The Machine token is generated from 256 random bits, stored mode `0600`,
   compared without early exit, and retained for CLI/bootstrap access.
 - One owner password is stored only as an Argon2id hash. Browser sessions
   expire, logout and password change revoke them, and password attempts are
-  rate-limited per client address.
+  rate-limited per client key. Direct mode uses the peer IP. Tailscale Serve
+  mode currently accepts `Tailscale-User-Login` from a loopback proxy; a
+  second global limiter is still required because another local process can
+  spoof that header and vary the key.
+- The current web client stores its 24-hour owner bearer in `localStorage` and
+  supplies it in the terminal WebSocket query. Replacing that transport with
+  an HttpOnly owner cookie or a short-lived one-use WebSocket ticket is a V1
+  release blocker; deployments must treat same-origin script access and URL
+  logging as credential exposure until it is fixed.
 - Every remote terminal input frame appends timestamp, client address,
   Session ID, and byte count to `audit.jsonl`. The input payload is excluded.
 - Finished FULL Sessions reject input, resize, signal, and kill before a PTY
   handle or input audit entry is touched. A closed-device race is reconciled
   once and returned as a stable Session error, never a raw OS `EIO`.
 - PTY output is retained in compressed Session logs. Terminal output is
-  untrusted and is never executed.
+  untrusted and is never executed. Per-Session in-memory scrollback is
+  bounded, but total compressed-log and JSONL audit quotas, rotation, and
+  secure purge are still V1 release blockers because output may contain
+  printed secrets.
 - The daemon creates its data directory and `sessions/` as `0700`, and
   Session logs, SQLite (with its WAL/SHM files), and audit logs as `0600`,
   whatever the umask. An existing data directory or database that is wider is
@@ -111,7 +126,9 @@ vendor cloud. The approved design is recorded in
   paths, and plain HTTP (outside development) are refused at startup.
 - **Tailscale Serve identity.** With `behind_tailscale_serve = true`, login
   lockout keys on `Tailscale-User-Login` from loopback peers only, so one
-  tailnet user cannot lock out another; the header is ignored otherwise.
+  tailnet user cannot lock out another; the header is ignored otherwise. The
+  loopback trust boundary does not authenticate the local proxy process, so a
+  spoof-resistant or global secondary attempt budget remains required.
 - **Redaction.** Codes and credentials are a `Secret` type whose `Debug` and
   `Display` print `[redacted]`. `pairing-audit.jsonl` (control) and
   `link-audit.jsonl` (worker) are owner-only and record kind, IDs, peer, and

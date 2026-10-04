@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="height:100%; display:grid; grid-template-columns:minmax(200px,280px) minmax(0,1fr); min-height:560px">
+<aside style="border-right:1px solid var(--line); display:flex; flex-direction:column; padding:40px 0 24px">
+<div style="display:flex; align-items:baseline; justify-content:space-between; padding:0 24px 16px"><h1 style="margin:0; font-size:28px; line-height:30px; font-weight:800; letter-spacing:-0.03em">Recipes</h1><span style="font-size:13px; color:var(--text-3)">1</span></div>
+<div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding:8px 24px; border-top:2px solid var(--text-1); margin:0 24px 0 24px; padding-left:0">SERVERS</div>
+<button style="display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:12px 24px; border:0; background:var(--bg-1); color:var(--text-1); text-align:left; box-shadow:inset 2px 0 0 var(--accent)"><span style="font-size:15px; font-weight:700">Qwen vLLM Server</span><span style="font-size:12px; color:var(--text-3)">RTX-PC · 3 parameters</span></button>
+<div style="flex:1"></div>
+<div style="padding:0 24px"><button disabled="{{ true }}" style="width:100%; height:36px; border:1px dashed var(--line-strong); background:transparent; color:var(--text-3); font-size:13px; font-weight:700">+ New recipe</button></div>
+</aside>
+<section style="overflow:auto; padding:40px clamp(20px,4vw,48px) 64px">
+<div style="max-width:760px; display:flex; flex-direction:column; gap:32px; animation:sn-in .25s ease-out">
+<header style="display:flex; flex-direction:column; gap:8px; border-bottom:2px solid var(--text-1); padding-bottom:18px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">RUN RECIPE</span>
+<h2 style="margin:0; font-size:40px; line-height:42px; font-weight:800; letter-spacing:-0.035em">Qwen vLLM Server</h2>
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-2)">vllm serve {model} --port {port} --max-model-len {context}</span>
+</header>
+<form onSubmit="{{ run }}" style="display:flex; flex-direction:column; gap:32px">
+<div style="display:flex; flex-direction:column">
+<span style="font-size:15px; font-weight:800; padding-bottom:8px; border-bottom:1px solid var(--line)">Parameters</span>
+<sc-for list="{{ fields }}" as="f" hint-placeholder-count="3">
+<label style="display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; padding:12px 0; border-bottom:1px solid var(--line)">
+<span style="flex:0 0 130px; display:flex; flex-direction:column"><span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700">{{ f.key }}</span><span style="font-size:12px; color:var(--text-3)">default {{ f.def }}</span></span>
+<span style="flex:1 1 220px; min-width:0; display:flex; flex-direction:column; gap:4px"><input value="{{ f.val }}" onChange="{{ f.onChange }}" inputmode="{{ f.mode }}" spellcheck="false" style="height:40px; padding:0 12px; border:1px solid {{ f.bd }}; background:transparent; color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:14px"></input><sc-if value="{{ f.err }}"><span style="font-size:12px; font-weight:600; color:var(--s-failed-fg)">{{ f.err }}</span></sc-if><sc-if value="{{ f.warn }}"><span style="font-size:12px; font-weight:600; color:var(--s-waiting-fg)">{{ f.warn }}</span></sc-if></span>
+<button type="button" onClick="{{ f.reset }}" disabled="{{ f.isDef }}" style="flex:none; width:56px; height:32px; border:0; background:transparent; color:{{ f.rc }}; font-size:12px; font-weight:600">Reset</button>
+</label>
+</sc-for>
+</div>
+<div style="display:flex; flex-direction:column">
+<span style="font-size:15px; font-weight:800; padding-bottom:8px; border-bottom:1px solid var(--line)">Target machine</span>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1px; background:var(--line); border-bottom:1px solid var(--line)">
+<sc-for list="{{ machines }}" as="m" hint-placeholder-count="3">
+<button type="button" onClick="{{ m.pick }}" disabled="{{ m.off }}" style="display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:14px 14px 16px; border:0; background:{{ m.bg }}; color:{{ m.fg }}; text-align:left">
+<span style="display:flex; align-items:center; gap:8px; width:100%"><span style="width:14px; height:14px; flex:none; box-shadow:inset 0 0 0 1.5px {{ m.rb }}; display:flex; align-items:center; justify-content:center"><span style="width:6px; height:6px; background:{{ m.dotSel }}"></span></span><span style="font-size:15px; font-weight:700">{{ m.name }}</span></span>
+<span style="font-size:12px; color:{{ m.sub }}; padding-left:22px">{{ m.meta }}</span>
+</button>
+</sc-for>
+</div>
+</div>
+<div style="display:flex; flex-direction:column; gap:8px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">COMMAND PREVIEW</span>
+<div style="background:var(--term-bg); color:var(--term-fg); padding:16px 18px; font-family:'JetBrains Mono',monospace; font-size:14px; line-height:22px; overflow-wrap:anywhere"><span style="color:#8A8A86">{{ target }} $ </span>{{ preview }}</div>
+</div>
+<div style="display:flex; align-items:center; gap:12px">
+<button type="submit" disabled="{{ blocked }}" style="height:48px; padding:0 24px; border:0; background:{{ runBg }}; color:{{ runFg }}; font-size:15px; font-weight:700; display:flex; align-items:center; gap:10px"><sc-if value="{{ running }}"><span class="tg-motion" style="width:12px; height:12px; border:2px solid var(--on-accent); border-right-color:transparent; animation:tg-spin .8s linear infinite"></span></sc-if>{{ runLabel }}</button>
+<span style="font-size:13px; color:var(--text-3)">Starts a new session and opens it.</span>
+</div>
+</form>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  DEF = { model:'Qwen/Qwen3-8B', port:'8000', context:'32768' };
+  state = { v: { ...this.DEF }, m:'rtx', running:false };
+  renderVals() {
+    const go = this.props.go || (() => {});
+    const { v, m, running } = this.state;
+    const errs = {
+      model: v.model.trim() ? '' : 'Required',
+      port: /^\d+$/.test(v.port) && +v.port >= 1 && +v.port <= 65535 ? '' : 'Port must be 1–65535',
+      context: /^\d+$/.test(v.context) && +v.context > 0 ? '' : 'Must be a positive integer'
+    };
+    const warns = { port: m === 'rtx' && v.port === '8000' && !errs.port ? ':8000 is already used by vLLM on RTX-PC' : '' };
+    const fields = ['model','port','context'].map(key => ({ key, def:this.DEF[key], val:v[key], mode: key === 'model' ? 'text' : 'numeric',
+      onChange: e => { const x = e.target.value; this.setState(s => ({ v: { ...s.v, [key]: x } })); },
+      reset: () => this.setState(s => ({ v: { ...s.v, [key]: this.DEF[key] } })), isDef: v[key] === this.DEF[key], rc: v[key] === this.DEF[key] ? 'var(--text-3)' : 'var(--accent-fg)',
+      err: errs[key], warn: warns[key] || '', bd: errs[key] ? 'var(--s-failed-fg)' : 'var(--line-strong)' }));
+    const ms = [{ id:'rtx', name:'RTX-PC', meta:'Online · RTX 4090 24 GB', off:false },{ id:'mini', name:'Mac Mini', meta:'Online · M2 Pro 32 GB', off:false },{ id:'mbp', name:'MacBook', meta:'Offline · 14m ago', off:true }]
+      .map(x => { const on = x.id === m; return { ...x, pick: () => this.setState({ m:x.id }), bg: on ? 'var(--bg-1)' : 'var(--bg-0)', fg: x.off ? 'var(--text-3)' : 'var(--text-1)', sub: 'var(--text-3)',
+        rb: on ? 'var(--text-1)' : 'var(--line-strong)', dotSel: on ? 'var(--text-1)' : 'transparent' }; });
+    const names = { rtx:'RTX-PC', mini:'Mac Mini' };
+    const bad = Object.values(errs).some(Boolean);
+    return {
+      fields, machines: ms, target: names[m], preview: `vllm serve ${v.model} --port ${v.port} --max-model-len ${v.context}`,
+      blocked: bad || running, running, runLabel: running ? 'Starting…' : `Run on ${names[m]}`,
+      runBg: bad ? 'var(--bg-2)' : 'var(--accent)', runFg: bad ? 'var(--text-3)' : 'var(--on-accent)',
+      run: e => { e.preventDefault(); if (bad || running) return; this.setState({ running:true }); setTimeout(() => go('app/session', { id:'vllm' }), 900); }
+    };
+  }
+}
+</script>
+</body>
+</html>

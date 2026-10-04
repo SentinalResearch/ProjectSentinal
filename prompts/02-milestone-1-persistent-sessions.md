@@ -1,5 +1,9 @@
 # MILESTONE 1 — Persistent sessions (v0.1)
 
+> Historical build prompt: the shipped service names are now
+> `sentinald.service` and `dev.sentinal.sentinald.plist`; the `tad` names below
+> describe the original compatibility path.
+
 Goal: start `python long_job.py`, close every client, reattach later from
 another device and see the same process and the same screen.
 

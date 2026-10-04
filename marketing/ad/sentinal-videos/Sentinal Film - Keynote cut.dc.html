@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sentinal — keynote cut</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;height:100%;background:#000}a{color:#8C9EFF}a:hover{color:#F2F2F0}</style>
+<script>window.OM_SCENES = '[{"name":"Night","dur":6,"desc":"Black. One green RUNNING dot pulses. It\'s 2 a.m. / Your model is still training."},{"name":"Mark","dur":5,"desc":"The dot turns blue and the slash draws beside it: the Sentinal mark. Sentinal keeps watch."},{"name":"Machines","dur":11,"desc":"Every session. Every machine. Laptop floats up in perspective, needs-you cards rise, camera pushes in."},{"name":"Going","dur":10,"desc":"Giant 68 % count, loss curve draws 0.41 to 0.37, HEALTHY. Know how it\'s going."},{"name":"Reach","dur":10,"desc":"Phone floats in, notification at 2:04, tap, answer y. Answer from anywhere."},{"name":"Terminal","dur":9,"desc":"The real terminal. Four panes tilt up and settle flat. One tap away."},{"name":"End","dur":9,"desc":"Mark draws, Sentinal, tagline, Coming soon., github.com/SentinalResearch, fade to black"}]';</script>
+<script>window.OM_PLAYBACK = '{"mode":"loop"}';</script>
+</helmet>
+<div style="position:fixed; inset:0; background:#000">
+<x-import component-from-global-scope="SentinalKeynote" from="./animations-v3.jsx ./sentinal-keynote.jsx" format="{{ format }}" hint-size="100%,100%" style="position:absolute; inset:0"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;format&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;16:9&quot;,&quot;1:1&quot;,&quot;9:16&quot;],&quot;default&quot;:&quot;16:9&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;motionEditor&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() { return { format: this.props.format ?? '16:9' }; }
+}
+</script>
+</body>
+</html>

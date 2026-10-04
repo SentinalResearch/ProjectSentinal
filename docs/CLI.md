@@ -130,7 +130,8 @@ sentinal update --rollback VERSION [--prefix DIR]
 
 `doctor` reads local installation/configuration state and invokes the native
 service manager and Tailscale status commands. It makes no enrollment request
-and reports `Pairing: UNPAIRED` until Milestone 4.0 exists.
+and reports `Pairing: UNPAIRED` until the worker is explicitly enrolled with
+`sentinal connect`.
 
 `update` reads the credential-free HTTPS `.ts.net` origin from
 `<prefix>/share/sentinal/release.json`, downloads the same bounded bootstrap

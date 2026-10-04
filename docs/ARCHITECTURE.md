@@ -2,8 +2,8 @@
 
 ## Shape
 
-One Rust binary per machine (`sentinald`, currently built as `tad`), a
-TypeScript web app, the `sentinal` CLI (currently `ta`), and an
+One Rust daemon per machine (`sentinald`, with `tad` as a compatibility
+alias), a TypeScript web app, the `sentinal` CLI (`ta` compatibility alias), and an
 optional Python **intelligence** service. They all speak one protocol,
 defined once in `crates/protocol`.
 
@@ -41,8 +41,10 @@ sentinal/
 ├── shell/               zsh/bash/fish hooks (OSC 133) (Milestone 2)
 ├── scripts/             development launchers and offline tests
 ├── web/                 Vite + xterm.js PWA           (Milestone 1)
-├── intelligence/        Python agent + training       (V2)
-└── recipes/             built-in TOML recipes         (Milestone 4)
+├── eval/                deterministic model-evaluation foundation
+├── recipes/             built-in TOML recipes         (Milestone 4)
+├── design_handoff_sentinal/ source design references
+└── marketing/           reproducible product-film source
 ```
 
 ## Key decisions
@@ -78,10 +80,13 @@ the existing `SESSION_UPDATED` message. No watcher path uses a model.
 ## Installation and Machine enrollment
 
 One owner-selected Machine may run the local control role in addition to its
-normal `sentinald` responsibilities. It serves the PWA and verified worker
-packages to ACL-authorized Tailnet peers. This is local infrastructure, not a
-required cloud service. Session aggregation/routing remains a later approved
-design decision.
+normal `sentinald` responsibilities. It serves verified worker packages and is
+the approved authenticated origin for the PWA; the source-tree path still uses
+a separate Vite development server, and production PWA delivery remains a V1
+gate. This is local infrastructure, not a required cloud service. The browser
+authenticates to the control origin. The control daemon maintains one
+independently credentialed connection per enrolled worker and routes
+terminal/data operations only to the Machine that owns the selected Session.
 
 Installation and authority are separate boundaries:
 
@@ -104,6 +109,9 @@ Tailnet HTTPS package service
 - Pairing exchanges the code for a credential unique to that Machine. The
   Machine token stays local and remains the daemon's local CLI/bootstrap
   boundary.
+- Before proxying terminal or output traffic, the control authenticates the
+  worker's `/api/v1/link/identity` response and pins its immutable Machine ID.
+  Worker endpoints and credentials never enter browser responses or storage.
 - Removing or revoking a Machine does not uninstall it or delete its local
   Sessions. Reconnecting is an explicit owner-authorized action.
 

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="height:100%; display:grid; grid-template-columns:240px minmax(0,1fr); min-height:560px">
+<aside style="border-right:1px solid var(--line); padding:40px 0 24px; display:flex; flex-direction:column; gap:1px">
+<h1 style="margin:0 24px 16px; font-size:28px; line-height:30px; font-weight:800; letter-spacing:-0.03em">Settings</h1>
+<div style="height:2px; background:var(--text-1); margin:0 24px 8px"></div>
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.pick }}" style="height:40px; padding:0 24px; border:0; background:{{ t.bg }}; color:{{ t.fg }}; font-size:14px; font-weight:{{ t.fw }}; text-align:left; box-shadow:{{ t.bar }}" style-hover="color:var(--text-1)">{{ t.label }}</button></sc-for>
+</aside>
+<section style="overflow:auto; padding:40px 48px 64px">
+<div style="max-width:960px; display:flex; flex-direction:column; gap:32px; animation:sn-in .2s ease-out">
+
+<sc-if value="{{ isMachines }}" hint-placeholder-val="{{ true }}">
+<header style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; border-bottom:2px solid var(--text-1); padding-bottom:16px">
+<div style="display:flex; flex-direction:column; gap:6px"><h2 style="margin:0; font-size:32px; line-height:34px; font-weight:800; letter-spacing:-0.03em">Machines &amp; tokens</h2><span style="font-size:14px; color:var(--text-2)">Each machine runs an agent that authenticates with its own token.</span></div>
+<button onClick="{{ openPair }}" style="height:40px; padding:0 18px; border:0; background:var(--accent); color:var(--on-accent); font-size:14px; font-weight:700">Pair new machine</button>
+</header>
+<div style="display:flex; flex-direction:column; overflow-x:auto">
+<div style="min-width:840px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) 150px 170px 170px; gap:16px; padding-bottom:8px; border-bottom:1px solid var(--line); font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)"><span>MACHINE</span><span>HARDWARE</span><span>STATUS</span><span>TOKEN</span><span></span></div>
+<sc-for list="{{ machines }}" as="m" hint-placeholder-count="3">
+<div style="min-width:840px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) 150px 170px 170px; gap:16px; align-items:center; min-height:60px; border-bottom:1px solid var(--line)">
+<div style="display:flex; flex-direction:column"><span style="font-size:15px; font-weight:700">{{ m.name }}</span><span style="font-size:12px; color:var(--text-3)">{{ m.os }}</span></div>
+<span style="font-size:13px; color:var(--text-2)">{{ m.hw }}</span>
+<span style="display:flex; align-items:center; gap:6px; font-size:13px; color:{{ m.sc }}"><span style="width:7px; height:7px; background:{{ m.dot }}; box-shadow:{{ m.ring }}"></span>{{ m.status }}</span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--text-2)">{{ m.token }}</span>
+<div style="display:flex; gap:4px; justify-content:flex-end">
+<sc-if value="{{ m.confirming }}"><span style="font-size:12px; font-weight:600; align-self:center; color:var(--s-failed-fg)">Revoke?</span><button onClick="{{ m.doRevoke }}" style="height:30px; padding:0 10px; border:0; background:var(--s-failed); color:var(--ink); font-size:12px; font-weight:700">Revoke</button><button onClick="{{ m.cancel }}" style="height:30px; padding:0 10px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:12px; font-weight:600">Keep</button></sc-if>
+<sc-if value="{{ m.idle }}"><button onClick="{{ m.rotate }}" style="height:30px; padding:0 10px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:12px; font-weight:600" style-hover="border-color:var(--text-1)">Rotate</button><button onClick="{{ m.revoke }}" style="height:30px; padding:0 10px; border:1px solid var(--line-strong); background:transparent; color:var(--s-failed-fg); font-size:12px; font-weight:600">Revoke…</button></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ isNotif }}">
+<header style="display:flex; flex-direction:column; gap:6px; border-bottom:2px solid var(--text-1); padding-bottom:16px"><h2 style="margin:0; font-size:32px; line-height:34px; font-weight:800; letter-spacing:-0.03em">Notifications</h2><span style="font-size:14px; color:var(--text-2)">Choose which events send a push notification, per session.</span></header>
+<div style="display:flex; flex-direction:column; overflow-x:auto">
+<div style="min-width:660px; display:grid; grid-template-columns:minmax(0,1.6fr) repeat(5,88px); gap:8px; padding-bottom:8px; border-bottom:1px solid var(--line); font-size:11px; font-weight:700; letter-spacing:0.06em; color:var(--text-3)"><span>SESSION</span><sc-for list="{{ kinds }}" as="k" hint-placeholder-count="5"><span style="text-align:center">{{ k }}</span></sc-for></div>
+<sc-for list="{{ rules }}" as="r" hint-placeholder-count="6">
+<div style="min-width:660px; display:grid; grid-template-columns:minmax(0,1.6fr) repeat(5,88px); gap:8px; align-items:center; min-height:52px; border-bottom:1px solid var(--line); background:{{ r.rowBg }}">
+<div style="display:flex; flex-direction:column; padding-left:{{ r.pl }}"><span style="font-size:14px; font-weight:700">{{ r.name }}</span><span style="font-size:12px; color:var(--text-3)">{{ r.machine }}</span></div>
+<sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5"><button onClick="{{ c.toggle }}" aria-pressed="{{ c.on }}" title="{{ c.title }}" style="justify-self:center; width:44px; height:44px; border:0; background:transparent; display:flex; align-items:center; justify-content:center"><span style="width:20px; height:20px; display:flex; align-items:center; justify-content:center; background:{{ c.bg }}; box-shadow:inset 0 0 0 1.5px {{ c.bd }}; color:var(--bg-0); font-size:13px; font-weight:800">{{ c.mark }}</span></button></sc-for>
+</div>
+</sc-for>
+</div>
+<div style="display:flex; flex-direction:column; gap:10px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">PREVIEW</span>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px">
+<div style="background:var(--bg-1); padding:12px 14px; display:flex; gap:12px; box-shadow:inset 3px 0 0 var(--s-failed)"><div style="display:flex; flex-direction:column; gap:2px"><span style="font-size:12px; font-weight:700">Sentinal</span><span style="font-size:13px; line-height:18px">RTX-PC · pytest: failed — 3 failures in molecule correspondence tests</span></div></div>
+<div style="background:var(--bg-1); padding:12px 14px; display:flex; gap:12px; box-shadow:inset 3px 0 0 var(--s-waiting)"><div style="display:flex; flex-direction:column; gap:2px"><span style="font-size:12px; font-weight:700">Sentinal</span><span style="font-size:13px; line-height:18px">Mac Mini · npm install: waiting for input — Continue? [y/N]</span></div></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isAccount }}">
+<header style="display:flex; flex-direction:column; gap:6px; border-bottom:2px solid var(--text-1); padding-bottom:16px"><h2 style="margin:0; font-size:32px; line-height:34px; font-weight:800; letter-spacing:-0.03em">Account</h2><span style="font-size:14px; color:var(--text-2)">One admin account. Signed-in browsers are listed below.</span></header>
+<form onSubmit="{{ changePw }}" style="display:flex; flex-direction:column; gap:14px; max-width:420px">
+<span style="font-size:15px; font-weight:800">Change password</span>
+<sc-for list="{{ pwFields }}" as="f" hint-placeholder-count="3"><label style="display:flex; flex-direction:column; gap:6px"><span style="font-size:13px; font-weight:600">{{ f.label }}</span><input type="password" value="{{ f.val }}" onChange="{{ f.on }}" style="height:44px; padding:0 12px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:15px"></input></label></sc-for>
+<sc-if value="{{ pwMsg }}"><span style="font-size:13px; font-weight:600; color:{{ pwMsgC }}">{{ pwMsg }}</span></sc-if>
+<button type="submit" style="align-self:flex-start; height:40px; padding:0 18px; border:1.5px solid var(--text-1); background:transparent; color:var(--text-1); font-size:14px; font-weight:700">Update password</button>
+</form>
+<div style="display:flex; flex-direction:column">
+<span style="font-size:15px; font-weight:800; padding-bottom:8px; border-bottom:1px solid var(--line)">Signed-in browsers</span>
+<div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:center; min-height:56px; border-bottom:1px solid var(--line)"><div style="display:flex; flex-direction:column"><span style="font-size:14px; font-weight:700">This browser</span><span style="font-size:12px; color:var(--text-3)">Active now</span></div><button onClick="{{ signOut }}" style="height:32px; padding:0 12px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:13px; font-weight:600">Sign out</button></div>
+</div>
+<div style="display:flex; align-items:center; gap:12px; padding:14px 16px; border:1px dashed var(--line-strong)"><span style="font-size:12px; font-weight:700; letter-spacing:0.06em; color:var(--text-3)">PROTOTYPE</span><button onClick="{{ expire }}" style="height:32px; padding:0 12px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:13px; font-weight:600">Simulate session expiry</button></div>
+</sc-if>
+</div>
+</section>
+
+<sc-if value="{{ pairOpen }}">
+<div onClick="{{ closePair }}" style="position:fixed; inset:0; z-index:50; background:var(--scrim); display:flex; align-items:center; justify-content:center; padding:24px; animation:sn-in .15s ease-out">
+<div onClick="{{ stop }}" role="dialog" style="width:100%; max-width:520px; background:var(--bg-1); box-shadow:inset 0 4px 0 var(--accent), 0 24px 64px rgba(0,0,0,.45); padding:28px 24px 24px; display:flex; flex-direction:column; gap:20px">
+<div style="display:flex; justify-content:space-between; align-items:baseline"><span style="font-size:11px; font-weight:800; letter-spacing:0.08em; color:var(--accent-fg)">PAIR NEW MACHINE · STEP {{ stepN }} OF 3</span><button onClick="{{ closePair }}" style="border:0; background:transparent; color:var(--text-2); font-size:18px; width:28px; height:28px">×</button></div>
+<sc-if value="{{ step1 }}">
+<form onSubmit="{{ genToken }}" style="display:flex; flex-direction:column; gap:18px">
+<span style="font-size:26px; line-height:30px; font-weight:800; letter-spacing:-0.02em">Name the machine</span>
+<label style="display:flex; flex-direction:column; gap:6px"><span style="font-size:13px; font-weight:600">Display name</span><input value="{{ pairName }}" onChange="{{ onPairName }}" autofocus="{{ true }}" placeholder="e.g. Office PC" style="height:44px; padding:0 12px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:15px"></input></label>
+<button type="submit" disabled="{{ noName }}" style="height:44px; border:0; background:{{ genBg }}; color:{{ genFg }}; font-size:14px; font-weight:700">Generate pairing token</button>
+</form>
+</sc-if>
+<sc-if value="{{ step2 }}">
+<div style="display:flex; flex-direction:column; gap:16px">
+<span style="font-size:26px; line-height:30px; font-weight:800; letter-spacing:-0.02em">Run this on {{ pairName }}</span>
+<div style="background:var(--term-bg); color:var(--term-fg); padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:14px; line-height:22px; overflow-wrap:anywhere">sentinal-agent pair {{ token }}</div>
+<div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-2)"><span>One-time token · expires in <b style="color:var(--text-1)">{{ ttl }}</b></span><button onClick="{{ copy }}" style="border:0; background:transparent; padding:0; color:var(--accent-fg); font-size:13px; font-weight:700">{{ copyLabel }}</button></div>
+<div style="display:flex; flex-direction:column; gap:8px; padding-top:6px; border-top:1px solid var(--line)"><span style="font-size:13px; font-weight:600">Waiting for the agent to connect…</span><div style="height:4px; background:var(--bg-2); overflow:hidden"><div class="tg-motion" style="width:20%; height:100%; background:var(--text-1); animation:tg-indet 1.6s ease-in-out infinite"></div></div></div>
+<button onClick="{{ simulateConnect }}" style="align-self:flex-start; height:32px; padding:0 12px; border:1px dashed var(--line-strong); background:transparent; color:var(--text-2); font-size:12px; font-weight:600">Prototype: simulate agent connected</button>
+</div>
+</sc-if>
+<sc-if value="{{ step3 }}">
+<div style="display:flex; flex-direction:column; gap:16px">
+<span style="font-size:26px; line-height:30px; font-weight:800; letter-spacing:-0.02em">{{ pairName }} is online</span>
+<span style="font-size:14px; line-height:21px; color:var(--text-2)">It now appears in the sidebar and on the overview. The pairing token has been used and cannot be reused.</span>
+<button onClick="{{ closePair }}" style="height:44px; border:0; background:var(--accent); color:var(--on-accent); font-size:14px; font-weight:700">Done</button>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  KINDS = ['finished','error','stalled','checkpoint','progress'];
+  SESS = [['qwen','Qwen Training','RTX-PC'],['vllm','vLLM','RTX-PC'],['pytest','pytest','RTX-PC'],['shell','shell','RTX-PC'],['npm','npm install','Mac Mini'],['compression','Compression','Mac Mini']];
+  constructor(p) {
+    super(p);
+    const rules = { _default: { finished:true, error:true, stalled:true, checkpoint:false, progress:false } };
+    this.SESS.forEach(([id]) => rules[id] = { ...rules._default, checkpoint: id === 'qwen' });
+    this.state = { tab:'machines', rules, confirm:null, tokens:{ rtx:'••••3f2a', mini:'••••91c0', mbp:'••••d47e' }, extra:[],
+      pair:false, step:1, pairName:'', token:'', ttl:600, copied:false, pw:['','',''], pwMsg:'', pwOk:false };
+  }
+  componentDidMount() { this.t = setInterval(() => { if (this.state.pair && this.state.step === 2) this.setState(s => ({ ttl: Math.max(0, s.ttl - 1) })); }, 1000); }
+  componentWillUnmount() { clearInterval(this.t); }
+  rnd(n) { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < n; i++) s += a[Math.floor(Math.random() * a.length)]; return s; }
+  renderVals() {
+    const st = this.state;
+    const tabs = [['machines','Machines & tokens'],['notif','Notifications'],['account','Account']].map(([k,label]) => { const on = st.tab === k;
+      return { label, pick: () => this.setState({ tab:k }), bg: on ? 'var(--bg-1)' : 'transparent', fg: on ? 'var(--text-1)' : 'var(--text-2)', fw: on ? 700 : 500, bar: on ? 'inset 2px 0 0 var(--accent)' : 'none' }; });
+    const base = [
+      { id:'rtx', name:'RTX-PC', os:'Linux', hw:'Ryzen 9 · 64 GB · RTX 4090 24 GB', online:true },
+      { id:'mini', name:'Mac Mini', os:'macOS', hw:'M2 Pro · 32 GB', online:true },
+      { id:'mbp', name:'MacBook', os:'macOS', hw:'M3 · 16 GB', online:false },
+      ...st.extra
+    ];
+    const machines = base.filter(m => st.tokens[m.id] !== 'revoked').map(m => ({ ...m,
+      status: m.online ? 'Online' : 'Offline · 14m ago', sc: m.online ? 'var(--text-1)' : 'var(--text-3)',
+      dot: m.online ? 'var(--s-running)' : 'transparent', ring: m.online ? 'none' : 'inset 0 0 0 1.5px var(--s-disconnected-fg)',
+      token: 'sa_' + (st.tokens[m.id] || '••••'), confirming: st.confirm === m.id, idle: st.confirm !== m.id,
+      rotate: () => this.setState(s => ({ tokens: { ...s.tokens, [m.id]: '••••' + this.rnd(4).toLowerCase() } })),
+      revoke: () => this.setState({ confirm:m.id }), cancel: () => this.setState({ confirm:null }),
+      doRevoke: () => this.setState(s => ({ confirm:null, tokens: { ...s.tokens, [m.id]:'revoked' } })) }));
+    const rows = [['_default','Default for new sessions',''], ...this.SESS];
+    const rules = rows.map(([id,name,machine]) => ({ name, machine, rowBg: id === '_default' ? 'var(--bg-1)' : 'transparent', pl: id === '_default' ? '12px' : '0',
+      cells: this.KINDS.map(k => { const on = st.rules[id][k]; return { on, title: `${name}: ${k}`, mark: on ? '✓' : '', bg: on ? 'var(--text-1)' : 'transparent', bd: on ? 'var(--text-1)' : 'var(--line-strong)',
+        toggle: () => this.setState(s => ({ rules: { ...s.rules, [id]: { ...s.rules[id], [k]: !on } } })) }; }) }));
+    const pwLabels = ['Current password','New password','Confirm new password'];
+    const mm = String(Math.floor(st.ttl / 60)).padStart(2,'0') + ':' + String(st.ttl % 60).padStart(2,'0');
+    return {
+      tabs, isMachines: st.tab === 'machines', isNotif: st.tab === 'notif', isAccount: st.tab === 'account',
+      machines, rules, kinds: this.KINDS.map(k => k.toUpperCase()),
+      pwFields: pwLabels.map((label,i) => ({ label, val: st.pw[i], on: e => { const v = e.target.value; this.setState(s => { const pw = s.pw.slice(); pw[i] = v; return { pw, pwMsg:'' }; }); } })),
+      pwMsg: st.pwMsg, pwMsgC: st.pwOk ? 'var(--s-running-fg)' : 'var(--s-failed-fg)',
+      changePw: e => { e.preventDefault(); const [a,b,c] = st.pw;
+        if (!a) return this.setState({ pwMsg:'Enter your current password.', pwOk:false });
+        if (b.length < 12) return this.setState({ pwMsg:'New password needs at least 12 characters.', pwOk:false });
+        if (b !== c) return this.setState({ pwMsg:'New passwords don’t match.', pwOk:false });
+        this.setState({ pw:['','',''], pwMsg:'Password updated. Other browsers will be signed out.', pwOk:true }); },
+      signOut: this.props.signOut, expire: this.props.expire,
+      pairOpen: st.pair, stepN: st.step, step1: st.step === 1, step2: st.step === 2, step3: st.step === 3,
+      openPair: () => this.setState({ pair:true, step:1, pairName:'', copied:false }), closePair: () => this.setState({ pair:false }), stop: e => e.stopPropagation(),
+      pairName: st.pairName, onPairName: e => this.setState({ pairName: e.target.value }), noName: !st.pairName.trim(),
+      genBg: st.pairName.trim() ? 'var(--accent)' : 'var(--bg-2)', genFg: st.pairName.trim() ? 'var(--on-accent)' : 'var(--text-3)',
+      genToken: e => { e.preventDefault(); if (!st.pairName.trim()) return; this.setState({ step:2, token: `${this.rnd(4)}-${this.rnd(4)}-${this.rnd(4)}`, ttl:600 }); },
+      token: st.token, ttl: mm, copyLabel: st.copied ? 'Copied' : 'Copy command',
+      copy: () => { try { navigator.clipboard.writeText('sentinal-agent pair ' + st.token); } catch (e) {} this.setState({ copied:true }); },
+      simulateConnect: () => { const id = 'new' + Date.now(); this.setState(s => ({ step:3, extra: [...s.extra, { id, name: s.pairName.trim(), os:'—', hw:'Reported on first heartbeat', online:true }], tokens: { ...s.tokens, [id]: '••••' + this.rnd(4).toLowerCase() } })); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="max-width:1200px; padding:40px 48px 80px; display:flex; flex-direction:column; gap:28px; animation:sn-in .25s ease-out">
+<header style="display:flex; flex-direction:column; gap:6px"><h1 style="margin:0; font-size:36px; line-height:38px; font-weight:800; letter-spacing:-0.03em">History</h1><span style="font-size:14px; color:var(--text-2)">Every command Sentinal has seen, on every machine.</span></header>
+<div style="display:flex; align-items:center; gap:12px; height:56px; padding:0 16px; border:1.5px solid var(--text-1)">
+<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex:none; color:var(--text-2)"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5l3 3"></path></svg>
+<input ref="{{ qRef }}" value="{{ q }}" onChange="{{ onQ }}" placeholder="Search commands, e.g. train.py" spellcheck="false" style="flex:1; min-width:0; height:100%; border:0; outline:0; background:transparent; color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:16px"></input>
+<sc-if value="{{ hasQ }}"><button onClick="{{ clearQ }}" style="height:28px; padding:0 8px; border:0; background:transparent; color:var(--text-3); font-size:12px; font-weight:600">Clear</button></sc-if>
+</div>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px 24px">
+<sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+<div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">{{ f.label }}</span>
+<div style="display:flex; flex-wrap:wrap; gap:4px"><sc-for list="{{ f.opts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.pick }}" style="height:30px; padding:0 10px; border:1px solid {{ o.bd }}; background:{{ o.bg }}; color:{{ o.fg }}; font-size:12.5px; font-weight:600">{{ o.label }}</button></sc-for></div>
+</div>
+</sc-for>
+</div>
+<section style="display:flex; flex-direction:column; overflow-x:auto">
+<div style="min-width:820px; display:grid; grid-template-columns:36px minmax(0,1fr) 110px 150px 130px 80px; gap:16px; padding-bottom:8px; border-bottom:1px solid var(--text-1); font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)"><span></span><span>COMMAND · {{ countLabel }}</span><span>MACHINE</span><span>PROJECT</span><span>STARTED</span><span style="text-align:right">TIME</span></div>
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+<div onClick="{{ r.open }}" style="min-width:820px; display:grid; grid-template-columns:36px minmax(0,1fr) 110px 150px 130px 80px; gap:16px; align-items:center; min-height:52px; border-bottom:1px solid var(--line); cursor:{{ r.cur }}" style-hover="background:var(--bg-1)">
+<span style="padding-left:4px"><dc-import name="StateTag" state="{{ r.s }}" size="sm" icon-only="{{ true }}" hint-size="24px,20px"></dc-import></span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.cmd }}</span>
+<span style="font-size:13px; color:{{ r.mc }}">{{ r.machine }}</span>
+<span style="font-size:13px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.project }}</span>
+<span style="font-size:13px; color:var(--text-2)">{{ r.when }}</span>
+<span style="font-size:14px; font-weight:600; text-align:right; padding-right:4px; color:{{ r.dc }}">{{ r.dur }}</span>
+</div>
+</sc-for>
+<sc-if value="{{ empty }}"><div style="padding:40px 0; display:flex; flex-direction:column; gap:10px; align-items:flex-start"><span style="font-size:17px; font-weight:700">No commands match.</span><button onClick="{{ reset }}" style="height:32px; padding:0 12px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:13px; font-weight:600">Reset filters</button></div></sc-if>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  qRef = React.createRef();
+  DATA = [
+    { s:'running', cmd:'python train.py --config moe.yaml', machine:'RTX-PC', project:'TIM', when:'Today 12:42', d:0, dur:'running', res:'running', id:'qwen' },
+    { s:'running', cmd:'vllm serve Qwen/Qwen3-8B --port 8000', machine:'RTX-PC', project:'—', when:'Today', d:0, dur:'running', res:'running', id:'vllm' },
+    { s:'failed', cmd:'pytest tests/', machine:'RTX-PC', project:'MentalAnimAItion', when:'Today', d:0, dur:'42s', res:'failed', id:'pytest' },
+    { s:'waiting', cmd:'npm install', machine:'Mac Mini', project:'—', when:'Today', d:0, dur:'waiting', res:'running', id:'npm' },
+    { s:'completed', cmd:'python benchmark.py', machine:'RTX-PC', project:'TIM', when:'Yesterday', d:1, dur:'18m', res:'success' },
+    { s:'completed', cmd:'cargo build', machine:'MacBook', project:'—', when:'3 days ago', d:3, dur:'31s', res:'success' }
+  ];
+  constructor(p) { super(p); const pr = p.params && p.params.project; this.state = { q:'', machine:'All', project: pr === 'tim' ? 'TIM' : pr === 'maa' ? 'MentalAnimAItion' : 'All', result:'All', date:'All time' }; }
+  componentDidMount() { this.qRef.current && this.qRef.current.focus(); }
+  renderVals() {
+    const go = this.props.go || (() => {});
+    const st = this.state;
+    const dateMax = { 'Today':0, '7 days':7, '30 days':30, 'All time':1e9 };
+    const rows = this.DATA.filter(r => (!st.q || r.cmd.toLowerCase().includes(st.q.toLowerCase()))
+      && (st.machine === 'All' || r.machine === st.machine) && (st.project === 'All' || r.project === st.project)
+      && (st.result === 'All' || r.res === st.result.toLowerCase()) && r.d <= dateMax[st.date])
+      .map(r => ({ ...r, open: () => r.id && go('app/session', { id: r.id }), cur: r.id ? 'pointer' : 'default',
+        mc: r.machine === 'MacBook' ? 'var(--text-3)' : 'var(--text-2)',
+        dc: r.res === 'failed' ? 'var(--s-failed-fg)' : r.res === 'running' ? `var(--s-${r.s}-fg)` : 'var(--text-1)' }));
+    const mk = (key, label, opts) => ({ label, opts: opts.map(o => { const on = st[key] === o; return { label:o, pick: () => this.setState({ [key]: o }),
+      bg: on ? 'var(--text-1)' : 'transparent', fg: on ? 'var(--bg-0)' : 'var(--text-2)', bd: on ? 'var(--text-1)' : 'var(--line-strong)' }; }) });
+    return {
+      qRef:this.qRef, q:st.q, hasQ: !!st.q, onQ: e => this.setState({ q:e.target.value }), clearQ: () => this.setState({ q:'' }),
+      filters: [mk('machine','MACHINE',['All','RTX-PC','Mac Mini','MacBook']), mk('project','PROJECT',['All','TIM','MentalAnimAItion']), mk('result','RESULT',['All','Success','Failed','Running']), mk('date','DATE',['Today','7 days','30 days','All time'])],
+      rows, empty: rows.length === 0, countLabel: `${rows.length} ${rows.length === 1 ? 'RESULT' : 'RESULTS'}`,
+      reset: () => this.setState({ q:'', machine:'All', project:'All', result:'All', date:'All time' })
+    };
+  }
+}
+</script>
+</body>
+</html>

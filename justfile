@@ -109,3 +109,6 @@ web-check:
 # Run the browser smoke test against a daemon with the fake PTY backend
 test-e2e:
     pnpm -C web test:e2e
+
+# Run all fast checks and the isolated browser acceptance suite
+acceptance: check test-e2e

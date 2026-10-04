@@ -3,6 +3,8 @@
 Status: **implementation and isolated acceptance complete on 2026-10-04;
 two-real-Tailnet-Machine acceptance pending.** Milestone 4.B is in `milestone-4b.md`.
 
+Automated acceptance below was recorded at commit `bdfeff9`.
+
 ## Architecture delivered
 
 - The browser authenticates only to the control origin. It opens one logical

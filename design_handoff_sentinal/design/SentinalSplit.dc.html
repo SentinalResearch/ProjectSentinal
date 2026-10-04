@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="height:100%; display:flex; flex-direction:column; min-height:560px">
+<header style="height:60px; flex:none; display:flex; align-items:center; gap:16px; padding:0 24px; border-bottom:1px solid var(--line)">
+<h1 style="margin:0; font-size:20px; font-weight:800; letter-spacing:-0.02em">Split view</h1>
+<span style="font-size:13px; color:var(--text-3)">{{ countLabel }}</span>
+<div style="margin-left:auto; display:flex; align-items:center; gap:8px">
+<span style="font-size:12px; color:var(--text-3)">Layout</span>
+<div style="display:flex">
+<sc-for list="{{ layouts }}" as="l" hint-placeholder-count="3"><button onClick="{{ l.pick }}" style="height:32px; min-width:40px; padding:0 10px; border:1px solid var(--line-strong); margin-left:-1px; background:{{ l.bg }}; color:{{ l.fg }}; font-size:13px; font-weight:700">{{ l.label }}</button></sc-for>
+</div>
+<div style="position:relative">
+<button onClick="{{ toggleAdd }}" disabled="{{ addDisabled }}" style="height:32px; padding:0 12px; border:1px solid var(--line-strong); background:transparent; color:{{ addFg }}; font-size:13px; font-weight:700">+ Add terminal</button>
+<sc-if value="{{ addOpen }}"><div style="position:absolute; right:0; top:36px; z-index:20; width:260px; background:var(--bg-1); border:1px solid var(--line-strong); box-shadow:0 16px 40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<sc-for list="{{ addable }}" as="a" hint-placeholder-count="2"><button onClick="{{ a.add }}" style="height:44px; display:flex; align-items:center; gap:10px; padding:0 12px; border:0; border-bottom:1px solid var(--line); background:transparent; color:var(--text-1); font-size:14px; font-weight:600; text-align:left" style-hover="background:var(--bg-2)"><dc-import name="StateTag" state="{{ a.state }}" size="sm" icon-only="{{ true }}" hint-size="24px,20px"></dc-import><span style="flex:1">{{ a.name }}</span><span style="font-size:12px; color:var(--text-3); font-weight:500">{{ a.machine }}</span></button></sc-for>
+</div></sc-if>
+</div>
+</div>
+</header>
+<div style="flex:1; min-height:0; display:grid; grid-template-columns:{{ cols }}; grid-template-rows:{{ rows }}; gap:2px; background:var(--line)">
+<sc-for list="{{ panes }}" as="p" hint-placeholder-count="4">
+<section onClick="{{ p.focus }}" style="min-width:0; min-height:0; display:flex; flex-direction:column; background:var(--term-bg); grid-row:{{ p.span }}; box-shadow:{{ p.ring }}">
+<div style="height:36px; flex:none; display:flex; align-items:center; gap:10px; padding:0 8px 0 10px; background:var(--bg-1)">
+<dc-import name="StateTag" state="{{ p.state }}" size="sm" hint-size="80px,20px"></dc-import>
+<span style="font-size:13px; font-weight:700; white-space:nowrap">{{ p.name }}</span>
+<span style="font-size:12px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ p.machine }} · {{ p.fact }}</span>
+<button onClick="{{ p.open }}" title="Open session" style="margin-left:auto; height:28px; padding:0 8px; border:0; background:transparent; color:var(--text-2); font-size:12px; font-weight:600" style-hover="color:var(--text-1); background:var(--bg-2)">Details</button>
+<button onClick="{{ p.close }}" title="Close pane" style="width:28px; height:28px; border:0; background:transparent; color:var(--text-2); font-size:16px" style-hover="color:var(--text-1); background:var(--bg-2)">×</button>
+</div>
+<div style="flex:1; min-height:0; overflow:auto; padding:10px 12px; font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:18px; color:var(--term-fg); display:flex; flex-direction:column; justify-content:flex-end">
+<sc-for list="{{ p.lines }}" as="l" hint-placeholder-count="4"><div style="white-space:pre-wrap; color:{{ l.c }}">{{ l.t }}</div></sc-for>
+<div style="white-space:pre"><span>{{ p.prompt }}</span><span class="tg-motion" style="display:inline-block; width:7px; height:14px; vertical-align:-2px; background:{{ p.cursor }}; animation:sn-blink 1.1s step-end infinite"></span></div>
+</div>
+</section>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  S = {
+    qwen: { name:'Qwen Training', machine:'RTX-PC', state:'running', fact:'epoch 68/100', prompt:'', out:['epoch 64/100  loss 0.41','epoch 65/100  loss 0.40','epoch 66/100  loss 0.39','epoch 67/100  loss 0.38','epoch 68/100  loss 0.37'] },
+    vllm: { name:'vLLM', machine:'RTX-PC', state:'running', fact:':8000', prompt:'', out:['$ vllm serve Qwen/Qwen3-8B --port 8000','Serving on :8000'] },
+    pytest: { name:'pytest', machine:'RTX-PC', state:'failed', fact:'42s', prompt:'~/Projects/MentalAnimAItion $ ', out:['$ pytest tests/','…','3 failed, 182 passed in 42s'] },
+    shell: { name:'shell', machine:'RTX-PC', state:'idle', fact:'~/Projects/TIM', prompt:'~/Projects/TIM $ ', out:[] },
+    npm: { name:'npm install', machine:'Mac Mini', state:'waiting', fact:'input', prompt:'', out:['$ npm install','Continue? [y/N]'] },
+    compression: { name:'Compression', machine:'Mac Mini', state:'stalled', fact:'no output 14m', prompt:'', out:[] }
+  };
+  constructor(p) { super(p); const f = p.params && p.params.focus; let ids = ['qwen','vllm','pytest','shell']; if (f && this.S[f]) ids = [f, ...ids.filter(i => i !== f)].slice(0, 4); this.state = { ids, active: ids[0], add: false }; }
+  renderVals() {
+    const go = this.props.go || (() => {});
+    const { ids, active } = this.state;
+    const n = ids.length;
+    const col = t => /^\$ /.test(t) ? '#F2F2F0' : /failed/.test(t) ? '#FF3B2F' : /Continue\?/.test(t) ? '#FFD000' : '#D4D4D0';
+    const panes = ids.map((id, i) => { const s = this.S[id]; return { ...s, lines: s.out.map(t => ({ t, c: col(t) })),
+      span: n === 3 && i === 0 ? 'span 2' : 'auto', ring: id === active ? 'inset 0 2px 0 var(--accent)' : 'none', cursor: id === active ? '#D4D4D0' : 'transparent',
+      focus: () => this.setState({ active: id }), open: e => { e.stopPropagation(); go('app/session', { id }); },
+      close: e => { e.stopPropagation(); this.setState(x => { const next = x.ids.filter(k => k !== id); return { ids: next, active: next[0] }; }); } }; });
+    const setN = k => () => this.setState(x => { let next = x.ids.slice(0, k); const pool = Object.keys(this.S).filter(i => !next.includes(i)); while (next.length < k && pool.length) next.push(pool.shift()); return { ids: next, active: next.includes(x.active) ? x.active : next[0] }; });
+    const addable = Object.keys(this.S).filter(i => !ids.includes(i)).map(id => ({ ...this.S[id], add: () => this.setState(x => ({ ids: [...x.ids, id].slice(0, 4), active: id, add: false })) }));
+    return {
+      panes, countLabel: `${n} of 4 terminals`,
+      cols: n <= 1 ? '1fr' : 'repeat(2, minmax(0,1fr))', rows: n <= 2 ? '1fr' : 'repeat(2, minmax(0,1fr))',
+      layouts: [2,3,4].map(k => ({ label: String(k), pick: setN(k), bg: n === k ? 'var(--text-1)' : 'transparent', fg: n === k ? 'var(--bg-0)' : 'var(--text-2)' })),
+      addOpen: this.state.add && addable.length > 0 && n < 4, toggleAdd: () => this.setState(x => ({ add: !x.add })), addable,
+      addDisabled: n >= 4, addFg: n >= 4 ? 'var(--text-3)' : 'var(--text-1)'
+    };
+  }
+}
+</script>
+</body>
+</html>

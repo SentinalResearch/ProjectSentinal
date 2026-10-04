@@ -4,8 +4,9 @@ Workers run `sentinald`. Since Milestone 4.0 one owner-selected control
 Machine also keeps a registry of enrolled workers: each worker is connected
 explicitly with `sentinal connect` and a one-time code, and gets a permanent
 Machine ID, an editable display name, and its own revocable credential. This
-is not a cloud service. Session aggregation across Machines arrives in 4.A;
-until then a browser sees the Sessions of the daemon it is signed in to.
+is not a cloud service. Milestone 4.A aggregation routes each browser action
+through the control daemon to the worker that owns the selected Session; the
+browser authenticates only to the control origin.
 
 ## Prerequisites and Tailnet policy
 
@@ -440,20 +441,24 @@ command in `docs/progress/milestone-1c.md`.
 
 ## Current boundaries
 
-- Machine enrollment, heartbeats, rename, and revocation are implemented;
-  Session aggregation and routing across Machines are Milestone 4.A. There is
-  no central or cloud server.
+- Machine enrollment, isolated heartbeats/revocation, concurrent aggregation,
+  worker identity proof, and Machine-scoped terminal/data routing are
+  implemented. There is no vendor cloud or required central service.
 - The browser UI is still served by the Vite development server; a
   production UI build behind Tailscale Serve is not shipped yet.
 - The worker package is exactly `sentinald`, `sentinal`, and shell assets.
-  There is no separate watcher-agent process; Milestone 3's watcher will be a
-  deterministic library linked into `sentinald`.
+  There is no separate watcher-agent process; Milestone 3's deterministic
+  watcher is linked into `sentinald`.
 - Tailscale supplies private networking and access policy. Sentinal does not
   configure the Tailnet or bypass host firewalls.
 - Browser/CLI disconnects do not end a Session. A daemon restart is different:
   FULL Sessions are interrupted and their PTYs are not reattachable yet.
-- Rich watcher-derived progress, health, errors, and adopted-log tailing remain
-  later milestones. Real mode shows only data the current daemon supplies.
+- Watcher-derived progress, health, errors, structured training summaries,
+  and adopted-log tailing are implemented. Real mode shows only data supplied
+  by the selected daemon; fixture data requires explicit demo mode.
+- Browser bearer transport, credential-refresh recovery, bounded sensitive
+  storage, login-throttle hardening, and the real two-Machine V1 run remain
+  release gates in `docs/AUDIT_TRACKER.md`.
 
 ## Onboarding boundary
 

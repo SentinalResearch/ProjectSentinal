@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sentinal</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%3E%3Crect%20width%3D'24'%20height%3D'24'%20fill%3D'%230A0A0A'%2F%3E%3Cpath%20d%3D'M6%2021L13%203.5'%20stroke%3D'%23F2F2F0'%20stroke-width%3D'3.4'%20stroke-linecap%3D'square'%2F%3E%3Ccircle%20cx%3D'17.5'%20cy%3D'17.5'%20r%3D'3.2'%20fill%3D'%233D5AFE'%2F%3E%3C%2Fsvg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;height:100%;background:#0A0A0A}*{box-sizing:border-box}a{color:var(--accent-fg);text-decoration:none}a:hover{text-decoration:underline}button{font-family:inherit;cursor:pointer}button:disabled{cursor:not-allowed}input,select{font-family:inherit}input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent-fg);outline-offset:1px}::placeholder{color:var(--text-3)}@keyframes tg-indet{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}@keyframes tg-spin{to{transform:rotate(360deg)}}@keyframes sn-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}@keyframes sn-blink{50%{opacity:0}}@keyframes sn-cue{0%{transform:scaleY(0);transform-origin:top}45%{transform:scaleY(1);transform-origin:top}55%{transform:scaleY(1);transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}@keyframes sn-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}@keyframes sn-scan{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}@keyframes sn-ping{0%{transform:scale(1);opacity:.9}100%{transform:scale(2.8);opacity:0}}@keyframes sn-pop{from{transform:scale(0)}to{transform:scale(1)}}@keyframes sn-grow{from{transform:scale(1)}to{transform:scale(140)}}@keyframes sn-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}@media (prefers-reduced-motion:reduce){.tg-motion{animation:none!important}}</style>
+</helmet>
+<div ref="{{ rootRef }}" style="--bg-0:#0A0A0A; --bg-1:#111111; --bg-2:#1C1C1C; --text-1:#F2F2F0; --text-2:#A6A6A2; --text-3:#8A8A86; --line:#262626; --line-strong:#6B6B67; --accent:#3D5AFE; --accent-fg:#8C9EFF; --on-accent:#FFFFFF; --ink:#0A0A0A; --s-created:#B9A8FF; --s-idle:#9C9C98; --s-running:#29D35F; --s-waiting:#FFD000; --s-stalled:#FF8A00; --s-completed:#36C5E8; --s-failed:#FF3B2F; --s-interrupted:#FF5CA8; --s-disconnected:transparent; --s-created-fg:#B9A8FF; --s-idle-fg:#9C9C98; --s-running-fg:#29D35F; --s-waiting-fg:#FFD000; --s-stalled-fg:#FF8A00; --s-completed-fg:#36C5E8; --s-failed-fg:#FF3B2F; --s-interrupted-fg:#FF5CA8; --s-disconnected-fg:#8A8A86; --term-bg:#0C0C0C; --term-fg:#D4D4D0; --scrim:rgba(0,0,0,0.7); height:100vh; min-height:640px; background:var(--bg-0); color:var(--text-1); font-family:'Archivo',system-ui,sans-serif; font-size:14px; line-height:20px; font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased">
+<sc-if value="{{ isLanding }}" hint-placeholder-val="{{ true }}">
+<dc-import name="SentinalLanding" go="{{ go }}" theme="{{ theme }}" toggle-theme="{{ toggleTheme }}" hint-size="100%,100%"></dc-import>
+</sc-if>
+<sc-if value="{{ isAuth }}">
+<dc-import name="SentinalAuth" mode="{{ authMode }}" set-mode="{{ setAuthMode }}" go="{{ go }}" on-login="{{ login }}" theme="{{ theme }}" toggle-theme="{{ toggleTheme }}" hint-size="100%,100%"></dc-import>
+</sc-if>
+<sc-if value="{{ isApp }}">
+<dc-import name="SentinalApp" screen="{{ screen }}" params="{{ params }}" go="{{ go }}" theme="{{ theme }}" toggle-theme="{{ toggleTheme }}" sign-out="{{ signOut }}" expire="{{ expire }}" hint-size="100%,100%"></dc-import>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  rootRef = React.createRef();
+  FILL = { created:'#B9A8FF', idle:'#9C9C98', running:'#29D35F', waiting:'#FFD000', stalled:'#FF8A00', completed:'#36C5E8', failed:'#FF3B2F', interrupted:'#FF5CA8' };
+  FG_L = { created:'#5B45C9', idle:'#5E5E5A', running:'#0A7030', waiting:'#7D5B00', stalled:'#9A4B00', completed:'#0A6680', failed:'#C4210F', interrupted:'#B01F6A', disconnected:'#62625E' };
+  vars(dark) {
+    const o = dark
+      ? {'bg-0':'#0A0A0A','bg-1':'#111111','bg-2':'#1C1C1C','text-1':'#F2F2F0','text-2':'#A6A6A2','text-3':'#8A8A86','line':'#262626','line-strong':'#6B6B67','accent':'#3D5AFE','accent-fg':'#8C9EFF','on-accent':'#FFFFFF','ink':'#0A0A0A','scrim':'rgba(0,0,0,0.7)'}
+      : {'bg-0':'#F7F6F2','bg-1':'#EFEEE9','bg-2':'#E4E3DD','text-1':'#0A0A0A','text-2':'#4A4A46','text-3':'#5E5E5A','line':'#D9D8D2','line-strong':'#8A8984','accent':'#2A44E0','accent-fg':'#2A44E0','on-accent':'#FFFFFF','ink':'#0A0A0A','scrim':'rgba(10,10,10,0.4)'};
+    for (const k in this.FILL) o['s-'+k] = this.FILL[k];
+    o['s-disconnected'] = 'transparent';
+    for (const k in this.FG_L) o['s-'+k+'-fg'] = dark ? (this.FILL[k] || '#8A8A86') : this.FG_L[k];
+    o['term-bg'] = '#0C0C0C'; o['term-fg'] = '#D4D4D0';
+    return o;
+  }
+  constructor(p) {
+    super(p);
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('sentinal.proto') || '{}'); } catch (e) {}
+    this.state = { route: saved.route || 'landing', authMode: saved.authMode || 'login', screen: saved.screen || 'overview', params: saved.params || {}, theme: saved.theme || this.props.theme || 'dark' };
+  }
+  componentDidMount() { this.apply(); }
+  componentDidUpdate() { this.apply(); try { localStorage.setItem('sentinal.proto', JSON.stringify(this.state)); } catch (e) {} }
+  apply() { const el = this.rootRef.current; if (!el) return; const t = this.vars(this.state.theme === 'dark'); for (const k in t) el.style.setProperty('--'+k, t[k]); document.body.style.background = t['bg-0']; }
+  go = (path, params) => {
+    const [a, b] = path.split('/');
+    if (a === 'app') this.setState({ route: 'app', screen: b || 'overview', params: params || {} });
+    else if (a === 'auth') this.setState({ route: 'auth', authMode: b || 'login' });
+    else this.setState({ route: 'landing' });
+  };
+  renderVals() {
+    const s = this.state;
+    return {
+      rootRef: this.rootRef, isLanding: s.route === 'landing', isAuth: s.route === 'auth', isApp: s.route === 'app',
+      authMode: s.authMode, screen: s.screen, params: s.params, theme: s.theme, go: this.go,
+      setAuthMode: m => this.setState({ authMode: m }),
+      toggleTheme: () => this.setState(x => ({ theme: x.theme === 'dark' ? 'light' : 'dark' })),
+      login: () => this.setState({ route: 'app' }),
+      signOut: () => this.setState({ route: 'auth', authMode: 'login' }),
+      expire: () => this.setState({ route: 'auth', authMode: 'expired' })
+    };
+  }
+}
+</script>
+</body>
+</html>

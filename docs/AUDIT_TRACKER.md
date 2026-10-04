@@ -74,21 +74,22 @@ client disconnects but not a daemon restart.
 
 | ID | Status | Contradiction | Required correction |
 |---|---|---|---|
-| C1 | Open | The audit-requested `docs/report-additions/SENTINEL-PLAN-updated.txt` does not exist; `docs/PLAN.md` is the active plan. | Remove the stale reference wherever the audit prompt is retained, or add an explicit pointer file. |
-| C2 | Open | `docs/PLAN.md` says capture-mode part D is pending; `docs/ROADMAP.md` marks adopted-log ingestion complete. | Update the plan status. |
-| C3 | Open | `docs/SETUP.md` says the watcher and rich health are later work; Roadmap M3 and the code say they are complete. | Replace the stale current-boundary section. |
-| C4 | Open | `docs/progress/milestone-4.0.md` says both link credentials rotate atomically; the implementation writes a JSON file and SQLite separately. | Describe the actual failure boundary until F5 closes. |
-| C5 | Open | `docs/SECURITY.md` says every route except health requires a bearer; setup/login/status and pairing exchange intentionally use other rules. | List public, bootstrap, owner, worker, and control route classes explicitly. |
-| C6 | Open | `docs/SECURITY.md` says throttling is per client address, while Serve mode keys it by a forwarded login header. | Document both keys and the F10 residual local-user risk. |
-| C7 | Open | `just check` still excludes Playwright, although 4.A/4.B definitions of done require browser acceptance. | Add an explicit CI/acceptance target that runs both fast checks and Playwright, while keeping the fast local target clear. |
-| C8 | Open | The old Milestone 1 prompt names `dev.terminal-agent.tad.plist`; current packaging uses the Sentinal service name while retaining legacy compatibility. | Mark the old path historical or update the prompt. |
-| C9 | Open | Older progress reports contain historical test counts that no longer describe HEAD. | Label counts with commit IDs and keep only the current count in this tracker. |
+| C1 | Closed | `docs/report-additions/SENTINEL-PLAN-updated.txt` now points to the canonical `docs/PLAN.md` instead of creating a second plan. | Keep `docs/PLAN.md` canonical. |
+| C2 | Closed | `docs/PLAN.md` now marks all capture stages and adopted-log ingestion complete. | Keep plan and Roadmap status synchronized. |
+| C3 | Closed | `docs/SETUP.md` now describes the implemented watcher, structured training data, aggregation, and routing. | Update the boundary section with each release. |
+| C4 | Closed | `docs/progress/milestone-4.0.md` now records the separate credential-file/SQLite write boundary and points at the unresolved recovery gate. | Close F5 before claiming crash-atomic refresh. |
+| C5 | Closed | `docs/SECURITY.md` now lists public, bootstrap, terminal/data, owner, exchange, and link-auth route classes. | Keep the list aligned with router tests. |
+| C6 | Closed | `docs/SECURITY.md` now documents direct-IP and Serve-header keys plus the residual spoofing risk tracked by F10. | Close F10 before removing the limitation. |
+| C7 | Closed | `just acceptance` runs both `just check` and Playwright; `docs/TESTING.md` defines when the combined gate is required. | Use the combined target for routing/mobile release candidates. |
+| C8 | Closed | The old Milestone 1 prompt is explicitly labelled historical and names the current service files. | Retain the old names only as compatibility context. |
+| C9 | Closed | `docs/progress/README.md` defines progress reports as point-in-time evidence and this tracker's verification table as the current count. | New reports must record their tested commit. |
 | C10 | Partial | Endpoint identity verification is mandatory (F11 closed), and Recipe context validation closes F2. Credential crash recovery and the `just check`/Playwright distinction remain likely agent failure points. | Close F5 and C7, then remove this row. |
 
 ## Verification record
 
 | Check | 2026-10-04 result |
 |---|---|
+| `just acceptance` | Pass after the repository/documentation sync: the complete `just check` gate followed by all 5 Playwright scenarios. |
 | `just check` | Pass: format, all-feature Clippy with warnings denied, workspace tests, TS binding check, 30 web files / 140 tests, 8 evaluator tests, and all shell checks. |
 | `just test-e2e` | Pass: 5 Playwright tests, including two workers and the 390×844 mobile Recipe flow. |
 | `cargo doc --workspace --no-deps` | Pass without warnings after fixing the stale `<tailnet>` rustdoc markup. |

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><style>@keyframes tg-pulse{0%{transform:scale(.45);opacity:1}100%{transform:scale(1.25);opacity:0}}@media (prefers-reduced-motion:reduce){.tg-pulse{animation:none!important;opacity:0}}</style></helmet>
+<span style="display:inline-flex; align-items:center; gap:{{ gap }}; height:{{ h }}; padding:{{ pad }}; background:{{ bg }}; color:{{ fg }}; box-shadow:{{ ring }}; font-family:'Archivo',system-ui,sans-serif; font-size:{{ fs }}; font-weight:700; letter-spacing:0.04em; line-height:1; white-space:nowrap; flex:none">
+<svg width="{{ icon }}" height="{{ icon }}" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" style="flex:none; overflow:visible">
+<sc-if value="{{ isRunning }}"><circle class="tg-pulse" cx="7" cy="7" r="6.5" stroke-width="1.5" style="transform-origin:7px 7px; animation:tg-pulse 2s ease-out infinite"></circle><circle cx="7" cy="7" r="4" fill="currentColor" stroke="none"></circle></sc-if>
+<sc-if value="{{ isCreated }}"><path d="M7 2.5v9M2.5 7h9"></path></sc-if>
+<sc-if value="{{ isIdle }}"><path d="M2.5 7h9"></path></sc-if>
+<sc-if value="{{ isWaiting }}"><path d="M4.6 4.9a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1 .8-1 1.5v.4"></path><rect x="6.1" y="10.6" width="1.8" height="1.8" fill="currentColor" stroke="none"></rect></sc-if>
+<sc-if value="{{ isStalled }}"><path d="M4.8 3v8M9.2 3v8"></path></sc-if>
+<sc-if value="{{ isCompleted }}"><path d="M2.6 7.2l3 3 5.8-6.4"></path></sc-if>
+<sc-if value="{{ isFailed }}"><path d="M3 3l8 8M11 3l-8 8"></path></sc-if>
+<sc-if value="{{ isInterrupted }}"><rect x="2.5" y="2.5" width="9" height="9" fill="currentColor" stroke="none"></rect></sc-if>
+<sc-if value="{{ isDisconnected }}"><circle cx="7" cy="7" r="5.5" stroke-dasharray="2.2 2"></circle><path d="M3.5 10.5l7-7"></path></sc-if>
+</svg>
+<sc-if value="{{ showLabel }}" hint-placeholder-val="{{ true }}"><span>{{ label }}</span></sc-if>
+</span>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:180,&quot;height&quot;:44},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;created&quot;,&quot;idle&quot;,&quot;running&quot;,&quot;waiting&quot;,&quot;stalled&quot;,&quot;completed&quot;,&quot;failed&quot;,&quot;interrupted&quot;,&quot;disconnected&quot;],&quot;default&quot;:&quot;running&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;md&quot;,&quot;sm&quot;],&quot;default&quot;:&quot;md&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;solid&quot;,&quot;line&quot;],&quot;default&quot;:&quot;solid&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;label&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;iconOnly&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const s = (this.props.state || 'idle').toLowerCase();
+    const sm = this.props.size === 'sm';
+    const line = this.props.variant === 'line';
+    const disc = s === 'disconnected';
+    const f = n => s === n;
+    const solid = !line && !disc;
+    return {
+      isRunning: f('running'), isCreated: f('created'), isIdle: f('idle'), isWaiting: f('waiting'), isStalled: f('stalled'),
+      isCompleted: f('completed'), isFailed: f('failed'), isInterrupted: f('interrupted'), isDisconnected: disc,
+      label: this.props.label || s.toUpperCase(), showLabel: this.props.iconOnly !== true,
+      bg: solid ? `var(--s-${s})` : 'transparent',
+      fg: solid ? 'var(--ink)' : `var(--s-${s}-fg)`,
+      ring: (disc && !line) ? `inset 0 0 0 1.5px var(--s-${s}-fg)` : 'none',
+      h: sm ? '20px' : '26px', pad: line ? '0' : (sm ? '0 7px 0 6px' : '0 10px 0 8px'),
+      fs: sm ? '10.5px' : '12px', icon: sm ? 11 : 13, gap: sm ? '5px' : '7px'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E9E8E3}*{box-sizing:border-box}a{color:#2A44E0}a:hover{text-decoration:underline}</style>
+</helmet>
+<section style="padding:48px; border-bottom:2px solid #0A0A0A; display:flex; flex-direction:column; gap:28px; font-family:'Archivo',system-ui,sans-serif; color:#0A0A0A">
+<div style="display:flex; flex-direction:column; gap:6px; max-width:900px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#5E5E5A">Turn 2 · Prompt + slash</span><h1 style="margin:0; font-size:40px; line-height:42px; font-weight:800; letter-spacing:-0.03em">1d with a slash: terminal and watcher</h1><p style="margin:0; font-size:15px; line-height:22px; color:#4A4A46">The prompt chevron stays; a slash adds the “path/command” reading, and the blue dot is the watcher. <a href="#2c">2c</a> is the chosen mark and is applied across the app.</p></div>
+<div style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-start">
+<sc-for list="{{ opts2 }}" as="o" hint-placeholder-count="4">
+<div id="{{ o.id }}" style="width:340px; background:#FFFFFF; display:flex; flex-direction:column">
+<div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid #D9D8D2"><span style="height:22px; padding:0 8px; display:flex; align-items:center; background:#0A0A0A; color:#FFFFFF; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700">{{ o.id }}</span><span style="font-size:16px; font-weight:800">{{ o.name }}</span></div>
+<div style="height:220px; display:flex; align-items:center; justify-content:center; background:#0A0A0A; --text-1:#F2F2F0; --accent:#3D5AFE"><dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 120 }}" hint-size="120px,120px"></dc-import></div>
+<div style="display:grid; grid-template-columns:1fr 1fr; --text-1:#0A0A0A; --accent:#2A44E0">
+<div style="height:120px; display:flex; align-items:center; justify-content:center; background:#F7F6F2"><dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 64 }}" hint-size="64px,64px"></dc-import></div>
+<div style="height:120px; display:flex; align-items:center; justify-content:center; background:#3D5AFE; --text-1:#FFFFFF"><dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 64 }}" mono="{{ true }}" hint-size="64px,64px"></dc-import></div>
+</div>
+<div style="display:flex; align-items:center; gap:18px; padding:16px; border-bottom:1px solid #D9D8D2; --text-1:#0A0A0A; --accent:#2A44E0">
+<dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 16 }}" hint-size="16px,16px"></dc-import>
+<dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 24 }}" hint-size="24px,24px"></dc-import>
+<dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 32 }}" hint-size="32px,32px"></dc-import>
+<span style="margin-left:auto; display:flex; align-items:center; gap:10px"><dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 22 }}" hint-size="22px,22px"></dc-import><span style="font-size:20px; font-weight:800; letter-spacing:-0.02em">Sentinal</span></span>
+</div>
+<p style="margin:0; padding:14px 16px 18px; font-size:13px; line-height:19px; color:#4A4A46; text-wrap:pretty">{{ o.why }}</p>
+</div>
+</sc-for>
+</div>
+</section>
+<section style="padding:48px; display:flex; flex-direction:column; gap:28px; font-family:'Archivo',system-ui,sans-serif; color:#0A0A0A">
+<div style="display:flex; flex-direction:column; gap:6px; max-width:900px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#5E5E5A">Turn 1 · Logo mark</span><h1 style="margin:0; font-size:40px; line-height:42px; font-weight:800; letter-spacing:-0.03em">Sentinal mark — four directions</h1><p style="margin:0; font-size:15px; line-height:22px; color:#4A4A46">All built from squares and dots so they hold at 16 px and print in one color. Superseded by turn 2.</p></div>
+<div style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-start">
+<sc-for list="{{ opts }}" as="o" hint-placeholder-count="4">
+<div id="{{ o.id }}" style="width:340px; background:#FFFFFF; display:flex; flex-direction:column">
+<div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid #D9D8D2"><span style="height:22px; padding:0 8px; display:flex; align-items:center; background:#0A0A0A; color:#FFFFFF; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700">{{ o.id }}</span><span style="font-size:16px; font-weight:800">{{ o.name }}</span></div>
+<div style="height:220px; display:flex; align-items:center; justify-content:center; background:#0A0A0A; --text-1:#F2F2F0; --accent:#3D5AFE"><dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 120 }}" hint-size="120px,120px"></dc-import></div>
+<div style="display:grid; grid-template-columns:1fr 1fr; --text-1:#0A0A0A; --accent:#2A44E0">
+<div style="height:120px; display:flex; align-items:center; justify-content:center; background:#F7F6F2"><dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 64 }}" hint-size="64px,64px"></dc-import></div>
+<div style="height:120px; display:flex; align-items:center; justify-content:center; background:#3D5AFE; --text-1:#FFFFFF"><dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 64 }}" mono="{{ true }}" hint-size="64px,64px"></dc-import></div>
+</div>
+<div style="display:flex; align-items:center; gap:18px; padding:16px; border-bottom:1px solid #D9D8D2; --text-1:#0A0A0A; --accent:#2A44E0">
+<dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 16 }}" hint-size="16px,16px"></dc-import>
+<dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 24 }}" hint-size="24px,24px"></dc-import>
+<dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 32 }}" hint-size="32px,32px"></dc-import>
+<span style="margin-left:auto; display:flex; align-items:center; gap:10px"><dc-import name="SentinalMark" variant="{{ o.v }}" size="{{ 22 }}" hint-size="22px,22px"></dc-import><span style="font-size:20px; font-weight:800; letter-spacing:-0.02em">Sentinal</span></span>
+</div>
+<p style="margin:0; padding:14px 16px 18px; font-size:13px; line-height:19px; color:#4A4A46; text-wrap:pretty">{{ o.why }}</p>
+</div>
+</sc-for>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return { opts2: [
+      { id:'2a', v:'e', name:'Prompt · path · dot', why:'Reads left to right like a command: prompt, slash, then the status dot. Most “terminal” of the three; the dot sits where output would appear.' },
+      { id:'2b', v:'f', name:'Prompt + watcher', why:'The slash rises from the baseline with the blue dot on top, like a figure standing watch beside the prompt. Terminal and watcher in one shape.' },
+      { id:'2c', v:'g', name:'Slash + dot', why:'Drops the chevron: one heavy slash and the dot. The most compact and logo-like; the terminal reading is lighter.' }
+    ], opts: [
+      { id:'1a', v:'a', name:'Watch grid', why:'A 3×3 grid of sessions with one larger dot in the middle: the sentinel watching all of them. Reads as “status board” and scales to a favicon.' },
+      { id:'1b', v:'b', name:'Dot-matrix S', why:'An S drawn on a terminal dot matrix, ending in a blue cursor dot. Most literal about terminals; strongest as a letterform.' },
+      { id:'1c', v:'c', name:'Window', why:'A heavy square frame with one dot inside: a lookout window. The quietest and most Swiss; works best at large sizes.' },
+      { id:'1d', v:'d', name:'Prompt', why:'The shell prompt chevron followed by a status dot. Immediately about the command line; a little closer to generic dev-tool marks.' }
+    ] };
+  }
+}
+</script>
+</body>
+</html>

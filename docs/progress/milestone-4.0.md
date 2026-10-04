@@ -248,7 +248,8 @@ All new types are additive. `PROTOCOL_VERSION` stays `1`.
 // POST /api/v1/link/refresh     Bearer <worker_credential>
 {"machine_id":"01J9…","control_credential":"<new 64 hex>"}
 → {"worker_credential":"<new 64 hex>","credential_expires_at":1806452540000}
-// both directions rotate atomically; the old worker_credential works for 60 s more
+// the old worker_credential works for 60 s more. The control credential file
+// and SQLite link row are separate writes; crash reconciliation is a V1 gate.
 
 // POST /api/v1/link/disconnect  Bearer <worker_credential>   {"machine_id":"01J9…"}  → 204
 ```

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="max-width:1200px; padding:40px 48px 80px; display:flex; flex-direction:column; gap:48px; animation:sn-in .25s ease-out">
+<header style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap">
+<div style="display:flex; flex-direction:column; gap:6px">
+<h1 style="margin:0; font-size:36px; line-height:38px; font-weight:800; letter-spacing:-0.03em">{{ title }}</h1>
+<span style="font-size:14px; color:var(--text-2)">{{ summary }}</span>
+</div>
+<sc-if value="{{ filtered }}"><button onClick="{{ clearFilter }}" style="height:32px; padding:0 12px; border:1px solid var(--line-strong); background:transparent; color:var(--text-1); font-size:13px; font-weight:600" style-hover="border-color:var(--text-1)">Show all machines</button></sc-if>
+</header>
+
+<sc-if value="{{ showNeeds }}" hint-placeholder-val="{{ true }}">
+<section style="display:flex; flex-direction:column">
+<div style="display:flex; align-items:baseline; justify-content:space-between; padding-bottom:10px; border-bottom:2px solid var(--text-1)"><span style="font-size:18px; font-weight:800">Needs you</span><span style="font-size:18px; font-weight:800">{{ needsCount }}</span></div>
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+<sc-for list="{{ needs }}" as="n" hint-placeholder-count="3">
+<div onClick="{{ n.open }}" style="background:var(--bg-0); padding:16px 20px 18px; border-bottom:1px solid var(--line); box-shadow:inset -1px 0 0 var(--line); display:flex; flex-direction:column; gap:10px; cursor:pointer; min-height:150px" style-hover="background:var(--bg-1)">
+<div style="display:flex; align-items:center; justify-content:space-between; gap:8px"><dc-import name="StateTag" state="{{ n.state }}" size="sm" hint-size="80px,20px"></dc-import><span style="font-size:12px; color:var(--text-3)">{{ n.machine }}</span></div>
+<div style="display:flex; flex-direction:column; gap:2px"><span style="font-size:17px; font-weight:700">{{ n.name }}</span><span style="font-size:13px; line-height:18px; color:var(--text-2); text-wrap:pretty">{{ n.fact }}</span></div>
+<sc-if value="{{ n.isPrompt }}">
+<div style="display:grid; grid-template-columns:minmax(0,1fr) 48px 48px; gap:2px">
+<span style="display:flex; align-items:center; padding:0 12px; background:var(--bg-1); font-family:'JetBrains Mono',monospace; font-size:14px">Continue? [y/N]</span>
+<button onClick="{{ answerY }}" style="height:44px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700">y</button>
+<button onClick="{{ answerN }}" style="height:44px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700">n</button>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</section>
+</sc-if>
+
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+<section style="display:flex; flex-direction:column; opacity:{{ g.op }}">
+<div style="display:flex; align-items:baseline; gap:16px; padding-bottom:10px; border-bottom:2px solid var(--text-1); flex-wrap:wrap">
+<span style="font-size:18px; font-weight:800">{{ g.name }}</span>
+<span style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2)"><span style="width:7px; height:7px; background:{{ g.dot }}; box-shadow:{{ g.ring }}"></span>{{ g.status }}</span>
+<span style="margin-left:auto; font-size:13px; color:var(--text-3)">{{ g.hw }}</span>
+</div>
+<sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+<div onClick="{{ r.open }}" style="display:grid; grid-template-columns:110px minmax(140px,1.3fr) minmax(0,1fr) minmax(0,110px) 64px; gap:16px; align-items:center; min-height:60px; padding:8px 0; border-bottom:1px solid var(--line); cursor:pointer" style-hover="background:var(--bg-1)">
+<span style="padding-left:2px"><dc-import name="StateTag" state="{{ r.state }}" size="sm" hint-size="80px,20px"></dc-import></span>
+<div style="display:flex; flex-direction:column; min-width:0"><span style="font-size:15px; font-weight:700">{{ r.name }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.cmd }}</span></div>
+<span style="font-size:13px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.fact }}</span>
+<span style="font-size:13px; color:var(--text-3)">{{ r.project }}</span>
+<span style="font-size:13px; font-weight:600; text-align:right; padding-right:8px">{{ r.dur }}</span>
+</div>
+</sc-for>
+<sc-if value="{{ g.empty }}"><div style="padding:16px 0; border-bottom:1px solid var(--line); font-size:13px; color:var(--text-3)">Offline · last seen 14m ago. Sessions will appear when the agent reconnects.</div></sc-if>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { answered: null };
+  renderVals() {
+    const go = this.props.go || (() => {});
+    const f = (this.props.params || {}).machine;
+    const ans = this.state.answered;
+    const open = id => () => go('app/session', { id });
+    const npm = ans ? { state: 'running', fact: `answered ${ans}`, dur: '—' } : { state: 'waiting', fact: 'Continue? [y/N]', dur: '—' };
+    const all = [
+      { id: 'rtx', name: 'RTX-PC', status: 'Online · Linux', hw: 'Ryzen 9 · 64 GB · RTX 4090 24 GB', dot: 'var(--s-running)', ring: 'none', op: 1, rows: [
+        { id: 'qwen', state: 'running', name: 'Qwen Training', cmd: 'python train.py --config moe.yaml', fact: 'epoch 68/100 · loss 0.37', project: 'TIM', dur: '1h31m' },
+        { id: 'vllm', state: 'running', name: 'vLLM', cmd: 'vllm serve Qwen/Qwen3-8B --port 8000', fact: ':8000 · GPU idle between requests', project: '—', dur: '—' },
+        { id: 'pytest', state: 'failed', name: 'pytest', cmd: 'pytest tests/', fact: '3 failed · 182 passed', project: 'MentalAnimAItion', dur: '42s' },
+        { id: 'shell', state: 'idle', name: 'shell', cmd: '~/Projects/TIM', fact: '—', project: 'TIM', dur: '—' } ] },
+      { id: 'mini', name: 'Mac Mini', status: 'Online · macOS', hw: 'M2 Pro · 32 GB', dot: 'var(--s-running)', ring: 'none', op: 1, rows: [
+        { id: 'npm', name: 'npm install', cmd: 'npm install', project: '—', ...npm },
+        { id: 'compression', state: 'stalled', name: 'Compression', cmd: '—', fact: 'no output 14m · CPU 0 %', project: '—', dur: '—' } ] },
+      { id: 'mbp', name: 'MacBook', status: 'Offline · last seen 14m ago', hw: 'M3 · 16 GB', dot: 'transparent', ring: 'inset 0 0 0 1.5px var(--s-disconnected-fg)', op: 0.55, rows: [] }
+    ];
+    const groups = all.filter(g => !f || g.id === f).map(g => ({ ...g, empty: g.rows.length === 0, rows: g.rows.map(r => ({ ...r, open: open(r.id) })) }));
+    const needsAll = [
+      ...(ans ? [] : [{ id: 'npm', m: 'mini', state: 'waiting', name: 'npm install', machine: 'Mac Mini', fact: 'Waiting for input', isPrompt: true }]),
+      { id: 'pytest', m: 'rtx', state: 'failed', name: 'pytest', machine: 'RTX-PC', fact: '3 failures in molecule correspondence tests · 182 passed · 42s', isPrompt: false },
+      { id: 'compression', m: 'mini', state: 'stalled', name: 'Compression', machine: 'Mac Mini', fact: 'No output for 14m, CPU 0 %. Possibly stalled (78 % confidence).', isPrompt: false }
+    ].filter(n => !f || n.m === f);
+    const needs = needsAll.map((n, i) => ({ ...n, open: open(n.id), pl: i === 0 ? '0' : '20px' }));
+    const names = { rtx: 'RTX-PC', mini: 'Mac Mini', mbp: 'MacBook' };
+    const stop = e => e.stopPropagation();
+    return {
+      title: f ? names[f] : 'Overview', filtered: !!f, clearFilter: () => go('app/overview'),
+      summary: f ? all.find(g => g.id === f).hw : `6 sessions on 2 machines · ${needsAll.length} need you · MacBook offline`,
+      needs, needsCount: needs.length, showNeeds: needs.length > 0, groups,
+      answerY: e => { stop(e); this.setState({ answered: 'y' }); }, answerN: e => { stop(e); this.setState({ answered: 'n' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

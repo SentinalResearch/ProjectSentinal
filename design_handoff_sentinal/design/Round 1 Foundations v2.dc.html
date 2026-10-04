@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#0A0A0A}*{box-sizing:border-box}a{color:var(--accent-fg);text-decoration:none}a:hover{text-decoration:underline}button{font-family:inherit}@keyframes tg-indet{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}@keyframes tg-spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.tg-motion{animation:none!important}}</style>
+</helmet>
+<div ref="{{ rootRef }}" style="--bg-0:#0A0A0A; --bg-1:#141414; --bg-2:#1F1F1F; --text-1:#F2F2F0; --text-2:#A6A6A2; --text-3:#8A8A86; --line:#2A2A2A; --line-strong:#6B6B67; --accent:#3D5AFE; --accent-fg:#8C9EFF; --on-accent:#FFFFFF; --ink:#0A0A0A; --s-created:#B9A8FF; --s-idle:#9C9C98; --s-running:#29D35F; --s-waiting:#FFD000; --s-stalled:#FF8A00; --s-completed:#36C5E8; --s-failed:#FF3B2F; --s-interrupted:#FF5CA8; --s-disconnected:transparent; --s-created-fg:#B9A8FF; --s-idle-fg:#9C9C98; --s-running-fg:#29D35F; --s-waiting-fg:#FFD000; --s-stalled-fg:#FF8A00; --s-completed-fg:#36C5E8; --s-failed-fg:#FF3B2F; --s-interrupted-fg:#FF5CA8; --s-disconnected-fg:#8A8A86; --sev-info:#8C9EFF; --sev-warning:#FFD000; --sev-error:#FF3B2F; --term-bg:#0C0C0C; --term-fg:#D4D4D0; --scrim:rgba(0,0,0,0.7); min-height:100vh; background:var(--bg-0); color:var(--text-1); font-family:'Archivo',system-ui,sans-serif; font-size:14px; line-height:20px; font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased">
+
+<header style="background:var(--accent); color:#FFFFFF; padding:32px 48px 40px">
+<div style="max-width:1344px; margin:0 auto; display:flex; flex-direction:column; gap:72px">
+<div style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:24px; border-top:2px solid #FFFFFF; padding-top:12px; font-size:13px; line-height:18px">
+<div style="display:flex; flex-direction:column"><span style="font-weight:700">terminal-agent</span><span style="opacity:.85">Control plane for terminal sessions</span></div>
+<div style="display:flex; flex-direction:column"><span style="font-weight:700">Round 1 of 4</span><span style="opacity:.85">Foundations · v2 Swiss</span></div>
+<div style="display:flex; flex-direction:column"><span style="font-weight:700">Phone 390 × 844</span><span style="opacity:.85">Desktop 1440 × 900</span></div>
+<div style="display:flex; justify-content:flex-end; align-items:flex-start; gap:0">
+<button onClick="{{ setDark }}" style="height:32px; padding:0 16px; border:1.5px solid #FFFFFF; font-size:13px; font-weight:700; cursor:pointer; background:{{ darkBg }}; color:{{ darkFg }}">Dark</button>
+<button onClick="{{ setLight }}" style="height:32px; padding:0 16px; border:1.5px solid #FFFFFF; border-left:0; font-size:13px; font-weight:700; cursor:pointer; background:{{ lightBg }}; color:{{ lightFg }}">Light</button>
+</div>
+</div>
+<div style="display:flex; flex-wrap:wrap; gap:16px 48px; align-items:flex-end">
+<h1 style="flex:1 1 auto; min-width:0; margin:0; font-size:clamp(64px,11vw,152px); line-height:0.85; font-weight:800; letter-spacing:-0.055em; overflow-wrap:anywhere">Foundations</h1>
+<div style="flex:0 1 300px; font-size:17px; line-height:24px; font-weight:500; text-wrap:pretty">Color, type, grid and the core components for watching long-running jobs.</div>
+</div>
+</div>
+</header>
+
+<div style="max-width:1440px; margin:0 auto; padding:56px 48px 120px; display:flex; flex-direction:column; gap:88px">
+
+<section style="display:grid; grid-template-columns:minmax(220px,3fr) minmax(0,9fr); gap:24px; border-top:2px solid var(--text-1); padding-top:16px">
+<div style="display:flex; flex-direction:column; gap:10px"><span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.05em">01</span><h2 style="margin:0; font-size:24px; line-height:28px; font-weight:700">Color</h2><p style="margin:0; color:var(--text-2); font-size:14px; text-wrap:pretty; max-width:260px">Neutral ground, one ultramarine accent, nine flat state colors. States are solid fields with black glyph and label, so they never depend on hue alone.</p></div>
+<div style="display:flex; flex-direction:column; gap:32px">
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:2px">
+<sc-for list="{{ tiles }}" as="t" hint-placeholder-count="9">
+<div style="height:168px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; background:{{ t.bg }}; color:{{ t.fg }}; box-shadow:{{ t.ring }}">
+<dc-import name="StateTag" state="{{ t.k }}" hint-size="100px,26px"></dc-import>
+<div style="display:flex; flex-direction:column; gap:2px"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; line-height:14px">{{ t.hexD }} · {{ t.hexL }}</span><span style="font-size:12px; line-height:16px; font-weight:500">{{ t.meaning }}</span></div>
+</div>
+</sc-for>
+</div>
+<div style="display:flex; flex-direction:column; overflow-x:auto; min-width:0">
+<div style="display:grid; min-width:780px; grid-template-columns:minmax(140px,1fr) minmax(185px,1fr) minmax(185px,1fr) minmax(160px,1.3fr); gap:16px; padding:0 0 8px; font-size:11px; line-height:14px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); border-bottom:1px solid var(--text-1)"><span>TOKEN</span><span>DARK</span><span>LIGHT</span><span>USE</span></div>
+<sc-for list="{{ tokenGroups }}" as="g" hint-placeholder-count="5">
+<div style="padding:18px 0 6px; min-width:780px; font-size:13px; font-weight:700; border-bottom:1px solid var(--line)">{{ g.group }}</div>
+<sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+<div style="display:grid; min-width:780px; grid-template-columns:minmax(140px,1fr) minmax(185px,1fr) minmax(185px,1fr) minmax(160px,1.3fr); gap:16px; padding:8px 0; align-items:center; border-bottom:1px solid var(--line)">
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px">{{ r.name }}</span>
+<span style="display:flex; align-items:center; gap:10px; min-width:0"><span style="width:36px; height:24px; background:#141414; display:flex; align-items:center; justify-content:center; flex:none"><span style="width:20px; height:12px; background:{{ r.d }}"></span></span><span style="display:flex; flex-direction:column; min-width:0"><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:15px; color:var(--text-2); white-space:nowrap">{{ r.d }}</span><span style="font-size:11px; line-height:14px; color:var(--text-3); white-space:nowrap">{{ r.cd }}</span></span></span>
+<span style="display:flex; align-items:center; gap:10px; min-width:0"><span style="width:36px; height:24px; background:#F7F6F2; display:flex; align-items:center; justify-content:center; flex:none"><span style="width:20px; height:12px; background:{{ r.l }}"></span></span><span style="display:flex; flex-direction:column; min-width:0"><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:15px; color:var(--text-2); white-space:nowrap">{{ r.l }}</span><span style="font-size:11px; line-height:14px; color:var(--text-3); white-space:nowrap">{{ r.cl }}</span></span></span>
+<span style="color:var(--text-2); font-size:13px; text-wrap:pretty">{{ r.use }}</span>
+</div>
+</sc-for>
+</sc-for>
+</div>
+<details style="border-top:1px solid var(--text-1); border-bottom:1px solid var(--line)">
+<summary style="padding:12px 0; cursor:pointer; font-weight:700">CSS variables — paste-ready</summary>
+<pre style="margin:0 0 16px; padding:16px; background:var(--bg-1); font-family:'JetBrains Mono',monospace; font-size:12px; line-height:18px; color:var(--text-2); overflow:auto; max-height:440px">{{ cssText }}</pre>
+</details>
+</div>
+</section>
+
+<section style="display:grid; grid-template-columns:minmax(220px,3fr) minmax(0,9fr); gap:24px; border-top:2px solid var(--text-1); padding-top:16px">
+<div style="display:flex; flex-direction:column; gap:10px"><span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.05em">02</span><h2 style="margin:0; font-size:24px; line-height:28px; font-weight:700">Type</h2><p style="margin:0; color:var(--text-2); font-size:14px; text-wrap:pretty; max-width:260px">Archivo for the interface, JetBrains Mono for anything a shell would print. Flush left, ragged right. Hierarchy comes from size and weight jumps, not boxes.</p></div>
+<div style="display:flex; flex-direction:column; gap:32px">
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:24px">
+<div style="display:flex; flex-direction:column; gap:12px; border-top:1px solid var(--line); padding-top:12px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">UI · ARCHIVO 400–800</span>
+<span style="font-size:120px; line-height:100px; font-weight:800; letter-spacing:-0.05em">68 %</span>
+<span style="font-size:22px; line-height:28px; font-weight:500">1h31m · 21.4 GB · 96 % · 0.41 → 0.37</span>
+</div>
+<div style="display:flex; flex-direction:column; gap:12px; border-top:1px solid var(--line); padding-top:12px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">COMMANDS · JETBRAINS MONO 400/500/700</span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:20px; line-height:30px">vllm serve Qwen/Qwen3-8B<br>--port 8000</span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; line-height:20px; color:var(--text-2)">~/Projects/TIM · :8000 · Continue? [y/N]</span>
+</div>
+</div>
+<div style="display:flex; flex-direction:column">
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding-bottom:8px; font-size:11px; line-height:14px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); border-bottom:1px solid var(--text-1)"><span>ROLE</span><span>PHONE</span><span>DESKTOP</span><span>SAMPLE</span></div>
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding:12px 0; align-items:baseline; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)"><span>display</span><span>56/52 · 800</span><span>72/64 · 800</span><span style="font-family:'Archivo',sans-serif; font-size:56px; line-height:52px; font-weight:800; letter-spacing:-0.05em; color:var(--text-1)">68 %</span></div>
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding:12px 0; align-items:baseline; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)"><span>title</span><span>30/32 · 700</span><span>32/36 · 700</span><span style="font-family:'Archivo',sans-serif; font-size:30px; line-height:32px; font-weight:700; letter-spacing:-0.02em; color:var(--text-1)">Qwen Training</span></div>
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding:12px 0; align-items:baseline; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)"><span>heading</span><span>17/22 · 700</span><span>16/22 · 700</span><span style="font-family:'Archivo',sans-serif; font-size:17px; line-height:22px; font-weight:700; color:var(--text-1)">Needs you</span></div>
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding:12px 0; align-items:baseline; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)"><span>body</span><span>15/22 · 400</span><span>14/20 · 400</span><span style="font-family:'Archivo',sans-serif; font-size:15px; line-height:22px; color:var(--text-1)">3 failed in molecule correspondence tests</span></div>
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding:12px 0; align-items:baseline; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)"><span>label</span><span>13/18 · 500</span><span>13/18 · 500</span><span style="font-family:'Archivo',sans-serif; font-size:13px; line-height:18px; font-weight:500; color:var(--text-1)">RTX-PC · running 1h31m</span></div>
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding:12px 0; align-items:baseline; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)"><span>overline</span><span>11/14 · 700</span><span>11/14 · 700</span><span style="font-family:'Archivo',sans-serif; font-size:11px; line-height:14px; font-weight:700; letter-spacing:0.08em; color:var(--text-1)">GPU · VRAM · HEALTH</span></div>
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding:12px 0; align-items:baseline; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)"><span>mono</span><span>13/20 · 400</span><span>13/20 · 400</span><span style="font-size:13px; line-height:20px; color:var(--text-1)">python train.py --config moe.yaml</span></div>
+<div style="display:grid; grid-template-columns:110px 120px 120px minmax(0,1fr); gap:16px; padding:12px 0; align-items:baseline; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)"><span>terminal</span><span>12.5/17</span><span>13.5/19</span><span style="font-size:12.5px; line-height:17px; color:var(--text-1)">epoch 68/100  loss 0.37</span></div>
+</div>
+</div>
+</section>
+
+<section style="display:grid; grid-template-columns:minmax(220px,3fr) minmax(0,9fr); gap:24px; border-top:2px solid var(--text-1); padding-top:16px">
+<div style="display:flex; flex-direction:column; gap:10px"><span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.05em">03</span><h2 style="margin:0; font-size:24px; line-height:28px; font-weight:700">Grid &amp; space</h2><p style="margin:0; color:var(--text-2); font-size:14px; text-wrap:pretty; max-width:260px">4-pt base. Phone: 4 columns, 16 margin, 12 gutter. Desktop: 12 columns, 48 margin, 24 gutter. Square corners; rules carry structure instead of shadows.</p></div>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:40px">
+<div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:12px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); margin-bottom:6px">SPACE</span>
+<sc-for list="{{ spaces }}" as="s" hint-placeholder-count="9">
+<div style="display:grid; grid-template-columns:80px 32px minmax(0,1fr); gap:10px; align-items:center"><span style="font-family:'JetBrains Mono',monospace; font-size:12px">{{ s.name }}</span><span style="font-size:12px; color:var(--text-3)">{{ s.px }}</span><span style="height:12px; width:{{ s.w }}; background:var(--text-1)"></span></div>
+</sc-for>
+</div>
+<div style="display:flex; flex-direction:column; gap:14px; border-top:1px solid var(--line); padding-top:12px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">PHONE GRID · 390</span>
+<div style="position:relative; width:195px; height:180px; background:var(--bg-1); display:grid; grid-template-columns:repeat(4,1fr); gap:6px; padding:0 8px"><span style="background:color-mix(in srgb, var(--accent) 35%, transparent)"></span><span style="background:color-mix(in srgb, var(--accent) 35%, transparent)"></span><span style="background:color-mix(in srgb, var(--accent) 35%, transparent)"></span><span style="background:color-mix(in srgb, var(--accent) 35%, transparent)"></span></div>
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); margin-top:6px">RULES &amp; RADIUS</span>
+<div style="display:flex; flex-direction:column; gap:10px; font-size:13px; color:var(--text-2)">
+<div style="display:grid; grid-template-columns:72px minmax(0,1fr); gap:12px; align-items:center"><span style="height:2px; background:var(--text-1)"></span><span>rule-heavy · 2 px text-1 · section start</span></div>
+<div style="display:grid; grid-template-columns:72px minmax(0,1fr); gap:12px; align-items:center"><span style="height:1px; background:var(--line-strong)"></span><span>rule · 1 px line-strong · controls</span></div>
+<div style="display:grid; grid-template-columns:72px minmax(0,1fr); gap:12px; align-items:center"><span style="height:1px; background:var(--line)"></span><span>hairline · 1 px line · row dividers</span></div>
+<div style="display:grid; grid-template-columns:72px minmax(0,1fr); gap:12px; align-items:center"><span style="height:24px; width:48px; border:1.5px solid var(--text-1)"></span><span>radius 0 on every component</span></div>
+<div style="display:grid; grid-template-columns:72px minmax(0,1fr); gap:12px; align-items:center"><span style="height:24px; width:48px; background:var(--bg-2); box-shadow:0 12px 32px rgba(0,0,0,.4)"></span><span>one shadow: sheets over scrim</span></div>
+</div>
+</div>
+</div>
+</section>
+
+<section style="display:grid; grid-template-columns:minmax(220px,3fr) minmax(0,9fr); gap:24px; border-top:2px solid var(--text-1); padding-top:16px">
+<div style="display:flex; flex-direction:column; gap:10px"><span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.05em">04</span><h2 style="margin:0; font-size:24px; line-height:28px; font-weight:700">Components</h2><p style="margin:0; color:var(--text-2); font-size:14px; text-wrap:pretty; max-width:260px">Every component sits on the grid and is built from type, rules and flat color. No rounded cards.</p></div>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:1px; background:var(--line); border-top:1px solid var(--line); border-bottom:1px solid var(--line)">
+
+<div style="background:var(--bg-0); padding:20px 20px 28px 0; display:flex; flex-direction:column; gap:16px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.1</span><span style="font-size:15px; font-weight:700">State tag</span></div>
+<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center"><dc-import name="StateTag" state="running" hint-size="100px,26px"></dc-import><dc-import name="StateTag" state="failed" hint-size="86px,26px"></dc-import><dc-import name="StateTag" state="waiting" hint-size="96px,26px"></dc-import><dc-import name="StateTag" state="disconnected" hint-size="140px,26px"></dc-import></div>
+<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center"><dc-import name="StateTag" state="stalled" size="sm" hint-size="80px,20px"></dc-import><dc-import name="StateTag" state="completed" size="sm" hint-size="96px,20px"></dc-import><dc-import name="StateTag" state="interrupted" size="sm" hint-size="110px,20px"></dc-import><dc-import name="StateTag" state="idle" size="sm" hint-size="56px,20px"></dc-import></div>
+<div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center"><dc-import name="StateTag" state="running" variant="line" size="sm" hint-size="70px,20px"></dc-import><dc-import name="StateTag" state="created" variant="line" size="sm" hint-size="70px,20px"></dc-import><dc-import name="StateTag" state="failed" variant="line" size="sm" hint-size="60px,20px"></dc-import></div>
+<span style="font-size:12px; color:var(--text-3)">solid · md &nbsp;/&nbsp; solid · sm &nbsp;/&nbsp; line · for dense tables</span>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 0 28px 20px; display:flex; flex-direction:column; gap:16px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.2</span><span style="font-size:15px; font-weight:700">Machine chip</span></div>
+<div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:2px solid var(--text-1)">
+<div style="display:flex; flex-direction:column; gap:2px; padding:10px 10px 10px 0; min-height:64px"><span style="font-size:15px; font-weight:700">RTX-PC</span><span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2)"><span style="width:8px; height:8px; background:var(--s-running)"></span>Online · Linux</span></div>
+<div style="display:flex; flex-direction:column; gap:2px; padding:10px; min-height:64px; border-left:1px solid var(--line)"><span style="font-size:15px; font-weight:700">Mac Mini</span><span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2)"><span style="width:8px; height:8px; background:var(--s-running)"></span>Online · macOS</span></div>
+<div style="display:flex; flex-direction:column; gap:2px; padding:10px; min-height:64px; border-left:1px solid var(--line)"><span style="font-size:15px; font-weight:700; color:var(--text-3)">MacBook</span><span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-3)"><span style="width:8px; height:8px; border:1.5px dashed var(--s-disconnected-fg)"></span>Offline · 14m ago</span></div>
+</div>
+<div style="display:flex; gap:12px; align-items:center"><div style="display:flex; flex-direction:column; gap:2px; padding:10px 12px; min-height:56px; background:var(--text-1); color:var(--bg-0); min-width:140px"><span style="font-size:15px; font-weight:700">RTX-PC</span><span style="font-size:12px">4 sessions</span></div><span style="font-size:12px; color:var(--text-3)">selected — inverted field</span></div>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 20px 28px 0; display:flex; flex-direction:column; gap:12px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.3</span><span style="font-size:15px; font-weight:700">Session row · compact</span></div>
+<div style="display:flex; flex-direction:column; border-top:1px solid var(--text-1)">
+<div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:start; padding:12px 0; border-bottom:1px solid var(--line)"><dc-import name="StateTag" state="failed" size="sm" hint-size="72px,20px"></dc-import><div style="display:flex; flex-direction:column; gap:2px"><span style="font-size:16px; line-height:20px; font-weight:700">pytest</span><span style="font-size:13px; color:var(--text-2)">3 failed · 182 passed · 42s</span></div><span style="font-size:12px; color:var(--text-3)">RTX-PC</span></div>
+<div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:start; padding:12px 0; border-bottom:1px solid var(--line)"><dc-import name="StateTag" state="running" size="sm" hint-size="80px,20px"></dc-import><div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:16px; line-height:20px; font-weight:700">Qwen Training</span><div style="height:3px; background:var(--bg-2)"><div style="width:68%; height:100%; background:var(--s-running-fg)"></div></div></div><span style="font-size:12px; color:var(--text-2)">68 %</span></div>
+</div>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 0 28px 20px; display:flex; flex-direction:column; gap:12px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.4</span><span style="font-size:15px; font-weight:700">Session card · expanded</span></div>
+<div style="display:flex; flex-direction:column; gap:14px; border-top:2px solid var(--text-1); padding-top:12px">
+<div style="display:flex; align-items:flex-start; gap:10px"><div style="flex:1; display:flex; flex-direction:column; gap:2px"><span style="font-size:20px; line-height:24px; font-weight:700; letter-spacing:-0.01em">Qwen Training</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)">python train.py --config moe.yaml</span></div><dc-import name="StateTag" state="running" hint-size="100px,26px"></dc-import></div>
+<div style="display:flex; align-items:flex-end; gap:16px"><span style="font-size:56px; line-height:48px; font-weight:800; letter-spacing:-0.05em">68 %</span><span style="font-size:13px; color:var(--text-2); padding-bottom:2px">epoch 68/100<br>1h31m · TIM · RTX-PC</span></div>
+<div style="height:4px; background:var(--bg-2)"><div style="width:68%; height:100%; background:var(--s-running-fg)"></div></div>
+<div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:1px solid var(--line)">
+<div style="display:flex; flex-direction:column; gap:2px; padding:8px 8px 0 0"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">LOSS</span><span style="font-size:16px; font-weight:600">0.41 → 0.37</span></div>
+<div style="display:flex; flex-direction:column; gap:2px; padding:8px 8px 0; border-left:1px solid var(--line)"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">GPU</span><span style="font-size:16px; font-weight:600">96 %</span></div>
+<div style="display:flex; flex-direction:column; gap:2px; padding:8px 8px 0; border-left:1px solid var(--line)"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">VRAM</span><span style="font-size:16px; font-weight:600">21.4 / 24 GB</span></div>
+</div>
+<div style="display:flex; align-items:center; gap:10px; border-top:1px solid var(--line); padding-top:12px"><span style="font-size:12px; font-weight:700; letter-spacing:0.06em; color:var(--s-running-fg)">✓ HEALTHY</span><span style="font-size:12px; color:var(--text-3); flex:1">last output 8s ago</span><button style="height:36px; padding:0 14px; border:1.5px solid var(--text-1); background:transparent; color:var(--text-1); font-size:13px; font-weight:700; cursor:pointer">Open terminal</button></div>
+</div>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 20px 28px 0; display:flex; flex-direction:column; gap:18px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.5</span><span style="font-size:15px; font-weight:700">Progress</span></div>
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; font-size:13px"><span>epoch 68/100</span><span style="font-weight:700">68 %</span></div><div style="position:relative; height:6px; background:var(--bg-2)"><div style="width:68%; height:100%; background:var(--s-running-fg)"></div><div style="position:absolute; inset:0; background:repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--bg-0) calc(10% - 1px) 10%)"></div></div><span style="font-size:12px; color:var(--text-3)">Known total — 10 % ticks, fill in state color</span></div>
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; font-size:13px"><span style="font-family:'JetBrains Mono',monospace; font-size:12.5px">npm install</span><span style="color:var(--text-2)">no total</span></div><div style="height:6px; background:var(--bg-2); overflow:hidden"><div class="tg-motion" style="width:20%; height:100%; background:var(--text-1); animation:tg-indet 1.8s ease-in-out infinite"></div></div><span style="font-size:12px; color:var(--text-3)">Unknown total — segment moves only while output arrives</span></div>
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; font-size:13px"><span>Compression</span><span style="color:var(--s-stalled-fg); font-weight:600">no output 14m</span></div><div style="height:6px; background:repeating-linear-gradient(135deg, var(--s-stalled-fg) 0 2px, transparent 2px 7px)"></div><span style="font-size:12px; color:var(--text-3)">No activity — static hatch in stalled color</span></div>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 0 28px 20px; display:flex; flex-direction:column; gap:18px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.6</span><span style="font-size:15px; font-weight:700">Resource meter</span></div>
+<div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 24px">
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; align-items:baseline"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">GPU</span><span style="font-size:20px; font-weight:700">96 %</span></div><div style="height:4px; background:var(--bg-2)"><div style="width:96%; height:100%; background:var(--text-1)"></div></div></div>
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; align-items:baseline"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">VRAM</span><span style="font-size:20px; font-weight:700">21.4<span style="font-size:13px; font-weight:500; color:var(--text-2)"> / 24 GB</span></span></div><div style="position:relative; height:4px; background:var(--bg-2)"><div style="width:89%; height:100%; background:var(--text-1)"></div><div style="position:absolute; left:95%; top:-4px; width:2px; height:12px; background:var(--text-3)"></div></div></div>
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; align-items:baseline"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">CPU</span><span style="font-size:20px; font-weight:700">0 %</span></div><div style="height:4px; background:var(--bg-2)"></div></div>
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; align-items:baseline"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">RAM</span><span style="font-size:20px; font-weight:700; color:var(--text-3)">—<span style="font-size:13px; font-weight:500"> / 64 GB</span></span></div><div style="height:4px; border-top:1px dashed var(--line-strong); border-bottom:1px dashed var(--line-strong)"></div></div>
+<div style="display:flex; flex-direction:column; gap:6px; grid-column:1 / -1; background:var(--s-waiting); color:var(--ink); padding:10px 12px"><div style="display:flex; justify-content:space-between; align-items:baseline"><span style="font-size:11px; font-weight:800; letter-spacing:0.08em">▲ VRAM HIGH · 13:58</span><span style="font-size:20px; font-weight:700">96.5 %<span style="font-size:13px; font-weight:500"> · 23.2 / 24 GB</span></span></div><div style="position:relative; height:4px; background:rgba(0,0,0,.18)"><div style="width:96.5%; height:100%; background:var(--ink)"></div></div></div>
+</div>
+<span style="font-size:12px; color:var(--text-3); text-wrap:pretty">Neutral fill. Tick = warning threshold. Crossing it flips the meter into a solid warning field. Dashed track = no sample.</span>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 20px 28px 0; display:flex; flex-direction:column; gap:12px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.7</span><span style="font-size:15px; font-weight:700">Health card</span></div>
+<div style="display:flex; flex-direction:column">
+<div style="display:flex; justify-content:space-between; align-items:center; background:var(--s-running); color:var(--ink); padding:10px 12px"><span style="font-size:11px; font-weight:800; letter-spacing:0.08em">HEALTH</span><span style="font-size:17px; font-weight:800; letter-spacing:0.02em">✓ HEALTHY</span></div>
+<div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:24px; font-size:14px">
+<sc-for list="{{ health }}" as="x" hint-placeholder-count="6">
+<div style="display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line)"><span style="color:var(--text-2)">{{ x.k }}</span><span style="font-weight:700; color:{{ x.c }}">{{ x.v }}</span></div>
+</sc-for>
+</div>
+<div style="display:flex; flex-direction:column; gap:4px; padding-top:10px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">EVIDENCE</span><span style="font-size:13px; color:var(--text-2)">loss improving for 5 checks · GPU 96 % · last output 8s ago</span></div>
+</div>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 0 28px 20px; display:flex; flex-direction:column; gap:12px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.8</span><span style="font-size:15px; font-weight:700">Event row</span></div>
+<div style="display:flex; flex-direction:column; border-top:1px solid var(--text-1)">
+<sc-for list="{{ events }}" as="e" hint-placeholder-count="6">
+<div style="display:grid; grid-template-columns:44px 12px minmax(0,1fr); gap:10px; align-items:start; padding:8px 0; border-bottom:1px solid var(--line)">
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; line-height:18px; color:var(--text-3)">{{ e.t }}</span>
+<span style="width:10px; height:10px; margin-top:4px; background:{{ e.c }}"></span>
+<span style="display:flex; flex-direction:column; min-width:0"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; line-height:18px; font-weight:700; color:{{ e.tc }}">{{ e.type }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:18px; overflow-wrap:anywhere">{{ e.d }}</span></span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 20px 28px 0; display:flex; flex-direction:column; gap:12px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.9</span><span style="font-size:15px; font-weight:700">Command history row</span></div>
+<div style="display:flex; flex-direction:column; border-top:1px solid var(--text-1)">
+<sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+<div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; min-height:44px; border-bottom:1px solid var(--line)">
+<dc-import name="StateTag" state="{{ h.s }}" size="sm" icon-only="{{ true }}" hint-size="24px,20px"></dc-import>
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ h.cmd }}</span>
+<span style="font-size:14px; font-weight:600; color:{{ h.dc }}">{{ h.dur }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 0 28px 20px; display:flex; flex-direction:column; gap:12px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.10</span><span style="font-size:15px; font-weight:700">Terminal key bar</span></div>
+<div style="display:grid; grid-template-columns:1.4fr repeat(6,1fr); gap:2px; background:var(--line); border:2px solid var(--line)">
+<button style="height:48px; border:0; background:var(--s-failed); color:var(--ink); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700">Ctrl‑C</button>
+<button style="height:48px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:13px">Esc</button>
+<button style="height:48px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:13px">Tab</button>
+<button style="height:48px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:16px">↑</button>
+<button style="height:48px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:16px">↓</button>
+<button style="height:48px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700">y</button>
+<button style="height:48px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700">n</button>
+</div>
+<span style="font-size:12px; color:var(--text-3); text-wrap:pretty">48 pt keys joined by 2 pt rules. Ctrl‑C is the only red key and always routes through the confirm sheet on long jobs. y / n are inverted for fastest recognition.</span>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 0 28px; display:flex; flex-direction:column; gap:14px; grid-column:1 / -1">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.11</span><span style="font-size:15px; font-weight:700">Buttons</span></div>
+<div style="display:grid; grid-template-columns:110px repeat(5,minmax(120px,1fr)); gap:10px 12px; align-items:center; overflow-x:auto">
+<span></span><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">DEFAULT</span><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">HOVER</span><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">PRESSED</span><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">DISABLED</span><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">LOADING</span>
+<span style="font-size:13px; font-weight:600">Primary</span>
+<button style="height:44px; border:0; background:var(--accent); color:var(--on-accent); font-size:14px; font-weight:700; cursor:pointer" style-hover="background:color-mix(in srgb, var(--accent) 85%, #FFFFFF)">Run recipe</button>
+<button style="height:44px; border:0; background:color-mix(in srgb, var(--accent) 85%, #FFFFFF); color:var(--on-accent); font-size:14px; font-weight:700">Run recipe</button>
+<button style="height:44px; border:0; background:color-mix(in srgb, var(--accent) 78%, #000000); color:var(--on-accent); font-size:14px; font-weight:700">Run recipe</button>
+<button style="height:44px; border:1px dashed var(--line-strong); background:transparent; color:var(--text-3); font-size:14px; font-weight:700">Run recipe</button>
+<button style="height:44px; border:0; background:var(--accent); color:var(--on-accent); font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px"><span class="tg-motion" style="width:12px; height:12px; border:2px solid var(--on-accent); border-right-color:transparent; animation:tg-spin .8s linear infinite"></span>Starting…</button>
+<span style="font-size:13px; font-weight:600">Secondary</span>
+<button style="height:44px; border:1.5px solid var(--text-1); background:transparent; color:var(--text-1); font-size:14px; font-weight:700; cursor:pointer" style-hover="background:var(--bg-2)">Open terminal</button>
+<button style="height:44px; border:1.5px solid var(--text-1); background:var(--bg-2); color:var(--text-1); font-size:14px; font-weight:700">Open terminal</button>
+<button style="height:44px; border:1.5px solid var(--text-1); background:var(--text-1); color:var(--bg-0); font-size:14px; font-weight:700">Open terminal</button>
+<button style="height:44px; border:1px dashed var(--line-strong); background:transparent; color:var(--text-3); font-size:14px; font-weight:700">Open terminal</button>
+<button style="height:44px; border:1.5px solid var(--text-1); background:transparent; color:var(--text-2); font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px"><span class="tg-motion" style="width:12px; height:12px; border:2px solid var(--text-2); border-right-color:transparent; animation:tg-spin .8s linear infinite"></span>Connecting…</button>
+<span style="font-size:13px; font-weight:600">Destructive</span>
+<button style="height:44px; border:0; background:var(--s-failed); color:var(--ink); font-size:14px; font-weight:700; cursor:pointer" style-hover="background:color-mix(in srgb, var(--s-failed) 85%, #FFFFFF)">Send Ctrl‑C</button>
+<button style="height:44px; border:0; background:color-mix(in srgb, var(--s-failed) 85%, #FFFFFF); color:var(--ink); font-size:14px; font-weight:700">Send Ctrl‑C</button>
+<button style="height:44px; border:0; background:color-mix(in srgb, var(--s-failed) 80%, #000000); color:var(--ink); font-size:14px; font-weight:700">Send Ctrl‑C</button>
+<button style="height:44px; border:1px dashed var(--line-strong); background:transparent; color:var(--text-3); font-size:14px; font-weight:700">Send Ctrl‑C</button>
+<button style="height:44px; border:0; background:var(--s-failed); color:var(--ink); font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px"><span class="tg-motion" style="width:12px; height:12px; border:2px solid var(--ink); border-right-color:transparent; animation:tg-spin .8s linear infinite"></span>Sending…</button>
+</div>
+<span style="font-size:12px; color:var(--text-3)">44 tall on phone, 36 on desktop. First column is live on hover.</span>
+</div>
+
+<div style="background:var(--bg-0); padding:20px 0 28px; display:flex; flex-direction:column; gap:14px; grid-column:1 / -1">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">4.12</span><span style="font-size:15px; font-weight:700">Confirm sheet · destructive</span></div>
+<div style="position:relative; height:360px; max-width:390px; overflow:hidden; background:var(--term-bg)">
+<div style="padding:16px; font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:17px; color:var(--term-fg); white-space:pre">epoch 67/100  loss 0.38
+epoch 68/100  loss 0.37</div>
+<div style="position:absolute; inset:0; background:var(--scrim)"></div>
+<div style="position:absolute; left:0; right:0; bottom:0; background:var(--bg-1); border-top:4px solid var(--s-failed); padding:20px 20px 24px; display:flex; flex-direction:column; gap:16px; box-shadow:0 -12px 32px rgba(0,0,0,.4)">
+<div style="display:flex; flex-direction:column; gap:8px">
+<span style="font-size:11px; font-weight:800; letter-spacing:0.08em; color:var(--s-failed-fg)">INTERRUPT · RTX-PC</span>
+<span style="font-size:24px; line-height:28px; font-weight:800; letter-spacing:-0.02em">Send Ctrl‑C to Qwen Training?</span>
+<span style="font-size:14px; line-height:20px; color:var(--text-2); text-wrap:pretty">Stops <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-1)">python train.py</span> after 1h31m at epoch 68/100. Last checkpoint <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-1)">ckpt/epoch_37.pt</span>.</span>
+</div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
+<button style="height:48px; border:1.5px solid var(--text-1); background:transparent; color:var(--text-1); font-size:15px; font-weight:700">Cancel</button>
+<button style="height:48px; border:0; background:var(--s-failed); color:var(--ink); font-size:15px; font-weight:700">Send Ctrl‑C</button>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</section>
+
+<section style="display:grid; grid-template-columns:minmax(220px,3fr) minmax(0,9fr); gap:24px; border-top:2px solid var(--text-1); padding-top:16px">
+<div style="display:flex; flex-direction:column; gap:10px"><span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.05em">05</span><h2 style="margin:0; font-size:24px; line-height:28px; font-weight:700">Specimen</h2><p style="margin:0; color:var(--text-2); font-size:14px; text-wrap:pretty; max-width:260px">Three phone views composed only from the parts above: home glance, running training, terminal with Ctrl‑C confirm.</p></div>
+<div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start">
+
+<div style="width:390px; height:844px; flex:none; border:1px solid var(--line-strong); border-radius:40px; overflow:hidden; background:var(--bg-0); display:flex; flex-direction:column">
+<div style="padding:58px 16px 0; display:flex; flex-direction:column; gap:16px">
+<div style="display:flex; align-items:baseline; justify-content:space-between"><span style="font-size:34px; line-height:36px; font-weight:800; letter-spacing:-0.03em">Sessions</span><span style="font-size:13px; color:var(--text-3)">6 on 2 machines</span></div>
+<div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:2px solid var(--text-1)">
+<div style="display:flex; flex-direction:column; gap:2px; padding:8px 8px 10px 0"><span style="font-size:14px; font-weight:700">RTX-PC</span><span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--text-2)"><span style="width:7px; height:7px; background:var(--s-running)"></span>Online · 4</span></div>
+<div style="display:flex; flex-direction:column; gap:2px; padding:8px 8px 10px; border-left:1px solid var(--line)"><span style="font-size:14px; font-weight:700">Mac Mini</span><span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--text-2)"><span style="width:7px; height:7px; background:var(--s-running)"></span>Online · 2</span></div>
+<div style="display:flex; flex-direction:column; gap:2px; padding:8px 8px 10px; border-left:1px solid var(--line)"><span style="font-size:14px; font-weight:700; color:var(--text-3)">MacBook</span><span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--text-3)"><span style="width:7px; height:7px; border:1.5px dashed var(--s-disconnected-fg)"></span>Offline 14m</span></div>
+</div>
+</div>
+<div style="flex:1; overflow:hidden; padding:8px 16px 0; display:flex; flex-direction:column">
+<div style="display:flex; align-items:baseline; justify-content:space-between; padding:12px 0 8px; border-bottom:2px solid var(--text-1)"><span style="font-size:17px; font-weight:800">Needs you</span><span style="font-size:17px; font-weight:800">3</span></div>
+<div style="display:flex; flex-direction:column; gap:10px; padding:12px 0; border-bottom:1px solid var(--line)">
+<div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:center"><dc-import name="StateTag" state="waiting" size="sm" hint-size="84px,20px"></dc-import><span style="font-size:16px; font-weight:700">npm install</span><span style="font-size:12px; color:var(--text-3)">Mac Mini</span></div>
+<div style="display:grid; grid-template-columns:minmax(0,1fr) 56px 56px; gap:2px; align-items:stretch"><span style="display:flex; align-items:center; background:var(--bg-1); padding:0 12px; font-family:'JetBrains Mono',monospace; font-size:14px">Continue? [y/N]</span><button style="height:48px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:700">y</button><button style="height:48px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:700">n</button></div>
+</div>
+<div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:start; padding:12px 0; border-bottom:1px solid var(--line)"><dc-import name="StateTag" state="failed" size="sm" hint-size="72px,20px"></dc-import><div style="display:flex; flex-direction:column; gap:2px"><span style="font-size:16px; line-height:20px; font-weight:700">pytest</span><span style="font-size:13px; color:var(--text-2)">3 failed · 182 passed · 42s</span></div><span style="font-size:12px; color:var(--text-3)">RTX-PC</span></div>
+<div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:start; padding:12px 0; border-bottom:1px solid var(--line)"><dc-import name="StateTag" state="stalled" size="sm" hint-size="80px,20px"></dc-import><div style="display:flex; flex-direction:column; gap:2px"><span style="font-size:16px; line-height:20px; font-weight:700">Compression</span><span style="font-size:13px; color:var(--text-2)">no output 14m · CPU 0 %</span></div><span style="font-size:12px; color:var(--text-3)">Mac Mini</span></div>
+<div style="display:flex; align-items:baseline; justify-content:space-between; padding:22px 0 8px; border-bottom:2px solid var(--text-1)"><span style="font-size:17px; font-weight:800">Running</span><span style="font-size:17px; font-weight:800">2</span></div>
+<div style="display:flex; flex-direction:column; gap:10px; padding:12px 0; border-bottom:1px solid var(--line)">
+<div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:start"><div style="display:flex; flex-direction:column; gap:2px"><span style="font-size:16px; line-height:20px; font-weight:700">Qwen Training</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--text-2)">python train.py --config moe.yaml</span></div><dc-import name="StateTag" state="running" size="sm" hint-size="80px,20px"></dc-import></div>
+<div style="display:flex; align-items:flex-end; gap:12px"><span style="font-size:48px; line-height:40px; font-weight:800; letter-spacing:-0.05em">68 %</span><span style="font-size:12px; line-height:16px; color:var(--text-2)">epoch 68/100<br>1h31m · <span style="color:var(--s-running-fg); font-weight:700">✓ Healthy</span></span></div>
+<div style="height:4px; background:var(--bg-2)"><div style="width:68%; height:100%; background:var(--s-running-fg)"></div></div>
+<div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr))">
+<div style="display:flex; flex-direction:column"><span style="font-size:10.5px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">LOSS</span><span style="font-size:14px; font-weight:600">0.41 → 0.37</span></div>
+<div style="display:flex; flex-direction:column; padding-left:8px; border-left:1px solid var(--line)"><span style="font-size:10.5px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">GPU</span><span style="font-size:14px; font-weight:600">96 %</span></div>
+<div style="display:flex; flex-direction:column; padding-left:8px; border-left:1px solid var(--line)"><span style="font-size:10.5px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">VRAM</span><span style="font-size:14px; font-weight:600">21.4 / 24 GB</span></div>
+</div>
+</div>
+<div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:start; padding:12px 0"><div style="display:flex; flex-direction:column; gap:2px"><span style="font-size:16px; line-height:20px; font-weight:700">vLLM</span><span style="font-size:13px; color:var(--text-2)"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-1)">:8000</span> · GPU idle between requests</span></div><dc-import name="StateTag" state="running" size="sm" hint-size="80px,20px"></dc-import></div>
+</div>
+</div>
+
+<div style="width:390px; height:844px; flex:none; border:1px solid var(--line-strong); border-radius:40px; overflow:hidden; background:var(--bg-0); display:flex; flex-direction:column">
+<div style="padding:54px 16px 0; display:flex; flex-direction:column; gap:10px">
+<span style="font-size:14px; font-weight:600; color:var(--accent-fg); height:24px">← RTX-PC</span>
+<span style="font-size:32px; line-height:34px; font-weight:800; letter-spacing:-0.03em">Qwen Training</span>
+<div style="display:flex; gap:6px"><dc-import name="StateTag" state="running" hint-size="100px,26px"></dc-import><span style="display:inline-flex; align-items:center; height:26px; padding:0 10px; box-shadow:inset 0 0 0 1.5px var(--s-running-fg); color:var(--s-running-fg); font-size:12px; font-weight:700; letter-spacing:0.04em">✓ HEALTHY</span></div>
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)">python train.py --config moe.yaml</span>
+</div>
+<div style="flex:1; overflow:hidden; padding:16px 16px 0; display:flex; flex-direction:column; gap:16px">
+<div style="display:flex; flex-direction:column; gap:8px; border-top:2px solid var(--text-1); padding-top:10px">
+<div style="display:flex; align-items:flex-end; justify-content:space-between"><span style="font-size:96px; line-height:78px; font-weight:800; letter-spacing:-0.06em">68<span style="font-size:40px; letter-spacing:-0.02em">%</span></span><span style="text-align:right; font-size:13px; line-height:18px; color:var(--text-2)">epoch 68/100<br>running 1h31m</span></div>
+<div style="position:relative; height:8px; background:var(--bg-2)"><div style="width:68%; height:100%; background:var(--s-running-fg)"></div><div style="position:absolute; inset:0; background:repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--bg-0) calc(10% - 1px) 10%)"></div></div>
+</div>
+<div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px">
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; align-items:baseline"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">GPU</span><span style="font-size:18px; font-weight:700">96 %</span></div><div style="height:4px; background:var(--bg-2)"><div style="width:96%; height:100%; background:var(--text-1)"></div></div></div>
+<div style="display:flex; flex-direction:column; gap:6px"><div style="display:flex; justify-content:space-between; align-items:baseline"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">VRAM</span><span style="font-size:18px; font-weight:700">21.4<span style="font-size:12px; font-weight:500; color:var(--text-2)"> / 24 GB</span></span></div><div style="position:relative; height:4px; background:var(--bg-2)"><div style="width:89%; height:100%; background:var(--text-1)"></div><div style="position:absolute; left:95%; top:-4px; width:2px; height:12px; background:var(--text-3)"></div></div></div>
+</div>
+<div style="display:flex; flex-direction:column">
+<div style="display:flex; justify-content:space-between; align-items:center; background:var(--s-running); color:var(--ink); padding:8px 10px"><span style="font-size:11px; font-weight:800; letter-spacing:0.08em">HEALTH</span><span style="font-size:14px; font-weight:800">✓ HEALTHY</span></div>
+<div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:16px; font-size:13px">
+<sc-for list="{{ health }}" as="x" hint-placeholder-count="6">
+<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--line)"><span style="color:var(--text-2)">{{ x.k }}</span><span style="font-weight:700; color:{{ x.c }}">{{ x.v }}</span></div>
+</sc-for>
+</div>
+<span style="font-size:12px; line-height:16px; color:var(--text-2); padding-top:8px">loss improving for 5 checks · GPU 96 % · last output 8s ago</span>
+</div>
+<div style="display:flex; flex-direction:column">
+<div style="display:flex; justify-content:space-between; padding-bottom:6px; border-bottom:2px solid var(--text-1)"><span style="font-size:15px; font-weight:800">Events</span><span style="font-size:13px; color:var(--text-3)">6</span></div>
+<sc-for list="{{ eventsRecent }}" as="e" hint-placeholder-count="4">
+<div style="display:grid; grid-template-columns:40px 10px minmax(0,1fr); gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line)">
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">{{ e.t }}</span>
+<span style="width:8px; height:8px; background:{{ e.c }}"></span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"><span style="font-weight:700; color:{{ e.tc }}">{{ e.type }}</span> {{ e.d }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="padding:10px 16px 34px; display:grid; grid-template-columns:1fr 1.4fr; gap:8px; border-top:1px solid var(--line)">
+<button style="height:48px; border:1.5px solid var(--s-failed-fg); background:transparent; color:var(--s-failed-fg); font-size:15px; font-weight:700">Ctrl‑C…</button>
+<button style="height:48px; border:0; background:var(--accent); color:var(--on-accent); font-size:15px; font-weight:700">Open terminal</button>
+</div>
+</div>
+
+<div style="width:390px; height:844px; flex:none; border:1px solid var(--line-strong); border-radius:40px; overflow:hidden; background:var(--term-bg); display:flex; flex-direction:column">
+<div style="padding:52px 16px 10px; display:flex; align-items:center; gap:10px; background:var(--bg-1); border-bottom:2px solid var(--text-1)">
+<button style="height:36px; padding:0 12px; border:1.5px solid var(--text-1); background:transparent; color:var(--text-1); font-size:13px; font-weight:700">Detach</button>
+<span style="flex:1; font-size:16px; font-weight:800">Qwen Training</span>
+<dc-import name="StateTag" state="running" size="sm" hint-size="80px,20px"></dc-import>
+</div>
+<div style="flex:1; position:relative; overflow:hidden">
+<div style="padding:12px 16px; font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:17px; color:var(--term-fg); white-space:pre">$ python train.py --config moe.yaml
+epoch 64/100  loss 0.41
+epoch 65/100  loss 0.40
+epoch 66/100  loss 0.39
+epoch 67/100  loss 0.38
+epoch 68/100  loss 0.37</div>
+<div style="position:absolute; inset:0; background:var(--scrim)"></div>
+<div style="position:absolute; left:0; right:0; bottom:0; background:var(--bg-1); border-top:4px solid var(--s-failed); padding:20px 16px 20px; display:flex; flex-direction:column; gap:16px; box-shadow:0 -12px 32px rgba(0,0,0,.4)">
+<div style="display:flex; flex-direction:column; gap:8px">
+<span style="font-size:11px; font-weight:800; letter-spacing:0.08em; color:var(--s-failed-fg)">INTERRUPT · RTX-PC</span>
+<span style="font-size:24px; line-height:28px; font-weight:800; letter-spacing:-0.02em">Send Ctrl‑C to Qwen Training?</span>
+<span style="font-size:14px; line-height:20px; color:var(--text-2); text-wrap:pretty">Stops <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-1)">python train.py</span> after 1h31m at epoch 68/100. Last checkpoint <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-1)">ckpt/epoch_37.pt</span>.</span>
+</div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
+<button style="height:48px; border:1.5px solid var(--text-1); background:transparent; color:var(--text-1); font-size:15px; font-weight:700">Cancel</button>
+<button style="height:48px; border:0; background:var(--s-failed); color:var(--ink); font-size:15px; font-weight:700">Send Ctrl‑C</button>
+</div>
+</div>
+</div>
+<div style="display:grid; grid-template-columns:1.4fr repeat(6,1fr); gap:2px; background:var(--line); border-top:2px solid var(--line)">
+<button style="height:48px; border:0; background:var(--s-failed); color:var(--ink); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700">Ctrl‑C</button>
+<button style="height:48px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:13px">Esc</button>
+<button style="height:48px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:13px">Tab</button>
+<button style="height:48px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:16px">↑</button>
+<button style="height:48px; border:0; background:var(--bg-1); color:var(--text-1); font-family:'JetBrains Mono',monospace; font-size:16px">↓</button>
+<button style="height:48px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700">y</button>
+<button style="height:48px; border:0; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700">n</button>
+</div>
+<div style="height:30px; background:var(--bg-1)"></div>
+</div>
+
+</div>
+</section>
+
+<section style="display:grid; grid-template-columns:minmax(220px,3fr) minmax(0,9fr); gap:24px; border-top:2px solid var(--text-1); padding-top:16px">
+<div style="display:flex; flex-direction:column; gap:10px"><span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.05em">06</span><h2 style="margin:0; font-size:24px; line-height:28px; font-weight:700">Component notes</h2></div>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); column-gap:24px">
+<sc-for list="{{ notes }}" as="n" hint-placeholder-count="11">
+<div style="padding:14px 0 18px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:6px">
+<div style="display:flex; gap:10px; align-items:baseline"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">{{ n.id }}</span><span style="font-weight:700">{{ n.name }}</span></div>
+<div style="font-size:13px; line-height:19px; color:var(--text-2); text-wrap:pretty">{{ n.body }}</div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section style="display:grid; grid-template-columns:minmax(220px,3fr) minmax(0,9fr); gap:24px; border-top:2px solid var(--text-1); padding-top:16px">
+<div style="display:flex; flex-direction:column; gap:10px"><span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.05em">07</span><h2 style="margin:0; font-size:24px; line-height:28px; font-weight:700">Open questions</h2></div>
+<div style="display:flex; flex-direction:column; max-width:820px">
+<sc-for list="{{ questions }}" as="q" hint-placeholder-count="9">
+<div style="display:grid; grid-template-columns:40px minmax(0,1fr); gap:8px; padding:12px 0; border-top:1px solid var(--line)"><span style="font-size:15px; font-weight:800">{{ q.n }}</span><span style="font-size:15px; line-height:22px; text-wrap:pretty">{{ q.t }}</span></div>
+</sc-for>
+</div>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  rootRef = React.createRef();
+  state = { theme: this.props.theme || 'dark' };
+  FILL = { created:'#B9A8FF', idle:'#9C9C98', running:'#29D35F', waiting:'#FFD000', stalled:'#FF8A00', completed:'#36C5E8', failed:'#FF3B2F', interrupted:'#FF5CA8' };
+  FG_L = { created:'#5B45C9', idle:'#5E5E5A', running:'#0A7030', waiting:'#7D5B00', stalled:'#9A4B00', completed:'#0A6680', failed:'#C4210F', interrupted:'#B01F6A', disconnected:'#62625E' };
+  MEANING = { created:'Registered, not started', idle:'Shell open, nothing running', running:'Producing output', waiting:'Needs your input', stalled:'No output past threshold', completed:'Exited 0', failed:'Exited non-zero', interrupted:'Stopped by signal', disconnected:'Agent unreachable' };
+  base(dark){ const o = dark
+    ? {'bg-0':'#0A0A0A','bg-1':'#141414','bg-2':'#1F1F1F','text-1':'#F2F2F0','text-2':'#A6A6A2','text-3':'#8A8A86','line':'#2A2A2A','line-strong':'#6B6B67','accent':'#3D5AFE','accent-fg':'#8C9EFF','on-accent':'#FFFFFF','ink':'#0A0A0A'}
+    : {'bg-0':'#EFEEE9','bg-1':'#F7F6F2','bg-2':'#E4E3DD','text-1':'#0A0A0A','text-2':'#4A4A46','text-3':'#5E5E5A','line':'#D2D1CB','line-strong':'#8A8984','accent':'#2A44E0','accent-fg':'#2A44E0','on-accent':'#FFFFFF','ink':'#0A0A0A'};
+    for (const k in this.FILL) o['s-'+k] = this.FILL[k];
+    o['s-disconnected'] = 'transparent';
+    for (const k in this.FG_L) o['s-'+k+'-fg'] = dark ? (this.FILL[k] || '#8A8A86') : this.FG_L[k];
+    o['sev-info'] = o['accent-fg']; o['sev-warning'] = o['s-waiting-fg']; o['sev-error'] = o['s-failed-fg'];
+    o['term-bg'] = '#0C0C0C'; o['term-fg'] = '#D4D4D0'; o['scrim'] = dark ? 'rgba(0,0,0,0.7)' : 'rgba(10,10,10,0.45)';
+    return o; }
+  T = { dark: this.base(true), light: this.base(false) };
+  USE = { 'bg-0':'Page, phone screens','bg-1':'Sheets, sidebar, insets','bg-2':'Tracks, pressed rows','text-1':'Primary text, heavy rules, inverted fields','text-2':'Secondary text','text-3':'Timestamps, overlines, units','line':'Hairline row dividers (decorative)','line-strong':'Dashed/disabled control outlines (≥3:1)','accent':'Primary button, header field','accent-fg':'Links, back, focus ring','on-accent':'Text on accent','ink':'Glyph + label on every state fill','sev-info':'Info events','sev-warning':'Warning events, thresholds','sev-error':'Error events','term-bg':'Terminal — same in both themes','term-fg':'Terminal default foreground','scrim':'Behind sheets' };
+  lum(h){ if(!/^#[0-9A-F]{6}$/i.test(h)) return null; const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=0.03928?v/12.92:((v+0.055)/1.055)**2.4); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; }
+  cr(a,b){ const x=this.lum(a),y=this.lum(b); if(x==null||y==null) return ''; return ((Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)).toFixed(1)+':1'; }
+  componentDidMount(){ this.apply(); }
+  componentDidUpdate(pp){ if(pp.theme!==this.props.theme && this.props.theme) this.setState({theme:this.props.theme}); this.apply(); }
+  apply(){ const el=this.rootRef.current; if(!el) return; const t=this.T[this.state.theme]; for(const k in t) el.style.setProperty('--'+k,t[k]); document.body.style.background=t['bg-0']; }
+  renderVals() {
+    const {dark,light}=this.T;
+    const ratio=(t,k)=>{ if(/^s-[a-z]+$/.test(k)) return this.cr(t[k],t.ink)+' ink';
+      if(k==='on-accent') return this.cr(t[k],t.accent); if(k==='term-fg') return this.cr(t[k],t['term-bg']);
+      if(['bg-0','bg-1','bg-2','line','scrim','term-bg','ink','accent'].includes(k)) return ''; return this.cr(t[k],t['bg-1']); };
+    const states=['created','idle','running','waiting','stalled','completed','failed','interrupted','disconnected'];
+    const groups=[['Surface',['bg-0','bg-1','bg-2']],['Text',['text-1','text-2','text-3']],['Line & accent',['line','line-strong','accent','accent-fg','on-accent','ink']],
+      ['State · fill',states.filter(s=>s!=='disconnected').map(s=>'s-'+s)],['State · foreground on surface',states.map(s=>'s-'+s+'-fg')],['Severity',['sev-info','sev-warning','sev-error']],['Terminal & overlay',['term-bg','term-fg','scrim']]];
+    const tokenGroups=groups.map(([group,keys])=>({group,rows:keys.map(k=>({name:'--'+k,d:dark[k],l:light[k],cd:ratio(dark,k),cl:ratio(light,k),
+      use:this.USE[k] || (k.endsWith('-fg') ? 'Dots, bars, text in '+k.slice(2,-3).toUpperCase()+' color' : 'Solid field for '+k.slice(2).toUpperCase())}))}));
+    const tiles=states.map(k=>k==='disconnected'
+      ? {k,bg:'var(--bg-1)',fg:'var(--text-2)',ring:'inset 0 0 0 1.5px var(--s-disconnected-fg)',hexD:'—',hexL:'—',meaning:this.MEANING[k]}
+      : {k,bg:this.FILL[k],fg:'#0A0A0A',ring:'none',hexD:this.FILL[k],hexL:this.FG_L[k],meaning:this.MEANING[k]});
+    const block=t=>Object.entries(t).map(([k,v])=>`  --${k}: ${v};`).join('\n');
+    const scale=`  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;\n  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;\n  --radius: 0;\n  --rule-heavy: 2px; --rule: 1px;\n  --font-ui: 'Archivo', system-ui, sans-serif;\n  --font-mono: 'JetBrains Mono', ui-monospace, monospace;`;
+    const cssText=`:root {\n${scale}\n}\n\n:root, [data-theme="dark"] {\n${block(dark)}\n}\n\n[data-theme="light"] {\n${block(light)}\n}`;
+    const sp=[4,8,12,16,20,24,32,40,48], nm=[1,2,3,4,5,6,8,10,12];
+    const spaces=sp.map((p,i)=>({name:'space-'+nm[i],px:p,w:(p*4)+'px'}));
+    const ev=[['12:42','var(--text-1)','var(--text-1)','COMMAND_STARTED','python train.py --config moe.yaml'],['12:44','var(--line-strong)','var(--text-2)','PROGRESS','epoch 1/100'],['13:41','var(--sev-info)','var(--sev-info)','CHECKPOINT_CREATED','ckpt/epoch_37.pt'],['13:58','var(--s-waiting)','var(--sev-warning)','RESOURCE_HIGH','VRAM 96.5 %'],['14:02','var(--s-waiting)','var(--sev-warning)','WARNING','VRAM usage high'],['14:13','var(--line-strong)','var(--text-2)','PROGRESS','epoch 68/100']]
+      .map(([t,c,tc,type,d])=>({t,c,tc,type,d}));
+    const history=[['completed','cargo build','31s','var(--text-1)'],['failed','pytest tests/','42s','var(--text-1)'],['completed','python benchmark.py','18m','var(--text-1)'],['running','python train.py','running','var(--s-running-fg)']].map(([s,cmd,dur,dc])=>({s,cmd,dur,dc}));
+    const g='var(--s-running-fg)';
+    const health=[['Progress','68 %','var(--text-1)'],['Activity','GOOD',g],['Resources','GOOD',g],['Stability','GOOD',g],['Errors','NONE','var(--text-1)'],['Overall','HEALTHY',g]].map(([k,v,c])=>({k,v,c}));
+    const on=this.state.theme==='dark'; const set=t=>()=>this.setState({theme:t});
+    const notes=[
+      ['State tag','Solid field + black glyph + label: md for headers, sm for rows, line for dense desktop tables, icon-only only where the label sits in an adjacent column. DISCONNECTED is the one outlined state, since it describes absence. RUNNING pulses every 2 s, off under reduced motion.'],
+      ['Machine chip','A column in a 3-up grid under a heavy rule, not a pill. Hover: bg-2. Pressed/selected: inverted field (text-1 ground, bg-0 type). Offline: text-3 name, dashed square, last-seen instead of OS. Still tappable.'],
+      ['Session row','Compact: tag · name + one fact · machine, hairline below, whole row is the target (≥ 64 pt). Hover bg-1, pressed bg-2. Values render “—” until first sample, no shimmer.'],
+      ['Session card','Expanded form for the featured running job: heavy rule, title + command, display-size percent, bar, 3-column metric strip, health line, one secondary action.'],
+      ['Progress','Known total: 6 pt bar, 10 % ticks cut into the fill, fill in state foreground. Unknown total: 20 % segment moves only while output arrives. No activity: static diagonal hatch in stalled color.'],
+      ['Resource meter','Big number, small unit, 4 pt neutral bar, threshold tick. Over threshold the whole meter becomes a yellow field with ink type and a ▲ HIGH label. No sample: dashed track and “—”.'],
+      ['Health card','Colored header field carries Overall (green / yellow / red with ✓ ▲ ✕). Six fixed rows beneath as a 2-column ruled table, then the evidence line.'],
+      ['Event row','Time · 8 pt color square · TYPE (mono bold) · detail. Info = accent, warning = yellow, error = red, routine = grey square. 44 pt when tappable (jumps to that point in scrollback).'],
+      ['History row','Icon-only state tag (the glyph is the label), command in mono with ellipsis, bold tabular duration. 44 pt min.'],
+      ['Key bar','Seven 48 pt keys joined by 2 pt rules. Pressed: invert for 80 ms + haptic. Ctrl‑C is solid red and opens the confirm sheet on long jobs; y / n are inverted fields.'],
+      ['Buttons','Primary (ultramarine) once per view for the forward action. Secondary: 1.5 pt outline; pressed inverts. Destructive: red field, only inside a confirm sheet; entry points use the outlined “Ctrl‑C…” form. Disabled: dashed outline, text-3. Loading: square spinner + “…ing” label, width locked.'],
+      ['Confirm sheet','Scrim + bg-1 sheet with a 4 pt red top rule, overline naming action and machine, 24 pt question, consequence line (runtime, progress, last checkpoint). Cancel left, destructive right, equal width, nothing pre-focused.']
+    ].map(([name,body],i)=>({id:'4.'+(i+1),name,body}));
+    const qs=['Ctrl‑C confirm threshold: always confirm, or only after the job has run N minutes? I assumed a threshold on the key bar and “always” on the detail-screen button.',
+      'Is there a separate Kill (SIGKILL / close session) beyond Ctrl‑C? It needs its own sheet copy.',
+      'Should one-tap y / n send immediately, or show a short undo window first? Currently immediate.',
+      'Warning threshold for VRAM / RAM: 95 %? Should the health engine own these numbers, or the UI?',
+      'Show stall confidence (78 %) to you, or only the POSSIBLY STALLED label?',
+      'Per-session CPU / RAM isn’t in the data. Do agents report per-session, or only per-machine?',
+      'Ultramarine as the single accent (header field + primary button). Keep it, or would you prefer red-free black/white primaries with color reserved for states only?',
+      'Times are 24-hour. Machine’s timezone or the viewer’s?',
+      'Fonts: Archivo + JetBrains Mono, self-hosted in the PWA for offline use. OK?'].map((t,i)=>({n:String(i+1).padStart(2,'0'),t}));
+    return { rootRef:this.rootRef, tokenGroups, tiles, cssText, spaces, events:ev, eventsRecent:ev.slice().reverse().slice(0,4), history, health, notes, questions:qs,
+      setDark:set('dark'), setLight:set('light'), darkBg:on?'#FFFFFF':'transparent', darkFg:on?'var(--accent)':'#FFFFFF', lightBg:on?'transparent':'#FFFFFF', lightFg:on?'#FFFFFF':'var(--accent)' };
+  }
+}
+</script>
+</body>
+</html>

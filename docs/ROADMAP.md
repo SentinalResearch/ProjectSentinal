@@ -3,6 +3,11 @@
 Work top to bottom. Tick boxes as they land. Each milestone ends with a
 demo you can actually use.
 
+**Current boundary (2026-10-04):** Milestones 4.A and 4.B are implemented and
+pass isolated automated acceptance. The repository is a V1 release candidate;
+the production-delivery, security-hardening, platform-evidence, and real
+two-Machine gates remain open in `docs/AUDIT_TRACKER.md`.
+
 The product name is **Sentinal**. The target user-facing binaries are
 `sentinal` and `sentinald`; the existing `ta` and `tad` names remain in place
 until the Milestone 1b migration is implemented and tested.
@@ -219,7 +224,8 @@ prompt, and see the stable Machine ID appear under that display name.
 - [x] Recipe files in `recipes/`, launch from UI
 - [x] "Save as recipe" after a successful command
 - [x] ntfy notifications for completed / failed / waiting / stalled
-- [x] Installable phone PWA: Machines → Sessions → attach → run Recipe at 390×844
+- [x] Phone PWA shell: Machines → Sessions → attach → run Recipe at 390×844
+- [ ] Serve and verify the production-built PWA from the authenticated control origin
 - [ ] Complete the two-real-Machine V1 demo in `docs/progress/milestone-4b.md`
 
 ## Reliability R1 — Daemon-restart-resilient FULL Sessions

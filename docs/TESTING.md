@@ -112,6 +112,8 @@ produces with `insta`. When a parser changes, review the snapshot diff.
 ```bash
 just test              # all fast tests
 just check             # fmt + clippy + tests (run before every commit)
+just test-e2e          # isolated Playwright browser acceptance
+just acceptance        # just check + Playwright
 just network --dry-run # validate/inspect the Tailscale development launch
 just demo              # explicit local fixture UI (not a backend test)
 cargo test -p protocol # one crate
@@ -125,3 +127,9 @@ frontend proxy arguments, port bounds, and rejection of wildcard, LAN, and
 out-of-range CGNAT addresses. It also proves the network launcher forces
 `VITE_DATA=api`; data-mode and badge tests prove fixtures are opt-in and
 labelled.
+
+Playwright is intentionally a separate process-level suite because it starts
+isolated daemon processes and a browser. Milestones that change enrollment,
+Machine routing, terminal control, Recipes, notifications, or mobile behavior
+must record both `just check` and `just test-e2e`; `just acceptance` runs that
+combined gate.

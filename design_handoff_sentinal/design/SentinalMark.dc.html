@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<svg width="{{ px }}" height="{{ px }}" viewBox="0 0 24 24" fill="none" style="display:block; flex:none; color:{{ ink }}" aria-label="Sentinal" role="img">
+<sc-if value="{{ isA }}" hint-placeholder-val="{{ true }}">
+<circle cx="4" cy="4" r="2.1" fill="currentColor"></circle><circle cx="12" cy="4" r="2.1" fill="currentColor"></circle><circle cx="20" cy="4" r="2.1" fill="currentColor"></circle>
+<circle cx="4" cy="12" r="2.1" fill="currentColor"></circle><circle cx="12" cy="12" r="3.6" fill="{{ acc }}"></circle><circle cx="20" cy="12" r="2.1" fill="currentColor"></circle>
+<circle cx="4" cy="20" r="2.1" fill="currentColor"></circle><circle cx="12" cy="20" r="2.1" fill="currentColor"></circle><circle cx="20" cy="20" r="2.1" fill="currentColor"></circle>
+</sc-if>
+<sc-if value="{{ isB }}">
+<circle cx="5" cy="2.5" r="1.9" fill="currentColor"></circle><circle cx="12" cy="2.5" r="1.9" fill="currentColor"></circle><circle cx="19" cy="2.5" r="1.9" fill="currentColor"></circle>
+<circle cx="5" cy="7.25" r="1.9" fill="currentColor"></circle>
+<circle cx="5" cy="12" r="1.9" fill="currentColor"></circle><circle cx="12" cy="12" r="1.9" fill="currentColor"></circle><circle cx="19" cy="12" r="1.9" fill="currentColor"></circle>
+<circle cx="19" cy="16.75" r="1.9" fill="currentColor"></circle>
+<circle cx="5" cy="21.5" r="1.9" fill="currentColor"></circle><circle cx="12" cy="21.5" r="1.9" fill="currentColor"></circle><circle cx="19" cy="21.5" r="2.5" fill="{{ acc }}"></circle>
+</sc-if>
+<sc-if value="{{ isC }}">
+<rect x="2" y="2" width="20" height="20" stroke="currentColor" stroke-width="2.6"></rect><circle cx="12" cy="12" r="4" fill="{{ acc }}"></circle>
+</sc-if>
+<sc-if value="{{ isD }}">
+<path d="M3.5 5l7 7-7 7" stroke="currentColor" stroke-width="3" stroke-linecap="square"></path><circle cx="18" cy="17.5" r="3.2" fill="{{ acc }}"></circle>
+</sc-if>
+<sc-if value="{{ isE }}">
+<path d="M2.5 6l6 6-6 6" stroke="currentColor" stroke-width="2.8" stroke-linecap="square"></path><path d="M11 20.5L15.5 3.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="square"></path><circle cx="20" cy="18.5" r="2.8" fill="{{ acc }}"></circle>
+</sc-if>
+<sc-if value="{{ isF }}">
+<path d="M2.5 7l6 6-6 6" stroke="currentColor" stroke-width="2.8" stroke-linecap="square"></path><path d="M11.5 21.5L16 9" stroke="currentColor" stroke-width="2.8" stroke-linecap="square"></path><circle cx="18.5" cy="4" r="2.9" fill="{{ acc }}"></circle>
+</sc-if>
+<sc-if value="{{ isG }}">
+<path d="M5 22L13.5 2" stroke="currentColor" stroke-width="3.4" stroke-linecap="square"></path><circle cx="18" cy="18.5" r="3.4" fill="{{ acc }}"></circle>
+</sc-if>
+</svg>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:120,&quot;height&quot;:120},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;a&quot;,&quot;b&quot;,&quot;c&quot;,&quot;d&quot;],&quot;default&quot;:&quot;a&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:24,&quot;min&quot;:12,&quot;max&quot;:256,&quot;tsType&quot;:&quot;number&quot;},&quot;mono&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;color&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const v = this.props.variant || 'g';
+    const mono = this.props.mono === true;
+    return {
+      px: this.props.size || 24, isA: v === 'a', isB: v === 'b', isC: v === 'c', isD: v === 'd', isE: v === 'e', isF: v === 'f', isG: v === 'g',
+      ink: this.props.color || 'var(--text-1)', acc: mono ? 'currentColor' : (this.props.accent || 'var(--accent)')
+    };
+  }
+}
+</script>
+</body>
+</html>

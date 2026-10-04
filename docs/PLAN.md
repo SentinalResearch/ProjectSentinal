@@ -100,7 +100,7 @@ Auto-source OSC shell hooks in daemon-owned PTYs, track exact Commands and
 cwd, persist SQLite history and FTS5, recover orphaned Sessions, sample
 process trees and resources, and stream live Metrics to the web UI.
 
-### Phase 1b — any terminal into Sentinal (A–C/E complete; D pending)
+### Phase 1b — any terminal into Sentinal (complete)
 
 Bring ordinary terminals and already-running processes into Sentinal through
 four explicit modes:
@@ -116,14 +116,14 @@ auto-wrap/adopt, watcher-backed log tail, and finished-Session replay stages.
 Safety and test gates are normative in `CAPTURE_MODES.md`, `SECURITY.md`, and
 `TESTING.md`.
 
-### Phase 1c — deployable worker and two-host acceptance
+### Phase 1c — deployable worker and two-host acceptance (complete)
 
 Package the existing daemon, CLI, hooks, and user service as one worker bundle.
 Provide distinct same-Machine, daemon-only worker, and remote control-UI launch
 roles, plus a tested installer and exact Tailscale setup guide. This proves one
 selected worker from a second Machine; it does not claim aggregation.
 
-### Phase 1c.1 — Tailnet bootstrap and private package delivery
+### Phase 1c.1 — Tailnet bootstrap and private package delivery (complete)
 
 Designate one owner-controlled `sentinald` as the local control Machine and
 let it serve verified Linux/macOS worker releases inside the Tailnet. The
@@ -144,7 +144,7 @@ Reinstall and update preserve Machine identity, credentials, SQLite, logs,
 adapters, and recipes. Package delivery is Tailnet-local infrastructure, not
 a public package repository or cloud requirement.
 
-### Phase 3 — Event engine and deterministic watchers
+### Phase 3 — Event engine and deterministic watchers (complete)
 
 Turn output, process state, Metrics, Commands, and exit status into Events.
 Ship a generic watcher, training/pytest/vLLM adapters, declarative adapters,
@@ -152,13 +152,19 @@ and adopted-log ingestion.
 
 ### Phase 4 — connect, enrollment, multi-Machine dashboard, Recipes, notifications
 
+The 4.0, 4.A, and 4.B implementations and isolated browser acceptance are
+complete. Production PWA delivery, security remediation, supported-host
+integration evidence, and the real two-Machine V1 run remain release gates.
+
 After installation, `sentinal connect` explicitly pairs the worker with the
 given control URL. The UI creates a short-lived, single-use code; the CLI
 reads it from a hidden prompt or stdin, never argv or a URL. Connect presents
 the worker's stable Machine ID and requested display name, then exchanges the
 code for a unique revocable Machine credential. The Machine token stays local.
-Later stages aggregate enrolled Machines, launch built-in or saved Recipes,
-and deliver event-driven ntfy notifications.
+The control daemon now aggregates enrolled Machines, proves worker identity,
+routes actions to the owning Machine, launches built-in or saved Recipes, and
+delivers event-driven ntfy notifications without exposing worker credentials
+to the browser.
 
 ### Reliability R1 — daemon-restart-resilient FULL Sessions
 
@@ -186,6 +192,11 @@ tracking, adoption, process/resource monitoring, deterministic Events and a
 basic watcher, web/mobile dashboard, remote attach, and Recipes. It does not
 contain autonomous execution or sophisticated AI.
 
+That feature boundary is implemented. The repository remains a V1 release
+candidate until the checklist in `docs/AUDIT_TRACKER.md` is complete. In
+particular, “persistent” currently means across client disconnects: a
+`sentinald` restart interrupts daemon-owned live PTYs until Reliability R1.
+
 When V1 is complete, the owner can open a phone, see every Machine and
 Session—including work started outside Sentinal—inspect Commands, progress,
 and resources, attach where capture is FULL, and launch a saved Recipe.
@@ -196,18 +207,14 @@ and resources, attach where capture is FULL, and launch a saved Recipe.
 protocol/data model (complete)
   → PTY persistence and attach (complete)
   → Command tracking, SQLite, Metrics (complete)
-  → Milestone 1b contract + private local ingress
-  → Sentinal Watch
-  → external shell hook
-  → auto-wrap + read-only adopt
-  → finished Session replay + worker packaging/two-host acceptance
-  → Tailnet bootstrap + private package delivery
-  → Event engine + generic watcher
-  → adopted log tail
-  → secure Machine enrollment + aggregation
-  → Recipes + notifications
-  → autocomplete + specialized watchers + notifications
+  → all capture modes + retained replay (complete)
+  → worker packaging + private delivery (complete)
+  → Event engine + deterministic watchers (complete)
+  → secure Machine enrollment + aggregation (implemented; real acceptance pending)
+  → Recipes + notifications + mobile UI (implemented; release gates pending)
+  → V1 audit remediation + production PWA delivery
   → Projects
+  → autocomplete and additional specialized watchers
   → optional local agent + journal + suggestions
 ```
 
@@ -225,7 +232,8 @@ crates/watcher     deterministic output → Events (Phase 3)
 shell/             zsh/bash/fish integrations
 web/               React PWA
 recipes/           built-in Recipe TOML
-intelligence/      optional Python service and evals
+eval/              deterministic model-evaluation foundation
+intelligence/      optional Python service (V2, not yet created)
 ```
 
 ## Required documents
@@ -240,12 +248,12 @@ Each milestone updates every affected document before it is complete.
 | Roadmap/checklists | `docs/ROADMAP.md` | current |
 | Testing guide | `docs/TESTING.md` | current |
 | Approved dependencies | `docs/DEPENDENCIES.md` | current |
-| Protocol/data model | `crates/protocol` + fixtures | current through M2 and 1b.C |
-| Capture modes | `docs/CAPTURE_MODES.md` | implemented through 1b.C; log tail pending |
+| Protocol/data model | `crates/protocol` + fixtures | current through 4.B |
+| Capture modes | `docs/CAPTURE_MODES.md` | all four modes and adopted log tail implemented |
 | Security/privacy | `docs/SECURITY.md` | current + planned guarantees labelled |
 | CLI reference | `docs/CLI.md` | current commands + 1b target specified |
 | Shell hooks | `docs/SHELL_HOOKS.md` | current OSC path + external path specified |
-| Setup/Tailscale/PWA | `docs/SETUP.md` | current through Milestone 1c; expanded in 1c.1/Phase 4 |
-| Design sources | `design_handoff_sentinal/design/` | in progress |
-| Eval results | `docs/EVALS.md` | due V2 intelligence work |
+| Setup/Tailscale/PWA | `docs/SETUP.md` | current through 4.B; production PWA delivery pending |
+| Design sources | `design_handoff_sentinal/design/` | retained source handoff; production UI is under `web/` |
+| Eval foundation | `eval/README.md` | deterministic generator, scorer, and rules baseline |
 | Milestone reports | `docs/progress/<milestone>.md` | per milestone |

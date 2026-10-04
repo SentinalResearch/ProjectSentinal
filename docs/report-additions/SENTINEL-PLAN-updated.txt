@@ -1,0 +1,4 @@
+The canonical, maintained development plan is ../PLAN.md.
+
+This pointer exists because the independent audit request used this historical
+path. Do not maintain a second copy of the plan here.

@@ -4,6 +4,9 @@ Status: **implementation and isolated acceptance complete on 2026-10-04;
 the two-real-Machine V1 demo is pending.** The roadmap's final box stays open
 until the run below is appended with its literal output.
 
+Milestone implementation acceptance below was recorded at commit `9cb5a95`;
+the audit-hardening regression checks are recorded in `docs/AUDIT_TRACKER.md`.
+
 ## Delivered
 
 ### Recipes
