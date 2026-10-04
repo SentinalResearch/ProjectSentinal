@@ -7,9 +7,9 @@ fixed; do not mark a row closed from a plan or an untested claim.
 
 Last code review: **2026-10-04**. The recheck covered all 111 files changed
 from audit baseline `c89e78c` through 4.B commit `9cb5a95`, plus every tracked
-and newly added source/test/doc file in the pending telemetry and remediation
-diff. Generated build/package/marketing artifacts and the owner's untracked
-root files were not treated as project changes.
+and newly added source/test/doc file in audit-remediation commit `cd38af6`.
+Generated build/package/marketing artifacts and the owner's untracked root
+files were not treated as project changes.
 
 Status meanings:
 
@@ -37,9 +37,9 @@ boundary, but the project is not yet a releasable V1. The release gates are
 browser credential transport (F3), credential refresh recovery (F5), bounded
 sensitive storage (F9), login throttling
 (F10), a production PWA delivery path (N1), a green integration suite (F14),
-and the recorded two-real-Machine 4.A/4.B acceptance. F2 is closed by the
-pending audit-hardening commit. F1 may remain in R1 only if every V1 claim says
-that Sessions survive client disconnects but not a daemon restart.
+and the recorded two-real-Machine 4.A/4.B acceptance. F2 and F6 are closed in
+`cd38af6`. F1 may remain in R1 only if every V1 claim says that Sessions survive
+client disconnects but not a daemon restart.
 
 ## Finding tracker
 
@@ -125,15 +125,16 @@ candidate build.
 
 ## Next remediation order
 
-1. Commit and verify F2; keep remote Recipe execution blocked on any validation
-   failure.
-2. Replace the browser bearer/query-token design (F3).
-3. Make credential refresh recoverable and idempotent (F5).
-4. Reconcile active Commands on child exit (F6).
-5. Add storage quotas, rotation, usage, and purge (F9).
-6. Add the global/non-spoofable login throttle (F10).
-7. Ship the production PWA path (N1).
-8. Fix the adoption picker and run the full ignored suite (F14).
-9. Run and record the real 4.A/4.B acceptance on the release candidate.
-10. Address protocol evolution/ID representation (F7/F8) before calling the
-    wire format stable, then schedule R1 from actual user evidence.
+1. Replace the browser bearer/query-token design (F3).
+2. Make credential refresh recoverable and idempotent (F5).
+3. Add storage quotas, rotation, usage, and purge (F9).
+4. Add the global/non-spoofable login throttle (F10).
+5. Ship the production PWA path (N1).
+6. Run the host-local ignored suite on Linux and keep credential-dependent
+   Tailnet acceptance separate (F14).
+7. Run and record the real 4.A/4.B acceptance on the release candidate.
+8. Address protocol evolution and ID representation (F7/F8) before calling the
+   wire format stable.
+9. Reconcile the documentation contradictions C1-C9 with the implementation.
+10. Schedule the R1 keeper decision from actual V1 use evidence, while keeping
+    the daemon-restart limitation explicit.
