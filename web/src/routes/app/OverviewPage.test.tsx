@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
+import { store } from "../../data/mock/store";
 import { AppShell } from "./AppShell";
 import { OverviewPage } from "./OverviewPage";
 
@@ -55,5 +56,16 @@ describe("OverviewPage", () => {
 
     await waitFor(() => expect(screen.getAllByText("Waiting for input")).toHaveLength(1), { timeout: 3000 });
     expect(screen.queryByRole("button", { name: "y" })).not.toBeInTheDocument();
+  });
+
+  it("shows authentication expiry separately from an offline Machine", async () => {
+    const machine = store.machines.find((entry) => entry.id === "mbp");
+    if (!machine) throw new Error("MacBook fixture missing");
+    const previous = machine.status;
+    machine.status = "AUTH_EXPIRED";
+    renderOverview();
+
+    expect((await screen.findAllByText(/Authentication expired · last seen/)).length).toBeGreaterThanOrEqual(2);
+    machine.status = previous;
   });
 });

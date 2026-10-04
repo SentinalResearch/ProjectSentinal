@@ -234,6 +234,13 @@ async fn connect_pairs_the_worker_and_stores_owner_only_credentials() {
         .manager
         .verify_control_credential(&"0".repeat(64))
         .is_none());
+    h.clock.fetch_add(90 * DAY, Ordering::SeqCst);
+    assert!(
+        w.manager
+            .verify_control_credential(presented.expose())
+            .is_none(),
+        "an expired control credential cannot authorize worker APIs"
+    );
 }
 
 #[tokio::test]

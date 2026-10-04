@@ -65,6 +65,8 @@ process.env.SENTINAL_E2E_SOCKET = control.socket;
 process.env.SENTINAL_E2E_CONTROL_URL = "http://127.0.0.1:7421";
 process.env.SENTINAL_E2E_WORKER_A = workerA.socket;
 process.env.SENTINAL_E2E_WORKER_B = workerB.socket;
+process.env.SENTINAL_E2E_WORKER_A_URL = "ws://127.0.0.1:7431/api/v1/ws";
+process.env.SENTINAL_E2E_WORKER_B_URL = "ws://127.0.0.1:7432/api/v1/ws";
 process.env.SENTINAL_E2E_WORKER_A_ROOT = workerA.root;
 process.env.SENTINAL_E2E_WORKER_B_ROOT = workerB.root;
 

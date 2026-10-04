@@ -399,7 +399,9 @@ impl LinkManager {
     pub fn verify_control_credential(&self, bearer: &str) -> Option<LinkIdentity> {
         let link = self.read_link().ok().flatten()?;
         let expected = link.control_credential_sha256.as_deref()?;
+        let expires_at = link.credential_expires_at?;
         if link.state != StoredState::Active
+            || expires_at.0 <= (self.inner.clock)().0
             || !link_crypto::same_hash(&link_crypto::sha256_hex(bearer), expected)
         {
             return None;

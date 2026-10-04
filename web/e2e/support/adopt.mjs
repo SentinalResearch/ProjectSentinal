@@ -52,6 +52,45 @@ export function linkSecrets(root) {
   return [link.worker_credential, link.control_credential_sha256].filter(Boolean);
 }
 
+/** Create a FULL Session directly on a test worker, outside the browser boundary. */
+export function createWorkerSession(url, machineToken, title) {
+  return new Promise((resolve, reject) => {
+    const endpoint = new URL(url);
+    endpoint.searchParams.set("token", machineToken);
+    const socket = new WebSocket(endpoint);
+    const timeout = setTimeout(() => {
+      socket.close();
+      reject(new Error(`timed out creating '${title}'`));
+    }, 10_000);
+    socket.onerror = () => reject(new Error(`worker WebSocket failed for '${title}'`));
+    socket.onopen = () => socket.send(JSON.stringify({
+      version: 1,
+      payload: {
+        type: "CREATE_SESSION",
+        shell: "/bin/zsh",
+        cwd: "/tmp",
+        cols: 100,
+        rows: 30,
+        origin: "UI",
+        title,
+        command: null,
+      },
+    }));
+    socket.onmessage = (message) => {
+      const envelope = JSON.parse(String(message.data));
+      if (envelope.payload.type === "ERROR") {
+        clearTimeout(timeout);
+        socket.close();
+        reject(new Error(envelope.payload.message));
+      } else if (envelope.payload.type === "SESSION_UPDATED") {
+        clearTimeout(timeout);
+        socket.close();
+        resolve(envelope.payload.session);
+      }
+    };
+  });
+}
+
 /** Environment value set by playwright.config.mjs. */
 export function e2eEnv(name) {
   const value = process.env[name];

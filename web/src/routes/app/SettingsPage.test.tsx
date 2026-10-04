@@ -47,7 +47,7 @@ describe("SettingsPage", () => {
     expect(await screen.findByRole("heading", { name: "Account" }, { timeout: 5000 })).toBeInTheDocument();
   });
 
-  it("revoking a Machine requires the inline Revoke?/Revoke/Keep confirm step", async () => {
+  it("revoking a Machine names it in the inline confirmation", async () => {
     renderSettings("/app/settings/machines");
     const user = userEvent.setup();
 
@@ -67,11 +67,11 @@ describe("SettingsPage", () => {
     );
 
     await user.click(within(row).getByRole("button", { name: "Revoke…" }));
-    expect(within(row).getByText("Revoke?")).toBeInTheDocument();
+    expect(within(row).getByText("Revoke RTX-PC?")).toBeInTheDocument();
 
     // Keep cancels without revoking.
     await user.click(within(row).getByRole("button", { name: "Keep" }));
-    expect(within(row).queryByText("Revoke?")).not.toBeInTheDocument();
+    expect(within(row).queryByText("Revoke RTX-PC?")).not.toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "Revoke…" })).toBeInTheDocument();
 
     // Confirming revokes the Machine; its row stays, marked Revoked, for history.

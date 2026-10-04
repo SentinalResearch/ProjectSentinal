@@ -306,21 +306,28 @@ async fn authorize(
         .flatten()
         .and_then(token_from_query);
     let supplied = header_token.or(query_token).map(str::to_string);
-    match supplied
-        .as_deref()
-        .map(|token| state.auth.authorize(token))
-        .transpose()
-    {
-        Ok(Some(Some(_))) => {
+    match supplied.as_deref() {
+        Some(token) if api_token_authorized(&state, token) => {
             if let Some(token) = supplied {
                 request.extensions_mut().insert(AuthorizedToken(token));
             }
             Ok(next.run(request).await)
         }
-        Ok(_) => Err(StatusCode::UNAUTHORIZED),
+        _ => Err(StatusCode::UNAUTHORIZED),
+    }
+}
+
+fn api_token_authorized(state: &AppState, token: &str) -> bool {
+    match state.auth.authorize(token) {
+        Ok(Some(_)) => true,
+        Ok(None) => state
+            .link
+            .as_ref()
+            .and_then(|link| link.verify_control_credential(token))
+            .is_some(),
         Err(error) => {
             tracing::error!(%error, "authentication state failed");
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            false
         }
     }
 }
@@ -425,14 +432,7 @@ async fn close_expired(socket: &mut WebSocket) {
 }
 
 fn connection_authorized(state: &AppState, token: &str) -> bool {
-    match state.auth.authorize(token) {
-        Ok(Some(_)) => true,
-        Ok(None) => false,
-        Err(error) => {
-            tracing::error!(%error, "failed to revalidate websocket authentication");
-            false
-        }
-    }
+    api_token_authorized(state, token)
 }
 
 async fn handle_client_message(

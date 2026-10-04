@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { e2eEnv as env, linkSecrets, sentinal } from "./support/adopt.mjs";
+import { createWorkerSession, e2eEnv as env, linkSecrets, sentinal } from "./support/adopt.mjs";
 
 const password = "test-password-for-playwright";
 
@@ -32,6 +32,8 @@ async function enroll(page: Page, socket: string, name: string) {
 
 test("two workers enroll, rename, and revoke independently with no secret in the browser", async ({ page }) => {
   test.setTimeout(180_000);
+  const browserSockets: string[] = [];
+  page.on("websocket", (socket) => browserSockets.push(socket.url()));
   const workerA = env("SENTINAL_E2E_WORKER_A");
   const workerB = env("SENTINAL_E2E_WORKER_B");
   await signIn(page);
@@ -46,6 +48,53 @@ test("two workers enroll, rename, and revoke independently with no secret in the
   await expect(rows).toHaveCount(3, { timeout: 10_000 });
   await expect(rows.filter({ hasText: "RTX PC" })).toHaveCount(2);
   await expect(rows.filter({ hasText: "RTX PC" }).filter({ hasText: "Online" })).toHaveCount(2, { timeout: 10_000 });
+
+  // Both workers deliberately use daemon-local Session ID 1. The browser sees
+  // two composite identities and reaches each only through the control origin.
+  const workerSessionA = await createWorkerSession(
+    env("SENTINAL_E2E_WORKER_A_URL"), "worker-a-token", "Worker A routed session",
+  );
+  const workerSessionB = await createWorkerSession(
+    env("SENTINAL_E2E_WORKER_B_URL"), "worker-b-token", "Worker B routed session",
+  );
+  expect(workerSessionA.id).toBe(1);
+  expect(workerSessionB.id).toBe(1);
+
+  await page.getByTitle("Overview").last().click();
+  await expect(page.getByText("Worker A routed session", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Worker B routed session", { exact: true })).toBeVisible();
+  await page.getByText("Worker A routed session", { exact: true }).click();
+  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await expect(page.getByText("No events yet.", { exact: true })).toHaveCount(1);
+  await page.getByTitle("Overview").last().click();
+  await page.getByText("Worker B routed session", { exact: true }).click();
+  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+
+  // Disconnect A while this page remains alive. Its last snapshot stays visible,
+  // B keeps attaching, and reconnecting A does not duplicate the Event snapshot.
+  const disconnected = sentinal(workerA, ["disconnect"]);
+  expect(disconnected.status, disconnected.stderr).toBe(0);
+  await page.getByTitle("Overview").last().click();
+  await expect(page.getByText(/Disconnected · last seen/).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Worker A routed session", { exact: true })).toHaveCount(1);
+  await page.getByText("Worker B routed session", { exact: true }).click();
+  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+
+  await page.getByTitle("Settings").click();
+  await page.getByRole("button", { name: "Machines" }).click();
+  await enroll(page, workerA, "RTX PC");
+  await page.getByTitle("Overview").last().click();
+  await expect(page.getByText("Worker A routed session", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+  await page.getByText("Worker A routed session", { exact: true }).click();
+  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await expect(page.getByText("No events yet.", { exact: true })).toHaveCount(1);
+
+  expect(browserSockets.some((url) => url.includes(`/machines/${workerSessionA.machine_id}/ws`))).toBe(true);
+  expect(browserSockets.some((url) => url.includes(`/machines/${workerSessionB.machine_id}/ws`))).toBe(true);
+  expect(browserSockets.every((url) => new URL(url).port === "4173")).toBe(true);
+
+  await page.getByTitle("Settings").click();
+  await page.getByRole("button", { name: "Machines" }).click();
 
   // Rename one; reload shows the control-backed registry.
   // Pin the row by position: editing replaces its name text with an input.

@@ -7,7 +7,7 @@ import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
 import { slugifyProject } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
-import type { HistoryEntry } from "../../data/types";
+import type { HistoryEntry, HistoryResults } from "../../data/types";
 import type { SessionState } from "../../protocol/SessionState";
 import styles from "./HistoryPage.module.css";
 
@@ -37,7 +37,7 @@ export function HistoryPage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [qInput, setQInput] = useState(searchParams.get("q") ?? "");
-  const [rows, setRows] = useState<HistoryEntry[] | null>(null);
+  const [rows, setRows] = useState<HistoryResults | null>(null);
 
   const machineFilter = searchParams.get("machine") ?? "All";
   const projectSlug = searchParams.get("project") ?? "All";
@@ -204,6 +204,11 @@ export function HistoryPage() {
       </div>
 
       <section className={styles.tableWrap}>
+        {rows?.unavailableMachines && rows.unavailableMachines.length > 0 && (
+          <p role="status" className={styles.subtitle}>
+            Partial results · unavailable: {rows.unavailableMachines.map((id) => machines.find((m) => m.id === id)?.name ?? id).join(", ")}
+          </p>
+        )}
         <div className={styles.tableScroll}>
           <div className={styles.tableHead}>
             <span />

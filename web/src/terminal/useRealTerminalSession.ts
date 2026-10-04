@@ -1,7 +1,8 @@
 import type { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { SESSION_TOKEN_KEY, defaultDaemonUrl } from "../data/api";
+import { dataAdapter } from "../data";
+import { SESSION_TOKEN_KEY } from "../data/api";
 import { decodeTerminalFrame, encodeTerminalFrame } from "../frame";
 import type { ClientRequest } from "../protocol/ClientRequest";
 import type { DaemonMessage } from "../protocol/DaemonMessage";
@@ -9,14 +10,6 @@ import type { Envelope } from "../protocol/Envelope";
 
 const PROTOCOL_VERSION = 1;
 const encoder = new TextEncoder();
-export const DAEMON_MESSAGE_EVENT = "terminal-agent-daemon-message";
-
-// QUESTION: real (non-mock, VITE_DATA=api) session ids from the daemon are numeric
-// (protocol/SessionId.ts), but the mock adapter's Session.id is a string slug
-// ("qwen"). TerminalPane always takes a string id and Number()s it here for the
-// real path — untested against a live daemon (none is reachable in this
-// environment). See QUESTIONS.md.
-//
 // QUESTION: each TerminalPane opens its own WebSocket to the daemon, so Split
 // View (multiple panes) opens N connections instead of sharing one — acceptable
 // for a first pass, flagged in FUTURE.md if pooling is wanted later.
@@ -34,13 +27,20 @@ export interface RealTerminalSession {
 
 export function useRealTerminalSession(sessionId: string, terminal: Terminal | null): RealTerminalSession {
   const [attached, setAttached] = useState(false);
-  const numericId = Number(sessionId);
   const socketRef = useRef<WebSocket | null>(null);
+  let route: ReturnType<typeof dataAdapter.resolveTerminal> | null = null;
+  try {
+    route = dataAdapter.resolveTerminal(sessionId);
+  } catch {
+    // The live-data bootstrap has not registered the owning Machine yet.
+  }
+  const numericId = route?.localSessionId;
+  const websocketUrl = route?.websocketUrl;
 
   const sendBytes = useCallback(
     (bytes: Uint8Array) => {
       const socket = socketRef.current;
-      if (socket?.readyState === WebSocket.OPEN) {
+      if (numericId !== undefined && socket?.readyState === WebSocket.OPEN) {
         socket.send(encodeTerminalFrame(numericId, bytes));
       }
     },
@@ -48,9 +48,9 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
   );
 
   useEffect(() => {
-    if (!terminal || !Number.isFinite(numericId)) return;
+    if (!terminal || numericId === undefined || websocketUrl === undefined) return;
 
-    const endpoint = new URL(defaultDaemonUrl());
+    const endpoint = new URL(websocketUrl);
     const token = localStorage.getItem(SESSION_TOKEN_KEY) ?? "";
     endpoint.searchParams.set("token", token);
     const socket = new WebSocket(endpoint);
@@ -73,7 +73,6 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       if (typeof event.data === "string") {
         try {
           const envelope = JSON.parse(event.data) as Envelope<DaemonMessage>;
-          window.dispatchEvent(new CustomEvent(DAEMON_MESSAGE_EVENT, { detail: envelope.payload }));
           if (envelope.payload.type === "ERROR") {
             terminal.write(`\r\n\x1b[38;2;255;59;47m[error] ${envelope.payload.message}\x1b[0m\r\n`);
           }
@@ -98,7 +97,7 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       sendRequest({ type: "DETACH", session_id: numericId });
       socket.close();
     };
-  }, [terminal, numericId]);
+  }, [terminal, numericId, websocketUrl]);
 
   return { attached, sendBytes };
 }

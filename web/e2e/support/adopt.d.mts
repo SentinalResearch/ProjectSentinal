@@ -17,4 +17,10 @@ export function sentinal(socket: string, args: string[], input?: string): Sentin
 
 export function linkSecrets(root: string): string[];
 
+export function createWorkerSession(
+  url: string,
+  machineToken: string,
+  title: string,
+): Promise<{ id: number; machine_id: string }>;
+
 export function e2eEnv(name: string): string;

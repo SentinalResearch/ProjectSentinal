@@ -98,6 +98,7 @@ impl Harness {
     }
 
     fn exchange_request(&self, code: &str, machine_id: &str, name: &str) -> LinkExchangeRequest {
+        let credential_digit = if machine_id == WORKER_B { "b" } else { "a" };
         LinkExchangeRequest {
             pairing_code: Secret::new(code),
             machine: LinkMachineInfo {
@@ -108,7 +109,7 @@ impl Harness {
                 capabilities: vec![MachineCapability::Sessions],
             },
             endpoint: endpoint("100.74.239.89"),
-            control_credential: Secret::new("c".repeat(64)),
+            control_credential: Secret::new(credential_digit.repeat(64)),
         }
     }
 
@@ -153,6 +154,67 @@ fn endpoint(address: &str) -> LinkEndpoint {
         port: 7420,
         dns_name: None,
     }
+}
+
+// ---- routing ---------------------------------------------------------------
+
+#[test]
+fn routing_targets_are_machine_scoped_and_revocation_removes_only_one() {
+    let h = harness();
+    let credential_a = h.pair(WORKER_A, "A");
+    let credential_b = h.pair(WORKER_B, "B");
+    h.heartbeat(&credential_a, WORKER_A, 1).unwrap();
+    h.heartbeat(&credential_b, WORKER_B, 1).unwrap();
+
+    let target_a = h
+        .control
+        .routing_target(&MachineId(WORKER_A.into()))
+        .unwrap();
+    let target_b = h
+        .control
+        .routing_target(&MachineId(WORKER_B.into()))
+        .unwrap();
+    assert_eq!(target_a.machine_id, MachineId(WORKER_A.into()));
+    assert_eq!(target_b.machine_id, MachineId(WORKER_B.into()));
+    assert_ne!(
+        target_a.control_credential.expose(),
+        target_b.control_credential.expose(),
+        "each Machine must route with only its own credential"
+    );
+
+    h.control.revoke(&MachineId(WORKER_A.into())).unwrap();
+    assert_eq!(
+        h.control
+            .routing_target(&MachineId(WORKER_A.into()))
+            .unwrap_err()
+            .failure
+            .code,
+        LinkFailureCode::LinkRevoked
+    );
+    assert_eq!(
+        h.control
+            .routing_target(&MachineId(WORKER_B.into()))
+            .unwrap()
+            .machine_id,
+        MachineId(WORKER_B.into())
+    );
+}
+
+#[test]
+fn routing_refuses_an_expired_machine_credential() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    h.heartbeat(&credential, WORKER_A, 1).unwrap();
+    h.advance(90 * 24 * 60 * 60 * 1_000);
+
+    assert_eq!(
+        h.control
+            .routing_target(&MachineId(WORKER_A.into()))
+            .unwrap_err()
+            .failure
+            .code,
+        LinkFailureCode::Unauthorized
+    );
 }
 
 // ---- codes --------------------------------------------------------------------
@@ -320,7 +382,7 @@ fn exchange_links_a_worker_once_and_reports_connected() {
         "one use only"
     );
     assert!(
-        h.secrets().contains(&"c".repeat(64)),
+        h.secrets().contains(&"a".repeat(64)),
         "control keeps the credential it presents"
     );
     assert!(!h.secrets().contains(response.worker_credential.expose()));
@@ -549,11 +611,8 @@ fn revoking_one_worker_leaves_the_other_and_the_control_untouched() {
     assert_eq!(status(WORKER_A), RegistryStatus::Revoked);
     assert_eq!(status(WORKER_B), RegistryStatus::Online);
     assert_eq!(status(CONTROL), RegistryStatus::Online);
-    assert_eq!(
-        h.secrets().matches(&"c".repeat(64)).count(),
-        1,
-        "A's control credential deleted"
-    );
+    assert!(!h.secrets().contains(&"a".repeat(64)));
+    assert!(h.secrets().contains(&"b".repeat(64)), "B's credential kept");
     assert_eq!(
         h.control
             .revoke(&MachineId(CONTROL.into()))

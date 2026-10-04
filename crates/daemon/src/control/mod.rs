@@ -4,6 +4,7 @@
 //! HMACs. A successful exchange creates one link with two directional
 //! credentials; each side keeps only a hash of the one it verifies.
 
+mod proxy;
 pub mod routes;
 mod secrets;
 
@@ -110,6 +111,20 @@ pub struct ControlService {
     clock: Clock,
     secrets: Arc<Mutex<ControlSecrets>>,
     audit: LinkAudit,
+}
+
+/// One authenticated worker destination. The credential must never leave the
+/// control daemon.
+#[derive(Clone, Debug)]
+pub struct RoutingTarget {
+    /// Immutable worker identity expected from `/link/identity`.
+    pub machine_id: MachineId,
+    /// Approved address reported by the worker's latest heartbeat.
+    pub endpoint: LinkEndpoint,
+    /// Credential presented only by the control to this worker.
+    pub control_credential: Secret,
+    /// Capabilities reported by this worker.
+    pub capabilities: Vec<MachineCapability>,
 }
 
 impl ControlService {
@@ -544,6 +559,81 @@ impl ControlService {
             .credential(&link.link_id)
             .filter(|credential| &credential.machine_id == machine_id)
             .map(|credential| credential.control_credential.clone())
+    }
+
+    /// Resolve one active worker to its endpoint and private control credential.
+    pub fn routing_target(&self, machine_id: &MachineId) -> Result<RoutingTarget, ControlFailure> {
+        let row = self
+            .store
+            .registry_machine(machine_id)
+            .map_err(ControlFailure::internal)?
+            .ok_or_else(not_found)?;
+        if row.role != MachineRole::Worker {
+            return Err(ControlFailure::new(
+                400,
+                LinkFailureCode::InvalidRequest,
+                "the control Machine is served locally",
+            ));
+        }
+        if row.state == RegistryState::Revoked {
+            return Err(ControlFailure::new(
+                410,
+                LinkFailureCode::LinkRevoked,
+                "this Machine link was revoked",
+            ));
+        }
+        if row.state != RegistryState::Active {
+            return Err(ControlFailure::new(
+                409,
+                LinkFailureCode::InvalidRequest,
+                "this Machine is not connected",
+            ));
+        }
+        let endpoint = row.endpoint.ok_or_else(|| {
+            ControlFailure::new(
+                503,
+                LinkFailureCode::Internal,
+                "this Machine has no approved endpoint",
+            )
+        })?;
+        let link = self
+            .store
+            .active_link_for(machine_id)
+            .map_err(ControlFailure::internal)?
+            .ok_or_else(|| {
+                ControlFailure::new(
+                    503,
+                    LinkFailureCode::Internal,
+                    "this Machine has no active link",
+                )
+            })?;
+        if link.expires_at.0 <= (self.clock)().0 {
+            return Err(ControlFailure::new(
+                401,
+                LinkFailureCode::Unauthorized,
+                "this Machine credential expired",
+            ));
+        }
+        let control_credential = self
+            .secrets
+            .lock()
+            .ok()
+            .and_then(|secrets| secrets.credential(&link.link_id).cloned())
+            .filter(|credential| &credential.machine_id == machine_id)
+            .map(|credential| credential.control_credential)
+            .ok_or_else(|| {
+                ControlFailure::new(
+                    503,
+                    LinkFailureCode::Internal,
+                    "this Machine has no active control credential",
+                )
+            })?;
+        Ok(RoutingTarget {
+            machine_id: machine_id.clone(),
+            endpoint,
+            control_credential,
+            capabilities: row.capabilities,
+        })
     }
 
     /// Record an origin rejection seen by the HTTP layer.

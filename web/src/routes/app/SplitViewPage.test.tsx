@@ -70,4 +70,12 @@ describe("SplitViewPage", () => {
 
     await waitFor(() => expect(screen.getByText("2 of 4 terminals")).toBeInTheDocument());
   });
+
+  it("shows each pane's owning Machine and independent connection state", async () => {
+    renderSplit("/app/split?focus=compression");
+
+    await screen.findByText("4 of 4 terminals");
+    expect(screen.getAllByText(/RTX-PC · ONLINE/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Mac Mini · ONLINE/).length).toBeGreaterThan(0);
+  });
 });

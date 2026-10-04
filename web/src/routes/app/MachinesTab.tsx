@@ -170,6 +170,8 @@ function RegistryRow({
               </span>
             </>
           )}
+          {machine.capabilities.length > 0 && ` · ${machine.capabilities.join(", ")}`}
+          {machine.credential && ` · credential ${machine.credential.expires_at <= Date.now() ? "expired" : "active"}`}
         </span>
         {error && (
           <span className={styles.rowError} role="alert">
@@ -194,7 +196,7 @@ function RegistryRow({
       <div className={styles.machineActions}>
         {confirming ? (
           <>
-            <span className={styles.revokeConfirmLabel}>Revoke?</span>
+            <span className={styles.revokeConfirmLabel}>Revoke {machine.display_name}?</span>
             <button
               type="button"
               className={styles.revokeBtn}
@@ -221,6 +223,11 @@ function RegistryRow({
                 Rename
               </button>
             )}
+            {!online && machine.status !== "REVOKED" && (
+              <button type="button" className={styles.rotateBtn} disabled={busy} onClick={() => void onChanged()}>
+                Reconnect
+              </button>
+            )}
             {canRevoke && (
               <button type="button" className={styles.revokeEntry} onClick={() => setConfirming(true)}>
                 Revoke…
@@ -234,6 +241,11 @@ function RegistryRow({
 }
 
 function statusLabel(machine: RegistryMachine): string {
+  if (machine.credential && machine.credential.expires_at <= Date.now()) {
+    return machine.last_seen
+      ? `Authentication expired · last seen ${new Date(machine.last_seen).toLocaleString()}`
+      : "Authentication expired";
+  }
   switch (machine.status) {
     case "ONLINE":
       return "Online";

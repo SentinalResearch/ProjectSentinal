@@ -18,6 +18,10 @@ function generationTime(session: SessionLineage["ordered"][number]): string {
   return new Date(session.createdAt).toLocaleString();
 }
 
+function displayedSessionId(id: string): string {
+  return id.includes(":") ? (id.split(":").at(-1) ?? id) : id;
+}
+
 /** Render one bounded history window with isolated terminal emulators. */
 export function SessionHistoryTerminals({
   lineage,
@@ -62,13 +66,13 @@ export function SessionHistoryTerminals({
           >
             {previous && (
               <div className={styles.generationBoundary}>
-                Session {previous.id} ended — continued as Session {generation.id} at {generationTime(generation)}
+                Session {displayedSessionId(previous.id)} ended — continued as Session {displayedSessionId(generation.id)} at {generationTime(generation)}
               </div>
             )}
             <div className={styles.generationHeader}>
               <strong>Generation {generationIndex + 1} of {lineage.ordered.length}</strong>
               <span>
-                Session {generation.id} · {generation.state}
+                Session {displayedSessionId(generation.id)} · {generation.state}
                 {generation.exitCode !== null && generation.exitCode !== undefined
                   ? ` · exit code ${generation.exitCode}`
                   : ""}

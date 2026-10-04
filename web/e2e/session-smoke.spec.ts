@@ -15,7 +15,7 @@ test("control proxy authenticates to one fake worker and attaches", async ({ pag
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await page.getByRole("button", { name: "New session" }).click();
 
-  await expect(page).toHaveURL(/\/app\/sessions\/1$/);
+  await expect(page).toHaveURL(/\/app\/sessions\/[^/]+(?:%3A|:)1$/);
   await expect(page.getByRole("heading", { name: "Session 1" })).toBeVisible();
   await expect(page.getByTestId("terminal-host").locator(".xterm")).toBeVisible();
   await expect(page.getByText("attached", { exact: true })).toBeVisible();
@@ -31,7 +31,7 @@ test("a Watch-created FULL session appears and attaches", async ({ page }) => {
   // The same CREATE_SESSION request `sentinal watch` sends, with its machine token.
   const session = await page.evaluate(
     () =>
-      new Promise<{ id: number; origin: string; capture: string; title: string | null }>(
+      new Promise<{ id: number; machine_id: string; origin: string; capture: string; title: string | null }>(
         (resolve, reject) => {
           const socket = new WebSocket(`ws://${window.location.host}/api/v1/ws?token=test-token`);
           socket.onerror = () => reject(new Error("websocket failed"));
@@ -66,7 +66,7 @@ test("a Watch-created FULL session appears and attaches", async ({ page }) => {
   expect(session.origin).toBe("WATCH");
   expect(session.capture).toBe("FULL");
 
-  await page.goto(`/app/sessions/${session.id}`);
+  await page.goto(`/app/sessions/${session.machine_id}:${session.id}`);
   await expect(page.getByRole("heading", { name: "Watched job" })).toBeVisible();
   await expect(page.getByTestId("terminal-host").locator(".xterm")).toBeVisible();
   await expect(page.getByText("attached", { exact: true })).toBeVisible();
@@ -86,7 +86,7 @@ test("three Session generations survive reload with input only on the latest", a
 
   const finished = await page.evaluate(
     () =>
-      new Promise<{ id: number; state: string }>((resolve, reject) => {
+      new Promise<{ id: number; machine_id: string; state: string }>((resolve, reject) => {
         const socket = new WebSocket(`ws://${window.location.host}/api/v1/ws?token=test-token`);
         let createdId: number | null = null;
         socket.onerror = () => reject(new Error("websocket failed"));
@@ -133,7 +133,7 @@ test("three Session generations survive reload with input only on the latest", a
   const replay = page.waitForResponse((response) =>
     response.url().includes(`/api/v1/sessions/${finished.id}/output`),
   );
-  await page.goto(`/app/sessions/${finished.id}`);
+  await page.goto(`/app/sessions/${finished.machine_id}:${finished.id}`);
   await expect(page.getByText(/Session ended — output saved/)).toContainText("INTERRUPTED");
   await expect(page.getByTestId("terminal-host")).toHaveAttribute("aria-readonly", "true");
   expect((await replay).status()).toBe(200);
@@ -143,8 +143,9 @@ test("three Session generations survive reload with input only on the latest", a
   expect(sentFrames.filter((frame) => typeof frame !== "string")).toHaveLength(0);
 
   await page.getByRole("button", { name: "Continue in new Session" }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/sessions/(?!${finished.id}$)\\d+$`));
-  const secondId = Number(page.url().split("/").at(-1));
+  await expect.poll(() => Number(decodeURIComponent(page.url().split("/").at(-1) ?? "").split(":").at(-1)))
+    .not.toBe(finished.id);
+  const secondId = Number(decodeURIComponent(page.url().split("/").at(-1) ?? "").split(":").at(-1));
   expect(secondId).not.toBe(finished.id);
   await expect(page.getByRole("heading", { name: "Finished record" })).toBeVisible();
   await expect(page.getByText(`Session ${finished.id} ended — continued as Session ${secondId}`)).toBeVisible();
@@ -175,8 +176,9 @@ test("three Session generations survive reload with input only on the latest", a
   await page.reload();
   await expect(page.getByRole("button", { name: "Continue in new Session" })).toBeVisible();
   await page.getByRole("button", { name: "Continue in new Session" }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/sessions/(?!${secondId}$)\\d+$`));
-  const thirdId = Number(page.url().split("/").at(-1));
+  await expect.poll(() => Number(decodeURIComponent(page.url().split("/").at(-1) ?? "").split(":").at(-1)))
+    .not.toBe(secondId);
+  const thirdId = Number(decodeURIComponent(page.url().split("/").at(-1) ?? "").split(":").at(-1));
   expect(new Set([finished.id, secondId, thirdId]).size).toBe(3);
   await expect(page.getByText("Generation 3 of 3", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(`Session ${secondId} ended — continued as Session ${thirdId}`)).toBeVisible();

@@ -1,15 +1,16 @@
 import { encodeTerminalFrame } from "../../frame";
 import type { ClientRequest } from "../../protocol/ClientRequest";
+import type { Command } from "../../protocol/Command";
 import type { DaemonMessage } from "../../protocol/DaemonMessage";
 import type { Envelope } from "../../protocol/Envelope";
-import type { Machine as WireMachine } from "../../protocol/Machine";
-import type { Session as WireSession } from "../../protocol/Session";
-import type { Command } from "../../protocol/Command";
 import type { Event as WireEvent } from "../../protocol/Event";
 import type { EventKind } from "../../protocol/EventKind";
 import type { Health } from "../../protocol/Health";
-import { NotImplemented, type DataAdapter, type LiveEvent } from "../adapter";
-import type { HistoryEntry, Machine, Session, SessionEvent, SessionHealth } from "../types";
+import type { Machine as WireMachine } from "../../protocol/Machine";
+import type { RegistryMachine } from "../../protocol/RegistryMachine";
+import type { Session as WireSession } from "../../protocol/Session";
+import { NotImplemented, RegistryError, type DataAdapter, type HistoryFilters, type LiveEvent } from "../adapter";
+import type { HistoryEntry, HistoryResults, Machine, Session, SessionEvent, SessionHealth } from "../types";
 import {
   AUTH_EXPIRED_EVENT,
   createAuthApi,
@@ -17,13 +18,22 @@ import {
   SESSION_TOKEN_KEY,
   type TokenStorage,
 } from "./auth";
+import {
+  EventDeduper,
+  RetryState,
+  compositeId,
+  localId,
+  machineId,
+  mapConcurrent,
+} from "./machine-connections";
+import { createRegistryApi } from "./registry";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
-import { createRegistryApi } from "./registry";
 
 const PROTOCOL_VERSION = 1;
 const SOCKET_OPEN = 1;
 const POLL_INTERVAL_MS = 2_000;
+const QUERY_CONCURRENCY = 3;
 const encoder = new TextEncoder();
 
 export function defaultDaemonUrl(): string {
@@ -48,6 +58,7 @@ interface PendingReply {
   accepts: (message: DaemonMessage) => boolean;
   resolve: (message: DaemonMessage) => void;
   reject: (error: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
 }
 
 export interface ApiAdapterOptions {
@@ -56,19 +67,22 @@ export interface ApiAdapterOptions {
   storage?: TokenStorage;
   socketFactory?: (url: string) => ApiSocket;
   fetcher?: typeof fetch;
+  now?: () => number;
 }
 
-/**
- * Replies to CREATE_SESSION / KILL are SESSION_UPDATED for a FULL Session;
- * the daemon also pushes unsolicited SESSION_UPDATED observations for
- * reduced-capture Sessions, which must never be taken as a reply.
- */
+interface MachineConnection {
+  id: string;
+  transport: DaemonTransport;
+  machine: Machine;
+  sessions: Session[];
+  retry: RetryState;
+  retryAt: number;
+  registry?: RegistryMachine;
+}
+
 function isFullSessionUpdate(reply: DaemonMessage, id?: number): boolean {
-  return (
-    reply.type === "SESSION_UPDATED" &&
-    reply.session.capture === "FULL" &&
-    (id === undefined || reply.session.id === id)
-  );
+  return reply.type === "SESSION_UPDATED" && reply.session.capture === "FULL" &&
+    (id === undefined || reply.session.id === id);
 }
 
 function daemonError(message: string): Error {
@@ -83,15 +97,17 @@ function formatDuration(milliseconds: number): string {
   return `${Math.floor(minutes / 60)}h${minutes % 60}m`;
 }
 
+function formatLastSeen(timestamp: number | null, now: number): string | undefined {
+  return timestamp === null ? undefined : formatDuration(now - timestamp);
+}
+
 function mapMachine(machine: WireMachine): Machine {
   const ramGb = machine.ram_bytes / 1024 ** 3;
   const hardware = [
     machine.cpu === "unknown" ? `${machine.cpu_cores} CPU cores` : machine.cpu,
     machine.ram_bytes > 0 ? `${ramGb.toFixed(ramGb >= 10 ? 0 : 1)} GB RAM` : null,
     ...machine.gpus.map((gpu) => gpu.name),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  ].filter(Boolean).join(" · ");
   return {
     id: machine.id,
     name: machine.name,
@@ -101,9 +117,30 @@ function mapMachine(machine: WireMachine): Machine {
   };
 }
 
+function mapRegistryMachine(row: RegistryMachine, now: number): Machine {
+  const expired = row.credential !== null && row.credential.expires_at <= now;
+  const credentialStatus = row.role === "CONTROL" ? undefined
+    : row.credential === null ? "MISSING" as const
+      : expired ? "EXPIRED" as const : "ACTIVE" as const;
+  const endpoint = row.endpoint
+    ? `${row.endpoint.dns_name ?? row.endpoint.address}:${row.endpoint.port}`
+    : undefined;
+  return {
+    id: row.machine_id,
+    name: row.display_name,
+    os: row.os === "MACOS" ? "macOS" : "Linux",
+    hardware: row.daemon_version ? `Sentinal ${row.daemon_version}` : "Hardware unavailable",
+    status: expired ? "AUTH_EXPIRED" : row.status,
+    lastSeen: formatLastSeen(row.last_seen, now),
+    endpoint,
+    capabilities: row.capabilities,
+    credentialStatus,
+  };
+}
+
 export function mapSession(session: WireSession): Session {
   return {
-    id: String(session.id),
+    id: compositeId(session.machine_id, session.id),
     machine: session.machine_id,
     name: session.title ?? `Session ${session.id}`,
     project: session.project_id ?? undefined,
@@ -119,8 +156,7 @@ export function mapSession(session: WireSession): Session {
     exitCode: session.exit_code,
     log: session.log ?? undefined,
     continuedFrom: session.continued_from === null || session.continued_from === undefined
-      ? undefined
-      : String(session.continued_from),
+      ? undefined : compositeId(session.machine_id, session.continued_from),
     createdAt: session.created_at,
     updatedAt: session.updated_at,
   };
@@ -173,9 +209,7 @@ export function watcherEventPatch(observed: WireEvent): Partial<Session> | undef
 
 function applyWatcherEvents(session: Session, events: WireEvent[]): Session {
   let result = { ...session, events: events.map(mapWatcherEvent) };
-  for (const event of events) {
-    result = { ...result, ...watcherEventPatch(event) };
-  }
+  for (const event of events) result = { ...result, ...watcherEventPatch(event) };
   return result;
 }
 
@@ -189,15 +223,23 @@ function relativeDate(startedAt: number): { date: string; daysAgo: number } {
 function mapCommand(command: Command): HistoryEntry {
   const elapsed = (command.finished_at ?? Date.now()) - command.started_at;
   return {
-    id: String(command.id),
+    id: compositeId(command.machine_id, command.id),
     ok: command.exit_code === null ? null : command.exit_code === 0,
     command: command.text,
     duration: command.exit_code === null ? "running" : formatDuration(elapsed),
     machine: command.machine_id,
     cwd: command.cwd,
     ...relativeDate(command.started_at),
-    sessionId: String(command.session_id),
+    sessionId: compositeId(command.machine_id, command.session_id),
   };
+}
+
+function workerSocketUrl(controlUrl: string, owner: string): string {
+  const endpoint = new URL(controlUrl);
+  endpoint.pathname = `/api/v1/machines/${encodeURIComponent(owner)}/ws`;
+  endpoint.search = "";
+  endpoint.hash = "";
+  return endpoint.toString();
 }
 
 class DaemonTransport {
@@ -205,48 +247,56 @@ class DaemonTransport {
   private connecting: Promise<ApiSocket> | null = null;
   private readonly pending: PendingReply[] = [];
   private readonly listeners = new Set<(event: LiveEvent) => void>();
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
   private latestGpuPct: number | undefined;
   private latestVramTotal = 0;
+  private readonly eventDeduper = new EventDeduper();
 
   constructor(
-    private readonly url: string,
+    readonly url: string,
+    private machine: string,
     private readonly storage: TokenStorage,
     private readonly socketFactory: (url: string) => ApiSocket,
+    private readonly ownsBrowserAuthentication: boolean,
   ) {}
 
-  async request(
-    request: ClientRequest,
-    accepts: (message: DaemonMessage) => boolean,
-  ): Promise<DaemonMessage> {
+  setMachine(machine: string): void {
+    this.machine = machine;
+  }
+
+  rememberEventBaseline(events: WireEvent[]): void {
+    for (const event of events) this.eventDeduper.accept(this.machine, event.id);
+  }
+
+  async request(request: ClientRequest, accepts: (message: DaemonMessage) => boolean): Promise<DaemonMessage> {
     const socket = await this.connect();
     return new Promise((resolve, reject) => {
-      this.pending.push({ accepts, resolve, reject });
+      const pending: PendingReply = {
+        accepts,
+        resolve,
+        reject,
+        timeout: setTimeout(() => {
+          const index = this.pending.indexOf(pending);
+          if (index >= 0) this.pending.splice(index, 1);
+          reject(daemonError(`Machine '${this.machine}' did not answer within 10 seconds`));
+        }, 10_000),
+      };
+      this.pending.push(pending);
       const envelope: Envelope<ClientRequest> = { version: PROTOCOL_VERSION, payload: request };
       socket.send(JSON.stringify(envelope));
     });
   }
 
-  async sendBytes(sessionId: string, bytes: Uint8Array): Promise<void> {
+  async sendBytes(session: number, bytes: Uint8Array): Promise<void> {
     const socket = await this.connect();
-    socket.send(encodeTerminalFrame(Number(sessionId), bytes));
+    socket.send(encodeTerminalFrame(session, bytes));
   }
 
   subscribe(listener: (event: LiveEvent) => void): () => void {
     this.listeners.add(listener);
-    if (this.pollTimer === null) {
-      this.pollTimer = setInterval(() => void this.pollSessions(), POLL_INTERVAL_MS);
-    }
-    return () => {
-      this.listeners.delete(listener);
-      if (this.listeners.size === 0 && this.pollTimer !== null) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = null;
-      }
-    };
+    return () => this.listeners.delete(listener);
   }
 
-  reset() {
+  reset(): void {
     const socket = this.socket;
     this.socket = null;
     this.connecting = null;
@@ -259,7 +309,6 @@ class DaemonTransport {
     if (this.connecting !== null) return this.connecting;
     const token = this.storage.getItem(SESSION_TOKEN_KEY);
     if (!token) return Promise.reject(daemonError("missing browser session"));
-
     const endpoint = new URL(this.url);
     endpoint.searchParams.set("token", token);
     this.connecting = new Promise((resolve, reject) => {
@@ -282,7 +331,7 @@ class DaemonTransport {
         if (this.socket === socket) this.socket = null;
         this.connecting = null;
         this.rejectPending(daemonError("connection closed"));
-        if (event.code === 4_001) {
+        if (this.ownsBrowserAuthentication && event.code === 4_001) {
           this.storage.removeItem(SESSION_TOKEN_KEY);
           window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
         }
@@ -292,7 +341,7 @@ class DaemonTransport {
     return this.connecting;
   }
 
-  private handleMessage(event: MessageEvent<string | ArrayBuffer | Blob>) {
+  private handleMessage(event: MessageEvent<string | ArrayBuffer | Blob>): void {
     if (typeof event.data !== "string") return;
     let envelope: Envelope<DaemonMessage>;
     try {
@@ -308,76 +357,64 @@ class DaemonTransport {
     const message = envelope.payload;
     if (message.type === "ERROR") {
       const pending = this.pending.shift();
-      pending?.reject(daemonError(message.message));
+      if (pending) {
+        clearTimeout(pending.timeout);
+        pending.reject(daemonError(message.message));
+      }
       return;
     }
-
-    if (message.type === "SESSION_UPDATED") {
-      const session = mapSession(message.session);
-      for (const listener of this.listeners) listener({ type: "SESSION_UPDATED", session });
+    if (message.type === "SESSION_UPDATED" && message.session.machine_id === this.machine) {
+      this.emit({ type: "SESSION_UPDATED", session: mapSession(message.session) });
     } else if (message.type === "MACHINE_METRICS") {
       this.latestGpuPct = message.metrics.gpus.reduce<number | undefined>(
-        (highest, gpu) => highest === undefined ? gpu.util_percent : Math.max(highest, gpu.util_percent),
-        undefined,
+        (highest, gpu) => highest === undefined ? gpu.util_percent : Math.max(highest, gpu.util_percent), undefined,
       );
       this.latestVramTotal = message.metrics.gpus.reduce((total, gpu) => total + gpu.vram_total_bytes, 0);
     } else if (message.type === "SESSION_METRICS") {
       const totals = message.metrics.totals;
-      const metrics = {
-        cpuPct: Math.round(totals.cpu_percent * 10) / 10,
-        ramGB: Math.round((totals.rss_bytes / 1024 ** 3) * 10) / 10,
-        gpuPct: totals.gpu_mem_bytes > 0 ? this.latestGpuPct : undefined,
-        vramGB: this.latestVramTotal > 0 || totals.gpu_mem_bytes > 0
-          ? Math.round((totals.gpu_mem_bytes / 1024 ** 3) * 10) / 10
-          : undefined,
-        vramTotalGB: this.latestVramTotal > 0
-          ? Math.round((this.latestVramTotal / 1024 ** 3) * 10) / 10
-          : undefined,
-      };
-      for (const listener of this.listeners) {
-        listener({ type: "SESSION_METRICS", sessionId: String(message.metrics.session_id), metrics });
-      }
-    } else if (message.type === "COMMAND_UPDATED") {
-      for (const listener of this.listeners) {
-        listener({
-          type: "COMMAND_UPDATED",
-          sessionId: String(message.command.session_id),
-          command: message.command.finished_at === null ? message.command.text : undefined,
-        });
-      }
-    } else if (message.type === "EVENT") {
-      const observed = message.event;
-      for (const listener of this.listeners) {
-        listener({
-          type: "EVENT_APPENDED",
-          sessionId: String(observed.session_id),
-          event: mapWatcherEvent(observed),
-          sessionPatch: watcherEventPatch(observed),
-        });
-      }
+      this.emit({
+        type: "SESSION_METRICS",
+        sessionId: compositeId(this.machine, message.metrics.session_id),
+        metrics: {
+          cpuPct: Math.round(totals.cpu_percent * 10) / 10,
+          ramGB: Math.round((totals.rss_bytes / 1024 ** 3) * 10) / 10,
+          gpuPct: totals.gpu_mem_bytes > 0 ? this.latestGpuPct : undefined,
+          vramGB: this.latestVramTotal > 0 || totals.gpu_mem_bytes > 0
+            ? Math.round((totals.gpu_mem_bytes / 1024 ** 3) * 10) / 10 : undefined,
+          vramTotalGB: this.latestVramTotal > 0
+            ? Math.round((this.latestVramTotal / 1024 ** 3) * 10) / 10 : undefined,
+        },
+      });
+    } else if (message.type === "COMMAND_UPDATED" && message.command.machine_id === this.machine) {
+      this.emit({
+        type: "COMMAND_UPDATED",
+        sessionId: compositeId(this.machine, message.command.session_id),
+        command: message.command.finished_at === null ? message.command.text : undefined,
+      });
+    } else if (message.type === "EVENT" && this.eventDeduper.accept(this.machine, message.event.id)) {
+      this.emit({
+        type: "EVENT_APPENDED",
+        sessionId: compositeId(this.machine, message.event.session_id),
+        event: mapWatcherEvent(message.event),
+        sessionPatch: watcherEventPatch(message.event),
+      });
     }
-
     const index = this.pending.findIndex((pending) => pending.accepts(message));
     if (index >= 0) {
-      const [pending] = this.pending.splice(index, 1);
+      const pending = this.pending.splice(index, 1)[0];
+      clearTimeout(pending.timeout);
       pending.resolve(message);
     }
   }
 
-  private rejectPending(error: Error) {
-    for (const pending of this.pending.splice(0)) pending.reject(error);
+  private emit(event: LiveEvent): void {
+    for (const listener of this.listeners) listener(event);
   }
 
-  private async pollSessions() {
-    if (!this.storage.getItem(SESSION_TOKEN_KEY)) return;
-    try {
-      const message = await this.request({ type: "LIST_SESSIONS" }, (reply) => reply.type === "SESSIONS");
-      if (message.type !== "SESSIONS") return;
-      for (const session of message.sessions.map(mapSession)) {
-        for (const listener of this.listeners) listener({ type: "SESSION_UPDATED", session });
-      }
-    } catch {
-      // Authentication state owns connection errors; polling retries on its next tick.
+  private rejectPending(error: Error): void {
+    for (const pending of this.pending.splice(0)) {
+      clearTimeout(pending.timeout);
+      pending.reject(error);
     }
   }
 }
@@ -390,74 +427,288 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   const storage = options.storage ?? window.localStorage;
   const socketFactory = options.socketFactory ?? ((url: string) => new WebSocket(url));
   const fetcher = options.fetcher ?? window.fetch.bind(window);
+  const now = options.now ?? Date.now;
   const authBaseUrl = options.daemonHttpUrl ?? defaultDaemonHttpUrl();
-  const transport = new DaemonTransport(options.daemonUrl ?? defaultDaemonUrl(), storage, socketFactory);
+  const controlSocketUrl = options.daemonUrl ?? defaultDaemonUrl();
+  const listeners = new Set<(event: LiveEvent) => void>();
+  const connections = new Map<string, MachineConnection>();
+  const controlTransport = new DaemonTransport(controlSocketUrl, "control", storage, socketFactory, true);
+  const baseRegistry = createRegistryApi({ baseUrl: authBaseUrl, fetcher, storage });
+  let controlMachineId: string | null = null;
+  let initialization: Promise<void> | null = null;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  const emit = (event: LiveEvent) => {
+    for (const listener of listeners) listener(event);
+  };
+  controlTransport.subscribe(emit);
+
+  const upsertWorker = (row: RegistryMachine): MachineConnection | null => {
+    if (row.role !== "WORKER") return null;
+    const machine = mapRegistryMachine(row, now());
+    let connection = connections.get(row.machine_id);
+    if (!connection) {
+      const transport = new DaemonTransport(
+        workerSocketUrl(controlSocketUrl, row.machine_id), row.machine_id, storage, socketFactory, false,
+      );
+      transport.subscribe(emit);
+      connection = {
+        id: row.machine_id,
+        transport,
+        machine,
+        sessions: [],
+        retry: new RetryState({ baseMs: 2_000, maximumMs: 60_000, wakeAfterMs: 30_000 }),
+        retryAt: 0,
+        registry: row,
+      };
+      connections.set(row.machine_id, connection);
+    } else {
+      connection.registry = row;
+      const status = machine.status === "ONLINE" && connection.machine.status === "OFFLINE"
+        ? "OFFLINE" : machine.status;
+      connection.machine = { ...connection.machine, ...machine, status };
+    }
+    return connection;
+  };
+
+  const loadRegistry = async (): Promise<void> => {
+    let rows: RegistryMachine[];
+    try {
+      rows = await baseRegistry.list();
+    } catch (error) {
+      if (error instanceof RegistryError && error.code === "NOT_CONTROL") return;
+      return;
+    }
+    const present = new Set<string>();
+    for (const row of rows) {
+      present.add(row.machine_id);
+      if (row.machine_id === controlMachineId) {
+        const connection = connections.get(row.machine_id);
+        if (connection) {
+          connection.machine = { ...connection.machine, ...mapRegistryMachine(row, now()), status: "ONLINE" };
+          emit({ type: "MACHINE_UPDATED", machine: connection.machine });
+        }
+      } else {
+        const connection = upsertWorker(row);
+        if (connection) emit({ type: "MACHINE_UPDATED", machine: connection.machine });
+      }
+    }
+    for (const [id, connection] of connections) {
+      if (id !== controlMachineId && !present.has(id)) {
+        connection.transport.reset();
+        connections.delete(id);
+        emit({
+          type: "DATA_RESET",
+          machines: [...connections.values()].map((entry) => entry.machine),
+          sessions: [...connections.values()].flatMap((entry) => entry.sessions),
+        });
+      }
+    }
+  };
+
+  const initialize = async (): Promise<void> => {
+    const reply = await controlTransport.request({ type: "GET_MACHINE" }, (message) => message.type === "MACHINE");
+    if (reply.type !== "MACHINE") throw daemonError("missing control Machine");
+    controlMachineId = reply.machine.id;
+    controlTransport.setMachine(reply.machine.id);
+    const current = connections.get(reply.machine.id);
+    if (current) {
+      current.machine = mapMachine(reply.machine);
+      current.retry.succeeded();
+      current.retryAt = 0;
+    } else {
+      connections.set(reply.machine.id, {
+        id: reply.machine.id,
+        transport: controlTransport,
+        machine: mapMachine(reply.machine),
+        sessions: [],
+        retry: new RetryState({ baseMs: 2_000, maximumMs: 60_000, wakeAfterMs: 30_000 }),
+        retryAt: 0,
+      });
+    }
+    await loadRegistry();
+  };
+
+  const ensureInitialized = async (): Promise<void> => {
+    if (controlMachineId !== null) return;
+    initialization ??= initialize().finally(() => { initialization = null; });
+    await initialization;
+  };
+
+  const queryMachine = async (connection: MachineConnection): Promise<void> => {
+    const reply = await connection.transport.request({ type: "GET_MACHINE" }, (message) => message.type === "MACHINE");
+    if (reply.type !== "MACHINE" || reply.machine.id !== connection.id) {
+      throw daemonError(`Machine '${connection.id}' returned another Machine identity`);
+    }
+    const registry = connection.registry;
+    const metadata = registry ? mapRegistryMachine(registry, now()) : undefined;
+    connection.machine = {
+      ...mapMachine(reply.machine),
+      name: registry?.display_name ?? reply.machine.name,
+      endpoint: metadata?.endpoint,
+      capabilities: registry?.capabilities,
+      credentialStatus: metadata?.credentialStatus,
+      lastSeen: "0s",
+      status: "ONLINE",
+    };
+    connection.retry.succeeded();
+    connection.retryAt = 0;
+  };
+
+  const querySessions = async (connection: MachineConnection): Promise<Session[]> => {
+    const reply = await connection.transport.request({ type: "LIST_SESSIONS" }, (message) => message.type === "SESSIONS");
+    if (reply.type !== "SESSIONS") return connection.sessions;
+    if (reply.sessions.some((session) => session.machine_id !== connection.id)) {
+      throw daemonError(`Machine '${connection.id}' returned a foreign Session`);
+    }
+    const mapped: Session[] = [];
+    const baseline: WireEvent[] = [];
+    for (const wire of reply.sessions) {
+      const events = await connection.transport.request(
+        { type: "GET_EVENTS", session_id: wire.id, after: null, limit: 500 },
+        (message) => message.type === "EVENTS",
+      );
+      const observed = events.type === "EVENTS" ? events.events : [];
+      baseline.push(...observed);
+      mapped.push(applyWatcherEvents(mapSession(wire), observed));
+    }
+    connection.transport.rememberEventBaseline(baseline);
+    connection.sessions = mapped;
+    return mapped;
+  };
+
+  const markFailure = (connection: MachineConnection): void => {
+    connection.retryAt = connection.retry.failedAt(now());
+    if (connection.machine.status === "ONLINE") {
+      connection.machine = { ...connection.machine, status: "OFFLINE", lastSeen: connection.machine.lastSeen ?? "0s" };
+    }
+    emit({ type: "MACHINE_UPDATED", machine: connection.machine });
+  };
+
+  const queryEligible = (connection: MachineConnection): boolean =>
+    connection.machine.status !== "AUTH_EXPIRED" && connection.machine.status !== "DISCONNECTED" &&
+    connection.machine.status !== "REVOKED";
+
+  const refreshConnection = async (connection: MachineConnection, withSessions: boolean): Promise<void> => {
+    try {
+      await queryMachine(connection);
+      if (withSessions) await querySessions(connection);
+      emit({ type: "MACHINE_UPDATED", machine: connection.machine });
+      if (withSessions) for (const session of connection.sessions) emit({ type: "SESSION_UPDATED", session });
+    } catch {
+      markFailure(connection);
+    }
+  };
+
+  const refreshDue = async (): Promise<void> => {
+    await ensureInitialized();
+    await loadRegistry();
+    const at = now();
+    const due = [...connections.values()].filter((connection) => queryEligible(connection) && connection.retryAt <= at);
+    await mapConcurrent(due, QUERY_CONCURRENCY, (connection) => refreshConnection(connection, true));
+  };
 
   const getMachines = async (): Promise<Machine[]> => {
-    const message = await transport.request({ type: "GET_MACHINE" }, (reply) => reply.type === "MACHINE");
-    return message.type === "MACHINE" ? [mapMachine(message.machine)] : [];
+    await ensureInitialized();
+    await loadRegistry();
+    await mapConcurrent([...connections.values()].filter(queryEligible), QUERY_CONCURRENCY,
+      (connection) => refreshConnection(connection, false));
+    return [...connections.values()].map((connection) => connection.machine);
   };
 
   const getSessions = async (): Promise<Session[]> => {
-    const message = await transport.request({ type: "LIST_SESSIONS" }, (reply) => reply.type === "SESSIONS");
-    if (message.type !== "SESSIONS") return [];
-    const sessions: Session[] = [];
-    for (const wire of message.sessions) {
-      const reply = await transport.request(
-        { type: "GET_EVENTS", session_id: wire.id, after: null, limit: 500 },
-        (candidate) => candidate.type === "EVENTS",
-      );
-      sessions.push(applyWatcherEvents(mapSession(wire), reply.type === "EVENTS" ? reply.events : []));
-    }
-    return sessions;
+    await ensureInitialized();
+    await mapConcurrent([...connections.values()].filter(queryEligible), QUERY_CONCURRENCY,
+      (connection) => refreshConnection(connection, true));
+    return [...connections.values()].flatMap((connection) => connection.sessions);
   };
 
-  const auth = createAuthApi({ baseUrl: authBaseUrl, fetcher, storage, resetTransport: () => transport.reset() });
+  const owner = (sessionId: string): MachineConnection => {
+    const id = machineId(sessionId);
+    const connection = connections.get(id);
+    if (!connection) throw daemonError(`unknown owning Machine '${id}'`);
+    return connection;
+  };
 
-  return {
+  const outputUrl = (sessionId: string, offset: number, limit: number): string => {
+    const id = machineId(sessionId);
+    const local = localId(sessionId);
+    const prefix = id === controlMachineId ? authBaseUrl : `${authBaseUrl}/machines/${encodeURIComponent(id)}`;
+    return `${prefix}/sessions/${local}/output?offset=${offset}&limit=${limit}`;
+  };
+
+  const auth = createAuthApi({
+    baseUrl: authBaseUrl,
+    fetcher,
+    storage,
+    resetTransport: () => {
+      for (const connection of connections.values()) connection.transport.reset();
+      connections.clear();
+      controlMachineId = null;
+    },
+  });
+
+  const registry: DataAdapter["registry"] = {
+    ...baseRegistry,
+    async rename(id, displayName) {
+      const row = await baseRegistry.rename(id, displayName);
+      upsertWorker(row);
+      return row;
+    },
+    async revoke(id) {
+      await baseRegistry.revoke(id);
+      const connection = connections.get(id);
+      connection?.transport.reset();
+      connections.delete(id);
+    },
+  };
+
+  const adapter: DataAdapter = {
     getMachines,
     getSessions,
-    async createSession(options = {}) {
-      const message = await transport.request(
-        {
-          type: "CREATE_SESSION",
-          shell: options.shell ?? null,
-          cwd: options.cwd ?? null,
-          cols: options.cols ?? 80,
-          rows: options.rows ?? 24,
-          origin: "UI",
-          title: options.title ?? null,
-          command: null,
-        },
-        (reply) => isFullSessionUpdate(reply),
-      );
-      if (message.type !== "SESSION_UPDATED") throw daemonError("missing created session");
+    async createSession(create = {}) {
+      await ensureInitialized();
+      if (controlMachineId === null) throw daemonError("missing control Machine");
+      const transport = connections.get(controlMachineId)?.transport;
+      if (!transport) throw daemonError("missing control Machine connection");
+      const message = await transport.request({
+        type: "CREATE_SESSION",
+        shell: create.shell ?? null,
+        cwd: create.cwd ?? null,
+        cols: create.cols ?? 80,
+        rows: create.rows ?? 24,
+        origin: "UI",
+        title: create.title ?? null,
+        command: null,
+      }, (reply) => isFullSessionUpdate(reply));
+      if (message.type !== "SESSION_UPDATED") throw daemonError("missing created Session");
       return mapSession(message.session);
     },
     async continueSession(sessionId) {
-      const sourceId = Number(sessionId);
-      const message = await transport.request(
-        { type: "CONTINUE_SESSION", session_id: sourceId },
-        (reply) =>
-          reply.type === "SESSION_UPDATED" &&
-          reply.session.capture === "FULL" &&
-          reply.session.continued_from === sourceId,
+      await ensureInitialized();
+      const connection = owner(sessionId);
+      const source = localId(sessionId);
+      const message = await connection.transport.request(
+        { type: "CONTINUE_SESSION", session_id: source },
+        (reply) => reply.type === "SESSION_UPDATED" && reply.session.capture === "FULL" &&
+          reply.session.machine_id === connection.id && reply.session.continued_from === source,
       );
       if (message.type !== "SESSION_UPDATED") throw daemonError("missing continued Session");
       return mapSession(message.session);
     },
-    async replayOutput(sessionId, onChunk, options = {}) {
+    async replayOutput(sessionId, onChunk, replay = {}) {
+      await ensureInitialized();
+      owner(sessionId);
       const token = storage.getItem(SESSION_TOKEN_KEY);
       if (!token) throw daemonError("missing browser session");
-      const maximum = Math.min(64 * 1024 * 1024, Math.max(1, Math.floor(options.maxBytes ?? 64 * 1024 * 1024)));
+      const maximum = Math.min(64 * 1024 * 1024, Math.max(1, Math.floor(replay.maxBytes ?? 64 * 1024 * 1024)));
       let offset = 0;
       let bytesRead = 0;
       let warning: string | undefined;
       for (let page = 0; page < 256; page += 1) {
         const limit = Math.min(262144, maximum - bytesRead);
         if (limit <= 0) return warning ? { warning, bytesRead, truncated: true } : { bytesRead, truncated: true };
-        const endpoint = `${authBaseUrl}/sessions/${encodeURIComponent(sessionId)}/output?offset=${offset}&limit=${limit}`;
-        const response = await fetcher(endpoint, {
+        const response = await fetcher(outputUrl(sessionId, offset, limit), {
           headers: { authorization: `Bearer ${token}` },
         });
         if (!response.ok) {
@@ -475,11 +726,10 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
         if (chunk.length > 0) onChunk(chunk);
         bytesRead += chunk.length;
         warning = response.headers.get("x-sentinal-output-warning") ?? warning;
-        const complete = response.headers.get("x-sentinal-output-complete") === "true";
-        if (complete) return warning ? { warning, bytesRead } : { bytesRead };
-        if (bytesRead >= maximum) {
-          return warning ? { warning, bytesRead, truncated: true } : { bytesRead, truncated: true };
+        if (response.headers.get("x-sentinal-output-complete") === "true") {
+          return warning ? { warning, bytesRead } : { bytesRead };
         }
+        if (bytesRead >= maximum) return warning ? { warning, bytesRead, truncated: true } : { bytesRead, truncated: true };
         const next = Number(response.headers.get("x-sentinal-output-next-offset"));
         if (!Number.isSafeInteger(next) || next <= offset) {
           throw daemonError("saved output returned an invalid continuation offset");
@@ -488,45 +738,88 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       }
       throw daemonError("saved output exceeded the 64 MiB replay limit");
     },
-    getRecipes: () => unsupported("getRecipes"),
-    async getHistory(filters = {}) {
-      const request: ClientRequest = filters.query?.trim()
-        ? { type: "SEARCH_COMMANDS", query: filters.query.trim(), limit: 500 }
-        : {
-            type: "GET_HISTORY",
-            session_id: filters.sessionId === undefined ? null : Number(filters.sessionId),
-            limit: 500,
-          };
-      const message = await transport.request(request, (reply) => reply.type === "HISTORY");
-      if (message.type !== "HISTORY") return [];
-      const sessionsById = new Map((await getSessions()).map((session) => [session.id, session]));
-      return message.commands
-        .map((command) => {
-          const entry = mapCommand(command);
-          return { ...entry, project: sessionsById.get(entry.sessionId ?? "")?.project };
-        })
-        .filter((entry) => !filters.machine || entry.machine === filters.machine)
-        .filter((entry) => !filters.project || entry.project === filters.project)
-        .filter((entry) => {
-          if (!filters.result) return true;
-          if (filters.result === "running") return entry.ok === null;
-          return filters.result === "ok" ? entry.ok === true : entry.ok === false;
-        });
+    resolveTerminal(sessionId) {
+      const connection = owner(sessionId);
+      return { websocketUrl: connection.transport.url, localSessionId: localId(sessionId), machineId: connection.id };
     },
-    subscribe: (listener) => transport.subscribe(listener),
-    sendInput: (sessionId, data) => transport.sendBytes(sessionId, encoder.encode(data)),
+    getRecipes: () => unsupported("getRecipes"),
+    async getHistory(filters: HistoryFilters = {}) {
+      await ensureInitialized();
+      let targets: MachineConnection[];
+      if (filters.sessionId !== undefined) targets = [owner(filters.sessionId)];
+      else if (filters.machine !== undefined) {
+        const connection = connections.get(filters.machine);
+        targets = connection ? [connection] : [];
+      } else targets = [...connections.values()].filter(queryEligible);
+      const settled = await mapConcurrent(targets, QUERY_CONCURRENCY, async (connection) => {
+        try {
+          const request: ClientRequest = filters.query?.trim()
+            ? { type: "SEARCH_COMMANDS", query: filters.query.trim(), limit: 500 }
+            : { type: "GET_HISTORY", session_id: filters.sessionId === undefined ? null : localId(filters.sessionId), limit: 500 };
+          const message = await connection.transport.request(request, (reply) => reply.type === "HISTORY");
+          if (message.type !== "HISTORY" || message.commands.some((command) => command.machine_id !== connection.id)) {
+            throw daemonError(`Machine '${connection.id}' returned foreign history`);
+          }
+          return { connection, commands: message.commands, failed: false as const };
+        } catch {
+          markFailure(connection);
+          return { connection, commands: [] as Command[], failed: true as const };
+        }
+      });
+      const unavailable = settled.filter((result) => result.failed).map((result) => result.connection.id);
+      const projects = new Map(
+        [...connections.values()].flatMap((connection) => connection.sessions).map((session) => [session.id, session.project]),
+      );
+      const results = settled.flatMap((result) => result.commands).map((command) => {
+        const entry = mapCommand(command);
+        return { ...entry, project: projects.get(entry.sessionId ?? "") };
+      }).filter((entry) => !filters.project || entry.project === filters.project).filter((entry) => {
+        if (!filters.result) return true;
+        if (filters.result === "running") return entry.ok === null;
+        return filters.result === "ok" ? entry.ok === true : entry.ok === false;
+      }) as HistoryResults;
+      if (unavailable.length > 0) results.unavailableMachines = unavailable;
+      return results;
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      if (pollTimer === null) pollTimer = setInterval(() => void refreshDue(), POLL_INTERVAL_MS);
+      const onVisibility = () => {
+        if (document.visibilityState !== "visible") return;
+        const at = now();
+        for (const connection of connections.values()) connection.retryAt = connection.retry.resumeAt(at);
+        void refreshDue();
+      };
+      document.addEventListener("visibilitychange", onVisibility);
+      return () => {
+        listeners.delete(listener);
+        document.removeEventListener("visibilitychange", onVisibility);
+        if (listeners.size === 0 && pollTimer !== null) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      };
+    },
+    async sendInput(sessionId, data) {
+      await ensureInitialized();
+      await owner(sessionId).transport.sendBytes(localId(sessionId), encoder.encode(data));
+    },
     async sendSignal(sessionId, signal) {
+      await ensureInitialized();
+      const connection = owner(sessionId);
+      const local = localId(sessionId);
       if (signal === "SIGINT") {
-        await transport.sendBytes(sessionId, new Uint8Array([3]));
+        await connection.transport.sendBytes(local, new Uint8Array([3]));
         return;
       }
-      await transport.request(
-        { type: "KILL", session_id: Number(sessionId) },
-        (reply) => isFullSessionUpdate(reply, Number(sessionId)),
+      await connection.transport.request(
+        { type: "KILL", session_id: local },
+        (reply) => isFullSessionUpdate(reply, local) && reply.type === "SESSION_UPDATED" &&
+          reply.session.machine_id === connection.id,
       );
     },
     runRecipe: () => unsupported("runRecipe"),
-    registry: createRegistryApi({ baseUrl: authBaseUrl, fetcher, storage }),
+    registry,
     auth,
     notifications: {
       getRules: () => unsupported("notifications.getRules"),
@@ -534,6 +827,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       getJournal: () => unsupported("notifications.getJournal"),
     },
   };
+  return adapter;
 }
 
 export const apiAdapter = createApiAdapter();

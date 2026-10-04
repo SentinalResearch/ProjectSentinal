@@ -79,6 +79,10 @@ export const mockAdapter: DataAdapter = {
     return { bytesRead: 0 };
   },
 
+  resolveTerminal() {
+    throw new Error("mock Sessions do not have daemon terminal routes");
+  },
+
   async getRecipes() {
     return delay(store.recipes.map((r) => ({ ...r })));
   },

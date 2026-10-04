@@ -44,7 +44,7 @@ export function SplitPane({ session, machine, active, gridRow, onFocus, onClose 
         <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />
         <span className={styles.name}>{session.name}</span>
         <span className={styles.fact}>
-          {machine?.name ?? session.machine} · {formatSessionFact(session)}
+          {machine?.name ?? session.machine} · {machine?.status ?? "OFFLINE"} · {formatSessionFact(session)}
         </span>
         <button type="button" className={styles.detailsBtn} title="Open session" onClick={openDetails}>
           Details

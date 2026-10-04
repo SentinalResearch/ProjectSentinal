@@ -16,6 +16,16 @@ function needsFact(session: Session): string {
   return formatSessionFact(session);
 }
 
+function connectionLabel(machine: Machine): string {
+  switch (machine.status) {
+    case "ONLINE": return `Online · ${machine.os}`;
+    case "AUTH_EXPIRED": return `Authentication expired · last seen ${machine.lastSeen ?? "never"}`;
+    case "DISCONNECTED": return `Disconnected · last seen ${machine.lastSeen ?? "never"}`;
+    case "REVOKED": return `Revoked · last seen ${machine.lastSeen ?? "never"}`;
+    case "OFFLINE": return `Offline · last seen ${machine.lastSeen ?? "never"}`;
+  }
+}
+
 /** Activate a clickable row/card with Enter or Space, same as a native button — these are <div role="button">s (not real <button>s) because they contain nested interactive controls (y/n keys), and a <button> can't contain a <button>. */
 function onActivateKey(handler: () => void) {
   return (e: KeyboardEvent) => {
@@ -52,14 +62,14 @@ export function OverviewPage() {
   const needs = visibleSessions.filter(needsAttention);
 
   const onlineCount = machines.filter((m) => m.status === "ONLINE").length;
-  const offlineMachines = machines.filter((m) => m.status === "OFFLINE");
+  const unavailableMachines = machines.filter((m) => m.status !== "ONLINE");
 
   const summary = filteredMachine
     ? filteredMachine.hardware
     : [
         `${sessions.length} session${sessions.length === 1 ? "" : "s"} on ${onlineCount} machine${onlineCount === 1 ? "" : "s"}`,
         needs.length > 0 ? `${needs.length} need you` : null,
-        offlineMachines.length > 0 ? `${offlineMachines.map((m) => m.name).join(", ")} offline` : null,
+        unavailableMachines.length > 0 ? `${unavailableMachines.map((m) => m.name).join(", ")} unavailable` : null,
       ]
         .filter(Boolean)
         .join(" · ");
@@ -155,7 +165,7 @@ export function OverviewPage() {
                     boxShadow: online ? "none" : "inset 0 0 0 1.5px var(--s-disconnected-fg)",
                   }}
                 />
-                {online ? `Online · ${machine.os}` : `Offline · last seen ${machine.lastSeen ?? "—"} ago`}
+                {connectionLabel(machine)}
               </span>
               <span className={styles.machineHw}>{machine.hardware}</span>
             </div>
@@ -181,10 +191,13 @@ export function OverviewPage() {
               </button>
             ))}
 
-            {rows.length === 0 && (
+            {rows.length === 0 && machine.status !== "ONLINE" && (
               <div className={styles.emptyRow}>
-                Offline · last seen {machine.lastSeen ?? "—"} ago. Sessions will appear when the agent reconnects.
+                {connectionLabel(machine)}. Sessions will appear when the agent reconnects.
               </div>
+            )}
+            {rows.length === 0 && machine.status === "ONLINE" && (
+              <div className={styles.emptyRow}>Online · no Sessions.</div>
             )}
           </section>
         );

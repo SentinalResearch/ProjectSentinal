@@ -5,7 +5,7 @@
 //! one-time code (exchange) or a worker credential (heartbeat, refresh,
 //! disconnect). Secrets travel only in bodies and Authorization headers.
 
-use super::{ControlFailure, ControlService};
+use super::{proxy, ControlFailure, ControlService};
 use crate::{
     api::auth_routes::bearer_from_headers,
     auth::{AuthManager, CredentialKind},
@@ -53,6 +53,7 @@ impl ControlRoutes {
 
     /// Build the router.
     pub fn router(self) -> Router {
+        let proxy = proxy::routes(self.control.clone(), self.auth.clone());
         Router::new()
             .route("/api/v1/pairing/codes", post(create_code))
             .route(
@@ -70,6 +71,7 @@ impl ControlRoutes {
             .route("/api/v1/link/disconnect", post(disconnect))
             .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES))
             .with_state(self)
+            .merge(proxy)
     }
 
     fn control(&self) -> Result<&ControlService, ControlFailure> {

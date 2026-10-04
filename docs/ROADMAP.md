@@ -208,11 +208,12 @@ latest live generation.
 prompt, and see the stable Machine ID appear under that display name.
 
 ## Milestone 4.A — Multi-Machine aggregation
-- [ ] The local control Machine connects independently to every enrolled daemon; there is no required cloud service
-- [ ] Namespace Session/Command/Event identities by Machine in the web data layer
-- [ ] Isolate failures and show offline Machines with last-seen time
-- [ ] Route attach, input, Metrics, history, and search to the owning Machine only
-- [ ] Prove two fake daemons in Playwright, then complete a two-real-Machine acceptance run
+- [x] The local control Machine connects independently to every enrolled daemon; there is no required cloud service
+- [x] Namespace Session/Command/Event identities by Machine in the web data layer
+- [x] Isolate failures and show offline Machines with last-seen time
+- [x] Route attach, input, Metrics, history, and search to the owning Machine only
+- [x] Prove two fake daemons in Playwright
+- [ ] Complete the two-real-Machine routing acceptance run in `docs/progress/milestone-4a.md`
 
 ## Milestone 4.B — Recipes + notifications + mobile dashboard (v0.4)
 - [ ] Recipe files in `recipes/`, launch from UI

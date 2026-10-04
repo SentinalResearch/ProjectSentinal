@@ -31,7 +31,8 @@ test("an adopted log Session shows progress on a phone with no terminal controls
     expect(id).toBeTruthy();
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`/app/sessions/${id}`);
+    await page.goto("/app/overview");
+    await page.getByText("Tailed e2e run", { exact: true }).first().click();
 
     await expect(page.getByRole("heading", { name: "Tailed e2e run" })).toBeVisible();
     const badge = page.getByLabel("PROCESS_LOG capture").first();

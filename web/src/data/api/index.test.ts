@@ -7,6 +7,7 @@ import type { Envelope } from "../../protocol/Envelope";
 import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { Session as WireSession } from "../../protocol/Session";
 import type { Command } from "../../protocol/Command";
+import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import { createApiAdapter, type ApiSocket } from ".";
 
 const machine: WireMachine = {
@@ -90,6 +91,9 @@ class FakeAuthServer {
   readonly tokens = new Set<string>();
   private nextToken = 1;
   readonly outputRequests: URL[] = [];
+  readonly unavailableMachines = new Set<string>();
+  readonly revokedMachines: string[] = [];
+  registryMachines: RegistryMachine[] = [];
 
   constructor(password: string | null) {
     this.password = password;
@@ -134,7 +138,17 @@ class FakeAuthServer {
       this.tokens.clear();
       return json(this.issue());
     }
-    if (url.pathname === "/api/v1/sessions/1/output") {
+    if (url.pathname === "/api/v1/machines") {
+      return json({ machines: this.registryMachines });
+    }
+    const registryMachine = url.pathname.match(/^\/api\/v1\/machines\/([^/]+)$/);
+    if (registryMachine && request.method === "DELETE") {
+      const id = decodeURIComponent(registryMachine[1]);
+      this.revokedMachines.push(id);
+      this.registryMachines = this.registryMachines.filter((entry) => entry.machine_id !== id);
+      return new Response(null, { status: 204 });
+    }
+    if (url.pathname === "/api/v1/sessions/1/output" || /\/api\/v1\/machines\/[^/]+\/sessions\/1\/output/.test(url.pathname)) {
       this.outputRequests.push(url);
       const offset = Number(url.searchParams.get("offset") ?? "0");
       if (offset === 0) {
@@ -177,12 +191,15 @@ class FakeSocket implements ApiSocket {
   readonly requests: ClientRequest[] = [];
   /** Push an unsolicited observation of an adopted process before each reply. */
   observeFirst = false;
+  readonly machineId: string;
 
-  constructor(url: string, server: FakeAuthServer) {
+  constructor(url: string, private readonly server: FakeAuthServer) {
     this.url = url;
+    const routed = new URL(url).pathname.match(/^\/api\/v1\/machines\/([^/]+)\/ws$/);
+    this.machineId = routed ? decodeURIComponent(routed[1]) : machine.id;
     queueMicrotask(() => {
       const token = new URL(url).searchParams.get("token");
-      if (!token || !server.tokens.has(token)) {
+      if (!token || !server.tokens.has(token) || server.unavailableMachines.has(this.machineId)) {
         this.onerror?.(new Event("error"));
         return;
       }
@@ -192,6 +209,11 @@ class FakeSocket implements ApiSocket {
   }
 
   send(data: string | ArrayBufferLike | Blob | ArrayBufferView) {
+    if (this.server.unavailableMachines.has(this.machineId)) {
+      this.readyState = WebSocket.CLOSED;
+      this.onclose?.(new CloseEvent("close"));
+      return;
+    }
     if (typeof data !== "string") {
       const bytes = data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer);
       this.binaryFrames.push(bytes);
@@ -199,20 +221,27 @@ class FakeSocket implements ApiSocket {
     }
     const request = (JSON.parse(data) as Envelope<ClientRequest>).payload;
     this.requests.push(request);
+    const ownedMachine: WireMachine = {
+      ...machine,
+      id: this.machineId,
+      name: this.machineId === machine.id ? machine.name : "Worker Machine",
+    };
+    const ownedSession: WireSession = { ...session, machine_id: this.machineId };
+    const ownedCommand: Command = { ...command, machine_id: this.machineId };
     let payload: DaemonMessage;
-    if (request.type === "GET_MACHINE") payload = { type: "MACHINE", machine };
-    else if (request.type === "LIST_SESSIONS") payload = { type: "SESSIONS", sessions: [session] };
-    else if (request.type === "CREATE_SESSION") payload = { type: "SESSION_UPDATED", session };
+    if (request.type === "GET_MACHINE") payload = { type: "MACHINE", machine: ownedMachine };
+    else if (request.type === "LIST_SESSIONS") payload = { type: "SESSIONS", sessions: [ownedSession] };
+    else if (request.type === "CREATE_SESSION") payload = { type: "SESSION_UPDATED", session: ownedSession };
     else if (request.type === "CONTINUE_SESSION") {
       payload = {
         type: "SESSION_UPDATED",
-        session: { ...session, id: 2, state: "IDLE", continued_from: request.session_id },
+        session: { ...ownedSession, id: 2, state: "IDLE", continued_from: request.session_id },
       };
     }
     else if (request.type === "KILL") {
-      payload = { type: "SESSION_UPDATED", session: { ...session, state: "INTERRUPTED" } };
+      payload = { type: "SESSION_UPDATED", session: { ...ownedSession, state: "INTERRUPTED" } };
     } else if (request.type === "GET_HISTORY" || request.type === "SEARCH_COMMANDS") {
-      payload = { type: "HISTORY", commands: [command] };
+      payload = { type: "HISTORY", commands: [ownedCommand] };
     } else if (request.type === "GET_EVENTS") {
       payload = { type: "EVENTS", events: [watcherEvent] };
     } else {
@@ -221,7 +250,7 @@ class FakeSocket implements ApiSocket {
     if (this.observeFirst) {
       const observed: DaemonMessage = {
         type: "SESSION_UPDATED",
-        session: { ...session, id: 77, origin: "ADOPTED", capture: "PROCESS", state: "RUNNING" },
+        session: { ...ownedSession, id: 77, origin: "ADOPTED", capture: "PROCESS", state: "RUNNING" },
       };
       this.onmessage?.(
         new MessageEvent("message", {
@@ -292,6 +321,26 @@ function setup(password: string | null = "correct horse battery staple") {
   return { adapter, server, sockets, storage };
 }
 
+function workerRegistry(machineId = "worker-machine"): RegistryMachine {
+  return {
+    machine_id: machineId,
+    display_name: "Worker Machine",
+    role: "WORKER",
+    status: "ONLINE",
+    last_seen: 1_700_000_000_000,
+    endpoint: { address: "100.64.0.2", port: 6842, dns_name: "worker.tailnet.ts.net" },
+    os: "LINUX",
+    daemon_version: "0.1.0",
+    capabilities: ["SESSIONS", "EVENTS", "METRICS"],
+    credential: {
+      link_id: "link-worker",
+      created_at: 1_700_000_000_000,
+      expires_at: 1_900_000_000_000,
+      last_used_at: 1_700_000_000_000,
+    },
+  };
+}
+
 describe("apiAdapter authentication", () => {
   it("bootstraps the single owner and stores only the browser session token", async () => {
     const { adapter, storage } = setup(null);
@@ -324,7 +373,7 @@ describe("apiAdapter authentication", () => {
       expect.objectContaining({ id: "test-machine", name: "Test Machine", os: "macOS", status: "ONLINE" }),
     ]);
     await expect(adapter.getSessions()).resolves.toEqual([
-      expect.objectContaining({ id: "1", machine: "test-machine", name: "Session 1", state: "IDLE" }),
+      expect.objectContaining({ id: "test-machine:1", machine: "test-machine", name: "Session 1", state: "IDLE" }),
     ]);
     expect(sockets).toHaveLength(1);
   });
@@ -374,8 +423,8 @@ describe("apiAdapter authentication", () => {
     const created = await adapter.createSession();
     await adapter.sendInput(created.id, "echo ready\n");
 
-    expect(created.id).toBe("1");
-    expect(updates).toEqual(["1"]);
+    expect(created.id).toBe("test-machine:1");
+    expect(updates).toEqual(["test-machine:1"]);
     const frame = decodeTerminalFrame(sockets[0].binaryFrames[0]);
     expect(frame.sessionId).toBe(1);
     expect(new TextDecoder().decode(frame.payload)).toBe("echo ready\n");
@@ -386,13 +435,13 @@ describe("apiAdapter authentication", () => {
     const { adapter, sockets } = setup();
     await adapter.auth.login("correct horse battery staple");
 
-    const continued = await adapter.continueSession("1");
+    const continued = await adapter.continueSession("test-machine:1");
 
     expect(sockets[0].requests.at(-1)).toEqual({
       type: "CONTINUE_SESSION",
       session_id: 1,
     });
-    expect(continued).toMatchObject({ id: "2", continuedFrom: "1" });
+    expect(continued).toMatchObject({ id: "test-machine:2", continuedFrom: "test-machine:1" });
   });
 
   it("pages authenticated saved output as bytes and reports decoder warnings", async () => {
@@ -400,7 +449,7 @@ describe("apiAdapter authentication", () => {
     await adapter.auth.login("correct horse battery staple");
     const chunks: Uint8Array[] = [];
 
-    const replay = await adapter.replayOutput("1", (chunk) => chunks.push(chunk));
+    const replay = await adapter.replayOutput("test-machine:1", (chunk) => chunks.push(chunk));
 
     expect(chunks.map((chunk) => new TextDecoder().decode(chunk)).join("")).toBe("saved output");
     expect(replay.warning).toBe("TRUNCATED_ZSTD");
@@ -414,7 +463,7 @@ describe("apiAdapter authentication", () => {
     await adapter.auth.login("correct horse battery staple");
     const chunks: Uint8Array[] = [];
 
-    const replay = await adapter.replayOutput("1", (chunk) => chunks.push(chunk), {
+    const replay = await adapter.replayOutput("test-machine:1", (chunk) => chunks.push(chunk), {
       maxBytes: 6,
     });
 
@@ -431,7 +480,7 @@ describe("apiAdapter authentication", () => {
     sockets[0].observeFirst = true;
 
     const created = await adapter.createSession();
-    expect(created.id).toBe("1");
+    expect(created.id).toBe("test-machine:1");
     await adapter.sendSignal(created.id, "KILL");
     expect(sockets[0].requests.at(-1)).toEqual({ type: "KILL", session_id: 1 });
   });
@@ -446,12 +495,12 @@ describe("apiAdapter authentication", () => {
         cwd: "/work/model",
         duration: "31s",
         ok: true,
-        sessionId: "1",
+        sessionId: "test-machine:1",
       }),
     ]);
     expect(sockets[0].requests).toContainEqual({ type: "SEARCH_COMMANDS", query: "train", limit: 500 });
 
-    await adapter.getHistory({ sessionId: "1" });
+    await adapter.getHistory({ sessionId: "test-machine:1" });
     expect(sockets[0].requests).toContainEqual({ type: "GET_HISTORY", session_id: 1, limit: 500 });
   });
 
@@ -484,7 +533,7 @@ describe("apiAdapter authentication", () => {
     sockets[0].observe({
       type: "EVENT",
       event: {
-        id: 12,
+        id: 13,
         session_id: 1,
         command_id: 9,
         at: 1_700_000_001_000,
@@ -494,13 +543,13 @@ describe("apiAdapter authentication", () => {
 
     expect(events).toContainEqual({
       type: "SESSION_METRICS",
-      sessionId: "1",
+      sessionId: "test-machine:1",
       metrics: { cpuPct: 33.3, ramGB: 2, gpuPct: 96, vramGB: 10, vramTotalGB: 24 },
     });
-    expect(events).toContainEqual({ type: "COMMAND_UPDATED", sessionId: "1", command: "python train.py" });
+    expect(events).toContainEqual({ type: "COMMAND_UPDATED", sessionId: "test-machine:1", command: "python train.py" });
     expect(events).toContainEqual(expect.objectContaining({
       type: "EVENT_APPENDED",
-      sessionId: "1",
+      sessionId: "test-machine:1",
       event: expect.arrayContaining(["RESOURCE_HIGH"]),
     }));
   });
@@ -530,5 +579,101 @@ describe("apiAdapter authentication", () => {
 
     expect(storage.getItem("sentinal.sessionToken")).toBeNull();
     expect(expired).toBe(true);
+  });
+});
+
+describe("apiAdapter multi-Machine routing", () => {
+  it("keeps equal daemon-local IDs separate and routes every operation to its owner", async () => {
+    const { adapter, server, sockets } = setup();
+    server.registryMachines = [workerRegistry()];
+    await adapter.auth.login("correct horse battery staple");
+
+    await expect(adapter.getMachines()).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-machine", status: "ONLINE" }),
+      expect.objectContaining({ id: "worker-machine", status: "ONLINE", credentialStatus: "ACTIVE" }),
+    ]));
+    await expect(adapter.getSessions()).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-machine:1", machine: "test-machine" }),
+      expect.objectContaining({ id: "worker-machine:1", machine: "worker-machine" }),
+    ]));
+
+    const control = sockets.find((socket) => socket.machineId === "test-machine");
+    const worker = sockets.find((socket) => socket.machineId === "worker-machine");
+    expect(control).toBeDefined();
+    expect(worker).toBeDefined();
+    const controlRequestCount = control?.requests.length ?? 0;
+    await adapter.sendInput("worker-machine:1", "worker only\n");
+    await adapter.sendSignal("worker-machine:1", "KILL");
+    await adapter.getHistory({ machine: "worker-machine", query: "train" });
+
+    expect(control?.requests).toHaveLength(controlRequestCount);
+    expect(worker?.requests).toContainEqual({ type: "KILL", session_id: 1 });
+    expect(worker?.requests).toContainEqual({ type: "SEARCH_COMMANDS", query: "train", limit: 500 });
+    expect(worker?.binaryFrames).toHaveLength(1);
+    expect(new TextDecoder().decode(decodeTerminalFrame(worker!.binaryFrames[0]).payload)).toBe("worker only\n");
+    expect(adapter.resolveTerminal("worker-machine:1")).toEqual({
+      websocketUrl: "ws://daemon.test/api/v1/machines/worker-machine/ws",
+      localSessionId: 1,
+      machineId: "worker-machine",
+    });
+
+    const chunks: Uint8Array[] = [];
+    await adapter.replayOutput("worker-machine:1", (chunk) => chunks.push(chunk));
+    expect(server.outputRequests.at(-1)?.pathname).toBe("/api/v1/machines/worker-machine/sessions/1/output");
+    for (const socket of sockets) {
+      const endpoint = new URL(socket.url);
+      expect(endpoint.origin).toBe("ws://daemon.test");
+      expect(endpoint.searchParams.get("token")).toMatch(/^session-token-/);
+      expect(socket.url).not.toContain("a".repeat(64));
+      expect(socket.url).not.toContain("b".repeat(64));
+    }
+  });
+
+  it("retains an offline snapshot, isolates the healthy Machine, and deduplicates after recovery", async () => {
+    const { adapter, server, sockets } = setup();
+    server.registryMachines = [workerRegistry()];
+    const live: import("../adapter").LiveEvent[] = [];
+    const unsubscribe = adapter.subscribe((event) => live.push(event));
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getMachines();
+    await adapter.getSessions();
+
+    server.unavailableMachines.add("worker-machine");
+    const whileOffline = await adapter.getSessions();
+    expect(whileOffline).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-machine:1" }),
+      expect.objectContaining({ id: "worker-machine:1" }),
+    ]));
+    await expect(adapter.getMachines()).resolves.toContainEqual(
+      expect.objectContaining({ id: "worker-machine", status: "OFFLINE" }),
+    );
+    await adapter.sendInput("test-machine:1", "still healthy\n");
+
+    server.unavailableMachines.delete("worker-machine");
+    await adapter.getSessions();
+    const worker = sockets.filter((socket) => socket.machineId === "worker-machine").at(-1);
+    const before = live.filter((event) => event.type === "EVENT_APPENDED").length;
+    worker?.observe({ type: "EVENT", event: { ...watcherEvent, id: 99 } });
+    worker?.observe({ type: "EVENT", event: { ...watcherEvent, id: 99 } });
+    expect(live.filter((event) => event.type === "EVENT_APPENDED")).toHaveLength(before + 1);
+    unsubscribe();
+  });
+
+  it("revokes one Machine without dropping another connection", async () => {
+    const { adapter, server } = setup();
+    server.registryMachines = [workerRegistry(), workerRegistry("second-worker")];
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getMachines();
+
+    await adapter.registry.revoke("worker-machine");
+
+    expect(server.revokedMachines).toEqual(["worker-machine"]);
+    await expect(adapter.getMachines()).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "test-machine" }),
+      expect.objectContaining({ id: "second-worker" }),
+    ]));
+    await expect(adapter.getMachines()).resolves.not.toContainEqual(
+      expect.objectContaining({ id: "worker-machine" }),
+    );
   });
 });

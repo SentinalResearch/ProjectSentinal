@@ -1,10 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
+import { dataAdapter } from "../../data";
+import type { HistoryResults } from "../../data/types";
 import { AppShell } from "./AppShell";
 import { HistoryPage } from "./HistoryPage";
 
@@ -54,5 +56,15 @@ describe("HistoryPage", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Reset filters" }));
     await screen.findByText("cargo build");
+  });
+
+  it("labels an all-Machine search when one Machine is unavailable", async () => {
+    const partial = [] as HistoryResults;
+    partial.unavailableMachines = ["mbp"];
+    const history = vi.spyOn(dataAdapter, "getHistory").mockResolvedValue(partial);
+    renderHistory("/app/history?q=train");
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Partial results · unavailable: MacBook");
+    history.mockRestore();
   });
 });

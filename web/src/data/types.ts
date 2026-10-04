@@ -3,7 +3,7 @@ import type { SessionLog } from "../protocol/SessionLog";
 import type { SessionOrigin } from "../protocol/SessionOrigin";
 import type { SessionState } from "../protocol/SessionState";
 
-export type MachineStatus = "ONLINE" | "OFFLINE";
+export type MachineStatus = "ONLINE" | "OFFLINE" | "AUTH_EXPIRED" | "DISCONNECTED" | "REVOKED";
 
 export interface Machine {
   id: string;
@@ -12,6 +12,9 @@ export interface Machine {
   hardware: string;
   status: MachineStatus;
   lastSeen?: string;
+  endpoint?: string;
+  capabilities?: string[];
+  credentialStatus?: "ACTIVE" | "EXPIRED" | "MISSING";
 }
 
 export interface SessionProgress {
@@ -109,6 +112,9 @@ export interface HistoryEntry {
   sessionId?: string;
 }
 
+/** Aggregated history plus Machines that could not answer this query. */
+export type HistoryResults = HistoryEntry[] & { unavailableMachines?: string[] };
+
 export interface RecipeParam {
   key: string;
   default: string;
@@ -147,5 +153,4 @@ export interface AuthState {
   lockUntil: number | null;
   message?: string;
 }
-
 

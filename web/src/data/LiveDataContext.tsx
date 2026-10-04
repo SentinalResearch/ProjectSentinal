@@ -3,9 +3,6 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { dataAdapter } from "./index";
 import type { LiveEvent } from "./adapter";
 import type { Machine, Session } from "./types";
-import type { DaemonMessage } from "../protocol/DaemonMessage";
-import { DAEMON_MESSAGE_EVENT } from "../terminal/useRealTerminalSession";
-import { mapWatcherEvent, watcherEventPatch } from "./api";
 
 export interface LiveDataValue {
   machines: Machine[];
@@ -39,6 +36,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
     });
 
     const unsubscribe = dataAdapter.subscribe((event: LiveEvent) => {
+      setLoading(false);
       if (event.type === "DATA_RESET") {
         setMachines(event.machines);
         setSessions(event.sessions);
@@ -83,54 +81,9 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    let latestGpuPct: number | undefined;
-    let latestVramTotal = 0;
-    const onDaemonMessage = (raw: Event) => {
-      const message = (raw as CustomEvent<DaemonMessage>).detail;
-      if (message.type === "MACHINE_METRICS") {
-        latestGpuPct = message.metrics.gpus.reduce<number | undefined>(
-          (highest, gpu) => highest === undefined ? gpu.util_percent : Math.max(highest, gpu.util_percent),
-          undefined,
-        );
-        latestVramTotal = message.metrics.gpus.reduce((total, gpu) => total + gpu.vram_total_bytes, 0);
-      } else if (message.type === "SESSION_METRICS") {
-        const totals = message.metrics.totals;
-        setSessions((prev) => prev.map((session) => session.id === String(message.metrics.session_id)
-          ? {
-              ...session,
-              metrics: {
-                ...session.metrics,
-                cpuPct: Math.round(totals.cpu_percent * 10) / 10,
-                ramGB: Math.round((totals.rss_bytes / 1024 ** 3) * 10) / 10,
-                gpuPct: totals.gpu_mem_bytes > 0 ? latestGpuPct : undefined,
-                vramGB: latestVramTotal > 0 || totals.gpu_mem_bytes > 0
-                  ? Math.round((totals.gpu_mem_bytes / 1024 ** 3) * 10) / 10
-                  : undefined,
-                vramTotalGB: latestVramTotal > 0 ? Math.round((latestVramTotal / 1024 ** 3) * 10) / 10 : undefined,
-              },
-            }
-          : session));
-      } else if (message.type === "COMMAND_UPDATED") {
-        setSessions((prev) => prev.map((session) => session.id === String(message.command.session_id)
-          ? { ...session, command: message.command.finished_at === null ? message.command.text : undefined }
-          : session));
-      } else if (message.type === "EVENT") {
-        const event = message.event;
-        setSessions((prev) => prev.map((session) => session.id === String(event.session_id)
-          ? {
-              ...session,
-              ...watcherEventPatch(event),
-              events: [...(session.events ?? []), mapWatcherEvent(event)],
-            }
-          : session));
-      }
-    };
-    window.addEventListener(DAEMON_MESSAGE_EVENT, onDaemonMessage);
-
     return () => {
       cancelled = true;
       unsubscribe();
-      window.removeEventListener(DAEMON_MESSAGE_EVENT, onDaemonMessage);
     };
   }, []);
 

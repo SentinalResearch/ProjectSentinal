@@ -4,7 +4,7 @@ import type { PairingCodeStatus } from "../protocol/PairingCodeStatus";
 import type { RegistryMachine } from "../protocol/RegistryMachine";
 import type {
   AuthState,
-  HistoryEntry,
+  HistoryResults,
   JournalNotification,
   Machine,
   NotificationRuleSet,
@@ -38,6 +38,12 @@ export interface OutputReplayResult {
 
 export interface OutputReplayOptions {
   maxBytes?: number;
+}
+
+export interface TerminalRoute {
+  websocketUrl: string;
+  localSessionId: number;
+  machineId: string;
 }
 
 export type LiveEvent =
@@ -83,7 +89,10 @@ export interface DataAdapter {
     options?: OutputReplayOptions,
   ): Promise<OutputReplayResult>;
   getRecipes(): Promise<Recipe[]>;
-  getHistory(filters?: HistoryFilters): Promise<HistoryEntry[]>;
+  getHistory(filters?: HistoryFilters): Promise<HistoryResults>;
+
+  /** Resolve a browser composite Session ID to its owning Machine route. */
+  resolveTerminal(sessionId: string): TerminalRoute;
 
   /** Subscribe to live updates (epoch ticks, event appends, state transitions). Returns an unsubscribe function. */
   subscribe(listener: (event: LiveEvent) => void): () => void;
