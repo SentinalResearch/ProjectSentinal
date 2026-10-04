@@ -1,6 +1,8 @@
 import { config } from "../config";
 import { RegistryError, type DataAdapter, type HistoryFilters, type LiveEvent } from "../adapter";
+import { previewTemplate } from "../recipeTemplate";
 import type { AuthState, NotificationRuleSet, Session } from "../types";
+import { mockInsight, mockMetrics } from "./insights";
 import { acquireLiveUpdates, resolvePrompt } from "./live";
 import { delay, emit, findSession, store, subscribe as subscribeStore, updateSession, appendEvent } from "./store";
 
@@ -14,9 +16,6 @@ function nowTime(): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
-function renderTemplate(template: string, params: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => params[key] ?? `{${key}}`);
-}
 
 export const mockAdapter: DataAdapter = {
   async getMachines() {
@@ -130,7 +129,7 @@ export const mockAdapter: DataAdapter = {
     await delay(undefined, 300, 600);
     const recipe = store.recipes.find((r) => r.id === recipeId);
     if (!recipe) throw new Error(`unknown recipe '${recipeId}'`);
-    const command = renderTemplate(recipe.template, params);
+    const command = previewTemplate(recipe.template, params);
     const id = `${recipeId}-${Date.now()}`;
     const session: Session = {
       id,
@@ -145,6 +144,14 @@ export const mockAdapter: DataAdapter = {
     updateSession(id, { state: "CREATED" });
     setTimeout(() => updateSession(id, { state: "RUNNING" }), 1200);
     return { sessionId: id };
+  },
+
+  async saveRecipe(machineId: string, recipe: import("../types").Recipe) {
+    await delay(undefined, 100, 200);
+    const stored = { ...recipe, machine: machineId, machineIds: [machineId] };
+    const index = store.recipes.findIndex((item) => item.id === recipe.id);
+    if (index >= 0) store.recipes[index] = stored;
+    else store.recipes.push(stored);
   },
 
   registry: {
@@ -275,6 +282,11 @@ export const mockAdapter: DataAdapter = {
     },
   },
 
+  machineInsights: {
+    details: mockInsight,
+    metrics: mockMetrics,
+  },
+
   notifications: {
     async getRules() {
       return delay({ ...store.notificationRules });
@@ -285,6 +297,15 @@ export const mockAdapter: DataAdapter = {
     },
     async getJournal() {
       return delay(store.journal.map((j) => ({ ...j })));
+    },
+    async getStatus() {
+      return delay(store.machines.map((machine) => ({
+        machineId: machine.id,
+        configured: true,
+        server: "https://ntfy.sh",
+        topic: "sentinal-demo",
+        tokenConfigured: false,
+      })));
     },
   },
 };

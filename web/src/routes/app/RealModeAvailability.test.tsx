@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecipesPage } from "./RecipesPage";
 import { SettingsPage } from "./SettingsPage";
@@ -10,6 +11,8 @@ const apiCalls = vi.hoisted(() => ({
   registryList: vi.fn(),
   getNotificationRules: vi.fn(),
   getNotificationJournal: vi.fn(),
+  getNotificationStatus: vi.fn(),
+  setNotificationRule: vi.fn(),
 }));
 
 vi.mock("../../data", () => ({
@@ -20,6 +23,8 @@ vi.mock("../../data", () => ({
     notifications: {
       getRules: apiCalls.getNotificationRules,
       getJournal: apiCalls.getNotificationJournal,
+      getStatus: apiCalls.getNotificationStatus,
+      setRule: apiCalls.setNotificationRule,
     },
   },
 }));
@@ -52,12 +57,18 @@ function renderRoute(path: string) {
 }
 
 describe("real-data feature availability", () => {
-  it("explains that Recipes are not implemented instead of loading forever", () => {
+  beforeEach(() => {
+    apiCalls.getRecipes.mockResolvedValue([]);
+    apiCalls.getNotificationRules.mockResolvedValue({});
+    apiCalls.getNotificationJournal.mockResolvedValue([]);
+    apiCalls.getNotificationStatus.mockResolvedValue([]);
+  });
+
+  it("loads the real Recipe catalog without demonstration data", async () => {
     renderRoute("/app/recipes");
 
-    expect(screen.getByRole("heading", { name: "Recipes are not available yet" })).toBeInTheDocument();
-    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
-    expect(apiCalls.getRecipes).not.toHaveBeenCalled();
+    expect(await screen.findByText("No recipes yet.")).toBeInTheDocument();
+    expect(apiCalls.getRecipes).toHaveBeenCalledOnce();
   });
 
   it("shows the connected Machine and explains enrollment needs a control Machine", async () => {
@@ -71,12 +82,18 @@ describe("real-data feature availability", () => {
     expect(screen.queryByRole("button", { name: "Add Machine" })).not.toBeInTheDocument();
   });
 
-  it("explains that Notifications are not implemented instead of loading forever", () => {
+  it("loads real notification rules, status, and journal", async () => {
+    const user = userEvent.setup();
     renderRoute("/app/settings/notifications");
 
-    expect(screen.getByRole("heading", { name: "Notifications are not available yet" })).toBeInTheDocument();
-    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
-    expect(apiCalls.getNotificationRules).not.toHaveBeenCalled();
-    expect(apiCalls.getNotificationJournal).not.toHaveBeenCalled();
+    expect(await screen.findByRole("heading", { name: "Notifications" })).toBeInTheDocument();
+    expect(apiCalls.getNotificationRules).toHaveBeenCalledOnce();
+    expect(apiCalls.getNotificationJournal).toHaveBeenCalledOnce();
+    expect(apiCalls.getNotificationStatus).toHaveBeenCalledOnce();
+    await user.click(screen.getByTitle("Default for new sessions: waiting"));
+    expect(apiCalls.setNotificationRule).toHaveBeenCalledWith(
+      "local-machine:default",
+      expect.objectContaining({ waiting: false }),
+    );
   });
 });

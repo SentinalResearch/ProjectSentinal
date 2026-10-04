@@ -15,6 +15,14 @@ export type Recipe = {
    */
   name: string;
   /**
+   * Optional catalog grouping shown in the UI.
+   */
+  category: string | null;
+  /**
+   * Optional working directory or project label for the Recipe.
+   */
+  project: string | null;
+  /**
    * Machine this recipe is meant for; `None` means any machine.
    */
   machine_id: MachineId | null;

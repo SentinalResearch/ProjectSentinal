@@ -1,4 +1,4 @@
-const CACHE = "sentinal-v1";
+const CACHE = "sentinal-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icons/app-icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -16,5 +16,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).catch(() => caches.match("/")));
+    return;
+  }
+  if (SHELL.includes(url.pathname)) {
+    event.respondWith(caches.match(event.request).then((cached) => cached ?? fetch(event.request)));
+  }
 });

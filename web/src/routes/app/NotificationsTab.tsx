@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
 
-import { dataAdapter, isMockData } from "../../data";
+import { dataAdapter } from "../../data";
 import { useLiveData } from "../../data/LiveDataContext";
-import type { JournalNotification, NotificationRuleSet, NotificationRules } from "../../data/types";
+import type { JournalNotification, NotificationDeliveryStatus, NotificationRuleSet, NotificationRules } from "../../data/types";
 import styles from "./SettingsPage.module.css";
 
-const KINDS: (keyof NotificationRuleSet)[] = ["finished", "error", "stalled", "checkpoint", "progress"];
-const DEFAULT_ID = "_default";
+const KINDS: (keyof NotificationRuleSet)[] = ["finished", "error", "stalled", "waiting", "checkpoint", "progress"];
 
-/** Base defaults mirrored from SentinalSettings.dc.html's `_default` rule row. */
-const BASE_DEFAULT: NotificationRuleSet = { finished: true, error: true, stalled: true, checkpoint: false, progress: false };
+/** Mirrors `NotificationRuleSet::default()`, used until a Machine reports its own default. */
+const BASE_DEFAULT: NotificationRuleSet = { finished: true, error: true, stalled: true, waiting: true, checkpoint: false, progress: false };
 
 /** Preview cards use a red/yellow inset keyed by the notification text's own content — the two examples in fixtures.json are a failure and a waiting-for-input prompt, same mapping the prototype hardcodes but derived instead of hardcoded per-string. */
 function previewAccent(text: string): string {
@@ -19,18 +18,6 @@ function previewAccent(text: string): string {
 }
 
 export function NotificationsTab() {
-  if (!isMockData) {
-    return (
-      <div className={styles.unavailablePanel}>
-        <h2>Notifications are not available yet</h2>
-        <span>
-          Notification rules and delivery have not been implemented by the daemon. Live Session state remains
-          available without notifications.
-        </span>
-      </div>
-    );
-  }
-
   return <NotificationRules />;
 }
 
@@ -38,28 +25,55 @@ function NotificationRules() {
   const { sessions, machines } = useLiveData();
   const [rules, setRules] = useState<NotificationRules | null>(null);
   const [journal, setJournal] = useState<JournalNotification[]>([]);
+  const [statuses, setStatuses] = useState<NotificationDeliveryStatus[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     dataAdapter.notifications.getRules().then(setRules);
     dataAdapter.notifications.getJournal().then(setJournal);
+    dataAdapter.notifications.getStatus().then(setStatuses);
   }, []);
 
   if (!rules) return <div className={styles.tabLoading}>Loading…</div>;
 
-  function ruleFor(id: string): NotificationRuleSet {
-    return rules?.[id] ?? { ...BASE_DEFAULT, checkpoint: sessions.find((s) => s.id === id)?.progress !== undefined };
+  /** What the owning daemon applies: the Session override, else that Machine's default. */
+  function ruleFor(id: string, machineId: string): NotificationRuleSet {
+    return rules?.[id] ?? rules?.[`${machineId}:default`] ?? BASE_DEFAULT;
   }
 
-  function toggle(id: string, kind: keyof NotificationRuleSet) {
-    const current = ruleFor(id);
+  async function toggle(id: string, machineId: string, kind: keyof NotificationRuleSet) {
+    const previous = rules?.[id];
+    const current = ruleFor(id, machineId);
     const next = { ...current, [kind]: !current[kind] };
+    setError(null);
     setRules((prev) => ({ ...(prev ?? {}), [id]: next }));
-    void dataAdapter.notifications.setRule(id, next);
+    try {
+      await dataAdapter.notifications.setRule(id, next);
+    } catch (failure) {
+      setRules((prev) => {
+        const restored = { ...(prev ?? {}) };
+        if (previous) restored[id] = previous;
+        else delete restored[id];
+        return restored;
+      });
+      setError(failure instanceof Error ? failure.message : "The Machine refused the rule.");
+    }
   }
 
-  const rows: { id: string; name: string; machine: string; isDefault?: boolean }[] = [
-    { id: DEFAULT_ID, name: "Default for new sessions", machine: "", isDefault: true },
-    ...sessions.map((s) => ({ id: s.id, name: s.name, machine: machines.find((m) => m.id === s.machine)?.name ?? s.machine })),
+  const rows: { id: string; name: string; machineId: string; machine: string; isDefault?: boolean }[] = [
+    ...machines.map((machine) => ({
+      id: `${machine.id}:default`,
+      name: "Default for new sessions",
+      machineId: machine.id,
+      machine: machine.name,
+      isDefault: true,
+    })),
+    ...sessions.map((s) => ({
+      id: s.id,
+      name: s.name,
+      machineId: s.machine,
+      machine: machines.find((m) => m.id === s.machine)?.name ?? s.machine,
+    })),
   ];
 
   return (
@@ -71,6 +85,22 @@ function NotificationRules() {
         </div>
       </header>
 
+      <div className={styles.previewWrap}>
+        {statuses.map((status) => (
+          <span key={status.machineId}>
+            {machines.find((machine) => machine.id === status.machineId)?.name ?? status.machineId}: {status.configured
+              ? `${status.server}/${status.topic}${status.tokenConfigured ? " · token configured" : ""}`
+              : "notify.toml not configured"}
+          </span>
+        ))}
+      </div>
+
+      {error && (
+        <p className={styles.rowError} role="alert">
+          {error}
+        </p>
+      )}
+
       <div className={styles.tableScroll}>
         <div className={styles.notifHeadRow}>
           <span>SESSION</span>
@@ -81,7 +111,7 @@ function NotificationRules() {
           ))}
         </div>
         {rows.map((row) => {
-          const rule = ruleFor(row.id);
+          const rule = ruleFor(row.id, row.machineId);
           return (
             <div
               key={row.id}
@@ -99,9 +129,10 @@ function NotificationRules() {
                     key={k}
                     type="button"
                     aria-pressed={on}
+                    aria-label={`${row.name} on ${row.machine}: ${k}`}
                     title={`${row.name}: ${k}`}
                     className={styles.notifCell}
-                    onClick={() => toggle(row.id, k)}
+                    onClick={() => void toggle(row.id, row.machineId, k)}
                   >
                     <span
                       className={styles.notifMark}

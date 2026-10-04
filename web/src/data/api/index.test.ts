@@ -92,6 +92,8 @@ class FakeAuthServer {
   private nextToken = 1;
   readonly outputRequests: URL[] = [];
   readonly unavailableMachines = new Set<string>();
+  /** Machines whose Session list also carries a row stamped with another Machine ID. */
+  readonly foreignSessionMachines = new Set<string>();
   readonly revokedMachines: string[] = [];
   registryMachines: RegistryMachine[] = [];
 
@@ -230,7 +232,13 @@ class FakeSocket implements ApiSocket {
     const ownedCommand: Command = { ...command, machine_id: this.machineId };
     let payload: DaemonMessage;
     if (request.type === "GET_MACHINE") payload = { type: "MACHINE", machine: ownedMachine };
-    else if (request.type === "LIST_SESSIONS") payload = { type: "SESSIONS", sessions: [ownedSession] };
+    else if (request.type === "LIST_SESSIONS") {
+      const foreign = { ...ownedSession, id: 2, machine_id: "terminal-agent-machine" };
+      payload = {
+        type: "SESSIONS",
+        sessions: this.server.foreignSessionMachines.has(this.machineId) ? [ownedSession, foreign] : [ownedSession],
+      };
+    }
     else if (request.type === "CREATE_SESSION") payload = { type: "SESSION_UPDATED", session: ownedSession };
     else if (request.type === "CONTINUE_SESSION") {
       payload = {
@@ -244,6 +252,58 @@ class FakeSocket implements ApiSocket {
       payload = { type: "HISTORY", commands: [ownedCommand] };
     } else if (request.type === "GET_EVENTS") {
       payload = { type: "EVENTS", events: [watcherEvent] };
+    } else if (request.type === "LIST_RECIPES" || request.type === "SAVE_RECIPE") {
+      payload = {
+        type: "RECIPES",
+        recipes: [{
+          id: "cargo-test",
+          name: "cargo test",
+          category: "TESTS",
+          project: null,
+          machine_id: null,
+          command: "cargo test {arguments}",
+          params: [{ name: "arguments", default: "--workspace", description: null }],
+        }],
+      };
+    } else if (request.type === "GET_MACHINE_DETAILS") {
+      payload = {
+        type: "MACHINE_DETAILS",
+        details: {
+          hostname: `${this.machineId}-host`,
+          os_version: "macOS 26.6.2",
+          kernel_version: "25.6.0",
+          daemon_version: "0.1.9",
+          started_at: 1_700_000_000_000,
+          bind: "100.64.0.2:7420",
+          link: null,
+          processes: [{
+            session_id: 1,
+            processes: [{ pid: 4242, parent_pid: 1, name: "python", cpu_percent: 97.5, rss_bytes: 1_073_741_824, gpu_mem_bytes: null }],
+          }],
+        },
+      };
+    } else if (request.type === "GET_MACHINE_METRICS") {
+      payload = {
+        type: "MACHINE_METRICS_HISTORY",
+        range: request.range,
+        points: [
+          { at: 1_700_000_000_000, cpu_percent: 42.5, ram_used_bytes: 4_294_967_296, ram_total_bytes: 17_179_869_184, gpu_percent: null, vram_used_bytes: null, vram_total_bytes: null },
+          { at: 1_700_000_300_000, cpu_percent: 10, ram_used_bytes: 8_589_934_592, ram_total_bytes: 17_179_869_184, gpu_percent: 80, vram_used_bytes: 5, vram_total_bytes: 10 },
+        ],
+      };
+    } else if (request.type === "RUN_RECIPE") {
+      payload = { type: "SESSION_UPDATED", session: { ...ownedSession, id: 3, title: "cargo test" } };
+    } else if (request.type === "GET_NOTIFICATION_RULES" || request.type === "SET_NOTIFICATION_RULE") {
+      payload = {
+        type: "NOTIFICATION_RULES",
+        rules: {
+          default: { finished: true, error: true, stalled: true, waiting: true, checkpoint: false, progress: false },
+          sessions: [],
+        },
+        status: { configured: true, server: "https://ntfy.sh", topic: "safe-topic", token_configured: true },
+      };
+    } else if (request.type === "GET_NOTIFICATION_JOURNAL") {
+      payload = { type: "NOTIFICATION_JOURNAL", entries: [] };
     } else {
       payload = { type: "ERROR", message: `unsupported test request ${request.type}` };
     }
@@ -544,7 +604,7 @@ describe("apiAdapter authentication", () => {
     expect(events).toContainEqual({
       type: "SESSION_METRICS",
       sessionId: "test-machine:1",
-      metrics: { cpuPct: 33.3, ramGB: 2, gpuPct: 96, vramGB: 10, vramTotalGB: 24 },
+      metrics: { cpuPct: 33.3, ramGB: 2, ramTotalGB: 16, gpuPct: 96, vramGB: 10, vramTotalGB: 24 },
     });
     expect(events).toContainEqual({ type: "COMMAND_UPDATED", sessionId: "test-machine:1", command: "python train.py" });
     expect(events).toContainEqual(expect.objectContaining({
@@ -583,6 +643,125 @@ describe("apiAdapter authentication", () => {
 });
 
 describe("apiAdapter multi-Machine routing", () => {
+  it("routes Recipe launch and notification settings only to their owning Machine", async () => {
+    const { adapter, server, sockets } = setup();
+    server.registryMachines = [workerRegistry()];
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getMachines();
+
+    const recipes = await adapter.getRecipes();
+    const workerRecipe = recipes.find((recipe) => recipe.machine === "worker-machine");
+    expect(workerRecipe).toBeDefined();
+    const control = sockets.find((socket) => socket.machineId === "test-machine")!;
+    const worker = sockets.find((socket) => socket.machineId === "worker-machine")!;
+    const controlRunCount = control.requests.filter((request) => request.type === "RUN_RECIPE").length;
+    await expect(adapter.runRecipe(workerRecipe!.id, { arguments: "-p protocol" }, "worker-machine"))
+      .resolves.toEqual({ sessionId: "worker-machine:3" });
+    await adapter.notifications.setRule("worker-machine:default", {
+      finished: true, error: true, stalled: false, waiting: true, checkpoint: false, progress: false,
+    });
+
+    expect(control.requests.filter((request) => request.type === "RUN_RECIPE")).toHaveLength(controlRunCount);
+    expect(worker.requests).toContainEqual({
+      type: "RUN_RECIPE", recipe_id: "cargo-test", values: { arguments: "-p protocol" }, session_id: null,
+    });
+    expect(worker.requests).toContainEqual(expect.objectContaining({
+      type: "SET_NOTIFICATION_RULE", session_id: null,
+    }));
+  });
+
+  it("keeps each daemon's own hardware description across registry refreshes", async () => {
+    const { adapter, server } = setup();
+    server.registryMachines = [
+      { ...workerRegistry("test-machine"), role: "CONTROL", display_name: "Control", credential: null },
+      workerRegistry(),
+    ];
+    const live: import("../adapter").LiveEvent[] = [];
+    adapter.subscribe((event) => live.push(event));
+    await adapter.auth.login("correct horse battery staple");
+
+    for (let refresh = 0; refresh < 2; refresh += 1) {
+      const machines = await adapter.getMachines();
+      for (const id of ["test-machine", "worker-machine"]) {
+        expect(machines.find((entry) => entry.id === id)?.hardware).toBe("Apple M4, 16 GB");
+      }
+    }
+    // Live updates after the first query must not regress to the registry's version label.
+    for (const id of ["test-machine", "worker-machine"]) {
+      const updates = live.flatMap((event) =>
+        event.type === "MACHINE_UPDATED" && event.machine.id === id ? [event.machine.hardware] : []);
+      const known = updates.indexOf("Apple M4, 16 GB");
+      expect(known, id).toBeGreaterThanOrEqual(0);
+      expect(updates.slice(known).filter((hardware) => hardware.startsWith("Sentinal")), id).toEqual([]);
+    }
+  });
+
+  it("hides a foreign-stamped Session without flipping its Machine offline", async () => {
+    const { adapter, server } = setup();
+    server.registryMachines = [
+      { ...workerRegistry("test-machine"), role: "CONTROL", display_name: "Control", credential: null },
+      workerRegistry(),
+    ];
+    server.foreignSessionMachines.add("test-machine");
+    server.foreignSessionMachines.add("worker-machine");
+    const statuses: string[] = [];
+    adapter.subscribe((event) => {
+      if (event.type === "MACHINE_UPDATED") statuses.push(`${event.machine.id}:${event.machine.status}`);
+    });
+    await adapter.auth.login("correct horse battery staple");
+
+    for (let poll = 0; poll < 3; poll += 1) {
+      await adapter.getMachines();
+      const sessions = await adapter.getSessions();
+      expect(sessions.map((entry) => entry.id).sort()).toEqual(["test-machine:1", "worker-machine:1"]);
+    }
+    expect(statuses.filter((status) => !status.endsWith(":ONLINE"))).toEqual([]);
+  });
+
+  it("asks only the owning Machine for its details and metric history", async () => {
+    const { adapter, server, sockets } = setup();
+    server.registryMachines = [workerRegistry()];
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getMachines();
+
+    const details = await adapter.machineInsights.details("worker-machine");
+    const history = await adapter.machineInsights.metrics("worker-machine", "DAY");
+
+    expect(details).toMatchObject({
+      hostname: "worker-machine-host",
+      osVersion: "macOS 26.6.2",
+      daemonVersion: "0.1.9",
+      processes: [{ sessionId: "worker-machine:1", processes: [expect.objectContaining({ name: "python" })] }],
+    });
+    expect(history).toEqual([
+      { at: 1_700_000_000_000, cpuPct: 42.5, ramPct: 25, gpuPct: undefined, vramPct: undefined },
+      { at: 1_700_000_300_000, cpuPct: 10, ramPct: 50, gpuPct: 80, vramPct: 50 },
+    ]);
+    const control = sockets.find((socket) => socket.machineId === "test-machine");
+    const worker = sockets.find((socket) => socket.machineId === "worker-machine");
+    expect(worker?.requests).toContainEqual({ type: "GET_MACHINE_METRICS", range: "DAY" });
+    expect(control?.requests.some((request) => request.type === "GET_MACHINE_DETAILS" || request.type === "GET_MACHINE_METRICS")).toBe(false);
+  });
+
+  it("keeps the owner's display name for a renamed control across polls", async () => {
+    const { adapter, server } = setup();
+    server.registryMachines = [
+      { ...workerRegistry("test-machine"), role: "CONTROL", display_name: "Mac-Mini", credential: null },
+    ];
+    const names: string[] = [];
+    adapter.subscribe((event) => {
+      if (event.type === "MACHINE_UPDATED" && event.machine.id === "test-machine") names.push(event.machine.name);
+    });
+    await adapter.auth.login("correct horse battery staple");
+
+    for (let poll = 0; poll < 3; poll += 1) {
+      await adapter.getMachines();
+      await adapter.getSessions();
+    }
+    expect(names.length).toBeGreaterThan(0);
+    expect(new Set(names)).toEqual(new Set(["Mac-Mini"]));
+  });
+
   it("keeps equal daemon-local IDs separate and routes every operation to its owner", async () => {
     const { adapter, server, sockets } = setup();
     server.registryMachines = [workerRegistry()];

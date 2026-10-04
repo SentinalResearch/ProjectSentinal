@@ -112,7 +112,8 @@ pub fn bounded_text(mut text: String) -> String {
     text
 }
 
-/// Socket path from `SENTINAL_SOCKET`, else the daemon's default location.
+/// Socket path from `SENTINAL_SOCKET`, else the installed daemon.toml's
+/// `local_socket`, else the daemon's default location.
 pub fn socket_path(
     explicit: Option<PathBuf>,
     home: Option<&Path>,
@@ -120,13 +121,25 @@ pub fn socket_path(
 ) -> Option<PathBuf> {
     explicit.filter(|path| path.is_absolute()).or_else(|| {
         home.map(|home| {
-            local_socket_path(
-                &home.join(DEFAULT_DATA_DIR),
-                xdg_runtime_dir,
-                cfg!(target_os = "macos"),
+            configured_socket(&home.join(".config/terminal-agent/daemon.toml")).unwrap_or_else(
+                || {
+                    local_socket_path(
+                        &home.join(DEFAULT_DATA_DIR),
+                        xdg_runtime_dir,
+                        cfg!(target_os = "macos"),
+                    )
+                },
             )
         })
     })
+}
+
+/// The absolute `local_socket` an installer pinned in `config`, if any.
+fn configured_socket(config: &Path) -> Option<PathBuf> {
+    let text = std::fs::read_to_string(config).ok()?;
+    let table = text.parse::<toml::Table>().ok()?;
+    let path = PathBuf::from(table.get("local_socket")?.as_str()?);
+    path.is_absolute().then_some(path)
 }
 
 /// Whether `SENTINAL_SESSION_ID` or `SENTINAL_DISABLE=1` suppresses reporting.

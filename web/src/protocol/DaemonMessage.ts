@@ -2,7 +2,14 @@
 import type { Command } from "./Command";
 import type { Event } from "./Event";
 import type { Machine } from "./Machine";
+import type { MachineDetails } from "./MachineDetails";
+import type { MachineMetricPoint } from "./MachineMetricPoint";
 import type { MachineMetrics } from "./MachineMetrics";
+import type { MetricRange } from "./MetricRange";
+import type { NotificationJournalEntry } from "./NotificationJournalEntry";
+import type { NotificationRules } from "./NotificationRules";
+import type { NotificationStatus } from "./NotificationStatus";
+import type { Recipe } from "./Recipe";
 import type { Session } from "./Session";
 import type { SessionMetrics } from "./SessionMetrics";
 
@@ -63,6 +70,44 @@ export type DaemonMessage = {
    * Commands matching the history request.
    */
   commands: Array<Command>;
+} | {
+  "type": "RECIPES";
+  /**
+   * Valid built-in and user Recipes.
+   */
+  recipes: Array<Recipe>;
+} | {
+  "type": "NOTIFICATION_RULES";
+  /**
+   * Rules stored by this Machine.
+   */
+  rules: NotificationRules;
+  /**
+   * Secret-free ntfy configuration state.
+   */
+  status: NotificationStatus;
+} | {
+  "type": "MACHINE_DETAILS";
+  /**
+   * Facts for the Machine page.
+   */
+  details: MachineDetails;
+} | {
+  "type": "MACHINE_METRICS_HISTORY";
+  /**
+   * The requested range.
+   */
+  range: MetricRange;
+  /**
+   * Bucketed averages.
+   */
+  points: Array<MachineMetricPoint>;
+} | {
+  "type": "NOTIFICATION_JOURNAL";
+  /**
+   * Newest attempted deliveries first.
+   */
+  entries: Array<NotificationJournalEntry>;
 } | {
   "type": "ERROR";
   /**

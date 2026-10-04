@@ -8,14 +8,17 @@ use crate::{
     config::{ConfigError, DaemonConfig},
     control::{ControlService, ControlSettings},
     identity,
+    insights::{HostFacts, MachineInsights},
     link::{LinkManager, LinkSettings},
     local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{process_tree, MetricsSampler, ResourceDebouncer},
+    notifications::{spawn_notifier, NotificationService},
     origin::OriginPolicy,
     package_service::{package_router, PackageService, PackageServiceError},
     private_fs::ensure_private_dir,
     process_probe::ProcessProbe,
     pty::{FakePty, PtyBackend, RealPty},
+    recipes::RecipeCatalog,
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
 };
 use protocol::{
@@ -155,11 +158,10 @@ pub async fn run() -> Result<(), DaemonError> {
         &config.data_dir.join("terminal-agent.sqlite3"),
     )?);
     if let Ok(identity) = &identity {
-        if let Some(legacy) = identity.legacy_machine_id.as_deref() {
-            let changed = store.rewrite_machine_id(legacy, &identity.machine_id)?;
-            if changed > 0 {
-                tracing::info!(changed, legacy, machine_id = %identity.machine_id, "moved history to the stable Machine ID");
-            }
+        // Covers the recorded legacy ID and any older hostname fallback.
+        let changed = store.adopt_local_history(&identity.machine_id)?;
+        if changed > 0 {
+            tracing::info!(changed, machine_id = %identity.machine_id, "moved history to the stable Machine ID");
         }
     }
     store.upsert_machine(&machine)?;
@@ -232,7 +234,11 @@ pub async fn run() -> Result<(), DaemonError> {
     // FULL Sessions were interrupted above; reduced-capture ones are resumed
     // only when their root process identity still matches.
     sessions.recover_external_sessions(store.live_sessions()?)?;
-    spawn_metric_sampler(sessions.clone(), store);
+    let insights = MachineInsights::new(
+        HostFacts::detect(config.bind.to_string(), now()),
+        Some(store.clone()),
+    );
+    spawn_metric_sampler(sessions.clone(), store.clone(), insights.clone());
     spawn_external_monitor(sessions.clone());
     let local_socket =
         UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
@@ -253,10 +259,33 @@ pub async fn run() -> Result<(), DaemonError> {
         })
     });
     let shutdown_sessions = sessions.clone();
+    let (recipes, recipe_diagnostics) =
+        RecipeCatalog::load(Some(home.join(".config/terminal-agent/recipes")));
+    for diagnostic in recipe_diagnostics {
+        tracing::warn!(path = %diagnostic.path.display(), reason = %diagnostic.message, "Recipe file ignored or overridden");
+    }
+    let (notifications, notification_diagnostics) = NotificationService::load(
+        &home.join(".config/terminal-agent/notify.toml"),
+        config.data_dir.join("notification-rules.json"),
+        machine.id.clone(),
+        Arc::new(now),
+    );
+    for diagnostic in notification_diagnostics {
+        tracing::warn!(reason = %diagnostic, "notification configuration ignored");
+    }
+    spawn_notifier(
+        notifications.clone(),
+        sessions.subscribe_events(),
+        store.clone(),
+        machine.name.clone(),
+    );
     let state = AppState::new(sessions, machine, auth)
+        .with_insights(insights)
         .with_origins(origins)
         .with_control(control)
         .with_link(link)
+        .with_recipes(recipes)
+        .with_notifications(notifications)
         .with_tailscale_serve(config.behind_tailscale_serve);
     let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
     let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx, handler));
@@ -403,7 +432,7 @@ fn spawn_external_monitor(sessions: SessionManager) {
     });
 }
 
-fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {
+fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>, insights: MachineInsights) {
     tokio::spawn(async move {
         let mut sampler = MetricsSampler::new();
         let mut debouncers = HashMap::<protocol::SessionId, ResourceDebouncer>::new();
@@ -421,6 +450,14 @@ fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {
             let at = now();
             let snapshot = sampler.sample(at, &roots);
             let root_by_session = roots.into_iter().collect::<HashMap<_, _>>();
+            insights.record_processes(
+                root_by_session
+                    .iter()
+                    .map(|(session_id, root)| {
+                        (*session_id, process_tree(&snapshot.processes, *root))
+                    })
+                    .collect(),
+            );
             let ram_total = snapshot.machine.ram_total_bytes;
             let gpu_percent = snapshot
                 .machine
@@ -496,15 +533,16 @@ fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>) {
 
 fn machine_description() -> Machine {
     let name = machine_name();
+    let (cpu, ram_bytes) = crate::metrics::host_hardware();
     Machine {
         id: MachineId(slug(&name)),
         name,
         os: operating_system(),
-        cpu: "unknown".into(),
+        cpu,
         cpu_cores: std::thread::available_parallelism()
             .map(|cores| u32::try_from(cores.get()).unwrap_or(u32::MAX))
             .unwrap_or(1),
-        ram_bytes: 0,
+        ram_bytes,
         gpus: vec![],
         status: MachineStatus::Online,
         last_seen: now(),

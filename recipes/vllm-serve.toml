@@ -1,0 +1,16 @@
+id = "vllm-serve"
+name = "vLLM serve"
+category = "SERVERS"
+command = "vllm serve {model} --port {port} --max-model-len {context}"
+
+[[params]]
+name = "model"
+description = "Hugging Face model ID"
+
+[[params]]
+name = "port"
+default = "8000"
+
+[[params]]
+name = "context"
+default = "32768"

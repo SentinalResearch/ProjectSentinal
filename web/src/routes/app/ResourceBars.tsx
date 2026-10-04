@@ -5,7 +5,13 @@ export function ResourceBars({ metrics }: { metrics: SessionMetrics | undefined 
   if (!metrics) return null;
   const rows = [
     metrics.cpuPct === undefined ? null : { label: "CPU", value: `${metrics.cpuPct} %`, percent: metrics.cpuPct },
-    metrics.ramGB === undefined ? null : { label: "RAM", value: `${metrics.ramGB} GB`, percent: undefined },
+    metrics.ramGB === undefined
+      ? null
+      : {
+          label: "RAM",
+          value: `${metrics.ramGB}${metrics.ramTotalGB === undefined ? "" : ` / ${metrics.ramTotalGB}`} GB`,
+          percent: metrics.ramTotalGB ? (metrics.ramGB / metrics.ramTotalGB) * 100 : undefined,
+        },
     metrics.gpuPct === undefined ? null : { label: "GPU", value: `${metrics.gpuPct} %`, percent: metrics.gpuPct },
     metrics.vramGB === undefined
       ? null

@@ -33,8 +33,10 @@ pub mod ids;
 pub mod link;
 pub mod local;
 pub mod machine;
+pub mod machine_details;
 pub mod message;
 pub mod metric;
+pub mod notification;
 pub mod process;
 pub mod recipe;
 pub mod session;
@@ -55,11 +57,18 @@ pub use health::{
 pub use ids::{CommandId, EventId, MachineId, ProjectId, SessionId};
 pub use link::{MachineCapability, MachineRole, Secret};
 pub use machine::{Gpu, Machine, MachineStatus, Os};
+pub use machine_details::{
+    MachineDetails, MachineMetricPoint, MetricRange, ProcessSummary, SessionProcesses,
+};
 pub use message::{
     ClientRequest, DaemonMessage, Envelope, LocalErrorCode, LocalRequest, LocalResponse,
     MAX_COMMAND_TEXT_BYTES, MAX_LOCAL_FRAME_BYTES, PROTOCOL_VERSION,
 };
 pub use metric::{GpuMetrics, MachineMetrics, SessionMetrics};
+pub use notification::{
+    NotificationJournalEntry, NotificationRuleSet, NotificationRules, NotificationStatus,
+    SessionNotificationRule,
+};
 pub use process::{tree_totals, Process, ProcessState, ProcessTotals};
 pub use recipe::{Recipe, RecipeParam};
 pub use session::{CaptureCapabilities, CaptureLevel, Session, SessionOrigin, SessionState};

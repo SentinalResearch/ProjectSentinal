@@ -544,6 +544,28 @@ impl Store {
         transaction.commit()?;
         Ok(sessions + commands)
     }
+
+    /// Stamp every Session and Command in this local store with `machine_id`.
+    ///
+    /// The store only ever holds this daemon's own history, so rows written
+    /// under any earlier ID (for example a hostname fallback that was never
+    /// recorded as the legacy ID) belong to this Machine. Returns rows changed.
+    pub fn adopt_local_history(&self, machine_id: &MachineId) -> Result<usize, StoreError> {
+        let mut connection = self.lock()?;
+        let transaction = connection.transaction()?;
+        let sessions = transaction.execute(
+            "UPDATE sessions SET json = json_set(json, '$.machine_id', ?1)
+             WHERE json_extract(json, '$.machine_id') IS NOT ?1",
+            [&machine_id.0],
+        )?;
+        let commands = transaction.execute(
+            "UPDATE commands SET machine_id = ?1 WHERE machine_id IS NOT ?1",
+            [&machine_id.0],
+        )?;
+        transaction.execute("DELETE FROM machines WHERE id IS NOT ?1", [&machine_id.0])?;
+        transaction.commit()?;
+        Ok(sessions + commands)
+    }
 }
 
 const REGISTRY_SELECT: &str = "SELECT machine_id, display_name, role, os, daemon_version,

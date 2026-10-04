@@ -1,0 +1,8 @@
+id = "npm-dev"
+name = "npm dev"
+category = "DEVELOPMENT"
+command = "npm run dev -- --port {port}"
+
+[[params]]
+name = "port"
+default = "5173"

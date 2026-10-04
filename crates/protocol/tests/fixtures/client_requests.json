@@ -9,5 +9,13 @@
   { "version": 1, "payload": { "type": "KILL", "session_id": 128 } },
   { "version": 1, "payload": { "type": "GET_HISTORY", "session_id": 128, "limit": 100 } },
   { "version": 1, "payload": { "type": "GET_EVENTS", "session_id": 128, "after": 3, "limit": 100 } },
-  { "version": 1, "payload": { "type": "SEARCH_COMMANDS", "query": "train", "limit": 50 } }
+  { "version": 1, "payload": { "type": "SEARCH_COMMANDS", "query": "train", "limit": 50 } },
+  { "version": 1, "payload": { "type": "LIST_RECIPES" } },
+  { "version": 1, "payload": { "type": "RUN_RECIPE", "recipe_id": "cargo-test", "values": { "package": "protocol" }, "session_id": null } },
+  { "version": 1, "payload": { "type": "SAVE_RECIPE", "recipe": { "id": "train", "name": "Train", "category": "ML", "project": "~/src/model", "machine_id": null, "command": "python train.py --model {model}", "params": [{ "name": "model", "default": null, "description": null }] } } },
+  { "version": 1, "payload": { "type": "GET_NOTIFICATION_RULES" } },
+  { "version": 1, "payload": { "type": "SET_NOTIFICATION_RULE", "session_id": 128, "rules": { "finished": true, "error": true, "stalled": true, "waiting": true, "checkpoint": false, "progress": false } } },
+  { "version": 1, "payload": { "type": "GET_NOTIFICATION_JOURNAL" } },
+  { "version": 1, "payload": { "type": "GET_MACHINE_DETAILS" } },
+  { "version": 1, "payload": { "type": "GET_MACHINE_METRICS", "range": "DAY" } }
 ]

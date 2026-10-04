@@ -1,7 +1,7 @@
 # Milestone 4.A progress — Multi-Machine aggregation and routing
 
 Status: **implementation and isolated acceptance complete on 2026-10-04;
-two-real-Tailnet-Machine acceptance pending.** Milestone 4.B has not started.
+two-real-Tailnet-Machine acceptance pending.** Milestone 4.B is in `milestone-4b.md`.
 
 ## Architecture delivered
 

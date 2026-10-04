@@ -1,0 +1,16 @@
+id = "uvicorn"
+name = "uvicorn / FastAPI"
+category = "SERVERS"
+command = "uvicorn {app} --host {host} --port {port}"
+
+[[params]]
+name = "app"
+default = "main:app"
+
+[[params]]
+name = "host"
+default = "127.0.0.1"
+
+[[params]]
+name = "port"
+default = "8000"

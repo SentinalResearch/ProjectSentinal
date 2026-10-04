@@ -1,0 +1,8 @@
+id = "pytest"
+name = "pytest"
+category = "TESTS"
+command = "pytest {path}"
+
+[[params]]
+name = "path"
+default = "."

@@ -45,7 +45,33 @@ enum Persistence {
 impl SessionManager {
     /// Spawn a shell and return its session in the idle state.
     pub async fn create(&self, request: CreateSession) -> Result<Session, SessionManagerError> {
-        let prepared = self.prepare(request, None, None)?;
+        let prepared = self.prepare(request, None, None, None)?;
+        self.publish(prepared, Persistence::Ordinary)
+    }
+
+    /// Spawn a Watch Session and type one already safely rendered Recipe command.
+    pub async fn create_recipe(
+        &self,
+        rendered: String,
+        cwd: Option<PathBuf>,
+        title: String,
+    ) -> Result<Session, SessionManagerError> {
+        let mut command = rendered.into_bytes();
+        command.push(b'\r');
+        let prepared = self.prepare(
+            CreateSession {
+                shell: None,
+                cwd,
+                cols: 120,
+                rows: 40,
+                origin: SessionOrigin::Watch,
+                title: Some(title),
+                command: None,
+            },
+            None,
+            None,
+            Some(command),
+        )?;
         self.publish(prepared, Persistence::Ordinary)
     }
 
@@ -67,6 +93,7 @@ impl SessionManager {
             },
             source.project_id,
             Some(source_id),
+            None,
         )?;
         self.publish(prepared, Persistence::Continuation(source_id))
     }
@@ -76,6 +103,7 @@ impl SessionManager {
         request: CreateSession,
         project_id: Option<ProjectId>,
         continued_from: Option<SessionId>,
+        rendered_command: Option<Vec<u8>>,
     ) -> Result<PreparedSession, SessionManagerError> {
         validate_size(request.cols, request.rows)?;
         if !matches!(
@@ -90,7 +118,10 @@ impl SessionManager {
             .shell
             .or_else(|| std::env::var("SHELL").ok())
             .unwrap_or_else(|| "/bin/sh".into());
-        let initial_command = initial_command(request.origin, &shell, request.command.as_deref())?;
+        let initial_command = match rendered_command {
+            Some(command) => Some(command),
+            None => initial_command(request.origin, &shell, request.command.as_deref())?,
+        };
         let cwd = request
             .cwd
             .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
@@ -213,6 +244,7 @@ impl SessionManager {
             output,
             structured,
             observations: self.inner.observations.clone(),
+            events: self.inner.events.clone(),
             tracker: Mutex::new(CommandTracker::new(
                 self.inner.config.machine_id.clone(),
                 cwd.to_string_lossy(),

@@ -5,12 +5,15 @@ pub mod auth_routes;
 mod capture_tests;
 mod output;
 
+use crate::insights::MachineInsights;
 use crate::{
     auth::AuthManager,
     control::{routes::ControlRoutes, ControlService},
     framing::{decode_terminal_frame, encode_terminal_frame},
     link::LinkManager,
+    notifications::NotificationService,
     origin::OriginPolicy,
+    recipes::RecipeCatalog,
     session_manager::{Attachment, CreateSession, SessionManager},
 };
 use axum::{
@@ -42,6 +45,9 @@ pub struct AppState {
     link: Option<LinkManager>,
     origins: OriginPolicy,
     behind_tailscale_serve: bool,
+    recipes: RecipeCatalog,
+    notifications: Option<NotificationService>,
+    insights: Option<MachineInsights>,
 }
 
 impl AppState {
@@ -49,6 +55,7 @@ impl AppState {
     ///
     /// No browser origin is allowed until [`AppState::with_origins`] says so.
     pub fn new(sessions: SessionManager, machine: Machine, auth: AuthManager) -> Self {
+        let (recipes, _) = RecipeCatalog::load(None);
         AppState {
             sessions,
             machine,
@@ -58,6 +65,9 @@ impl AppState {
             origins: OriginPolicy::new(&[], false)
                 .unwrap_or_else(|_| unreachable!("empty list is valid")),
             behind_tailscale_serve: false,
+            recipes,
+            notifications: None,
+            insights: None,
         }
     }
 
@@ -82,6 +92,24 @@ impl AppState {
     /// Trust `Tailscale-User-Login` from loopback peers (Tailscale Serve).
     pub fn with_tailscale_serve(mut self, enabled: bool) -> Self {
         self.behind_tailscale_serve = enabled;
+        self
+    }
+
+    /// Install the Recipe catalog loaded for this daemon.
+    pub fn with_recipes(mut self, recipes: RecipeCatalog) -> Self {
+        self.recipes = recipes;
+        self
+    }
+
+    /// Install the Machine page's host facts, process trees, and history.
+    pub fn with_insights(mut self, insights: MachineInsights) -> Self {
+        self.insights = Some(insights);
+        self
+    }
+
+    /// Install local notification rules and delivery for this daemon.
+    pub fn with_notifications(mut self, notifications: NotificationService) -> Self {
+        self.notifications = Some(notifications);
         self
     }
 
@@ -196,6 +224,97 @@ impl AppState {
                     Err(error) => error_action(error),
                 }
             }
+            ClientRequest::ListRecipes => WsAction::Reply(DaemonMessage::Recipes {
+                recipes: self.recipes.list(),
+            }),
+            ClientRequest::RunRecipe {
+                recipe_id,
+                values,
+                session_id,
+            } => {
+                let recipe = match self.recipes.get(&recipe_id) {
+                    Ok(recipe) => recipe,
+                    Err(error) => return error_action(error),
+                };
+                if recipe
+                    .machine_id
+                    .as_ref()
+                    .is_some_and(|id| id != &self.machine.id)
+                {
+                    return error_action(format!(
+                        "recipe '{}' is restricted to Machine '{}'",
+                        recipe.id,
+                        recipe.machine_id.as_ref().map_or("", |id| id.0.as_str())
+                    ));
+                }
+                let rendered = match recipe.render(&values) {
+                    Ok(rendered) => rendered,
+                    Err(error) => return error_action(error),
+                };
+                if let Some(session_id) = session_id {
+                    let mut bytes = rendered.into_bytes();
+                    bytes.push(b'\r');
+                    match self.sessions.write_input(session_id, &bytes, "recipe") {
+                        Ok(()) => session_reply(&self.sessions, session_id),
+                        Err(error) => error_action(error),
+                    }
+                } else {
+                    let cwd = recipe.project.as_ref().map(Into::into);
+                    match self
+                        .sessions
+                        .create_recipe(rendered, cwd, recipe.name.clone())
+                        .await
+                    {
+                        Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),
+                        Err(error) => error_action(error),
+                    }
+                }
+            }
+            ClientRequest::SaveRecipe { recipe } => match self.recipes.save(recipe) {
+                Ok(()) => WsAction::Reply(DaemonMessage::Recipes {
+                    recipes: self.recipes.list(),
+                }),
+                Err(error) => error_action(error),
+            },
+            ClientRequest::GetNotificationRules => match &self.notifications {
+                Some(notifications) => WsAction::Reply(DaemonMessage::NotificationRules {
+                    rules: notifications.rules(),
+                    status: notifications.status(),
+                }),
+                None => error_action("notifications are not configured"),
+            },
+            ClientRequest::SetNotificationRule { session_id, rules } => match &self.notifications {
+                Some(notifications) => match notifications.set_rule(session_id, rules) {
+                    Ok(()) => WsAction::Reply(DaemonMessage::NotificationRules {
+                        rules: notifications.rules(),
+                        status: notifications.status(),
+                    }),
+                    Err(error) => error_action(error),
+                },
+                None => error_action("notifications are not configured"),
+            },
+            ClientRequest::GetMachineDetails => match &self.insights {
+                Some(insights) => WsAction::Reply(DaemonMessage::MachineDetails {
+                    details: insights
+                        .details(self.link.as_ref().and_then(|link| link.status().ok())),
+                }),
+                None => error_action("Machine details are not available on this daemon"),
+            },
+            ClientRequest::GetMachineMetrics { range } => match &self.insights {
+                Some(insights) => match insights.history(range, current_time()) {
+                    Ok(points) => {
+                        WsAction::Reply(DaemonMessage::MachineMetricsHistory { range, points })
+                    }
+                    Err(error) => error_action(error),
+                },
+                None => error_action("Machine metrics history is not available on this daemon"),
+            },
+            ClientRequest::GetNotificationJournal => match &self.notifications {
+                Some(notifications) => WsAction::Reply(DaemonMessage::NotificationJournal {
+                    entries: notifications.journal(),
+                }),
+                None => error_action("notifications are not configured"),
+            },
         }
     }
 }
@@ -579,4 +698,12 @@ fn error_action(error: impl std::fmt::Display) -> WsAction {
     WsAction::Reply(DaemonMessage::Error {
         message: error.to_string(),
     })
+}
+
+fn current_time() -> protocol::Timestamp {
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    protocol::Timestamp(i64::try_from(millis).unwrap_or(i64::MAX))
 }

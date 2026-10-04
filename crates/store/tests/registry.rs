@@ -402,3 +402,53 @@ fn legacy_machine_id_is_rewritten_in_sessions_and_commands() {
         0
     );
 }
+
+#[test]
+fn every_local_row_is_adopted_by_the_stable_machine_id() {
+    // A daemon's store holds only its own history, so a row stamped by an
+    // earlier hostname fallback (not the recorded legacy ID) still belongs here.
+    let store = Store::open_in_memory().unwrap();
+    for (id, machine) in [(1, "terminal-agent-machine"), (2, WORKER), (3, "old-host")] {
+        let session = Session::new(
+            SessionId(id),
+            MachineId(machine.into()),
+            "/bin/zsh",
+            "/w",
+            Timestamp(1),
+        );
+        store.insert_session(&session).unwrap();
+        let command = Command::start(
+            CommandId(id),
+            SessionId(id),
+            MachineId(machine.into()),
+            "ls",
+            "/w",
+            Timestamp(2),
+        );
+        store.insert_command(&command).unwrap();
+    }
+
+    let changed = store
+        .adopt_local_history(&MachineId(WORKER.into()))
+        .unwrap();
+
+    assert_eq!(changed, 4);
+    for id in 1..=3 {
+        assert_eq!(
+            store.session(SessionId(id)).unwrap().unwrap().machine_id.0,
+            WORKER
+        );
+        assert_eq!(
+            store.history(Some(SessionId(id)), 10).unwrap()[0]
+                .machine_id
+                .0,
+            WORKER
+        );
+    }
+    assert_eq!(
+        store
+            .adopt_local_history(&MachineId(WORKER.into()))
+            .unwrap(),
+        0
+    );
+}

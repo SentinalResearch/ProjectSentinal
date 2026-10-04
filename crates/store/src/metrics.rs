@@ -1,7 +1,7 @@
 //! Raw metric retention and one-minute downsampling.
 
 use crate::{to_sql_id, Store, StoreError};
-use protocol::{SessionId, Timestamp};
+use protocol::{MachineMetricPoint, SessionId, Timestamp};
 use rusqlite::params;
 
 const RAW_RETENTION_MS: i64 = 60 * 60 * 1_000;
@@ -116,6 +116,47 @@ impl Store {
                 vram_used_bytes: row.get(6)?,
                 vram_total_bytes: row.get(7)?,
                 sample_count: row.get(8)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Machine-wide averages since `since`, in `bucket_ms` buckets, oldest first.
+    ///
+    /// Combines minute averages (older than the raw window) with raw samples;
+    /// Session-scoped rows are excluded.
+    pub fn machine_metric_points(
+        &self,
+        since: Timestamp,
+        bucket_ms: i64,
+    ) -> Result<Vec<MachineMetricPoint>, StoreError> {
+        let bucket = bucket_ms.max(1);
+        let connection = self.lock()?;
+        let mut statement = connection.prepare(
+            "SELECT (at / ?2) * ?2 AS bucket, AVG(cpu_percent), ROUND(AVG(ram_used_bytes)),
+             MAX(ram_total_bytes), AVG(gpu_percent), ROUND(AVG(vram_used_bytes)), MAX(vram_total_bytes)
+             FROM (
+               SELECT minute_at AS at, cpu_percent, ram_used_bytes, ram_total_bytes, gpu_percent,
+                      vram_used_bytes, vram_total_bytes
+               FROM metrics_minute WHERE session_id IS NULL AND minute_at >= ?1
+               UNION ALL
+               SELECT at, cpu_percent, ram_used_bytes, ram_total_bytes, gpu_percent,
+                      vram_used_bytes, vram_total_bytes
+               FROM metrics_raw WHERE session_id IS NULL AND at >= ?1
+             )
+             GROUP BY bucket ORDER BY bucket",
+        )?;
+        let rows = statement.query_map(params![since.0, bucket], |row| {
+            Ok(MachineMetricPoint {
+                at: Timestamp(row.get(0)?),
+                cpu_percent: row.get::<_, f64>(1)? as f32,
+                ram_used_bytes: row.get::<_, f64>(2)? as u64,
+                ram_total_bytes: row.get::<_, i64>(3)?.max(0) as u64,
+                gpu_percent: row.get::<_, Option<f64>>(4)?.map(|value| value as f32),
+                vram_used_bytes: row.get::<_, Option<f64>>(5)?.map(|value| value as u64),
+                vram_total_bytes: row
+                    .get::<_, Option<i64>>(6)?
+                    .map(|value| value.max(0) as u64),
             })
         })?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)

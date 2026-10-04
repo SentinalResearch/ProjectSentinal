@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { createWorkerSession, e2eEnv as env, linkSecrets, sentinal } from "./support/adopt.mjs";
 
 const password = "test-password-for-playwright";
+test.use({ viewport: { width: 390, height: 844 } });
 
 async function signIn(page: Page) {
   await page.goto("/login");
@@ -69,6 +70,21 @@ test("two workers enroll, rename, and revoke independently with no secret in the
   await page.getByTitle("Overview").last().click();
   await page.getByText("Worker B routed session", { exact: true }).click();
   await expect(page.getByText("attached", { exact: true })).toBeVisible();
+
+  // The phone-sized PWA loads worker-local Recipe catalogs and launches only
+  // through the selected catalog owner.
+  await page.goto("/app/recipes");
+  const cargoRecipes = page.getByRole("button").filter({ hasText: "cargo test" });
+  await expect(cargoRecipes).toHaveCount(3, { timeout: 10_000 });
+  await cargoRecipes.last().click();
+  await expect(page).toHaveURL(/\/app\/recipes\/[^/]+%2Fcargo-test$/);
+  const recipeOwner = decodeURIComponent(new URL(page.url()).pathname.split("/").pop() ?? "").split("/")[0];
+  expect([workerSessionA.machine_id, workerSessionB.machine_id]).toContain(recipeOwner);
+  await page.getByRole("button", { name: /Run on RTX PC/ }).click();
+  await expect(page.getByRole("heading", { name: "cargo test" })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  // The new Session belongs to the Machine whose catalog entry was chosen.
+  expect(decodeURIComponent(new URL(page.url()).pathname)).toContain(`/app/sessions/${recipeOwner}:`);
 
   // Disconnect A while this page remains alive. Its last snapshot stays visible,
   // B keeps attaching, and reconnecting A does not duplicate the Event snapshot.

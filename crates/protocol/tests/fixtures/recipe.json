@@ -1,6 +1,8 @@
 {
   "id": "qwen-vllm",
   "name": "Qwen vLLM Server",
+  "category": "SERVERS",
+  "project": null,
   "machine_id": "rtx-pc",
   "command": "vllm serve {model} --port {port} --max-model-len {context}",
   "params": [

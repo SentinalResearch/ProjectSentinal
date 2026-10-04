@@ -344,6 +344,7 @@ impl SessionManager {
         let command_message = DaemonMessage::CommandUpdated {
             command: command.clone(),
         };
+        let _ = handle.events.send(event.clone());
         let event_message = DaemonMessage::Event { event };
         let _ = handle.structured.send(command_message.clone());
         let _ = handle.structured.send(event_message.clone());
@@ -454,6 +455,7 @@ impl SessionManager {
             output,
             structured,
             observations: self.inner.observations.clone(),
+            events: self.inner.events.clone(),
             tracker: Mutex::new(CommandTracker::new(
                 self.inner.config.machine_id.clone(),
                 cwd,

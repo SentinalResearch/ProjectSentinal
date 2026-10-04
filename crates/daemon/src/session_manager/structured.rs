@@ -215,6 +215,7 @@ impl SessionManager {
         if let Some(store) = &self.inner.store {
             store.insert_event(&event)?;
         }
+        let _ = handle.events.send(event.clone());
         let message = DaemonMessage::Event {
             event: event.clone(),
         };

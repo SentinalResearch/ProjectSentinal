@@ -262,6 +262,40 @@ fn suppression_and_socket_selection() {
     );
 }
 
+#[test]
+fn installed_config_socket_wins_over_the_runtime_default() {
+    // The installer pins `local_socket` in daemon.toml; the CLI must use the
+    // daemon's socket even when XDG_RUNTIME_DIR would point elsewhere.
+    let home = short_dir();
+    let config = home.join(".config/terminal-agent");
+    std::fs::create_dir_all(&config).unwrap();
+    std::fs::write(
+        config.join("daemon.toml"),
+        "bind = \"127.0.0.1:7420\"\nlocal_socket = \"/pinned/run/sentinald.sock\"\n",
+    )
+    .unwrap();
+    assert_eq!(
+        socket_path(None, Some(&home), Some(Path::new("/run/user/1000"))),
+        Some(PathBuf::from("/pinned/run/sentinald.sock"))
+    );
+    // SENTINAL_SOCKET still overrides the config.
+    assert_eq!(
+        socket_path(Some("/x/s.sock".into()), Some(&home), None),
+        Some(PathBuf::from("/x/s.sock"))
+    );
+    // A relative configured path is ignored.
+    std::fs::write(
+        config.join("daemon.toml"),
+        "local_socket = \"run/s.sock\"\n",
+    )
+    .unwrap();
+    assert_eq!(
+        socket_path(None, Some(&home), None),
+        Some(home.join(".local/share/terminal-agent/run/sentinald.sock"))
+    );
+    let _ = std::fs::remove_dir_all(home);
+}
+
 // ---- the real binary -------------------------------------------------------
 
 async fn run_reporter(socket: &Path, env: &[(&str, &str)]) -> std::process::Output {

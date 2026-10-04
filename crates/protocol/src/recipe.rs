@@ -9,6 +9,8 @@
 //! let recipe = Recipe {
 //!     id: "qwen-vllm".into(),
 //!     name: "Qwen vLLM Server".into(),
+//!     category: Some("SERVERS".into()),
+//!     project: None,
 //!     machine_id: None,
 //!     command: "vllm serve {model} --port {port}".into(),
 //!     params: vec![
@@ -70,6 +72,12 @@ pub struct Recipe {
     pub id: String,
     /// Display name, e.g. `"Qwen vLLM Server"`.
     pub name: String,
+    /// Optional catalog grouping shown in the UI.
+    #[serde(default)]
+    pub category: Option<String>,
+    /// Optional working directory or project label for the Recipe.
+    #[serde(default)]
+    pub project: Option<String>,
     /// Machine this recipe is meant for; `None` means any machine.
     pub machine_id: Option<MachineId>,
     /// The template, e.g. `"vllm serve {model} --port {port}"`.
@@ -120,6 +128,9 @@ impl Recipe {
                         .get(name)
                         .or_else(|| self.default_for(name))
                         .ok_or_else(|| ProtocolError::MissingParam(name.to_string()))?;
+                    if value.chars().any(char::is_control) {
+                        return Err(ProtocolError::InvalidRecipeParamValue(name.to_string()));
+                    }
                     out.push_str(&shell_quote(value));
                 }
             }
@@ -200,6 +211,8 @@ mod tests {
         Recipe {
             id: "test".into(),
             name: "Test".into(),
+            category: None,
+            project: None,
             machine_id: None,
             command: command.into(),
             params,
@@ -258,6 +271,14 @@ mod tests {
         assert_eq!(
             vllm().render(&values(&[("prot", "9000")])),
             Err(ProtocolError::UnknownParam("prot".into()))
+        );
+    }
+
+    #[test]
+    fn render_rejects_terminal_control_characters_in_values() {
+        assert_eq!(
+            vllm().render(&values(&[("model", "safe\nsecond-command")])),
+            Err(ProtocolError::InvalidRecipeParamValue("model".into()))
         );
     }
 

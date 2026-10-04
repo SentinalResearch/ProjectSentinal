@@ -7,10 +7,18 @@ import type { Event as WireEvent } from "../../protocol/Event";
 import type { EventKind } from "../../protocol/EventKind";
 import type { Health } from "../../protocol/Health";
 import type { Machine as WireMachine } from "../../protocol/Machine";
+import type { MachineDetails as WireMachineDetails } from "../../protocol/MachineDetails";
+import type { MachineMetricPoint } from "../../protocol/MachineMetricPoint";
+import type { Recipe as WireRecipe } from "../../protocol/Recipe";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import type { Session as WireSession } from "../../protocol/Session";
-import { NotImplemented, RegistryError, type DataAdapter, type HistoryFilters, type LiveEvent } from "../adapter";
-import type { HistoryEntry, HistoryResults, Machine, Session, SessionEvent, SessionHealth } from "../types";
+import { RegistryError, type DataAdapter, type HistoryFilters, type LiveEvent } from "../adapter";
+import type {
+  MachineInsight,
+  MachineMetricSample,
+  HistoryEntry, HistoryResults, JournalNotification, Machine, NotificationDeliveryStatus,
+  NotificationRules as UiNotificationRules, Recipe, Session, SessionEvent, SessionHealth,
+} from "../types";
 import {
   AUTH_EXPIRED_EVENT,
   createAuthApi,
@@ -78,6 +86,8 @@ interface MachineConnection {
   retry: RetryState;
   retryAt: number;
   registry?: RegistryMachine;
+  /** The daemon's own hardware line from GET_MACHINE; registry rows only know its version. */
+  hardware?: string;
 }
 
 function isFullSessionUpdate(reply: DaemonMessage, id?: number): boolean {
@@ -102,18 +112,63 @@ function formatLastSeen(timestamp: number | null, now: number): string | undefin
 }
 
 function mapMachine(machine: WireMachine): Machine {
-  const ramGb = machine.ram_bytes / 1024 ** 3;
+  // The design's compact form: "Ryzen 9, 64 GB, RTX 4090 24 GB".
+  const gigabytes = (bytes: number) => {
+    const value = bytes / 1024 ** 3;
+    return `${value.toFixed(value >= 10 ? 0 : 1)} GB`;
+  };
   const hardware = [
-    machine.cpu === "unknown" ? `${machine.cpu_cores} CPU cores` : machine.cpu,
-    machine.ram_bytes > 0 ? `${ramGb.toFixed(ramGb >= 10 ? 0 : 1)} GB RAM` : null,
-    ...machine.gpus.map((gpu) => gpu.name),
-  ].filter(Boolean).join(" · ");
+    machine.cpu === "unknown" ? `${machine.cpu_cores} cores` : machine.cpu,
+    machine.ram_bytes > 0 ? gigabytes(machine.ram_bytes) : null,
+    ...machine.gpus.map((gpu) => (gpu.vram_bytes ? `${gpu.name} ${gigabytes(gpu.vram_bytes)}` : gpu.name)),
+  ].filter(Boolean).join(", ");
   return {
     id: machine.id,
     name: machine.name,
     os: machine.os === "MACOS" ? "macOS" : "Linux",
     hardware,
     status: machine.status,
+  };
+}
+
+function mapMachineInsight(machineId: string, details: WireMachineDetails): MachineInsight {
+  return {
+    hostname: details.hostname,
+    osVersion: details.os_version ?? undefined,
+    kernelVersion: details.kernel_version ?? undefined,
+    daemonVersion: details.daemon_version,
+    startedAt: details.started_at,
+    bind: details.bind,
+    link: details.link
+      ? {
+          state: details.link.state,
+          controlUrl: details.link.control_url ?? undefined,
+          lastHeartbeatAt: details.link.last_heartbeat_at ?? undefined,
+          message: details.link.message ?? undefined,
+        }
+      : undefined,
+    processes: details.processes.map((entry) => ({
+      sessionId: compositeId(machineId, entry.session_id),
+      processes: entry.processes.map((process) => ({
+        pid: process.pid,
+        name: process.name,
+        cpuPct: process.cpu_percent,
+        rssBytes: process.rss_bytes,
+        gpuMemBytes: process.gpu_mem_bytes ?? undefined,
+      })),
+    })),
+  };
+}
+
+function mapMetricPoint(point: MachineMetricPoint): MachineMetricSample {
+  const percent = (used: number | null, total: number | null) =>
+    used === null || total === null || total <= 0 ? undefined : Math.round((used / total) * 1000) / 10;
+  return {
+    at: point.at,
+    cpuPct: Math.round(point.cpu_percent * 10) / 10,
+    ramPct: percent(point.ram_used_bytes, point.ram_total_bytes),
+    gpuPct: point.gpu_percent === null ? undefined : Math.round(point.gpu_percent * 10) / 10,
+    vramPct: percent(point.vram_used_bytes, point.vram_total_bytes),
   };
 }
 
@@ -249,6 +304,7 @@ class DaemonTransport {
   private readonly listeners = new Set<(event: LiveEvent) => void>();
   private latestGpuPct: number | undefined;
   private latestVramTotal = 0;
+  private latestRamTotal = 0;
   private readonly eventDeduper = new EventDeduper();
 
   constructor(
@@ -370,6 +426,7 @@ class DaemonTransport {
         (highest, gpu) => highest === undefined ? gpu.util_percent : Math.max(highest, gpu.util_percent), undefined,
       );
       this.latestVramTotal = message.metrics.gpus.reduce((total, gpu) => total + gpu.vram_total_bytes, 0);
+      this.latestRamTotal = message.metrics.ram_total_bytes;
     } else if (message.type === "SESSION_METRICS") {
       const totals = message.metrics.totals;
       this.emit({
@@ -378,6 +435,7 @@ class DaemonTransport {
         metrics: {
           cpuPct: Math.round(totals.cpu_percent * 10) / 10,
           ramGB: Math.round((totals.rss_bytes / 1024 ** 3) * 10) / 10,
+          ramTotalGB: this.latestRamTotal > 0 ? Math.round((this.latestRamTotal / 1024 ** 3) * 10) / 10 : undefined,
           gpuPct: totals.gpu_mem_bytes > 0 ? this.latestGpuPct : undefined,
           vramGB: this.latestVramTotal > 0 || totals.gpu_mem_bytes > 0
             ? Math.round((totals.gpu_mem_bytes / 1024 ** 3) * 10) / 10 : undefined,
@@ -419,10 +477,6 @@ class DaemonTransport {
   }
 }
 
-function unsupported(method: string): Promise<never> {
-  return Promise.reject(new NotImplemented(method));
-}
-
 export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   const storage = options.storage ?? window.localStorage;
   const socketFactory = options.socketFactory ?? ((url: string) => new WebSocket(url));
@@ -437,6 +491,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   let controlMachineId: string | null = null;
   let initialization: Promise<void> | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  const recipeRoutes = new Map<string, { machineId: string; sourceId: string }>();
 
   const emit = (event: LiveEvent) => {
     for (const listener of listeners) listener(event);
@@ -466,7 +521,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       connection.registry = row;
       const status = machine.status === "ONLINE" && connection.machine.status === "OFFLINE"
         ? "OFFLINE" : machine.status;
-      connection.machine = { ...connection.machine, ...machine, status };
+      connection.machine = { ...connection.machine, ...machine, status, hardware: connection.hardware ?? machine.hardware };
     }
     return connection;
   };
@@ -485,7 +540,16 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       if (row.machine_id === controlMachineId) {
         const connection = connections.get(row.machine_id);
         if (connection) {
-          connection.machine = { ...connection.machine, ...mapRegistryMachine(row, now()), status: "ONLINE" };
+          // Remembered so live queries keep the owner's display name, not the hostname.
+          connection.registry = row;
+          // The control's liveness comes from its own socket, not its registry row.
+          connection.machine = {
+            ...connection.machine,
+            ...mapRegistryMachine(row, now()),
+            status: connection.machine.status,
+            lastSeen: connection.machine.lastSeen,
+            hardware: connection.hardware ?? connection.machine.hardware,
+          };
           emit({ type: "MACHINE_UPDATED", machine: connection.machine });
         }
       } else {
@@ -514,6 +578,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     const current = connections.get(reply.machine.id);
     if (current) {
       current.machine = mapMachine(reply.machine);
+      current.hardware = current.machine.hardware;
       current.retry.succeeded();
       current.retryAt = 0;
     } else {
@@ -521,6 +586,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
         id: reply.machine.id,
         transport: controlTransport,
         machine: mapMachine(reply.machine),
+        hardware: mapMachine(reply.machine).hardware,
         sessions: [],
         retry: new RetryState({ baseMs: 2_000, maximumMs: 60_000, wakeAfterMs: 30_000 }),
         retryAt: 0,
@@ -551,6 +617,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       lastSeen: "0s",
       status: "ONLINE",
     };
+    connection.hardware = connection.machine.hardware;
     connection.retry.succeeded();
     connection.retryAt = 0;
   };
@@ -558,12 +625,12 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   const querySessions = async (connection: MachineConnection): Promise<Session[]> => {
     const reply = await connection.transport.request({ type: "LIST_SESSIONS" }, (message) => message.type === "SESSIONS");
     if (reply.type !== "SESSIONS") return connection.sessions;
-    if (reply.sessions.some((session) => session.machine_id !== connection.id)) {
-      throw daemonError(`Machine '${connection.id}' returned a foreign Session`);
-    }
+    // A row stamped with another Machine ID is never shown or routed. Dropping
+    // it (not the whole Machine) keeps the valid Sessions and a steady status.
+    const owned = reply.sessions.filter((session) => session.machine_id === connection.id);
     const mapped: Session[] = [];
     const baseline: WireEvent[] = [];
-    for (const wire of reply.sessions) {
+    for (const wire of owned) {
       const events = await connection.transport.request(
         { type: "GET_EVENTS", session_id: wire.id, after: null, limit: 500 },
         (message) => message.type === "EVENTS",
@@ -742,7 +809,41 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       const connection = owner(sessionId);
       return { websocketUrl: connection.transport.url, localSessionId: localId(sessionId), machineId: connection.id };
     },
-    getRecipes: () => unsupported("getRecipes"),
+    async getRecipes() {
+      await ensureInitialized();
+      recipeRoutes.clear();
+      const targets = [...connections.values()].filter(queryEligible);
+      const catalogs = await mapConcurrent(targets, QUERY_CONCURRENCY, async (connection) => {
+        try {
+          const reply = await connection.transport.request(
+            { type: "LIST_RECIPES" },
+            (message) => message.type === "RECIPES",
+          );
+          if (reply.type !== "RECIPES") return [];
+          return reply.recipes
+            .filter((recipe) => recipe.machine_id === null || recipe.machine_id === connection.id)
+            .map((recipe): Recipe => {
+              const id = `${connection.id}/${recipe.id}`;
+              recipeRoutes.set(id, { machineId: connection.id, sourceId: recipe.id });
+              return {
+                id,
+                sourceId: recipe.id,
+                name: recipe.name,
+                category: recipe.category ?? "OTHER",
+                project: recipe.project ?? undefined,
+                machine: connection.id,
+                machineIds: [connection.id],
+                template: recipe.command,
+                params: Object.fromEntries(recipe.params.map((param) => [param.name, param.default ?? ""])),
+              };
+            });
+        } catch {
+          markFailure(connection);
+          return [];
+        }
+      });
+      return catalogs.flat();
+    },
     async getHistory(filters: HistoryFilters = {}) {
       await ensureInitialized();
       let targets: MachineConnection[];
@@ -818,13 +919,151 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
           reply.session.machine_id === connection.id,
       );
     },
-    runRecipe: () => unsupported("runRecipe"),
+    async runRecipe(recipeId, params, targetMachineId) {
+      await ensureInitialized();
+      const route = recipeRoutes.get(recipeId);
+      if (!route || route.machineId !== targetMachineId) {
+        throw daemonError(`Recipe '${recipeId}' is not available on Machine '${targetMachineId}'`);
+      }
+      const connection = connections.get(targetMachineId);
+      if (!connection) throw daemonError(`unknown Recipe Machine '${targetMachineId}'`);
+      const reply = await connection.transport.request(
+        { type: "RUN_RECIPE", recipe_id: route.sourceId, values: params, session_id: null },
+        (message) => message.type === "SESSION_UPDATED" && message.session.machine_id === targetMachineId,
+      );
+      if (reply.type !== "SESSION_UPDATED") throw daemonError("missing Recipe Session");
+      return { sessionId: compositeId(targetMachineId, reply.session.id) };
+    },
+    async saveRecipe(targetMachineId, recipe) {
+      await ensureInitialized();
+      const connection = connections.get(targetMachineId);
+      if (!connection) throw daemonError(`unknown Recipe Machine '${targetMachineId}'`);
+      const wire: WireRecipe = {
+        id: recipe.sourceId ?? recipe.id,
+        name: recipe.name,
+        category: recipe.category || null,
+        project: recipe.project ?? null,
+        machine_id: null,
+        command: recipe.template,
+        params: Object.entries(recipe.params).map(([name, value]) => ({
+          name,
+          default: value || null,
+          description: null,
+        })),
+      };
+      await connection.transport.request(
+        { type: "SAVE_RECIPE", recipe: wire },
+        (message) => message.type === "RECIPES",
+      );
+    },
     registry,
     auth,
+    machineInsights: {
+      async details(id) {
+        await ensureInitialized();
+        const connection = connections.get(id);
+        if (!connection) throw daemonError(`unknown Machine '${id}'`);
+        const reply = await connection.transport.request(
+          { type: "GET_MACHINE_DETAILS" },
+          (message) => message.type === "MACHINE_DETAILS",
+        );
+        if (reply.type !== "MACHINE_DETAILS") throw daemonError(`Machine '${id}' sent no details`);
+        return mapMachineInsight(id, reply.details);
+      },
+      async metrics(id, range) {
+        await ensureInitialized();
+        const connection = connections.get(id);
+        if (!connection) throw daemonError(`unknown Machine '${id}'`);
+        const reply = await connection.transport.request(
+          { type: "GET_MACHINE_METRICS", range },
+          (message) => message.type === "MACHINE_METRICS_HISTORY" && message.range === range,
+        );
+        if (reply.type !== "MACHINE_METRICS_HISTORY") throw daemonError(`Machine '${id}' sent no history`);
+        return reply.points.map(mapMetricPoint);
+      },
+    },
     notifications: {
-      getRules: () => unsupported("notifications.getRules"),
-      setRule: () => unsupported("notifications.setRule"),
-      getJournal: () => unsupported("notifications.getJournal"),
+      async getRules() {
+        await ensureInitialized();
+        const output: UiNotificationRules = {};
+        await mapConcurrent([...connections.values()].filter(queryEligible), QUERY_CONCURRENCY, async (connection) => {
+          try {
+            const reply = await connection.transport.request(
+              { type: "GET_NOTIFICATION_RULES" },
+              (message) => message.type === "NOTIFICATION_RULES",
+            );
+            if (reply.type !== "NOTIFICATION_RULES") return;
+            output[`${connection.id}:default`] = reply.rules.default;
+            for (const override of reply.rules.sessions) {
+              output[compositeId(connection.id, override.session_id)] = override.rules;
+            }
+          } catch {
+            markFailure(connection);
+          }
+        });
+        return output;
+      },
+      async setRule(id, rules) {
+        await ensureInitialized();
+        const defaultSuffix = ":default";
+        const isDefault = id.endsWith(defaultSuffix);
+        const targetMachineId = isDefault ? id.slice(0, -defaultSuffix.length) : machineId(id);
+        const connection = connections.get(targetMachineId);
+        if (!connection) throw daemonError(`unknown notification Machine '${targetMachineId}'`);
+        await connection.transport.request(
+          { type: "SET_NOTIFICATION_RULE", session_id: isDefault ? null : localId(id), rules },
+          (message) => message.type === "NOTIFICATION_RULES",
+        );
+      },
+      async getJournal() {
+        await ensureInitialized();
+        const groups = await mapConcurrent(
+          [...connections.values()].filter(queryEligible), QUERY_CONCURRENCY,
+          async (connection): Promise<JournalNotification[]> => {
+            try {
+              const reply = await connection.transport.request(
+                { type: "GET_NOTIFICATION_JOURNAL" },
+                (message) => message.type === "NOTIFICATION_JOURNAL",
+              );
+              if (reply.type !== "NOTIFICATION_JOURNAL") return [];
+              return reply.entries.map((entry) => ({
+                id: `${connection.id}:${entry.id}`,
+                text: entry.text,
+                sessionId: compositeId(connection.id, entry.session_id),
+              }));
+            } catch {
+              markFailure(connection);
+              return [];
+            }
+          },
+        );
+        return groups.flat();
+      },
+      async getStatus() {
+        await ensureInitialized();
+        const groups = await mapConcurrent(
+          [...connections.values()].filter(queryEligible), QUERY_CONCURRENCY,
+          async (connection): Promise<NotificationDeliveryStatus[]> => {
+            try {
+              const reply = await connection.transport.request(
+                { type: "GET_NOTIFICATION_RULES" },
+                (message) => message.type === "NOTIFICATION_RULES",
+              );
+              if (reply.type !== "NOTIFICATION_RULES") return [];
+              return [{
+                machineId: connection.id,
+                configured: reply.status.configured,
+                server: reply.status.server ?? undefined,
+                topic: reply.status.topic ?? undefined,
+                tokenConfigured: reply.status.token_configured,
+              }];
+            } catch {
+              return [];
+            }
+          },
+        );
+        return groups.flat();
+      },
     },
   };
   return adapter;

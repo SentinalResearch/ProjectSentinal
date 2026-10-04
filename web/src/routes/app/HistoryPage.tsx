@@ -239,6 +239,19 @@ export function HistoryPage() {
                 <span className={`${styles.command} mono`}>
                   {entry.command}
                   {session && <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />}
+                  {entry.ok === true && entry.machine && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        const query = new URLSearchParams({ machine: entry.machine!, command: entry.command });
+                        if (entry.cwd) query.set("cwd", entry.cwd);
+                        navigate(`/app/recipes/new?${query.toString()}`);
+                      }}
+                    >
+                      Save as recipe
+                    </button>
+                  )}
                 </span>
                 <span className={styles.machineCell} style={{ color: machine?.status === "OFFLINE" ? "var(--text-3)" : "var(--text-2)" }}>
                   {machine?.name ?? "—"}

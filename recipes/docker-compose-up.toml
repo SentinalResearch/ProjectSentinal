@@ -1,0 +1,8 @@
+id = "docker-compose-up"
+name = "docker compose up"
+category = "SERVICES"
+command = "docker compose -f {file} up"
+
+[[params]]
+name = "file"
+default = "compose.yaml"

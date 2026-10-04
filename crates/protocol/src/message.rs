@@ -8,10 +8,12 @@ use crate::{
         normalize_pairing_code, validate_control_url, validate_display_name, ConnectionReport,
         ControlUrlPolicy, Secret,
     },
-    Command, Event, Machine, MachineId, MachineMetrics, ProtocolError, Session, SessionId,
-    SessionMetrics, SessionOrigin, Timestamp,
+    Command, Event, Machine, MachineId, MachineMetrics, NotificationJournalEntry,
+    NotificationRuleSet, NotificationRules, NotificationStatus, ProtocolError, Recipe, Session,
+    SessionId, SessionMetrics, SessionOrigin, Timestamp,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Current protocol version. Bump when a change breaks old clients.
 pub const PROTOCOL_VERSION: u32 = 1;
@@ -150,6 +152,40 @@ pub enum ClientRequest {
         query: String,
         /// Maximum number of commands to return.
         limit: u32,
+    },
+    /// List Recipes available on this Machine.
+    ListRecipes,
+    /// Render and run a Recipe on this Machine.
+    RunRecipe {
+        /// Daemon-local Recipe ID.
+        recipe_id: String,
+        /// User values rendered through [`Recipe::render`].
+        values: BTreeMap<String, String>,
+        /// Existing Session to receive the command, or a new Session when absent.
+        session_id: Option<SessionId>,
+    },
+    /// Validate and store a user Recipe on this Machine.
+    SaveRecipe {
+        /// Recipe definition to persist.
+        recipe: Recipe,
+    },
+    /// Read default and per-Session notification rules.
+    GetNotificationRules,
+    /// Replace the default rule or one Session override.
+    SetNotificationRule {
+        /// `None` changes this Machine's default.
+        session_id: Option<SessionId>,
+        /// Complete rule value.
+        rules: NotificationRuleSet,
+    },
+    /// Read the bounded, secret-free delivery journal.
+    GetNotificationJournal,
+    /// Host, daemon, link, and per-Session process facts for the Machine page.
+    GetMachineDetails,
+    /// Machine-wide CPU, RAM, and GPU history over `range`.
+    GetMachineMetrics {
+        /// How far back to reach.
+        range: crate::MetricRange,
     },
 }
 
@@ -542,6 +578,35 @@ pub enum DaemonMessage {
     History {
         /// Commands matching the history request.
         commands: Vec<Command>,
+    },
+    /// Recipes available on this Machine.
+    Recipes {
+        /// Valid built-in and user Recipes.
+        recipes: Vec<Recipe>,
+    },
+    /// Current notification rules and safe delivery configuration.
+    NotificationRules {
+        /// Rules stored by this Machine.
+        rules: NotificationRules,
+        /// Secret-free ntfy configuration state.
+        status: NotificationStatus,
+    },
+    /// Reply to `GET_MACHINE_DETAILS`.
+    MachineDetails {
+        /// Facts for the Machine page.
+        details: crate::MachineDetails,
+    },
+    /// Reply to `GET_MACHINE_METRICS`, oldest point first.
+    MachineMetricsHistory {
+        /// The requested range.
+        range: crate::MetricRange,
+        /// Bucketed averages.
+        points: Vec<crate::MachineMetricPoint>,
+    },
+    /// Bounded notification delivery journal.
+    NotificationJournal {
+        /// Newest attempted deliveries first.
+        entries: Vec<NotificationJournalEntry>,
     },
     /// A request failed.
     Error {

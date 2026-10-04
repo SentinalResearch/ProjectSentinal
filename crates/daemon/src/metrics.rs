@@ -249,9 +249,39 @@ fn nvidia_snapshot() -> (Vec<GpuMetrics>, HashMap<u32, u64>) {
     (metrics, gpu_by_pid)
 }
 
+/// The host's CPU model and total RAM in bytes, for the static Machine description.
+pub fn host_hardware() -> (String, u64) {
+    let mut system = System::new();
+    system.refresh_cpu_list(sysinfo::CpuRefreshKind::nothing());
+    system.refresh_memory();
+    let cpu = cpu_label(system.cpus().first().map(sysinfo::Cpu::brand));
+    (cpu, system.total_memory())
+}
+
+fn cpu_label(brand: Option<&str>) -> String {
+    brand
+        .map(str::trim)
+        .filter(|brand| !brand.is_empty())
+        .map_or_else(|| "unknown".into(), str::to_owned)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cpu_label_trims_and_falls_back_to_unknown() {
+        assert_eq!(cpu_label(Some("  Apple M4 ")), "Apple M4");
+        assert_eq!(cpu_label(Some("")), "unknown");
+        assert_eq!(cpu_label(None), "unknown");
+    }
+
+    #[test]
+    fn host_hardware_reports_this_hosts_cpu_and_ram() {
+        let (cpu, ram) = host_hardware();
+        assert_ne!(cpu, "unknown");
+        assert!(ram > 0);
+    }
 
     #[test]
     fn high_resource_emits_on_third_sample_only() {

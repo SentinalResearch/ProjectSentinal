@@ -22,7 +22,7 @@ use crate::{
     tracker::{CommandTracker, TrackerIds},
 };
 pub use error::SessionManagerError;
-use protocol::{DaemonMessage, MachineId, Session, SessionId, SessionOrigin, Timestamp};
+use protocol::{DaemonMessage, Event, MachineId, Session, SessionId, SessionOrigin, Timestamp};
 pub use replay::{
     OutputReplay, DEFAULT_OUTPUT_PAGE_BYTES, MAX_OUTPUT_PAGE_BYTES, MAX_OUTPUT_SCAN_BYTES,
 };
@@ -123,6 +123,8 @@ struct SessionHandle {
     structured: broadcast::Sender<DaemonMessage>,
     /// Global observation stream used by Sessions that cannot attach.
     observations: broadcast::Sender<DaemonMessage>,
+    /// Machine-wide Event stream consumed by local notification delivery.
+    events: broadcast::Sender<Event>,
     tracker: Mutex<CommandTracker>,
     /// Deterministic Event and Health state for this Session.
     watcher: Mutex<watcher::EventEngine>,
@@ -154,6 +156,8 @@ struct SessionManagerInner {
     /// Metrics and state of reduced-capture Sessions, for every connected
     /// client (they cannot attach, which is how FULL Sessions deliver them).
     observations: broadcast::Sender<DaemonMessage>,
+    /// Machine-wide structured Event stream.
+    events: broadcast::Sender<Event>,
     /// Serializes external shell registration so concurrent reports create one Session.
     registration: Mutex<()>,
     /// Serializes continuation so a source can never branch in one daemon.
@@ -171,6 +175,11 @@ pub struct SessionManager {
 }
 
 impl SessionManager {
+    /// Subscribe to Events emitted by every Session on this Machine.
+    pub fn subscribe_events(&self) -> broadcast::Receiver<Event> {
+        self.inner.events.subscribe()
+    }
+
     /// Create an empty session manager using the selected PTY backend.
     pub fn new(
         backend: Arc<dyn PtyBackend>,
@@ -221,6 +230,7 @@ impl SessionManager {
                 store,
                 probe: ProcessProbe::unavailable(),
                 observations: broadcast::channel(256).0,
+                events: broadcast::channel(256).0,
                 registration: Mutex::new(()),
                 continuation: tokio::sync::Mutex::new(()),
                 watcher_adapters: Vec::new(),

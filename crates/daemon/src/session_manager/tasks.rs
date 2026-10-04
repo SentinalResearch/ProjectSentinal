@@ -197,6 +197,7 @@ pub(super) fn apply_signal(
         }
     }
     if let Some(event) = &update.event {
+        let _ = handle.events.send(event.clone());
         let message = DaemonMessage::Event {
             event: event.clone(),
         };
@@ -334,6 +335,7 @@ pub(super) fn apply_observation(
         }
     }
     for event in events {
+        let _ = handle.events.send(event.clone());
         let message = DaemonMessage::Event { event };
         let _ = handle.structured.send(message.clone());
         if reduced {

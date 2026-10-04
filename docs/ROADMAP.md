@@ -216,9 +216,11 @@ prompt, and see the stable Machine ID appear under that display name.
 - [ ] Complete the two-real-Machine routing acceptance run in `docs/progress/milestone-4a.md`
 
 ## Milestone 4.B — Recipes + notifications + mobile dashboard (v0.4)
-- [ ] Recipe files in `recipes/`, launch from UI
-- [ ] "Save as recipe" after a successful command
-- [ ] ntfy notifications for completed / failed / waiting / stalled
+- [x] Recipe files in `recipes/`, launch from UI
+- [x] "Save as recipe" after a successful command
+- [x] ntfy notifications for completed / failed / waiting / stalled
+- [x] Installable phone PWA: Machines → Sessions → attach → run Recipe at 390×844
+- [ ] Complete the two-real-Machine V1 demo in `docs/progress/milestone-4b.md`
 
 ## Reliability R1 — Daemon-restart-resilient FULL Sessions
 - [ ] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation

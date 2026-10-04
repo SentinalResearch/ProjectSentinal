@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
 import { MockBadge } from "../../components/MockBadge";
 import { dataAdapter, isMockData } from "../../data";
 import { extractPort } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
+import { escapeTemplateLiteral, previewTemplate } from "../../data/recipeTemplate";
 import type { Recipe } from "../../data/types";
 import styles from "./RecipesPage.module.css";
 
@@ -30,33 +31,18 @@ function validateParam(key: string, value: string): string | undefined {
   return undefined;
 }
 
-function renderTemplate(template: string, values: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? `{${key}}`);
-}
-
 /** design_handoff_sentinal/design/SentinalRecipes.dc.html */
 export function RecipesPage() {
-  if (!isMockData) {
-    return (
-      <div className={styles.unavailable}>
-        <span className={styles.overline}>REAL DATA MODE</span>
-        <h1>Recipes are not available yet</h1>
-        <p>
-          Recipe storage and execution have not been implemented by the daemon. This page will not substitute
-          demonstration data while connected to a real Machine.
-        </p>
-        <p>
-          Start work now with <code>sentinal watch -- COMMAND [ARG...]</code>.
-        </p>
-      </div>
-    );
-  }
-
   return <RecipeCatalog />;
 }
 
 function RecipeCatalog() {
   const { id } = useParams<{ id?: string }>();
+  if (id === "new") return <SaveRecipeForm />;
+  return <RecipeCatalogView id={id} />;
+}
+
+function RecipeCatalogView({ id }: { id?: string }) {
   const navigate = useNavigate();
   const { machines, sessions } = useLiveData();
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
@@ -77,7 +63,7 @@ function RecipeCatalog() {
   if (recipe && recipe.id !== loadedRecipeId) {
     setLoadedRecipeId(recipe.id);
     setValues(recipe.params);
-    setMachineId(recipe.machine);
+    setMachineId(recipe.machineIds?.[0] ?? recipe.machine);
     setRunning(false);
   }
 
@@ -108,8 +94,8 @@ function RecipeCatalog() {
     if (inUse) warnings[k] = `:${port} is already used on ${targetMachine?.name ?? machineId}`;
   }
 
-  const preview = recipe ? renderTemplate(recipe.template, values) : "";
-  const blocked = !recipe || hasErrors || running || !machineId || targetMachine?.status === "OFFLINE";
+  const preview = recipe ? previewTemplate(recipe.template, values) : "";
+  const blocked = !recipe || hasErrors || running || !machineId || targetMachine?.status !== "ONLINE";
 
   async function handleRun(e: FormEvent) {
     e.preventDefault();
@@ -149,7 +135,8 @@ function RecipeCatalog() {
                     background: active ? "var(--bg-1)" : "transparent",
                     boxShadow: active ? "inset 2px 0 0 var(--accent)" : "none",
                   }}
-                  onClick={() => navigate(`/app/recipes/${r.id}`)}
+                  // API ids are `<machine>/<recipe>`; keep them one path segment.
+                  onClick={() => navigate(`/app/recipes/${encodeURIComponent(r.id)}`)}
                 >
                   <span className={styles.recipeName}>{r.name}</span>
                   <span className={styles.recipeMeta}>
@@ -174,7 +161,7 @@ function RecipeCatalog() {
             <header className={styles.formHeader}>
               <div className={styles.overlineRow}>
                 <span className={styles.overline}>RUN RECIPE</span>
-                <MockBadge />
+                  {isMockData && <MockBadge />}
               </div>
               <h2 className={styles.recipeTitle}>{recipe.name}</h2>
               <span className={`${styles.template} mono`}>{recipe.template}</span>
@@ -220,7 +207,7 @@ function RecipeCatalog() {
               <div className={styles.section}>
                 <span className={styles.sectionLabel}>Target machine</span>
                 <div className={styles.machineGrid}>
-                  {machines.map((m) => {
+                  {machines.filter((m) => (recipe.machineIds ?? [recipe.machine]).includes(m.id)).map((m) => {
                     const selected = machineId === m.id;
                     const offline = m.status === "OFFLINE";
                     return (
@@ -271,6 +258,95 @@ function RecipeCatalog() {
       ) : (
         <section className={styles.empty}>No recipes yet.</section>
       )}
+    </div>
+  );
+}
+
+function SaveRecipeForm() {
+  const navigate = useNavigate();
+  const [search] = useSearchParams();
+  const { machines } = useLiveData();
+  const machineId = search.get("machine") ?? "";
+  const command = search.get("command") ?? "";
+  const cwd = search.get("cwd") ?? undefined;
+  const parts = useMemo(() => command.split(/(\s+)/), [command]);
+  const selectable = parts.map((part, index) => ({ part, index })).filter(({ part }) => part.trim());
+  const [name, setName] = useState("Saved command");
+  const [id, setId] = useState("saved-command");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const target = machines.find((machine) => machine.id === machineId);
+
+  const params: Record<string, string> = {};
+  let ordinal = 1;
+  const template = parts.map((part, index) => {
+    if (!selected.has(index)) return escapeTemplateLiteral(part);
+    const key = `value${ordinal}`;
+    ordinal += 1;
+    params[key] = part;
+    return `{${key}}`;
+  }).join("");
+  const valid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) && name.trim() !== "" && command.trim() !== "" && target?.status === "ONLINE";
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!valid) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await dataAdapter.saveRecipe(machineId, {
+        id,
+        sourceId: id,
+        name: name.trim(),
+        category: "SAVED",
+        project: cwd,
+        machine: machineId,
+        machineIds: [machineId],
+        template,
+        params,
+      });
+      navigate("/app/recipes");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "The Machine refused the Recipe.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className={styles.form}>
+      <div className={styles.formInner}>
+        <header className={styles.formHeader}>
+          <span className={styles.overline}>SAVE AS RECIPE</span>
+          <h1 className={styles.recipeTitle}>Save a successful command</h1>
+          <span>{target?.name ?? machineId}</span>
+        </header>
+        <form onSubmit={save} className={styles.formBody}>
+          <label className={styles.paramRow}>Name<input value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <label className={styles.paramRow}>ID<input value={id} onChange={(event) => setId(event.target.value.toLowerCase())} /></label>
+          <div className={styles.section}>
+            <span className={styles.sectionLabel}>Choose literal values to make parameters</span>
+            {selectable.map(({ part, index }) => (
+              <label key={index} className={styles.paramRow}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(index)}
+                  onChange={() => setSelected((current) => {
+                    const next = new Set(current);
+                    if (next.has(index)) next.delete(index); else next.add(index);
+                    return next;
+                  })}
+                />
+                <code>{part}</code>
+              </label>
+            ))}
+          </div>
+          <div className={styles.previewBlock} data-testid="save-recipe-template">{template}</div>
+          {error && <p className={styles.paramError} role="alert">{error}</p>}
+          <Button type="submit" variant="primary" disabled={!valid || saving} loading={saving}>Save Recipe</Button>
+        </form>
+      </div>
     </div>
   );
 }

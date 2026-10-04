@@ -9,6 +9,7 @@ import { dataAdapter } from "../../data";
 import { formatSessionDuration, formatSessionFact, needsAttention } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { Machine, Session } from "../../data/types";
+import { MachinePanel } from "./MachinePanel";
 import styles from "./OverviewPage.module.css";
 
 function needsFact(session: Session): string {
@@ -92,6 +93,10 @@ export function OverviewPage() {
           </button>
         )}
       </header>
+
+      {filteredMachine && (
+        <MachinePanel machine={filteredMachine} sessions={visibleSessions} />
+      )}
 
       {needs.length > 0 && (
         <section className={styles.section}>

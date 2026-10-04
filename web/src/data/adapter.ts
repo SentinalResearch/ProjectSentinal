@@ -101,6 +101,7 @@ export interface DataAdapter {
   sendSignal(sessionId: string, signal: "SIGINT" | "KILL"): Promise<void>;
 
   runRecipe(recipeId: string, params: Record<string, string>, machineId: string): Promise<{ sessionId: string }>;
+  saveRecipe(machineId: string, recipe: Recipe): Promise<void>;
 
   /**
    * The control Machine's registry. Throws `RegistryError` with code
@@ -124,9 +125,16 @@ export interface DataAdapter {
     logout(): Promise<void>;
   };
 
+  /** Machine view facts, asked only of the owning Machine. */
+  machineInsights: {
+    details(machineId: string): Promise<import("./types").MachineInsight>;
+    metrics(machineId: string, range: import("./types").MetricRangeKey): Promise<import("./types").MachineMetricSample[]>;
+  };
+
   notifications: {
     getRules(): Promise<NotificationRules>;
     setRule(sessionId: string, rules: NotificationRuleSet): Promise<void>;
     getJournal(): Promise<JournalNotification[]>;
+    getStatus(): Promise<import("./types").NotificationDeliveryStatus[]>;
   };
 }

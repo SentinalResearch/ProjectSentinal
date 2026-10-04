@@ -27,6 +27,7 @@ export interface SessionMetrics {
   loss?: { from: number; to: number };
   cpuPct?: number;
   ramGB?: number;
+  ramTotalGB?: number;
   gpuPct?: number;
   vramGB?: number;
   vramTotalGB?: number;
@@ -122,9 +123,12 @@ export interface RecipeParam {
 
 export interface Recipe {
   id: string;
+  sourceId?: string;
   name: string;
   category: string;
   machine: string;
+  machineIds?: string[];
+  project?: string;
   template: string;
   params: Record<string, string>;
 }
@@ -133,6 +137,7 @@ export interface NotificationRuleSet {
   finished: boolean;
   error: boolean;
   stalled: boolean;
+  waiting: boolean;
   checkpoint: boolean;
   progress: boolean;
 }
@@ -145,6 +150,14 @@ export interface JournalNotification {
   sessionId?: string;
 }
 
+export interface NotificationDeliveryStatus {
+  machineId: string;
+  configured: boolean;
+  server?: string;
+  topic?: string;
+  tokenConfigured: boolean;
+}
+
 export type AuthStatus = "setup" | "signedOut" | "signedIn" | "expired" | "locked" | "wrong";
 
 export interface AuthState {
@@ -154,3 +167,34 @@ export interface AuthState {
   message?: string;
 }
 
+/** One process under a Session, without its command line. */
+export interface ProcessSummaryView {
+  pid: number;
+  name: string;
+  cpuPct: number;
+  rssBytes: number;
+  gpuMemBytes?: number;
+}
+
+/** Host, daemon, link, and per-Session process facts for the Machine view. */
+export interface MachineInsight {
+  hostname: string;
+  osVersion?: string;
+  kernelVersion?: string;
+  daemonVersion: string;
+  startedAt: number;
+  bind: string;
+  link?: { state: string; controlUrl?: string; lastHeartbeatAt?: number; message?: string };
+  processes: { sessionId: string; processes: ProcessSummaryView[] }[];
+}
+
+export type MetricRangeKey = "HOUR" | "DAY" | "WEEK";
+
+/** One Machine-wide history point, as percentages. */
+export interface MachineMetricSample {
+  at: number;
+  cpuPct: number;
+  ramPct?: number;
+  gpuPct?: number;
+  vramPct?: number;
+}

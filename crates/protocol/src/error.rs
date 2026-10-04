@@ -39,6 +39,10 @@ pub enum ProtocolError {
     #[error("recipe parameter '{0}' has no default and no value was given")]
     MissingParam(String),
 
+    /// A Recipe value contained terminal control bytes.
+    #[error("recipe parameter '{0}' contains terminal control characters")]
+    InvalidRecipeParamValue(String),
+
     /// A recipe template has a `{` without a matching `}` (use `{{` for a literal brace).
     #[error("recipe template has an unclosed '{{' at byte {0}")]
     UnclosedBrace(usize),

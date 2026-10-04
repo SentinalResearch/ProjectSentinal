@@ -1,0 +1,16 @@
+id = "llama-server"
+name = "llama.cpp server"
+category = "SERVERS"
+command = "llama-server -m {model} --port {port} -c {context}"
+
+[[params]]
+name = "model"
+description = "GGUF model path"
+
+[[params]]
+name = "port"
+default = "8080"
+
+[[params]]
+name = "context"
+default = "4096"

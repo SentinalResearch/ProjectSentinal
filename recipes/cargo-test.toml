@@ -1,0 +1,8 @@
+id = "cargo-test"
+name = "cargo test"
+category = "TESTS"
+command = "cargo test {arguments}"
+
+[[params]]
+name = "arguments"
+default = "--workspace"

@@ -1,0 +1,16 @@
+id = "llama-bench"
+name = "llama.cpp bench"
+category = "BENCHMARKS"
+command = "llama-bench -m {model} -p {prompt_tokens} -n {generated_tokens}"
+
+[[params]]
+name = "model"
+description = "GGUF model path"
+
+[[params]]
+name = "prompt_tokens"
+default = "512"
+
+[[params]]
+name = "generated_tokens"
+default = "128"

@@ -1,0 +1,12 @@
+id = "hf-download"
+name = "Hugging Face model download"
+category = "MODELS"
+command = "huggingface-cli download {model} --local-dir {directory}"
+
+[[params]]
+name = "model"
+description = "Hugging Face model ID"
+
+[[params]]
+name = "directory"
+default = "models"
