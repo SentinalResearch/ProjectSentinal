@@ -43,6 +43,10 @@ pub enum ProtocolError {
     #[error("recipe parameter '{0}' contains terminal control characters")]
     InvalidRecipeParamValue(String),
 
+    /// A Recipe placeholder was embedded in shell syntax where quoting cannot isolate it.
+    #[error("recipe placeholder '{{{0}}}' must be a standalone, unquoted shell word")]
+    InvalidRecipePlaceholderContext(String),
+
     /// A recipe template has a `{` without a matching `}` (use `{{` for a literal brace).
     #[error("recipe template has an unclosed '{{' at byte {0}")]
     UnclosedBrace(usize),

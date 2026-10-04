@@ -190,7 +190,7 @@ fn process_state(status: ProcessStatus) -> ProcessState {
 
 #[cfg(not(feature = "nvidia"))]
 fn nvidia_snapshot() -> (Vec<GpuMetrics>, HashMap<u32, u64>) {
-    (Vec::new(), HashMap::new())
+    crate::gpu_smi::snapshot()
 }
 
 #[cfg(feature = "nvidia")]

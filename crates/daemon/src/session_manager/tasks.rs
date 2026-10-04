@@ -159,6 +159,18 @@ pub(super) fn apply_signal(
         }
     };
     let (update, session) = update;
+    publish_tracker_update(session_id, handle, store, &update, session, at);
+    Some(update)
+}
+
+fn publish_tracker_update(
+    session_id: SessionId,
+    handle: &SessionHandle,
+    store: Option<&Store>,
+    update: &TrackerUpdate,
+    session: protocol::Session,
+    at: protocol::Timestamp,
+) {
     if let Some(store) = store {
         let result = if let Some(command) = &update.command {
             if command.finished_at.is_some() {
@@ -227,7 +239,6 @@ pub(super) fn apply_signal(
             apply_observation(session_id, handle, store, watcher::Observation { at, kind });
         }
     }
-    Some(update)
 }
 
 pub(super) fn apply_output(
@@ -290,16 +301,25 @@ pub(super) fn apply_observation(
             return;
         }
     };
-    let (session, command_id, health_changed, reduced) = match handle.session.lock() {
+    let training = match &update.adapter_state {
+        Some(watcher::AdapterState::Training(state)) => state.summary(),
+        _ => None,
+    };
+    let (session, command_id, session_changed, reduced) = match handle.session.lock() {
         Ok(mut session) => {
-            let health_changed = session.health.as_ref() != Some(&update.health);
-            if health_changed {
+            let mut session_changed = session.health.as_ref() != Some(&update.health);
+            if session_changed {
                 session.health = Some(update.health);
+            }
+            // Keep the last summary once the run stops printing training numbers.
+            if training.is_some() && session.training != training {
+                session.training = training;
+                session_changed = true;
             }
             (
                 session.clone(),
                 session.current_command,
-                health_changed,
+                session_changed,
                 session.capture != protocol::CaptureLevel::Full,
             )
         }
@@ -328,9 +348,9 @@ pub(super) fn apply_observation(
                 tracing::error!(session = session_id.0, %error, "failed to persist watcher Event");
             }
         }
-        if health_changed {
+        if session_changed {
             if let Err(error) = store.update_session(&session) {
-                tracing::error!(session = session_id.0, %error, "failed to persist Session Health");
+                tracing::error!(session = session_id.0, %error, "failed to persist Session Health and training");
             }
         }
     }
@@ -342,7 +362,7 @@ pub(super) fn apply_observation(
             let _ = handle.observations.send(message);
         }
     }
-    if health_changed {
+    if session_changed {
         let message = DaemonMessage::SessionUpdated { session };
         let _ = handle.structured.send(message.clone());
         if reduced {
@@ -390,7 +410,7 @@ pub(super) fn apply_health_event(
     }
     if let Some(store) = store {
         if let Err(error) = store.update_session(&session) {
-            tracing::error!(session = session_id.0, %error, "failed to persist Session Health");
+            tracing::error!(session = session_id.0, %error, "failed to persist Session Health and training");
         }
     }
     let message = DaemonMessage::SessionUpdated { session };
@@ -414,6 +434,35 @@ pub(super) fn spawn_exit_monitor(
                     handle
                         .pty_closed
                         .store(true, std::sync::atomic::Ordering::SeqCst);
+                    let at = clock();
+                    let tracker_update = match (handle.tracker.lock(), handle.session.lock()) {
+                        (Ok(mut tracker), Ok(mut session)) => Some(
+                            tracker
+                                .finish_on_shell_exit(&mut session, code, at)
+                                .map(|update| (update, session.clone())),
+                        ),
+                        _ => {
+                            tracing::error!(
+                                session = session_id.0,
+                                "command tracking lock poisoned during child exit"
+                            );
+                            None
+                        }
+                    };
+                    match tracker_update {
+                        Some(Ok((update, session))) => publish_tracker_update(
+                            session_id,
+                            &handle,
+                            store.as_deref(),
+                            &update,
+                            session,
+                            at,
+                        ),
+                        Some(Err(error)) => {
+                            tracing::warn!(session = session_id.0, %error, "failed to reconcile current Command on child exit");
+                        }
+                        None => {}
+                    }
                     let target = if code == 0 {
                         SessionState::Completed
                     } else {
@@ -422,7 +471,7 @@ pub(super) fn spawn_exit_monitor(
                     match handle.session.lock() {
                         Ok(mut session) if !session.state.is_finished() => {
                             session.exit_code = Some(code);
-                            if let Err(error) = session.transition(target, clock()) {
+                            if let Err(error) = session.transition(target, at) {
                                 tracing::error!(session = session_id.0, %error, "failed to record child exit");
                             } else {
                                 if let Some(store) = &store {

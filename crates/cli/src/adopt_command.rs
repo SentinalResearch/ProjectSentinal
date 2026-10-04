@@ -71,9 +71,38 @@ pub fn candidates(rows: &[PsRow], own_pid: u32) -> Vec<PsRow> {
         })
         .cloned()
         .collect();
-    found.sort_by_key(|row| std::cmp::Reverse(row.pid));
+    found.sort_by_key(|row| {
+        (
+            elapsed_seconds(&row.elapsed).unwrap_or(u64::MAX),
+            std::cmp::Reverse(row.pid),
+        )
+    });
     found.truncate(MAX_CANDIDATES);
     found
+}
+
+/// Parse the portable `ps etime` forms `[[dd-]hh:]mm:ss`.
+fn elapsed_seconds(value: &str) -> Option<u64> {
+    let (days, clock) = match value.split_once('-') {
+        Some((days, clock)) => (days.parse::<u64>().ok()?, clock),
+        None => (0, value),
+    };
+    let fields: Vec<u64> = clock
+        .split(':')
+        .map(str::parse)
+        .collect::<Result<_, _>>()
+        .ok()?;
+    let (hours, minutes, seconds) = match fields.as_slice() {
+        [minutes, seconds] => (0, *minutes, *seconds),
+        [hours, minutes, seconds] => (*hours, *minutes, *seconds),
+        _ => return None,
+    };
+    (minutes < 60 && seconds < 60).then(|| {
+        days.saturating_mul(86_400)
+            .saturating_add(hours.saturating_mul(3_600))
+            .saturating_add(minutes.saturating_mul(60))
+            .saturating_add(seconds)
+    })
 }
 
 /// What the user typed at the `--pick` prompt.

@@ -16,6 +16,9 @@ until the run below is appended with its literal output.
   its path and skipped, and the other Recipes still load. A user Recipe with a
   built-in's ID replaces it, and the override is logged.
 - Templates use `{name}` for parameters and `{{` / `}}` for literal braces.
+  A placeholder must be a standalone, unquoted shell word; quoted or adjacent
+  placeholders are rejected because wrapping a value cannot isolate shell
+  syntax when the surrounding template already controls its quote context.
   `RUN_RECIPE { recipe_id, values, session_id }` renders through
   `Recipe::render`, which shell-quotes every value. The daemon test asserts the
   exact bytes written to the fake PTY for an injection-shaped value.
@@ -84,7 +87,7 @@ $ cargo test -p daemon --lib notifications      # defaults, overrides, dedup, ca
 7 passed                                        # raw-line exclusion, HTTP scheme, fake ntfy server
 $ cargo test -p daemon --test recipes           # exact PTY bytes for an injection-shaped value
 $ pnpm -C web check
-27 files, 125 tests passed; TypeScript passed
+30 files, 140 tests passed; TypeScript passed
 $ pnpm -C web test:e2e                          # 390×844: Machine list → attach → run Recipe
 5 passed                                        # asserts the new Session belongs to the catalog's Machine
 $ just check

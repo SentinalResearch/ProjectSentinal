@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "description": "Functions a screen translator may call. Each maps to a Sentinal protocol Event; entries marked proposed are not in the protocol yet.",
+  "functions": [
+    {
+      "name": "progress_updated",
+      "description": "The latest visible progress of one kind (at most one call per unit).",
+      "protocol": "EventKind::ProgressUpdated",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "current": { "type": "number", "description": "Steps done, exactly as printed." },
+          "total": { "type": ["number", "null"], "description": "Total steps if printed, else null." },
+          "unit": { "type": "string", "description": "epoch, step, %, test, file, or the printed size unit (MB, GB, objects)." }
+        },
+        "required": ["current", "total", "unit"]
+      }
+    },
+    {
+      "name": "metric_reported",
+      "description": "The latest visible value of one named training or throughput metric.",
+      "protocol": "proposed",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Metric name, e.g. loss, val_loss, learning_rate, accuracy, perplexity, reward, tokens_per_second." },
+          "value": { "type": "number", "description": "Value exactly as printed (2e-4 means 0.0002)." }
+        },
+        "required": ["name", "value"]
+      }
+    },
+    {
+      "name": "checkpoint_created",
+      "description": "A checkpoint or model file was written (not loaded).",
+      "protocol": "EventKind::CheckpointCreated",
+      "parameters": {
+        "type": "object",
+        "properties": { "path": { "type": "string" } },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "error_detected",
+      "description": "One distinct error visible on screen. Never copy secrets into the summary.",
+      "protocol": "EventKind::ErrorDetected (kind proposed)",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["oom", "nan", "exception", "test_failure", "build_error", "network", "permission", "not_found", "killed", "port_in_use", "other"]
+          },
+          "summary": { "type": "string", "description": "At most 120 characters." }
+        },
+        "required": ["kind", "summary"]
+      }
+    },
+    {
+      "name": "warning_detected",
+      "description": "One warning line visible on screen.",
+      "protocol": "EventKind::WarningDetected",
+      "parameters": {
+        "type": "object",
+        "properties": { "summary": { "type": "string", "description": "At most 120 characters." } },
+        "required": ["summary"]
+      }
+    },
+    {
+      "name": "waiting_for_input",
+      "description": "The last screen line is a prompt that is waiting for the user.",
+      "protocol": "EventKind::WaitingForInput (kind proposed)",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["confirm", "password", "text", "key"] },
+          "prompt": { "type": "string" }
+        },
+        "required": ["kind", "prompt"]
+      }
+    },
+    {
+      "name": "server_started",
+      "description": "The running program started listening. URL without query strings or tokens.",
+      "protocol": "EventKind::ServerStarted",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "port": { "type": ["integer", "null"] },
+          "url": { "type": ["string", "null"] }
+        },
+        "required": ["port", "url"]
+      }
+    },
+    {
+      "name": "tests_summary",
+      "description": "Final pass/fail/skip counts of a test run.",
+      "protocol": "proposed",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "passed": { "type": "integer" },
+          "failed": { "type": "integer" },
+          "skipped": { "type": "integer" }
+        },
+        "required": ["passed", "failed", "skipped"]
+      }
+    },
+    {
+      "name": "propose_recipe",
+      "description": "Recipes suite only: a reusable Recipe for a command run repeatedly with varying values.",
+      "protocol": "Recipe (SAVE_RECIPE)",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "template": { "type": "string", "description": "The command with {param} placeholders where values varied." },
+          "params": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "name": { "type": "string" }, "default": { "type": ["string", "null"] } },
+              "required": ["name", "default"]
+            }
+          }
+        },
+        "required": ["name", "template", "params"]
+      }
+    }
+  ]
+}

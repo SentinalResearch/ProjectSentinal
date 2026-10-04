@@ -12,12 +12,25 @@ export function slugifyProject(name: string): string {
 }
 
 /** The single-line "what's happening" fact shown next to a session (row / needs-you card). */
+/** Loss as from → to: the watcher's training summary, else the mock's metrics. */
+export function lossOf(session: Session): { from?: number; to: number } | undefined {
+  const loss = session.training?.loss;
+  if (loss !== undefined) return { from: session.training?.firstLoss, to: loss };
+  return session.metrics?.loss;
+}
+
+/** Compact learning rate, e.g. 0.0002 → "2e-4". */
+export function formatLearningRate(rate: number): string {
+  return rate >= 0.01 ? String(rate) : rate.toExponential();
+}
+
 export function formatSessionFact(session: Session): string {
   const parts: string[] = [];
   if (session.progress) {
     parts.push(`${session.progress.unit} ${session.progress.current}/${session.progress.total}`);
   }
-  if (session.metrics?.loss) parts.push(`loss ${session.metrics.loss.to}`);
+  const loss = lossOf(session);
+  if (loss) parts.push(`loss ${loss.to}`);
   if (session.result) parts.push(`${session.result.failed} failed · ${session.result.passed} passed`);
   if (session.prompt) parts.push(session.prompt);
   if (session.details) parts.push(session.details);
@@ -44,7 +57,7 @@ export function sessionKind(session: Session): SessionKind {
   if (session.state === "FAILED" && session.result) return "failed";
   if (session.state === "WAITING" && session.prompt) return "waiting";
   if (session.state === "STALLED") return "stalled";
-  if (session.progress && session.metrics) return "training";
+  if (session.progress && (session.metrics || session.training)) return "training";
   if (extractPort(session) !== null) return "server";
   return "idle";
 }

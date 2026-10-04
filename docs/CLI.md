@@ -170,6 +170,8 @@ simulation.
 
 ```console
 sentinal ls
+sentinal top [--once]
+sentinal status <SESSION_ID>
 sentinal new [--cwd DIR]
 sentinal attach <SESSION_ID>
 sentinal kill <SESSION_ID>
@@ -193,6 +195,21 @@ sentinal update [--check | --rollback VERSION] [--prefix DIR]
 ```
 
 - `ls` lists Session ID, state, cwd, and shell.
+- `top` is a text view of this Machine, refreshed every 2 s until Ctrl-C:
+  - host, OS, Sentinal version and uptime;
+  - CPU, RAM, GPU and VRAM bars;
+  - a table of live Sessions with state, capture, progress, loss and trend,
+    CPU, memory and health.
+
+  `--once` (or output that is not a terminal) prints one snapshot. GPU numbers
+  come from `nvidia-smi` when it is installed.
+- `status` shows one Session:
+  - progress bar;
+  - training loss (with its first value, trend, best validation loss and
+    learning rate);
+  - health and its latest evidence;
+  - busiest processes (names only, never command lines);
+  - last eight Events.
 - `new` creates a FULL persistent Session and prints its ID.
 - `attach` connects the current terminal. Detach with `Ctrl+J`. The legacy
   `Ctrl-\`, then `d` sequence remains available for compatibility.

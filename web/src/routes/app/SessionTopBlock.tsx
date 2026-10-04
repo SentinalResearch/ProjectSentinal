@@ -1,7 +1,9 @@
 import { Button } from "../../components/Button";
-import { extractPort, type SessionKind } from "../../data/format";
+import { extractPort, formatLearningRate, lossOf, type SessionKind } from "../../data/format";
 import type { Session } from "../../data/types";
 import styles from "./SessionTopBlock.module.css";
+
+const TREND = { IMPROVING: "↓ improving", STABLE: "→ stable", WORSENING: "↑ worsening" } as const;
 
 export interface SessionTopBlockProps {
   session: Session;
@@ -54,6 +56,8 @@ export function SessionTopBlock({
     const vram = session.metrics?.vramGB;
     const vramTotal = session.metrics?.vramTotalGB;
     const vramPct = vram !== undefined && vramTotal ? Math.min(100, (vram / vramTotal) * 100) : undefined;
+    const loss = lossOf(session);
+    const training = session.training;
     return (
       <section className={styles.training}>
         <div className={styles.percentCol}>
@@ -74,11 +78,20 @@ export function SessionTopBlock({
           </div>
         </div>
 
-        {session.metrics?.loss && (
+        {loss && (
           <div className={styles.metricCol}>
             <span className={styles.metricLabel}>LOSS</span>
-            <span className={styles.metricValue}>{session.metrics.loss.to}</span>
-            <span className={styles.metricCaption}>from {session.metrics.loss.from}</span>
+            <span className={styles.metricValue}>{loss.to}</span>
+            <span className={styles.metricCaption}>
+              {[
+                loss.from !== undefined ? `from ${loss.from}` : null,
+                training && training.trend !== "UNKNOWN" ? `${TREND[training.trend]}` : null,
+                training?.bestValLoss !== undefined ? `best val ${training.bestValLoss}` : null,
+                training?.learningRate !== undefined ? `lr ${formatLearningRate(training.learningRate)}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
           </div>
         )}
 

@@ -281,6 +281,9 @@ pub struct Session {
     /// Latest deterministic watcher Health, if observations have produced one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health: Option<Health>,
+    /// Latest training numbers read from output, if the run looks like training.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub training: Option<crate::TrainingSummary>,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -313,6 +316,7 @@ impl Session {
             log: None,
             continued_from: None,
             health: None,
+            training: None,
             created_at: at,
             updated_at: at,
         }

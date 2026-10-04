@@ -10,6 +10,7 @@
       "shell": "/bin/zsh", "cwd": "~/Projects/TIM", "state": "RUNNING",
       "current_command": 8192, "origin": "WATCH", "capture": "FULL", "pid": 4242,
       "process_started_at": 1790000000000, "exit_code": null, "log": null,
+      "training": { "loss": 0.362, "first_loss": 1.84, "best_val_loss": 0.41, "learning_rate": 0.0002, "trend": "IMPROVING" },
       "created_at": 1790000000000, "updated_at": 1790000120000 } } },
   { "version": 1, "payload": { "type": "COMMAND_UPDATED", "command": {
       "id": 8192, "session_id": 128, "machine_id": "rtx-pc",

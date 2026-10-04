@@ -53,6 +53,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
             prompt: event.session.prompt ?? prev[idx].prompt,
             details: prev[idx].details ?? event.session.details,
             metrics: event.session.metrics ?? prev[idx].metrics,
+            training: event.session.training ?? prev[idx].training,
           };
           return next;
         });

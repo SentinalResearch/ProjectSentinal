@@ -9,6 +9,7 @@ import type { SessionLog } from "./SessionLog";
 import type { SessionOrigin } from "./SessionOrigin";
 import type { SessionState } from "./SessionState";
 import type { Timestamp } from "./Timestamp";
+import type { TrainingSummary } from "./TrainingSummary";
 
 /**
  * A persistent terminal on one machine.
@@ -78,6 +79,10 @@ export type Session = {
    * Latest deterministic watcher Health, if observations have produced one.
    */
   health?: Health | null;
+  /**
+   * Latest training numbers read from output, if the run looks like training.
+   */
+  training?: TrainingSummary | null;
   /**
    * When the session was created.
    */

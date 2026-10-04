@@ -25,6 +25,17 @@ pub enum Command {
     /// List sessions on the daemon.
     #[command(name = "ls")]
     List,
+    /// Live text view of this Machine's load and running Sessions.
+    Top {
+        /// Print one snapshot and exit (also the default when not on a terminal).
+        #[arg(long)]
+        once: bool,
+    },
+    /// One Session's progress, training numbers, health, processes, and Events.
+    Status {
+        /// Session ID.
+        id: u64,
+    },
     /// Create a new persistent session.
     New {
         /// Initial working directory.
@@ -106,7 +117,7 @@ pub enum Command {
     /// Machine, then type it at the hidden prompt. The code is never accepted
     /// on the command line.
     Connect {
-        /// Control origin, e.g. https://sentinal-control.<tailnet>.ts.net.
+        /// Control origin, e.g. `https://sentinal-control.<tailnet>.ts.net`.
         control_url: String,
         /// Display name to propose (defaults to the hostname).
         #[arg(long)]

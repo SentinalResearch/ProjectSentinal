@@ -8,6 +8,7 @@ pub mod config;
 pub mod control;
 pub mod entry;
 pub mod framing;
+pub mod gpu_smi;
 pub mod identity;
 pub mod insights;
 pub mod link;

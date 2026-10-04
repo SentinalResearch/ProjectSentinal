@@ -55,6 +55,35 @@ fn candidates_are_same_user_and_exclude_self_parent_ps_and_sentinald() {
 }
 
 #[test]
+fn candidates_rank_by_elapsed_time_before_truncating_high_pids() {
+    let mut input = rows();
+    for offset in 0..45 {
+        input.push(PsRow {
+            pid: 10_000 + offset,
+            ppid: 500,
+            uid: 501,
+            elapsed: format!("02:{offset:02}:00"),
+            args: format!("old-job-{offset}"),
+        });
+    }
+    input.push(PsRow {
+        pid: 42,
+        ppid: 500,
+        uid: 501,
+        elapsed: "00:01".into(),
+        args: "new-low-pid-job".into(),
+    });
+
+    let listed = candidates(&input, 600);
+    assert_eq!(listed.len(), 40);
+    assert_eq!(
+        listed[0].pid, 42,
+        "the newest process must survive truncation"
+    );
+    assert!(listed.iter().all(|row| row.args != "old-job-44"));
+}
+
+#[test]
 fn choices_accept_list_numbers_and_listed_pids_only() {
     let listed = candidates(&rows(), 600);
     assert_eq!(choose(&listed, "1\n"), Choice::Adopt(950));

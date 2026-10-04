@@ -42,6 +42,7 @@ pub mod recipe;
 pub mod session;
 pub mod session_log;
 pub mod time;
+pub mod training;
 
 pub use auth::{
     AuthChangePasswordRequest, AuthFailure, AuthFailureCode, AuthLoginRequest, AuthSession,
@@ -74,3 +75,4 @@ pub use recipe::{Recipe, RecipeParam};
 pub use session::{CaptureCapabilities, CaptureLevel, Session, SessionOrigin, SessionState};
 pub use session_log::{LogSource, SessionLog};
 pub use time::{DurationMs, Timestamp};
+pub use training::{LossTrend, TrainingSummary};

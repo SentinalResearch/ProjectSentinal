@@ -77,6 +77,8 @@ export interface Session {
   result?: SessionResult;
   prompt?: string;
   health?: SessionHealth;
+  /** Training numbers the watcher read from the run's output. */
+  training?: TrainingView;
   events?: SessionEvent[];
   /** How the Session entered Sentinal; absent means UI. */
   origin?: SessionOrigin;
@@ -197,4 +199,12 @@ export interface MachineMetricSample {
   ramPct?: number;
   gpuPct?: number;
   vramPct?: number;
+}
+
+export interface TrainingView {
+  loss?: number;
+  firstLoss?: number;
+  bestValLoss?: number;
+  learningRate?: number;
+  trend: "UNKNOWN" | "IMPROVING" | "STABLE" | "WORSENING";
 }

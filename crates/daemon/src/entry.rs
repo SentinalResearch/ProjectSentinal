@@ -543,7 +543,7 @@ fn machine_description() -> Machine {
             .map(|cores| u32::try_from(cores.get()).unwrap_or(u32::MAX))
             .unwrap_or(1),
         ram_bytes,
-        gpus: vec![],
+        gpus: crate::gpu_smi::inventory(),
         status: MachineStatus::Online,
         last_seen: now(),
         role: None,

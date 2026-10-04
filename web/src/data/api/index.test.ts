@@ -8,7 +8,7 @@ import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { Session as WireSession } from "../../protocol/Session";
 import type { Command } from "../../protocol/Command";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
-import { createApiAdapter, type ApiSocket } from ".";
+import { createApiAdapter, mapSession, type ApiSocket } from ".";
 
 const machine: WireMachine = {
   id: "test-machine",
@@ -436,6 +436,21 @@ describe("apiAdapter authentication", () => {
       expect.objectContaining({ id: "test-machine:1", machine: "test-machine", name: "Session 1", state: "IDLE" }),
     ]);
     expect(sockets).toHaveLength(1);
+  });
+
+  it("maps the watcher's training summary onto the Session", () => {
+    const mapped = mapSession({
+      ...session,
+      training: { loss: 0.362, first_loss: 1.84, best_val_loss: null, learning_rate: 0.0002, trend: "IMPROVING" },
+    });
+    expect(mapped.training).toEqual({
+      loss: 0.362,
+      firstLoss: 1.84,
+      bestValLoss: undefined,
+      learningRate: 0.0002,
+      trend: "IMPROVING",
+    });
+    expect(mapped.metrics).toBeUndefined();
   });
 
   it("loads persisted watcher Events and deterministic Health without parsing terminal text", async () => {

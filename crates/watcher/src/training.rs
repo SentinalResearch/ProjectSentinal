@@ -1,20 +1,7 @@
 //! Training progress, scalar, trend, and checkpoint recognition.
 
 use crate::{AdapterState, Observation, ObservationKind, WatcherAdapter};
-use protocol::{Command, EventKind};
-
-/// Direction of recent validation-loss movement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LossTrend {
-    /// No pair of validation values has been observed.
-    Unknown,
-    /// Validation loss decreased.
-    Improving,
-    /// Validation loss did not materially move.
-    Stable,
-    /// Validation loss increased.
-    Worsening,
-}
+use protocol::{Command, EventKind, LossTrend, TrainingSummary};
 
 /// Current structured state extracted from training output.
 #[derive(Debug, Clone, PartialEq)]
@@ -27,6 +14,8 @@ pub struct TrainingState {
     pub unit: Option<String>,
     /// Most recent training loss.
     pub last_loss: Option<f64>,
+    /// First training loss seen.
+    pub first_loss: Option<f64>,
     /// Best validation loss seen.
     pub best_val_loss: Option<f64>,
     /// Most recent learning rate.
@@ -50,12 +39,36 @@ impl TrainingAdapter {
                 total: None,
                 unit: None,
                 last_loss: None,
+                first_loss: None,
                 best_val_loss: None,
                 learning_rate: None,
                 trend: LossTrend::Unknown,
             },
             last_val_loss: None,
         }
+    }
+}
+
+impl TrainingAdapter {
+    /// The wire summary, once any training number has been read.
+    pub fn summary(&self) -> Option<TrainingSummary> {
+        self.state.summary()
+    }
+}
+
+impl TrainingState {
+    /// The wire summary, once any training number has been read.
+    pub fn summary(&self) -> Option<TrainingSummary> {
+        let known = self.last_loss.is_some()
+            || self.best_val_loss.is_some()
+            || self.learning_rate.is_some();
+        known.then_some(TrainingSummary {
+            loss: self.last_loss,
+            first_loss: self.first_loss,
+            best_val_loss: self.best_val_loss,
+            learning_rate: self.learning_rate,
+            trend: self.trend,
+        })
     }
 }
 
@@ -107,6 +120,7 @@ impl WatcherAdapter for TrainingAdapter {
             );
         }
         self.state.last_loss = scalar(line, "loss").or(self.state.last_loss);
+        self.state.first_loss = self.state.first_loss.or(self.state.last_loss);
         self.state.learning_rate = scalar(line, "learning_rate")
             .or_else(|| scalar(line, "lr"))
             .or(self.state.learning_rate);

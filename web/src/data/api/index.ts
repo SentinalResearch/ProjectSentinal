@@ -206,6 +206,15 @@ export function mapSession(session: WireSession): Session {
     shell: session.shell,
     events: [],
     health: session.health ? mapHealth(session.health) : undefined,
+    training: session.training
+      ? {
+          loss: session.training.loss ?? undefined,
+          firstLoss: session.training.first_loss ?? undefined,
+          bestValLoss: session.training.best_val_loss ?? undefined,
+          learningRate: session.training.learning_rate ?? undefined,
+          trend: session.training.trend,
+        }
+      : undefined,
     origin: session.origin,
     capture: session.capture,
     exitCode: session.exit_code,

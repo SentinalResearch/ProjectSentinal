@@ -10,7 +10,7 @@ mod health;
 mod observation;
 mod pytest;
 mod server;
-mod training;
+pub mod training;
 
 pub use adapter::{AdapterState, WatcherAdapter};
 pub use declarative::{DeclarativeAdapter, DeclarativeError, DeclarativeState};

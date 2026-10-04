@@ -23,8 +23,8 @@
 //! assert_eq!(recipe.render(&values).unwrap(), "vllm serve Qwen/Qwen3-8B --port 9000");
 //! ```
 //!
-//! **Safety:** parameter values are shell-quoted when they contain anything
-//! other than plain characters, so a value can never inject a second command.
+//! **Safety:** placeholders must be standalone, unquoted shell words. Parameter
+//! values are then shell-quoted, so a value cannot inject shell syntax.
 
 use crate::{MachineId, ProtocolError};
 use serde::{Deserialize, Serialize};
@@ -93,13 +93,36 @@ enum Part<'a> {
     Param(&'a str),
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ShellQuote {
+    #[default]
+    Unquoted,
+    Single,
+    Double,
+    Backtick,
+}
+
 impl Recipe {
     /// Check the template: braces are balanced and every `{name}` is declared.
     pub fn validate(&self) -> Result<(), ProtocolError> {
-        for part in parse_template(&self.command)? {
-            if let Part::Param(name) = part {
-                if !self.params.iter().any(|p| p.name == name) {
-                    return Err(ProtocolError::UndeclaredPlaceholder(name.to_string()));
+        let parts = parse_template(&self.command)?;
+        let mut quote = ShellQuote::Unquoted;
+        for (index, part) in parts.iter().enumerate() {
+            match part {
+                Part::Text(text) => quote = quote_after(text, quote),
+                Part::Param(name) => {
+                    if !self.params.iter().any(|p| p.name == *name) {
+                        return Err(ProtocolError::UndeclaredPlaceholder(name.to_string()));
+                    }
+                    let left_safe = index == 0
+                        || matches!(&parts[index - 1], Part::Text(text) if text.chars().last().is_some_and(char::is_whitespace));
+                    let right_safe = index + 1 == parts.len()
+                        || matches!(&parts[index + 1], Part::Text(text) if text.chars().next().is_some_and(char::is_whitespace));
+                    if quote != ShellQuote::Unquoted || !left_safe || !right_safe {
+                        return Err(ProtocolError::InvalidRecipePlaceholderContext(
+                            name.to_string(),
+                        ));
+                    }
                 }
             }
         }
@@ -144,6 +167,44 @@ impl Recipe {
             .find(|p| p.name == name)
             .and_then(|p| p.default.as_ref())
     }
+}
+
+/// Shell quote state after literal template text. Parameter values are safe to
+/// interpolate only in the unquoted state; shell quotes inside a value cannot
+/// protect it when the template has already opened quotes or backticks.
+fn quote_after(text: &str, mut quote: ShellQuote) -> ShellQuote {
+    let mut escaped = false;
+    for character in text.chars() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match quote {
+            ShellQuote::Unquoted => match character {
+                '\\' => escaped = true,
+                '\'' => quote = ShellQuote::Single,
+                '"' => quote = ShellQuote::Double,
+                '`' => quote = ShellQuote::Backtick,
+                _ => {}
+            },
+            ShellQuote::Single => {
+                if character == '\'' {
+                    quote = ShellQuote::Unquoted;
+                }
+            }
+            ShellQuote::Double => match character {
+                '\\' => escaped = true,
+                '"' => quote = ShellQuote::Unquoted,
+                _ => {}
+            },
+            ShellQuote::Backtick => match character {
+                '\\' => escaped = true,
+                '`' => quote = ShellQuote::Unquoted,
+                _ => {}
+            },
+        }
+    }
+    quote
 }
 
 /// Split a template into literal text and `{param}` parts.
@@ -300,6 +361,40 @@ mod tests {
     #[test]
     fn validate_fails_on_empty_placeholder() {
         assert!(recipe("run {}", vec![]).validate().is_err());
+    }
+
+    #[test]
+    fn placeholder_inside_quotes_cannot_turn_data_into_shell_substitution() {
+        for template in [
+            "printf '%s\\n' \"{value}\"",
+            "printf \"prefix {value} suffix\\n\"",
+            "printf 'prefix {value} suffix\\n'",
+            "printf `echo {value}`",
+        ] {
+            let r = recipe(template, vec![RecipeParam::required("value")]);
+            assert_eq!(
+                r.render(&values(&[("value", "$(printf AUDIT_MARKER)")])),
+                Err(ProtocolError::InvalidRecipePlaceholderContext(
+                    "value".into()
+                )),
+                "{template}"
+            );
+        }
+    }
+
+    #[test]
+    fn placeholder_adjacent_to_assignment_or_path_is_rejected() {
+        for template in [
+            "PORT={value} server",
+            "cat /tmp/{value}",
+            "echo {value}.txt",
+        ] {
+            let r = recipe(template, vec![RecipeParam::required("value")]);
+            assert!(matches!(
+                r.validate(),
+                Err(ProtocolError::InvalidRecipePlaceholderContext(_))
+            ));
+        }
     }
 
     #[test]

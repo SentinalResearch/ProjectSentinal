@@ -163,6 +163,44 @@ async fn dispatch(
         Command::Attach { id } => {
             let _ = client.attach(SessionId(id)).await?;
         }
+        Command::Top { once } => {
+            let live = !once && std::io::stdout().is_terminal();
+            loop {
+                let text = crate::top::render_top(
+                    &crate::top::fetch(&mut client, crate::hook_report::now()).await?,
+                );
+                if live {
+                    // Home and clear, then redraw in place.
+                    let _ = write!(
+                        out,
+                        "\x1b[H\x1b[2J{text}\nRefreshing every 2 s · Ctrl-C to quit\n"
+                    );
+                } else {
+                    let _ = write!(out, "{text}");
+                }
+                let _ = out.flush();
+                if !live {
+                    break;
+                }
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {}
+                    _ = tokio::signal::ctrl_c() => break,
+                }
+            }
+        }
+        Command::Status { id } => {
+            let snapshot = crate::top::fetch(&mut client, crate::hook_report::now()).await?;
+            let Some(session) = snapshot.sessions.iter().find(|session| session.id.0 == id) else {
+                let _ = writeln!(err, "sentinal: no Session {id} on this Machine");
+                return Ok(ExitCode::FAILURE);
+            };
+            let events = crate::top::fetch_events(&mut client, session.id).await?;
+            let _ = write!(
+                out,
+                "{}",
+                crate::top::render_status(&snapshot, session, &events)
+            );
+        }
         Command::Kill { id } => {
             match client
                 .request(ClientRequest::Kill {

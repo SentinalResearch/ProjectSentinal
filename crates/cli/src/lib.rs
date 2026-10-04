@@ -16,5 +16,6 @@ pub mod hook_report;
 pub mod hook_script;
 pub mod rc_file;
 pub mod rc_install;
+pub mod top;
 pub mod update;
 pub mod watch;

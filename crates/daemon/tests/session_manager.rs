@@ -811,8 +811,18 @@ async fn unterminated_training_output_persists_watcher_events_and_session_health
         stored.health.as_ref().and_then(|health| health.progress),
         Some(70.0)
     );
+    assert_eq!(
+        stored.training.as_ref().and_then(|training| training.loss),
+        Some(0.42)
+    );
 
     wait_for_state(&manager, session.id, SessionState::Completed).await;
+    let stored = store.session(session.id).unwrap().unwrap();
+    assert_eq!(stored.current_command, None);
+    let commands = store.history(Some(session.id), 10).unwrap();
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0].exit_code, Some(0));
+    assert!(commands[0].finished_at.is_some());
     fs::remove_dir_all(data_dir).unwrap();
 }
 

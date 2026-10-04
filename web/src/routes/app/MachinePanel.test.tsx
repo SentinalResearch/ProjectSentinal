@@ -57,7 +57,7 @@ describe("Machine view", () => {
   it("shows the busiest processes of each running Session", async () => {
     renderMachine("rtx");
     const processes = await screen.findByRole("region", { name: "Processes" }, { timeout: 5000 });
-    expect(within(processes).getByText("Qwen Training")).toBeInTheDocument();
+    expect(await within(processes).findByText("Qwen Training", {}, { timeout: 5000 })).toBeInTheDocument();
     expect(within(processes).getAllByText("worker").length).toBeGreaterThan(0);
   });
 

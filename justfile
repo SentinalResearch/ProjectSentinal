@@ -50,6 +50,7 @@ check:
     cargo test --workspace
     just gen-ts --check
     pnpm -C web check
+    python3 -m unittest discover -s eval -p 'test_*.py'
     bash scripts/tests/run-network-test.sh
     bash scripts/tests/run-roles-test.sh
     bash scripts/tests/install-worker-test.sh

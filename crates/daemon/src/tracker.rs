@@ -118,6 +118,19 @@ impl CommandTracker {
         self.current.take()
     }
 
+    /// Finish a running Command when its shell exits before reporting an end marker.
+    pub fn finish_on_shell_exit(
+        &mut self,
+        session: &mut Session,
+        exit_code: i32,
+        at: Timestamp,
+    ) -> Result<TrackerUpdate, TrackerError> {
+        if self.current.is_none() {
+            return Ok(TrackerUpdate::default());
+        }
+        self.finish(session, exit_code, at)
+    }
+
     fn start(
         &mut self,
         session: &mut Session,
@@ -260,6 +273,27 @@ mod tests {
             .unwrap();
         assert_eq!(command.status(), CommandStatus::Failed);
         assert_eq!(command.exit_code, Some(130));
+    }
+
+    #[test]
+    fn shell_exit_finishes_the_current_command_but_is_quiet_at_a_prompt() {
+        let (mut session, mut tracker) = setup();
+        assert_eq!(
+            tracker
+                .finish_on_shell_exit(&mut session, 0, Timestamp(10))
+                .unwrap(),
+            TrackerUpdate::default()
+        );
+
+        start(&mut tracker, &mut session, "exec python train.py", 100);
+        let update = tracker
+            .finish_on_shell_exit(&mut session, 137, Timestamp(200))
+            .unwrap();
+        let command = update.command.unwrap();
+        assert_eq!(command.exit_code, Some(137));
+        assert_eq!(command.finished_at, Some(Timestamp(200)));
+        assert_eq!(session.current_command, None);
+        assert_eq!(session.state, SessionState::Idle);
     }
 
     #[test]
