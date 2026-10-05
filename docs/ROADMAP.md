@@ -225,8 +225,24 @@ prompt, and see the stable Machine ID appear under that display name.
 - [x] "Save as recipe" after a successful command
 - [x] ntfy notifications for completed / failed / waiting / stalled
 - [x] Phone PWA shell: Machines → Sessions → attach → run Recipe at 390×844
-- [ ] Serve and verify the production-built PWA from the authenticated control origin
+- [x] Serve and verify the production-built PWA from the authenticated control origin
 - [ ] Complete the two-real-Machine V1 demo in `docs/progress/milestone-4b.md`
+
+## Milestone 4.C — Real notifications and mobile acceptance
+- [x] Inspect the current notification, authentication, routing, package-service, and PWA boundaries
+- [x] Approve the notification delivery, navigation, production PWA, and browser-cookie design
+- [x] Deliver structured Event notifications through a bounded persistent retry queue
+- [x] Keep notification text and journal metadata free of output, Command text, paths, and credentials
+- [x] Route ntfy actions through login to an exact namespaced Machine and Session
+- [x] Replace production browser bearer storage and WebSocket query tokens with an HttpOnly owner cookie
+- [x] Package and atomically serve the production PWA from the existing Tailnet control origin
+- [x] Show per-Machine notification configuration and bounded delivery history on mobile
+- [x] Pass production-build Playwright with two fake workers and `just acceptance`
+- [ ] Complete and record real-phone acceptance against the macOS and Linux workers
+
+**Demo:** a structured Event on either enrolled Machine reaches the owner's
+phone; tapping it signs in when necessary and opens that exact Machine and
+Session in the production Tailnet PWA.
 
 ## Reliability R1 — Daemon-restart-resilient FULL Sessions
 - [ ] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation
