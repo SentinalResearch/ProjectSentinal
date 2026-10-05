@@ -64,6 +64,7 @@ Default installed paths:
 | Config/token/password hash | `~/.config/terminal-agent/` |
 | SQLite/logs/audit/runtime | `~/.local/share/terminal-agent/` |
 | Shell-hook package assets | `~/.local/share/sentinal/shell/` |
+| Production PWA assets | `~/.local/share/sentinal/web/` |
 | macOS service | `~/Library/LaunchAgents/dev.sentinal.sentinald.plist` |
 | Linux service | `~/.config/systemd/user/sentinald.service` |
 
@@ -112,6 +113,7 @@ listen = "127.0.0.1:7422"
 directory = "/Users/OWNER/.local/share/terminal-agent/packages"
 public_base_url = "https://sentinal-control.TAILNET.ts.net"
 max_artifact_bytes = 268435456
+web_root = "/Users/OWNER/.local/share/sentinal/web"
 ```
 
 The daemon rejects plain HTTP, URL paths/ports/credentials, non-`.ts.net`
@@ -205,6 +207,11 @@ control$ tailscale serve status
 control$ curl --fail https://sentinal-control.TAILNET.ts.net/api/v1/health
 ```
 
+The `/` mapping serves the installed production PWA and package resources
+from port 7422; `/api` takes precedence and goes to the authenticated daemon
+API. This is the supported phone/PWA deployment. Vite remains a development
+tool and is not used for production or real-device acceptance.
+
 `allowed_origins` lists exact browser origins. An empty list admits no
 browser at all (the CLI and worker links still work). `*`, `null`, paths,
 and plain-HTTP origins are refused unless `development = true`, which only
@@ -257,6 +264,75 @@ refuses Machine links, and `sentinal identity reset` replaces it explicitly.
 are refused until you add `allowed_origins` (for the `just control` proxy in
 development: `development = true` and `allowed_origins =
 ["http://CONTROL_IP:5173"]`).
+
+## Configure real notifications
+
+Notification configuration is Machine-local and independent from package,
+owner-login, and Machine-link credentials. On every control or worker Machine
+that should deliver notifications, create the default file without putting a
+token in argv or shell history:
+
+```console
+$ umask 077
+$ mkdir -p ~/.config/terminal-agent
+$ $EDITOR ~/.config/terminal-agent/notify.toml
+$ chmod 600 ~/.config/terminal-agent/notify.toml
+```
+
+Use this shape, entering the real values only in the editor:
+
+```toml
+server = "https://ntfy.example"
+topic = "PRIVATE_TOPIC"
+token = "OPTIONAL_PRIVATE_TOKEN"
+```
+
+The file and its parent must belong to the current user; the file must be a
+regular non-symlink with mode `0600`. Production requires HTTPS. A missing
+file reports `unavailable`; an unsafe or invalid file reports `invalid` with a
+redacted field-level diagnostic. `sentinald` reloads a valid change without
+requiring a restart and keeps the last known-good configuration if a later
+edit is invalid.
+
+Settings → Notifications shows each Machine's configuration state, server
+origin, topic, whether a token is configured, and bounded delivery history.
+It never returns the token. Delivery states distinguish `queued`, `retrying`,
+`delivered`, `permanently failed`, `deduplicated`, `rule disabled`, and
+`not configured`. Previews are explicitly labelled; ntfy and the phone OS
+control final lock-screen layout and colors.
+
+Test the real pipeline with a normal watched Command rather than a fabricated
+UI Event:
+
+```console
+$ sentinal watch -t "Notification success" -- sh -c 'exit 0'
+$ sentinal watch -t "Notification failure" -- sh -c 'exit 7'
+$ sentinal watch -t "Waiting check" -- sh -c 'printf "Continue? [y/N] "; read answer'
+```
+
+Detach with `Ctrl+J` after starting the waiting test. The stored structured
+Event drives delivery; notification text never copies the terminal line or
+Command. Retriable timeout/connection/`429`/`5xx` results use four total
+attempts with bounded backoff and survive daemon restart in SQLite. Permanent
+`4xx` responses stop. Delivery work is bounded to four concurrent requests.
+
+Back up `notify.toml` only through a credential-safe secret backup. To disable
+notifications without exposing it, move or delete that exact file and verify
+Settings reports unavailable. Never paste it into logs or bug reports.
+
+## Production PWA install, update, and recovery
+
+The worker release includes `web/dist`, and the installer atomically installs
+it under `~/.local/share/sentinal/web`. Configure `[packages].web_root` to that
+absolute directory and open the `.ts.net` HTTPS origin on the phone. Use the
+browser's Add to Home Screen/Install action; login uses a Secure HttpOnly
+cookie, not browser storage or a WebSocket query token.
+
+The service worker caches only the public shell. Navigation is network-first,
+and an available update shows an explicit Refresh action. Package rollback
+restores the previous complete shell. If a phone retained a broken shell,
+remove the installed PWA/site data and reopen the HTTPS origin; no Session
+output or authentication data is meant to exist in Cache Storage.
 
 ## First start and authentication
 
@@ -458,9 +534,10 @@ command in `docs/progress/milestone-1c.md`.
 - Machine enrollment, isolated heartbeats/revocation, concurrent aggregation,
   worker identity proof, and Machine-scoped terminal/data routing are
   implemented. There is no vendor cloud or required central service.
-- The browser UI is still served by the Vite development server; a
-  production UI build behind Tailscale Serve is not shipped yet.
-- The worker package is exactly `sentinald`, `sentinal`, and shell assets.
+- The production PWA is installed with the worker bundle and served from the
+  authenticated Tailnet control origin; Vite is development-only.
+- The worker package is `sentinald`, `sentinal`, shell assets, and the PWA
+  shell.
   There is no separate watcher-agent process; Milestone 3's deterministic
   watcher is linked into `sentinald`.
 - Tailscale supplies private networking and access policy. Sentinal does not
@@ -470,8 +547,8 @@ command in `docs/progress/milestone-1c.md`.
 - Watcher-derived progress, health, errors, structured training summaries,
   and adopted-log tailing are implemented. Real mode shows only data supplied
   by the selected daemon; fixture data requires explicit demo mode.
-- Browser bearer transport, credential-refresh recovery, bounded sensitive
-  storage, login-throttle hardening, and the real two-Machine V1 run remain
+- Credential-refresh recovery, bounded sensitive storage, login-throttle
+  hardening, and the real two-Machine/phone V1 run remain
   release gates in `docs/AUDIT_TRACKER.md`.
 
 ## Onboarding boundary

@@ -6,7 +6,9 @@ import { join } from "node:path";
 const tempBase = process.platform === "darwin" ? "/private/tmp" : realpathSync(tmpdir());
 // Workers re-evaluate this file; they must reuse the daemon's directory.
 const testRoot = process.env.SENTINAL_E2E_ROOT ?? join(tempBase, `sentinal-e2e-${process.pid}-${Date.now()}`);
+const ntfyLog = join(testRoot, "ntfy.jsonl");
 process.env.SENTINAL_E2E_ROOT = testRoot;
+process.env.SENTINAL_E2E_NTFY_LOG = ntfyLog;
 mkdirSync(testRoot, { recursive: true, mode: 0o700 });
 
 /**
@@ -19,6 +21,7 @@ function daemon(name, port, extra) {
   const token = join(root, "token");
   const auth = join(root, "auth.json");
   const config = join(root, "daemon.toml");
+  const notify = join(root, "notify.toml");
   writeFileSync(token, `${name}-token\n`, { mode: 0o600 });
   writeFileSync(
     config,
@@ -28,6 +31,7 @@ function daemon(name, port, extra) {
       "scrollback_lines = 100",
       `token_file = ${JSON.stringify(token)}`,
       `auth_file = ${JSON.stringify(auth)}`,
+      `notify_file = ${JSON.stringify(notify)}`,
       `local_socket = ${JSON.stringify(join(root, "run", "sentinald.sock"))}`,
       `identity_file = ${JSON.stringify(join(root, "machine-id.json"))}`,
       `link_file = ${JSON.stringify(join(root, "link.json"))}`,
@@ -36,6 +40,11 @@ function daemon(name, port, extra) {
       ...extra,
       "",
     ].join("\n"),
+    { mode: 0o600 },
+  );
+  writeFileSync(
+    notify,
+    'server = "http://127.0.0.1:7440"\ntopic = "sentinal-e2e"\ntoken = "fake-private-token"\n',
     { mode: 0o600 },
   );
   return {
@@ -63,6 +72,7 @@ writeFileSync(join(control.root, "token"), "test-token\n", { mode: 0o600 });
 // Specs reach daemons through their private local sockets.
 process.env.SENTINAL_E2E_SOCKET = control.socket;
 process.env.SENTINAL_E2E_CONTROL_URL = "http://127.0.0.1:7421";
+process.env.SENTINAL_E2E_CONTROL_WS = "ws://127.0.0.1:7421/api/v1/ws";
 process.env.SENTINAL_E2E_WORKER_A = workerA.socket;
 process.env.SENTINAL_E2E_WORKER_B = workerB.socket;
 process.env.SENTINAL_E2E_WORKER_A_URL = "ws://127.0.0.1:7431/api/v1/ws";
@@ -93,12 +103,19 @@ export default defineConfig({
     { name: "enrollment", testMatch: "enrollment.spec.ts", dependencies: ["adopted"] },
   ],
   webServer: [
+    {
+      command: `SENTINAL_NTFY_LOG=${ntfyLog} node e2e/support/fake-ntfy.mjs`,
+      cwd: ".",
+      url: "http://127.0.0.1:7440/health",
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
     daemonServer(control),
     daemonServer(workerA),
     daemonServer(workerB),
     {
       command:
-        "VITE_DATA=api VITE_DAEMON_PROXY_TARGET=http://127.0.0.1:7421 pnpm dev --host 127.0.0.1 --port 4173",
+        "VITE_DATA=api VITE_DAEMON_PROXY_TARGET=http://127.0.0.1:7421 pnpm build && VITE_DAEMON_PROXY_TARGET=http://127.0.0.1:7421 pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort",
       url: "http://127.0.0.1:4173",
       reuseExistingServer: false,
       timeout: 60_000,

@@ -22,11 +22,12 @@ checkbox are complete. The live remediation status is in `AUDIT_TRACKER.md`.
   mode currently accepts `Tailscale-User-Login` from a loopback proxy; a
   second global limiter is still required because another local process can
   spoof that header and vary the key.
-- The current web client stores its 24-hour owner bearer in `localStorage` and
-  supplies it in the terminal WebSocket query. Replacing that transport with
-  an HttpOnly owner cookie or a short-lived one-use WebSocket ticket is a V1
-  release blocker; deployments must treat same-origin script access and URL
-  logging as credential exposure until it is fixed.
+- Browser authentication uses a same-origin owner Session cookie. Production
+  cookies are `Secure`, `HttpOnly`, `SameSite=Strict`, scoped to `/`, and have
+  no `Domain`; JavaScript never receives the bearer and WebSocket URLs contain
+  no credential. A separately named non-Secure cookie exists only when the
+  daemon is explicitly in development mode. CLI and Machine clients continue
+  to use bearer/link headers, and production rejects query-token auth.
 - Every remote terminal input frame appends timestamp, client address,
   Session ID, and byte count to `audit.jsonl`. The input payload is excluded.
 - Finished FULL Sessions reject input, resize, signal, and kill before a PTY
@@ -161,6 +162,30 @@ API:
 - `sentinal update` takes its origin only from owner-written release metadata
   and revalidates a credential-free HTTPS `.ts.net` origin. Downloaded
   bootstrap scripts are capped at 64 KiB.
+
+## Notification and production PWA boundaries
+
+- Only stored structured Events enter notification rules. Delivery never
+  scrapes terminal output independently, and presentation omits raw lines,
+  Command text, checkpoint paths, topics, and credentials.
+- `notify.toml` must be a same-user-owned regular file with mode `0600` in an
+  owner-only directory. Its token is sent only in the ntfy authorization
+  header and is never returned to the browser, journal, audit log, or error.
+- The SQLite outbox bounds pending work, concurrency, attempts, retry delays,
+  and retained terminal delivery history. Event work only enqueues, so a slow
+  notification server cannot block PTY, Metrics, or watcher processing.
+- Notification actions are built only from a verified HTTPS control origin
+  and encoded Machine and Session IDs. An unpaired worker omits the action.
+  Terminal output, titles, Commands, and Event text never become a URL.
+- The installed PWA shell is served from the loopback package listener through
+  Tailscale Serve. Only allow-listed files below the configured web root are
+  readable; symlinks, traversal, unknown paths, and oversized files fail
+  closed. API, WebSocket, auth, replay, pairing, and package routes take
+  precedence over SPA fallback.
+- The service worker caches only the versioned public app shell. It bypasses
+  API/package routes and never caches authentication responses, terminal
+  bytes, notification data, or Machine credentials. Packaged releases get a
+  distinct cache identity and remove old shell caches on activation.
 
 ## Data Sentinal records
 

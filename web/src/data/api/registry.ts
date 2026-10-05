@@ -4,7 +4,7 @@ import type { PairingCodeStatus } from "../../protocol/PairingCodeStatus";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import type { RegistryMachines } from "../../protocol/RegistryMachines";
 import { RegistryError, type DataAdapter } from "../adapter";
-import { SESSION_TOKEN_KEY, type TokenStorage } from "./auth";
+import type { TokenStorage } from "./auth";
 
 interface RegistryApiOptions {
   baseUrl: string;
@@ -13,22 +13,23 @@ interface RegistryApiOptions {
 }
 
 /**
- * Control-Machine registry over HTTP. Only the owner's browser Session token
- * is sent; worker credentials and Machine tokens never reach the browser, and
- * pairing codes exist only in the response body held in component state.
+ * Control-Machine registry over HTTP. The owner's HttpOnly browser cookie is
+ * attached by the browser; worker credentials and Machine tokens never reach
+ * JavaScript, and pairing codes exist only in component memory.
  */
 export function createRegistryApi(options: RegistryApiOptions): DataAdapter["registry"] {
-  const { baseUrl, fetcher, storage } = options;
+  const { baseUrl, fetcher } = options;
+  // Kept in the options contract while older callers migrate. It is never read.
+  void options.storage;
 
   const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-    const token = storage.getItem(SESSION_TOKEN_KEY);
     let response: Response;
     try {
       response = await fetcher(`${baseUrl}${path}`, {
         ...init,
+        credentials: "same-origin",
         headers: {
           ...(init.body ? { "content-type": "application/json" } : {}),
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
       });
     } catch {

@@ -1,8 +1,9 @@
 # Milestone 4.B progress — Recipes, notifications, mobile dashboard (V1)
 
-Status: **implementation and isolated acceptance complete on 2026-10-04;
-the two-real-Machine V1 demo is pending.** The roadmap's final box stays open
-until the run below is appended with its literal output.
+Status: **implementation and isolated acceptance complete; Milestone 4.C
+hardening is implemented, and the combined two-real-Machine/phone V1 demo is
+pending.** The roadmap's final box stays open until the run below is appended
+with its literal output.
 
 Milestone implementation acceptance below was recorded at commit `9cb5a95`;
 the audit-hardening regression checks are recorded in `docs/AUDIT_TRACKER.md`.
@@ -58,9 +59,9 @@ the audit-hardening regression checks are recorded in `docs/AUDIT_TRACKER.md`.
 - Capture honesty: an Event the Session's capture level cannot support as
   evidence (`CaptureLevel::supports_evidence`) never notifies, whatever the
   rules say.
-- Text is `"<machine> · <session title or command>: <short text>"`, built
-  from event data only. `ERROR_DETECTED` sends `error detected` and never the
-  matched output line.
+- Text is `"<machine> · <safe session label>: <short text>"`, built from
+  structured Event fields only. It never falls back to Command text or copies
+  matched output, prompt text, or checkpoint paths.
 - The Settings → Notifications table shows what each daemon actually applies:
   the Session override, otherwise that Machine's default. A refused change
   rolls back and is reported.
@@ -71,7 +72,9 @@ the audit-hardening regression checks are recorded in `docs/AUDIT_TRACKER.md`.
   terminal, key bar, Events, health and Ctrl-C with confirmation. The Recipes
   page has a parameter form, port-conflict warnings and a per-Machine target.
 - `manifest.webmanifest` includes any-purpose and maskable 192/512 icons. The
-  service worker caches the app shell only and never handles `/api/`.
+  packaged production shell is served at the Tailnet control origin. Its
+  release-versioned service worker caches the public shell only and never
+  handles API, auth, package, terminal, or notification data.
 
 ### Credential isolation
 
@@ -80,8 +83,9 @@ the audit-hardening regression checks are recorded in `docs/AUDIT_TRACKER.md`.
   Machine, and `NotificationStatus` reports only `token_configured`.
 - `RUN_RECIPE`, `SAVE_RECIPE` and rule changes go through the
   control-to-worker route for the owning Machine, the same path that 4.A
-  proved for input. Browser storage still holds only `sentinal.sessionToken`
-  and the theme, as `web/e2e/enrollment.spec.ts` asserts.
+  proved for input. Milestone 4.C moved browser auth to a Secure HttpOnly
+  cookie; JavaScript storage contains only the theme, and WebSocket URLs carry
+  no token, as `web/e2e/enrollment.spec.ts` asserts.
 
 ## Automated acceptance record
 

@@ -143,12 +143,14 @@ if [[ -n "$release_dir" ]]; then
   sentinal_require_safe_path release "$release_dir"
   source_bin_dir="$release_dir/bin"
   shell_source="$release_dir/shell"
+  web_source="$release_dir/web"
   build_command=""
 else
   sentinal_require_safe_path source "$source_dir"
   source_bin_dir="$source_dir/target/release"
   shell_source="$source_dir/shell"
-  build_command="cargo build --locked --offline --release -p daemon --bin sentinald -p cli --bin sentinal"
+  web_source="$source_dir/web/dist"
+  build_command="cargo build --locked --offline --release -p daemon --bin sentinald -p cli --bin sentinal; pnpm -C web build"
 fi
 
 release_version=""
@@ -183,6 +185,9 @@ fi
 for asset in ta.zsh ta.bash ta.fish external/sentinal.zsh external/sentinal.bash external/sentinal.fish vendor/bash-preexec.sh; do
   [[ -f "$shell_source/$asset" && ! -L "$shell_source/$asset" ]] || sentinal_install_die "missing shell asset '$shell_source/$asset'"
 done
+for asset in index.html manifest.webmanifest sw.js; do
+  [[ -f "$web_source/$asset" && ! -L "$web_source/$asset" ]] || sentinal_install_die "missing web asset '$web_source/$asset'"
+done
 
 if [[ -e "$config_file" || -L "$config_file" ]]; then
   [[ -f "$config_file" && ! -L "$config_file" ]] || sentinal_install_die "existing daemon config '$config_file' is not a regular file"
@@ -194,6 +199,7 @@ if [[ "$dry_run" == true ]]; then
   echo "Would install: $bin_dir/sentinal"
   echo "Would install: $bin_dir/sentinald"
   echo "Would install shell assets: $share_dir/shell"
+  echo "Would install production PWA: $share_dir/web"
   [[ -z "$release_version" ]] || echo "Release metadata: $release_version ($release_target)"
   echo "Would create config if absent: $config_file"
   echo "Worker bind: $bind_ip:$daemon_port"
@@ -207,7 +213,9 @@ fi
 
 if [[ -n "$build_command" ]]; then
   sentinal_require_command cargo
+  sentinal_require_command pnpm
   (cd "$source_dir" && cargo build --locked --offline --release -p daemon --bin sentinald -p cli --bin sentinal)
+  (cd "$source_dir" && pnpm -C web build)
 fi
 sentinal_validate_source_binary "$source_bin_dir/sentinal"
 sentinal_validate_source_binary "$source_bin_dir/sentinald"
@@ -238,6 +246,21 @@ mkdir -p "$shell_temporary"
 cp -R "$shell_source/." "$shell_temporary/"
 rm -rf -- "$shell_destination"
 mv "$shell_temporary" "$shell_destination"
+
+web_destination="$share_dir/web"
+web_temporary="$share_dir/web.tmp.$$"
+rm -rf -- "$web_temporary"
+mkdir -p "$web_temporary"
+cp -R "$web_source/." "$web_temporary/"
+web_cache_id="${release_version:-source}"
+if grep -Fq '__SENTINAL_RELEASE_ID__' "$web_temporary/sw.js"; then
+  sed "s/__SENTINAL_RELEASE_ID__/$web_cache_id/g" "$web_temporary/sw.js" >"$web_temporary/sw.js.next"
+  mv "$web_temporary/sw.js.next" "$web_temporary/sw.js"
+fi
+if [[ -d "$web_destination" ]]; then
+  mv "$web_destination" "$transaction/web.previous"
+fi
+mv "$web_temporary" "$web_destination"
 
 if [[ -e "$config_file" ]]; then
   echo "Preserved existing daemon config: $config_file"
@@ -279,6 +302,8 @@ if [[ "$install_service" == true ]]; then
     if [[ -f "$transaction/sentinald" ]]; then sentinal_atomic_install "$transaction/sentinald" "$bin_dir/sentinald"; else rm -f -- "$bin_dir/sentinald"; fi
     rm -rf -- "$shell_destination"
     [[ ! -d "$transaction/shell" ]] || mv "$transaction/shell" "$shell_destination"
+    rm -rf -- "$web_destination"
+    [[ ! -d "$transaction/web.previous" ]] || mv "$transaction/web.previous" "$web_destination"
     if [[ -f "$transaction/release.json" ]]; then mv "$transaction/release.json" "$release_state"; else rm -f -- "$release_state"; fi
     if [[ -f "$transaction/service" ]]; then mv "$transaction/service" "$service_file"; else rm -f -- "$service_file"; fi
     restored="${installed_version:-previous installation}"
@@ -291,6 +316,7 @@ trap - EXIT HUP INT TERM
 
 echo "Installed sentinal and sentinald in $bin_dir"
 echo "Installed shell assets in $shell_destination"
+echo "Installed production PWA in $web_destination"
 echo "Worker bind: $bind_ip:$daemon_port"
 echo "Config: $config_file"
 echo "Data retained at: $data_dir"

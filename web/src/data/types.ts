@@ -149,7 +149,15 @@ export type NotificationRules = Record<string, NotificationRuleSet>;
 export interface JournalNotification {
   id: string;
   text: string;
+  machineId?: string;
   sessionId?: string;
+  category?: string;
+  state?: string;
+  attempts?: number;
+  at?: number;
+  delivered?: boolean;
+  resultClass?: string;
+  requestBytes?: number;
 }
 
 export interface NotificationDeliveryStatus {
@@ -158,6 +166,9 @@ export interface NotificationDeliveryStatus {
   server?: string;
   topic?: string;
   tokenConfigured: boolean;
+  configurationState?: "UNAVAILABLE" | "CONFIGURED" | "INVALID";
+  diagnostic?: string;
+  reloadedAt?: number;
 }
 
 export type AuthStatus = "setup" | "signedOut" | "signedIn" | "expired" | "locked" | "wrong";

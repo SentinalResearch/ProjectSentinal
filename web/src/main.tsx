@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AppRouter } from "./AppRouter";
+import { PwaUpdatePrompt } from "./components/PwaUpdatePrompt";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import "./styles/global.css";
@@ -20,6 +21,7 @@ createRoot(root).render(
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <AppRouter />
+          <PwaUpdatePrompt />
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
@@ -29,5 +31,11 @@ createRoot(root).render(
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/sw.js");
+  });
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
   });
 }

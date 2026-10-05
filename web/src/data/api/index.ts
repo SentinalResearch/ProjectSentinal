@@ -23,7 +23,6 @@ import {
   AUTH_EXPIRED_EVENT,
   createAuthApi,
   defaultDaemonHttpUrl,
-  SESSION_TOKEN_KEY,
   type TokenStorage,
 } from "./auth";
 import {
@@ -319,7 +318,6 @@ class DaemonTransport {
   constructor(
     readonly url: string,
     private machine: string,
-    private readonly storage: TokenStorage,
     private readonly socketFactory: (url: string) => ApiSocket,
     private readonly ownsBrowserAuthentication: boolean,
   ) {}
@@ -372,10 +370,7 @@ class DaemonTransport {
   private connect(): Promise<ApiSocket> {
     if (this.socket?.readyState === SOCKET_OPEN) return Promise.resolve(this.socket);
     if (this.connecting !== null) return this.connecting;
-    const token = this.storage.getItem(SESSION_TOKEN_KEY);
-    if (!token) return Promise.reject(daemonError("missing browser session"));
     const endpoint = new URL(this.url);
-    endpoint.searchParams.set("token", token);
     this.connecting = new Promise((resolve, reject) => {
       const socket = this.socketFactory(endpoint.toString());
       socket.binaryType = "arraybuffer";
@@ -397,7 +392,6 @@ class DaemonTransport {
         this.connecting = null;
         this.rejectPending(daemonError("connection closed"));
         if (this.ownsBrowserAuthentication && event.code === 4_001) {
-          this.storage.removeItem(SESSION_TOKEN_KEY);
           window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
         }
       };
@@ -495,7 +489,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   const controlSocketUrl = options.daemonUrl ?? defaultDaemonUrl();
   const listeners = new Set<(event: LiveEvent) => void>();
   const connections = new Map<string, MachineConnection>();
-  const controlTransport = new DaemonTransport(controlSocketUrl, "control", storage, socketFactory, true);
+  const controlTransport = new DaemonTransport(controlSocketUrl, "control", socketFactory, true);
   const baseRegistry = createRegistryApi({ baseUrl: authBaseUrl, fetcher, storage });
   let controlMachineId: string | null = null;
   let initialization: Promise<void> | null = null;
@@ -513,7 +507,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     let connection = connections.get(row.machine_id);
     if (!connection) {
       const transport = new DaemonTransport(
-        workerSocketUrl(controlSocketUrl, row.machine_id), row.machine_id, storage, socketFactory, false,
+        workerSocketUrl(controlSocketUrl, row.machine_id), row.machine_id, socketFactory, false,
       );
       transport.subscribe(emit);
       connection = {
@@ -775,8 +769,6 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     async replayOutput(sessionId, onChunk, replay = {}) {
       await ensureInitialized();
       owner(sessionId);
-      const token = storage.getItem(SESSION_TOKEN_KEY);
-      if (!token) throw daemonError("missing browser session");
       const maximum = Math.min(64 * 1024 * 1024, Math.max(1, Math.floor(replay.maxBytes ?? 64 * 1024 * 1024)));
       let offset = 0;
       let bytesRead = 0;
@@ -785,7 +777,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
         const limit = Math.min(262144, maximum - bytesRead);
         if (limit <= 0) return warning ? { warning, bytesRead, truncated: true } : { bytesRead, truncated: true };
         const response = await fetcher(outputUrl(sessionId, offset, limit), {
-          headers: { authorization: `Bearer ${token}` },
+          credentials: "same-origin",
         });
         if (!response.ok) {
           let message = `saved output request failed with status ${response.status}`;
@@ -1038,7 +1030,15 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
               return reply.entries.map((entry) => ({
                 id: `${connection.id}:${entry.id}`,
                 text: entry.text,
+                machineId: connection.id,
                 sessionId: compositeId(connection.id, entry.session_id),
+                category: entry.category ?? undefined,
+                state: entry.state ?? (entry.delivered ? "DELIVERED" : undefined),
+                attempts: entry.attempts ?? undefined,
+                at: entry.at,
+                delivered: entry.delivered,
+                resultClass: entry.result_class ?? undefined,
+                requestBytes: entry.request_bytes ?? undefined,
               }));
             } catch {
               markFailure(connection);
@@ -1065,6 +1065,9 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
                 server: reply.status.server ?? undefined,
                 topic: reply.status.topic ?? undefined,
                 tokenConfigured: reply.status.token_configured,
+                configurationState: reply.status.configuration_state ?? undefined,
+                diagnostic: reply.status.diagnostic ?? undefined,
+                reloadedAt: reply.status.reloaded_at ?? undefined,
               }];
             } catch {
               return [];

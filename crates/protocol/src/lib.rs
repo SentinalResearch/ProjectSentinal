@@ -67,8 +67,9 @@ pub use message::{
 };
 pub use metric::{GpuMetrics, MachineMetrics, SessionMetrics};
 pub use notification::{
-    NotificationJournalEntry, NotificationRuleSet, NotificationRules, NotificationStatus,
-    SessionNotificationRule,
+    NotificationCategory, NotificationConfigurationState, NotificationDeliveryState,
+    NotificationJournalEntry, NotificationResultClass, NotificationRuleSet, NotificationRules,
+    NotificationStatus, SessionNotificationRule,
 };
 pub use process::{tree_totals, Process, ProcessState, ProcessTotals};
 pub use recipe::{Recipe, RecipeParam};

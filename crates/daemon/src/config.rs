@@ -23,6 +23,8 @@ pub struct PackageServiceConfig {
     pub public_base_url: String,
     /// Maximum accepted artifact length.
     pub max_artifact_bytes: u64,
+    /// Optional production PWA build served from the same Tailnet HTTPS origin.
+    pub web_root: Option<PathBuf>,
 }
 
 /// Configuration of the owner-selected control Machine role.
@@ -50,6 +52,8 @@ pub struct DaemonConfig {
     pub token_file: PathBuf,
     /// File containing the single owner's password hash.
     pub auth_file: PathBuf,
+    /// Owner-only ntfy configuration for this Machine.
+    pub notify_file: PathBuf,
     /// Private same-user Unix socket for local reporting.
     pub local_socket: PathBuf,
     /// Optional private package service for unpaired workers.
@@ -77,6 +81,7 @@ struct RawConfig {
     scrollback_lines: Option<usize>,
     token_file: Option<PathBuf>,
     auth_file: Option<PathBuf>,
+    notify_file: Option<PathBuf>,
     local_socket: Option<PathBuf>,
     packages: Option<RawPackageConfig>,
     identity_file: Option<PathBuf>,
@@ -107,6 +112,7 @@ struct RawPackageConfig {
     directory: Option<PathBuf>,
     public_base_url: Option<String>,
     max_artifact_bytes: Option<u64>,
+    web_root: Option<PathBuf>,
 }
 
 /// Errors produced while loading daemon configuration.
@@ -239,6 +245,9 @@ impl DaemonConfig {
             auth_file: raw
                 .auth_file
                 .unwrap_or_else(|| home.join(".config/terminal-agent/auth.json")),
+            notify_file: raw
+                .notify_file
+                .unwrap_or_else(|| config_dir.join("notify.toml")),
             local_socket,
             packages,
             identity_file: raw
@@ -327,6 +336,7 @@ fn parse_package_config(
         directory,
         public_base_url,
         max_artifact_bytes,
+        web_root: raw.web_root,
     }))
 }
 

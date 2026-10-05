@@ -12,7 +12,7 @@ use crate::{
     link::{LinkManager, LinkSettings},
     local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{process_tree, MetricsSampler, ResourceDebouncer},
-    notifications::{spawn_notifier, NotificationService},
+    notifications::{spawn_notification_workers, spawn_notifier, NotificationService},
     origin::OriginPolicy,
     package_service::{package_router, PackageService, PackageServiceError},
     private_fs::ensure_private_dir,
@@ -22,8 +22,8 @@ use crate::{
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
 };
 use protocol::{
-    link::LinkEndpoint, LocalRequest, Machine, MachineId, MachineRole, MachineStatus, Os, Resource,
-    Timestamp,
+    link::{LinkEndpoint, LocalLinkState},
+    LocalRequest, Machine, MachineId, MachineRole, MachineStatus, Os, Resource, Timestamp,
 };
 use std::{
     collections::HashMap,
@@ -264,10 +264,32 @@ pub async fn run() -> Result<(), DaemonError> {
     for diagnostic in recipe_diagnostics {
         tracing::warn!(path = %diagnostic.path.display(), reason = %diagnostic.message, "Recipe file ignored or overridden");
     }
+    let configured_control_origin = config
+        .control
+        .as_ref()
+        .map(|value| value.public_url.clone());
+    let notification_link = link.clone();
+    let control_origin = Arc::new(move || {
+        configured_control_origin.clone().or_else(|| {
+            notification_link.status().ok().and_then(|report| {
+                matches!(
+                    report.state,
+                    LocalLinkState::Active | LocalLinkState::ControlUnreachable
+                )
+                .then_some(report.control_url)
+                .flatten()
+            })
+        })
+    });
     let (notifications, notification_diagnostics) = NotificationService::load(
-        &home.join(".config/terminal-agent/notify.toml"),
+        &config.notify_file,
         config.data_dir.join("notification-rules.json"),
         machine.id.clone(),
+        machine.name.clone(),
+        daemon_uid,
+        config.development,
+        store.clone(),
+        control_origin,
         Arc::new(now),
     );
     for diagnostic in notification_diagnostics {
@@ -279,6 +301,8 @@ pub async fn run() -> Result<(), DaemonError> {
         store.clone(),
         machine.name.clone(),
     );
+    let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
+    spawn_notification_workers(notifications.clone(), server_shutdown_rx.clone());
     let state = AppState::new(sessions, machine, auth)
         .with_insights(insights)
         .with_origins(origins)
@@ -286,10 +310,10 @@ pub async fn run() -> Result<(), DaemonError> {
         .with_link(link)
         .with_recipes(recipes)
         .with_notifications(notifications)
-        .with_tailscale_serve(config.behind_tailscale_serve);
+        .with_tailscale_serve(config.behind_tailscale_serve)
+        .with_development(config.development);
     let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
     let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx, handler));
-    let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
     let package_task = if let Some(package_config) = config.packages.clone() {
         let package_address = package_config.listen;
         let package_origin = package_config.public_base_url.clone();

@@ -93,7 +93,7 @@ async fn harness() -> Harness {
     )
     .unwrap();
     let auth = AuthManager::load(&dir.join("auth.json"), "machine-token".into()).unwrap();
-    let routes = ControlRoutes::new(Some(control.clone()), auth, false);
+    let routes = ControlRoutes::new(Some(control.clone()), auth, false, false);
     let (url, server) = serve(routes.router()).await;
     Harness {
         control,
@@ -341,7 +341,7 @@ async fn an_unreachable_control_is_reported_without_writing_a_link() {
 async fn a_daemon_that_is_not_a_control_is_reported() {
     let dir = temp_dir("plain");
     let auth = AuthManager::load(&dir.join("auth.json"), "t".into()).unwrap();
-    let (url, server) = serve(ControlRoutes::new(None, auth, false).router()).await;
+    let (url, server) = serve(ControlRoutes::new(None, auth, false, false).router()).await;
     let h = harness().await;
     let w = worker(&h);
 

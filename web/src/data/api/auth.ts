@@ -1,5 +1,5 @@
 import type { AuthFailure } from "../../protocol/AuthFailure";
-import type { AuthSession } from "../../protocol/AuthSession";
+import type { AuthSessionInfo } from "../../protocol/AuthSessionInfo";
 import type { AuthStatus } from "../../protocol/AuthStatus";
 import type { DataAdapter } from "../adapter";
 import { config } from "../config";
@@ -46,6 +46,7 @@ export function createAuthApi(options: AuthApiOptions): DataAdapter["auth"] {
   const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
     const response = await fetcher(`${baseUrl}${path}`, {
       ...init,
+      credentials: "same-origin",
       headers: {
         ...(init.body ? { "content-type": "application/json" } : {}),
         ...init.headers,
@@ -58,18 +59,15 @@ export function createAuthApi(options: AuthApiOptions): DataAdapter["auth"] {
   };
 
   const clearSession = () => {
+    // Remove credentials written by releases before browser sessions became
+    // HttpOnly cookies. JavaScript never stores the replacement credential.
     storage.removeItem(SESSION_TOKEN_KEY);
     resetTransport();
   };
 
-  const saveSession = (session: AuthSession) => {
-    storage.setItem(SESSION_TOKEN_KEY, session.token);
+  const acceptSession = (_session: AuthSessionInfo) => {
+    storage.removeItem(SESSION_TOKEN_KEY);
     resetTransport();
-  };
-
-  const bearerHeaders = (): HeadersInit => {
-    const token = storage.getItem(SESSION_TOKEN_KEY);
-    return token ? { authorization: `Bearer ${token}` } : {};
   };
 
   const stateFromFailure = (error: unknown): AuthState => {
@@ -105,27 +103,24 @@ export function createAuthApi(options: AuthApiOptions): DataAdapter["auth"] {
         clearSession();
         return { status: "setup", attempts: 0, lockUntil: null };
       }
-      if (!storage.getItem(SESSION_TOKEN_KEY)) {
-        return { status: "signedOut", attempts: 0, lockUntil: null };
-      }
       try {
-        await request("/auth/session", { headers: bearerHeaders() });
+        await request("/auth/browser/session");
         return { status: "signedIn", attempts: 0, lockUntil: null };
       } catch (error) {
         clearSession();
         if (error instanceof AuthRequestError && error.failure.code === "INVALID_SESSION") {
-          return { status: "expired", attempts: 0, lockUntil: null, message: error.message };
+          return { status: "signedOut", attempts: 0, lockUntil: null };
         }
         return { status: "signedOut", attempts: 0, lockUntil: null };
       }
     },
     async login(password) {
       try {
-        const session = await request<AuthSession>("/auth/login", {
+        const session = await request<AuthSessionInfo>("/auth/browser/login", {
           method: "POST",
           body: JSON.stringify({ password }),
         });
-        saveSession(session);
+        acceptSession(session);
         return { status: "signedIn", attempts: 0, lockUntil: null };
       } catch (error) {
         clearSession();
@@ -134,12 +129,12 @@ export function createAuthApi(options: AuthApiOptions): DataAdapter["auth"] {
     },
     async setup(bootstrapToken, password) {
       try {
-        const session = await request<AuthSession>("/auth/setup", {
+        const session = await request<AuthSessionInfo>("/auth/browser/setup", {
           method: "POST",
           headers: { authorization: `Bearer ${bootstrapToken}` },
           body: JSON.stringify({ password }),
         });
-        saveSession(session);
+        acceptSession(session);
         return { status: "signedIn", attempts: 0, lockUntil: null };
       } catch (error) {
         clearSession();
@@ -155,18 +150,16 @@ export function createAuthApi(options: AuthApiOptions): DataAdapter["auth"] {
       }
     },
     async changePassword(current, next) {
-      const session = await request<AuthSession>("/auth/password", {
+      const session = await request<AuthSessionInfo>("/auth/browser/password", {
         method: "POST",
-        headers: bearerHeaders(),
         body: JSON.stringify({ current_password: current, new_password: next }),
       });
-      saveSession(session);
+      acceptSession(session);
     },
     async logout() {
       try {
-        await request<void>("/auth/logout", {
+        await request<void>("/auth/browser/logout", {
           method: "POST",
-          headers: bearerHeaders(),
         });
       } finally {
         clearSession();

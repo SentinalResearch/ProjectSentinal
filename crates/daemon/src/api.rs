@@ -45,6 +45,7 @@ pub struct AppState {
     link: Option<LinkManager>,
     origins: OriginPolicy,
     behind_tailscale_serve: bool,
+    development: bool,
     recipes: RecipeCatalog,
     notifications: Option<NotificationService>,
     insights: Option<MachineInsights>,
@@ -65,6 +66,7 @@ impl AppState {
             origins: OriginPolicy::new(&[], false)
                 .unwrap_or_else(|_| unreachable!("empty list is valid")),
             behind_tailscale_serve: false,
+            development: false,
             recipes,
             notifications: None,
             insights: None,
@@ -92,6 +94,12 @@ impl AppState {
     /// Trust `Tailscale-User-Login` from loopback peers (Tailscale Serve).
     pub fn with_tailscale_serve(mut self, enabled: bool) -> Self {
         self.behind_tailscale_serve = enabled;
+        self
+    }
+
+    /// Enable development-only authentication compatibility such as query tokens.
+    pub fn with_development(mut self, enabled: bool) -> Self {
+        self.development = enabled;
         self
     }
 
@@ -363,6 +371,7 @@ pub fn router(state: AppState) -> Router {
         state.control.clone(),
         state.auth.clone(),
         state.behind_tailscale_serve,
+        state.development,
     )
     .router();
     let origins = state.origins.clone();
@@ -419,12 +428,12 @@ async fn authorize(
     mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let header_token = auth_routes::bearer_from_headers(request.headers());
-    let query_token = (request.uri().path() == "/api/v1/ws")
+    let credential = auth_routes::credential_from_headers(request.headers(), state.development);
+    let query_token = (state.development && request.uri().path() == "/api/v1/ws")
         .then(|| request.uri().query())
         .flatten()
         .and_then(token_from_query);
-    let supplied = header_token.or(query_token).map(str::to_string);
+    let supplied = credential.or_else(|| query_token.map(str::to_string));
     match supplied.as_deref() {
         Some(token) if api_token_authorized(&state, token) => {
             if let Some(token) = supplied {

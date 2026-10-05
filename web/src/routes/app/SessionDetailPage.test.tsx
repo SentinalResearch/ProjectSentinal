@@ -161,4 +161,12 @@ describe("SessionDetailPage", () => {
       screen.queryByRole("button", { name: "Continue in new Session" }),
     ).not.toBeInTheDocument();
   });
+
+  it("keeps a missing notification target namespaced to its intended Machine", async () => {
+    renderSession("/app/sessions/rtx%3A999");
+
+    expect(await screen.findByRole("heading", { name: "Session 999" })).toBeInTheDocument();
+    expect(screen.getByText(/RTX-PC · Session missing/)).toBeInTheDocument();
+    expect(screen.getByText(/will not open a same-numbered Session elsewhere/)).toBeInTheDocument();
+  });
 });

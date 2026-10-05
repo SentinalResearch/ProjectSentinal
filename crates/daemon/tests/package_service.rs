@@ -74,6 +74,7 @@ fn service(root: &Path) -> PackageService {
             directory: root.to_path_buf(),
             public_base_url: "https://sentinal-control.example.ts.net".into(),
             max_artifact_bytes: 1024 * 1024,
+            web_root: None,
         },
         owner_uid(root),
     )
@@ -327,6 +328,97 @@ async fn package_audit_is_metadata_only() {
 }
 
 #[tokio::test]
+async fn production_web_shell_has_safe_fallback_headers_and_api_precedence() {
+    let root = TestDir::new("web-shell");
+    let packages = root.0.join("packages");
+    let web = root.0.join("web");
+    publish_fixture(&packages, b"verified archive");
+    fs::create_dir_all(web.join("assets")).unwrap();
+    fs::write(
+        web.join("index.html"),
+        b"<!doctype html><main>Sentinal</main>",
+    )
+    .unwrap();
+    fs::write(web.join("manifest.webmanifest"), b"{}").unwrap();
+    fs::write(
+        web.join("service-worker.js"),
+        b"self.addEventListener('fetch',()=>{})",
+    )
+    .unwrap();
+    fs::write(web.join("assets/app-a1b2c3.js"), b"console.log('app')").unwrap();
+    fs::write(web.join("secret.txt"), b"must not be exposed").unwrap();
+    let oversized = fs::File::create(web.join("assets/oversized.js")).unwrap();
+    oversized.set_len(8 * 1024 * 1024 + 1).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(web.join("secret.txt"), web.join("assets/linked.js")).unwrap();
+
+    let app = package_router(
+        PackageService::open(
+            PackageServiceConfig {
+                listen: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 7422),
+                directory: packages,
+                public_base_url: "https://sentinal-control.example.ts.net".into(),
+                max_artifact_bytes: 1024 * 1024,
+                web_root: Some(web),
+            },
+            owner_uid(&root.0),
+        )
+        .unwrap(),
+    );
+
+    let route = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/app/sessions/linux%3A1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(route.status(), StatusCode::OK);
+    assert_eq!(route.headers()["cache-control"], "no-cache");
+    assert_eq!(route.headers()["x-content-type-options"], "nosniff");
+    assert!(route.headers().contains_key("content-security-policy"));
+
+    let asset = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/assets/app-a1b2c3.js")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(asset.status(), StatusCode::OK);
+    assert_eq!(
+        asset.headers()["cache-control"],
+        "public, max-age=31536000, immutable"
+    );
+    assert_eq!(
+        asset.headers()["content-type"],
+        "text/javascript; charset=utf-8"
+    );
+
+    for path in [
+        "/api/v1/auth/status",
+        "/secret.txt",
+        "/assets/%2e%2e%2fsecret.txt",
+        "/assets/oversized.js",
+        "/assets/linked.js",
+    ] {
+        let response = app
+            .clone()
+            .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+        assert_eq!(response.headers()["cache-control"], "no-store");
+    }
+}
+
+#[tokio::test]
 async fn package_requests_have_a_global_per_minute_bound() {
     let root = TestDir::new("rate");
     publish_fixture(&root.0, b"verified archive");
@@ -372,6 +464,7 @@ async fn package_root_symlink_is_refused() {
             directory: linked,
             public_base_url: "https://sentinal-control.example.ts.net".into(),
             max_artifact_bytes: 1024,
+            web_root: None,
         },
         owner_uid(&real),
     )
@@ -396,6 +489,7 @@ async fn package_child_symlink_is_refused() {
             directory: packages,
             public_base_url: "https://sentinal-control.example.ts.net".into(),
             max_artifact_bytes: 1024,
+            web_root: None,
         },
         owner_uid(&outside),
     )

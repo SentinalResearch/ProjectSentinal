@@ -2,7 +2,7 @@
 
 use super::{ControlFailure, ControlService, RoutingTarget};
 use crate::{
-    api::auth_routes::bearer_from_headers,
+    api::auth_routes::credential_from_headers,
     auth::{AuthManager, CredentialKind},
 };
 use axum::{
@@ -39,9 +39,14 @@ struct ProxyState {
     control: Option<ControlService>,
     auth: AuthManager,
     http: reqwest::Client,
+    development: bool,
 }
 
-pub(super) fn routes(control: Option<ControlService>, auth: AuthManager) -> Router {
+pub(super) fn routes(
+    control: Option<ControlService>,
+    auth: AuthManager,
+    development: bool,
+) -> Router {
     let http = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(CONNECT_TIMEOUT)
@@ -58,6 +63,7 @@ pub(super) fn routes(control: Option<ControlService>, auth: AuthManager) -> Rout
             control,
             auth,
             http,
+            development,
         })
 }
 
@@ -126,9 +132,14 @@ async fn routed_websocket(
     headers: HeaderMap,
     upgrade: WebSocketUpgrade,
 ) -> Response {
-    let query_token = query.as_deref().and_then(token_from_query);
-    let supplied = bearer_from_headers(&headers).or(query_token);
-    let (target, owner_token) = match owner_target(&state, supplied, machine_id) {
+    let supplied = credential_from_headers(&headers, state.development).or_else(|| {
+        state
+            .development
+            .then(|| query.as_deref().and_then(token_from_query))
+            .flatten()
+            .map(str::to_string)
+    });
+    let (target, owner_token) = match owner_target(&state, supplied.as_deref(), machine_id) {
         Ok(value) => value,
         Err(error) => return failure_response(error),
     };
@@ -198,7 +209,8 @@ async fn routed_output(
     RawQuery(query): RawQuery,
     headers: HeaderMap,
 ) -> Response {
-    let (target, _) = match owner_target(&state, bearer_from_headers(&headers), machine_id) {
+    let supplied = credential_from_headers(&headers, state.development);
+    let (target, _) = match owner_target(&state, supplied.as_deref(), machine_id) {
         Ok(value) => value,
         Err(error) => return failure_response(error),
     };

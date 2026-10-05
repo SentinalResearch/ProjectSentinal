@@ -124,6 +124,7 @@ listen = "127.0.0.1:7422"
 directory = "/srv/sentinal/packages"
 public_base_url = "https://sentinal-control.example.ts.net"
 max_artifact_bytes = 1048576
+web_root = "/opt/sentinal/web"
 "#,
         Path::new("/home/tester"),
     )
@@ -137,6 +138,10 @@ max_artifact_bytes = 1048576
         "https://sentinal-control.example.ts.net"
     );
     assert_eq!(packages.max_artifact_bytes, 1_048_576);
+    assert_eq!(
+        packages.web_root,
+        Some(Path::new("/opt/sentinal/web").into())
+    );
 }
 
 #[test]

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { daemonRequest, e2eEnv as env } from "./support/adopt.mjs";
 
 test("control proxy authenticates to one fake worker and attaches", async ({ page }) => {
   const health = await page.request.get("/api/v1/health");
@@ -29,40 +30,17 @@ test("a Watch-created FULL session appears and attaches", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
 
   // The same CREATE_SESSION request `sentinal watch` sends, with its machine token.
-  const session = await page.evaluate(
-    () =>
-      new Promise<{ id: number; machine_id: string; origin: string; capture: string; title: string | null }>(
-        (resolve, reject) => {
-          const socket = new WebSocket(`ws://${window.location.host}/api/v1/ws?token=test-token`);
-          socket.onerror = () => reject(new Error("websocket failed"));
-          socket.onopen = () =>
-            socket.send(
-              JSON.stringify({
-                version: 1,
-                payload: {
-                  type: "CREATE_SESSION",
-                  shell: "/bin/zsh",
-                  cwd: "/tmp",
-                  cols: 100,
-                  rows: 30,
-                  origin: "WATCH",
-                  title: "Watched job",
-                  command: null,
-                },
-              }),
-            );
-          socket.onmessage = (message) => {
-            const envelope = JSON.parse(String(message.data));
-            if (envelope.payload.type === "SESSION_UPDATED") {
-              socket.close();
-              resolve(envelope.payload.session);
-            } else if (envelope.payload.type === "ERROR") {
-              reject(new Error(envelope.payload.message));
-            }
-          };
-        },
-      ),
-  );
+  const response = await daemonRequest(env("SENTINAL_E2E_CONTROL_WS"), "test-token", {
+    type: "CREATE_SESSION",
+    shell: "/bin/zsh",
+    cwd: "/tmp",
+    cols: 100,
+    rows: 30,
+    origin: "WATCH",
+    title: "Watched job",
+    command: null,
+  }, "SESSION_UPDATED");
+  const session = response.session as { id: number; machine_id: string; origin: string; capture: string; title: string | null };
   expect(session.origin).toBe("WATCH");
   expect(session.capture).toBe("FULL");
 
@@ -84,51 +62,15 @@ test("three Session generations survive reload with input only on the latest", a
   await page.getByRole("button", { name: /Sign in/ }).click();
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
 
-  const finished = await page.evaluate(
-    () =>
-      new Promise<{ id: number; machine_id: string; state: string }>((resolve, reject) => {
-        const socket = new WebSocket(`ws://${window.location.host}/api/v1/ws?token=test-token`);
-        let createdId: number | null = null;
-        socket.onerror = () => reject(new Error("websocket failed"));
-        socket.onopen = () =>
-          socket.send(
-            JSON.stringify({
-              version: 1,
-              payload: {
-                type: "CREATE_SESSION",
-                shell: "/bin/zsh",
-                cwd: "/tmp",
-                cols: 100,
-                rows: 30,
-                origin: "UI",
-                title: "Finished record",
-                command: null,
-              },
-            }),
-          );
-        socket.onmessage = (message) => {
-          const envelope = JSON.parse(String(message.data));
-          if (envelope.payload.type === "ERROR") {
-            reject(new Error(envelope.payload.message));
-            return;
-          }
-          if (envelope.payload.type !== "SESSION_UPDATED") return;
-          const session = envelope.payload.session;
-          if (createdId === null) {
-            createdId = session.id;
-            socket.send(
-              JSON.stringify({
-                version: 1,
-                payload: { type: "KILL", session_id: createdId },
-              }),
-            );
-          } else if (session.id === createdId && session.state === "INTERRUPTED") {
-            socket.close();
-            resolve(session);
-          }
-        };
-      }),
-  );
+  const createdResponse = await daemonRequest(env("SENTINAL_E2E_CONTROL_WS"), "test-token", {
+    type: "CREATE_SESSION", shell: "/bin/zsh", cwd: "/tmp", cols: 100, rows: 30,
+    origin: "UI", title: "Finished record", command: null,
+  }, "SESSION_UPDATED");
+  const created = createdResponse.session as { id: number; machine_id: string; state: string };
+  const killedResponse = await daemonRequest(env("SENTINAL_E2E_CONTROL_WS"), "test-token", {
+    type: "KILL", session_id: created.id,
+  }, "SESSION_UPDATED");
+  const finished = killedResponse.session as { id: number; machine_id: string; state: string };
 
   const replay = page.waitForResponse((response) =>
     response.url().includes(`/api/v1/sessions/${finished.id}/output`),
@@ -155,24 +97,9 @@ test("three Session generations survive reload with input only on the latest", a
   await page.reload();
   await expect(page.getByText(`Session ${finished.id} ended — continued as Session ${secondId}`)).toBeVisible();
 
-  await page.evaluate(
-    (sessionId) =>
-      new Promise<void>((resolve, reject) => {
-        const socket = new WebSocket(`ws://${window.location.host}/api/v1/ws?token=test-token`);
-        socket.onerror = () => reject(new Error("websocket failed"));
-        socket.onopen = () =>
-          socket.send(JSON.stringify({ version: 1, payload: { type: "KILL", session_id: sessionId } }));
-        socket.onmessage = (message) => {
-          const envelope = JSON.parse(String(message.data));
-          if (envelope.payload.type === "ERROR") reject(new Error(envelope.payload.message));
-          if (envelope.payload.type === "SESSION_UPDATED" && envelope.payload.session?.state === "INTERRUPTED") {
-            socket.close();
-            resolve();
-          }
-        };
-      }),
-    secondId,
-  );
+  await daemonRequest(env("SENTINAL_E2E_CONTROL_WS"), "test-token", {
+    type: "KILL", session_id: secondId,
+  }, "SESSION_UPDATED");
   await page.reload();
   await expect(page.getByRole("button", { name: "Continue in new Session" })).toBeVisible();
   await page.getByRole("button", { name: "Continue in new Session" }).click();
@@ -214,5 +141,7 @@ test("three Session generations survive reload with input only on the latest", a
     { type: "CONTINUE_SESSION", session_id: finished.id },
     { type: "CONTINUE_SESSION", session_id: secondId },
   ]);
-  expect(requests.filter((payload) => payload?.type === "CREATE_SESSION")).toHaveLength(1);
+  // Setup used the Node harness so no Machine token or privileged create frame
+  // ever crossed the browser boundary.
+  expect(requests.filter((payload) => payload?.type === "CREATE_SESSION")).toHaveLength(0);
 });

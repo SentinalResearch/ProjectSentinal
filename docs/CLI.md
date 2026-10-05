@@ -205,6 +205,12 @@ sentinal doctor [--prefix DIR] [--config-dir DIR]
 sentinal update [--check | --rollback VERSION] [--prefix DIR]
 ```
 
+Notifications have no synthetic `test` command. Configure `notify.toml` as
+described in `docs/SETUP.md`, then run an ordinary watched or hooked Command;
+its stored structured Event is the production path. Delivery/configuration
+state and privacy-safe previews are visible under Settings → Notifications.
+No CLI command prints the ntfy token.
+
 - `ls` lists Session ID, state, cwd, and shell.
 - `top` is a text view of this Machine, refreshed every 2 s until Ctrl-C:
   - host, OS, Sentinal version and uptime;

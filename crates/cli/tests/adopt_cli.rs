@@ -151,6 +151,10 @@ fn short_dir() -> PathBuf {
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
+    // A previous test process can leave this exact name behind if the OS
+    // later reuses its PID. It cannot belong to this process: NEXT gives each
+    // concurrently running test here a distinct suffix.
+    let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

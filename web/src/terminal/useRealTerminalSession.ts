@@ -2,7 +2,6 @@ import type { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dataAdapter } from "../data";
-import { SESSION_TOKEN_KEY } from "../data/api";
 import { decodeTerminalFrame, encodeTerminalFrame } from "../frame";
 import type { ClientRequest } from "../protocol/ClientRequest";
 import type { DaemonMessage } from "../protocol/DaemonMessage";
@@ -50,10 +49,7 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
   useEffect(() => {
     if (!terminal || numericId === undefined || websocketUrl === undefined) return;
 
-    const endpoint = new URL(websocketUrl);
-    const token = localStorage.getItem(SESSION_TOKEN_KEY) ?? "";
-    endpoint.searchParams.set("token", token);
-    const socket = new WebSocket(endpoint);
+    const socket = new WebSocket(websocketUrl);
     socket.binaryType = "arraybuffer";
     socketRef.current = socket;
 

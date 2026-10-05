@@ -60,11 +60,18 @@ for required in \
   sentinal-worker/BUILD.json \
   sentinal-worker/bin/sentinal \
   sentinal-worker/bin/sentinald \
+  sentinal-worker/web/index.html \
+  sentinal-worker/web/sw.js \
   sentinal-worker/scripts/install-worker.sh \
   sentinal-worker/shell/external/sentinal.zsh \
   sentinal-worker/packaging/systemd/sentinald.service; do
   grep -Fxq "$required" <<<"$entries" || fail "archive is missing $required"
 done
+service_worker="$(tar -xOzf "$first_artifact" sentinal-worker/web/sw.js)"
+grep -Fq 'sentinal-0.0.1-x86_64-apple-darwin' <<<"$service_worker" || fail 'service worker cache is not release-specific'
+if grep -Fq '__SENTINAL_RELEASE_ID__' <<<"$service_worker"; then
+  fail 'service worker retained its release marker'
+fi
 
 if "$builder" --version 0.0.1 --target riscv64-unknown-linux-musl \
   --bin-dir "$fake_bins" --output "$test_root/unsupported" 2>"$test_root/error"; then

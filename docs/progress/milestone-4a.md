@@ -52,8 +52,9 @@ the control-to-worker WebSocket proxy.
   and attaches both through Machine-scoped control-origin sockets. Worker A
   disconnects while Worker B remains controllable, then reconnects without a
   duplicate Session or Event view. Captured browser WebSocket URLs all use
-  port `4173`, and browser storage contains only `sentinal.sessionToken` and
-  the theme.
+  port `4173`. After Milestone 4.C, the owner Session is a Secure HttpOnly
+  cookie; JavaScript storage contains only the theme and WebSocket URLs contain
+  no credential.
 
 ## Automated acceptance record
 

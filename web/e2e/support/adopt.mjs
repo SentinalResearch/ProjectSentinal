@@ -54,27 +54,32 @@ export function linkSecrets(root) {
 
 /** Create a FULL Session directly on a test worker, outside the browser boundary. */
 export function createWorkerSession(url, machineToken, title) {
+  return daemonRequest(url, machineToken, {
+    type: "CREATE_SESSION",
+    shell: "/bin/zsh",
+    cwd: "/tmp",
+    cols: 100,
+    rows: 30,
+    origin: "UI",
+    title,
+    command: null,
+  }, "SESSION_UPDATED").then((payload) => payload.session);
+}
+
+/** Send one Machine-token request from the Node test harness, never the browser. */
+export function daemonRequest(url, machineToken, payload, responseType) {
   return new Promise((resolve, reject) => {
     const endpoint = new URL(url);
     endpoint.searchParams.set("token", machineToken);
     const socket = new WebSocket(endpoint);
     const timeout = setTimeout(() => {
       socket.close();
-      reject(new Error(`timed out creating '${title}'`));
+      reject(new Error(`timed out waiting for '${responseType}'`));
     }, 10_000);
-    socket.onerror = () => reject(new Error(`worker WebSocket failed for '${title}'`));
+    socket.onerror = () => reject(new Error(`daemon WebSocket failed for '${responseType}'`));
     socket.onopen = () => socket.send(JSON.stringify({
       version: 1,
-      payload: {
-        type: "CREATE_SESSION",
-        shell: "/bin/zsh",
-        cwd: "/tmp",
-        cols: 100,
-        rows: 30,
-        origin: "UI",
-        title,
-        command: null,
-      },
+      payload,
     }));
     socket.onmessage = (message) => {
       const envelope = JSON.parse(String(message.data));
@@ -82,12 +87,34 @@ export function createWorkerSession(url, machineToken, title) {
         clearTimeout(timeout);
         socket.close();
         reject(new Error(envelope.payload.message));
-      } else if (envelope.payload.type === "SESSION_UPDATED") {
+      } else if (envelope.payload.type === responseType) {
         clearTimeout(timeout);
         socket.close();
-        resolve(envelope.payload.session);
+        resolve(envelope.payload);
       }
     };
+  });
+}
+
+/** Produce stored COMMAND_STARTED/COMMAND_FINISHED Events through the real hook path. */
+export function reportCommand(socket, title, exitCode = 0) {
+  execFileSync("cargo", ["build", "--quiet", "-p", "cli", "--bin", "sentinal"], { cwd: repo, stdio: "inherit" });
+  const binary = join(repo, "target", "debug", "sentinal");
+  const pid = process.pid;
+  const common = ["hook", "report"];
+  const environment = {
+    ...process.env,
+    SENTINAL_SOCKET: socket,
+    SENTINAL_HOOK_TEXT: "printf structured-notification-test",
+    SENTINAL_TITLE: title,
+  };
+  execFileSync(binary, [...common, "start", "--pid", String(pid), "--shell", "/bin/sh", "--seq", "1"], {
+    env: environment,
+    stdio: "ignore",
+  });
+  execFileSync(binary, [...common, "finish", "--pid", String(pid), "--shell", "/bin/sh", "--seq", "1", "--exit", String(exitCode)], {
+    env: environment,
+    stdio: "ignore",
   });
 }
 

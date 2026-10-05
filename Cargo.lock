@@ -2228,6 +2228,7 @@ version = "0.0.1"
 dependencies = [
  "protocol",
  "rusqlite",
+ "serde",
  "serde_json",
  "thiserror 2.0.21",
 ]

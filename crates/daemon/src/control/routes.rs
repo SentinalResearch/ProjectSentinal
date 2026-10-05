@@ -7,7 +7,7 @@
 
 use super::{proxy, ControlFailure, ControlService};
 use crate::{
-    api::auth_routes::bearer_from_headers,
+    api::auth_routes::{bearer_from_headers, credential_from_headers},
     auth::{AuthManager, CredentialKind},
 };
 use axum::{
@@ -35,6 +35,7 @@ pub struct ControlRoutes {
     control: Option<ControlService>,
     auth: AuthManager,
     behind_tailscale_serve: bool,
+    development: bool,
 }
 
 impl ControlRoutes {
@@ -43,17 +44,19 @@ impl ControlRoutes {
         control: Option<ControlService>,
         auth: AuthManager,
         behind_tailscale_serve: bool,
+        development: bool,
     ) -> Self {
         ControlRoutes {
             control,
             auth,
             behind_tailscale_serve,
+            development,
         }
     }
 
     /// Build the router.
     pub fn router(self) -> Router {
-        let proxy = proxy::routes(self.control.clone(), self.auth.clone());
+        let proxy = proxy::routes(self.control.clone(), self.auth.clone(), self.development);
         Router::new()
             .route("/api/v1/pairing/codes", post(create_code))
             .route(
@@ -87,8 +90,8 @@ impl ControlRoutes {
     /// Require an owner browser Session (never the Machine token).
     fn owner(&self, headers: &HeaderMap) -> Result<&ControlService, ControlFailure> {
         let control = self.control()?;
-        let kind = bearer_from_headers(headers)
-            .and_then(|token| self.auth.authorize(token).ok().flatten());
+        let kind = credential_from_headers(headers, self.development)
+            .and_then(|token| self.auth.authorize(&token).ok().flatten());
         match kind {
             Some(CredentialKind::BrowserSession) => Ok(control),
             Some(CredentialKind::MachineToken) => Err(ControlFailure::new(

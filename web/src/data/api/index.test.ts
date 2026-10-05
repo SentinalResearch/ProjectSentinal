@@ -88,8 +88,7 @@ class MemoryStorage {
 
 class FakeAuthServer {
   password: string | null;
-  readonly tokens = new Set<string>();
-  private nextToken = 1;
+  browserAuthenticated = false;
   readonly outputRequests: URL[] = [];
   readonly unavailableMachines = new Set<string>();
   /** Machines whose Session list also carries a row stamped with another Machine ID. */
@@ -107,37 +106,38 @@ class FakeAuthServer {
     if (url.pathname === "/api/v1/auth/status") {
       return json({ setup_required: this.password === null });
     }
-    if (url.pathname === "/api/v1/auth/setup") {
+    if (url.pathname === "/api/v1/auth/browser/setup") {
       if (new Headers(request.headers).get("authorization") !== "Bearer bootstrap-token") {
         return failure("INVALID_BOOTSTRAP", "invalid bootstrap machine token", 401);
       }
       this.password = body(request).password as string;
+      this.browserAuthenticated = true;
       return json(this.issue());
     }
-    if (url.pathname === "/api/v1/auth/login") {
+    if (url.pathname === "/api/v1/auth/browser/login") {
       if (body(request).password !== this.password) {
         return failure("INVALID_CREDENTIALS", "invalid owner password", 401, 4);
       }
+      this.browserAuthenticated = true;
       return json(this.issue());
     }
-    const token = bearer(request);
-    if (!token || !this.tokens.has(token)) {
+    if (!this.browserAuthenticated) {
       return failure("INVALID_SESSION", "invalid or expired browser session", 401);
     }
-    if (url.pathname === "/api/v1/auth/session") {
+    if (url.pathname === "/api/v1/auth/browser/session") {
       return json({ expires_at: 1_790_086_400_000 });
     }
-    if (url.pathname === "/api/v1/auth/logout") {
-      this.tokens.delete(token);
+    if (url.pathname === "/api/v1/auth/browser/logout") {
+      this.browserAuthenticated = false;
       return new Response(null, { status: 204 });
     }
-    if (url.pathname === "/api/v1/auth/password") {
+    if (url.pathname === "/api/v1/auth/browser/password") {
       const values = body(request);
       if (values.current_password !== this.password) {
         return failure("INVALID_CREDENTIALS", "invalid owner password", 401, 0);
       }
       this.password = values.new_password as string;
-      this.tokens.clear();
+      this.browserAuthenticated = true;
       return json(this.issue());
     }
     if (url.pathname === "/api/v1/machines") {
@@ -175,9 +175,7 @@ class FakeAuthServer {
   };
 
   private issue() {
-    const token = `session-token-${this.nextToken++}`;
-    this.tokens.add(token);
-    return { token, expires_at: 1_790_086_400_000 };
+    return { expires_at: 1_790_086_400_000 };
   }
 }
 
@@ -200,8 +198,7 @@ class FakeSocket implements ApiSocket {
     const routed = new URL(url).pathname.match(/^\/api\/v1\/machines\/([^/]+)\/ws$/);
     this.machineId = routed ? decodeURIComponent(routed[1]) : machine.id;
     queueMicrotask(() => {
-      const token = new URL(url).searchParams.get("token");
-      if (!token || !server.tokens.has(token) || server.unavailableMachines.has(this.machineId)) {
+      if (!server.browserAuthenticated || server.unavailableMachines.has(this.machineId)) {
         this.onerror?.(new Event("error"));
         return;
       }
@@ -300,7 +297,15 @@ class FakeSocket implements ApiSocket {
           default: { finished: true, error: true, stalled: true, waiting: true, checkpoint: false, progress: false },
           sessions: [],
         },
-        status: { configured: true, server: "https://ntfy.sh", topic: "safe-topic", token_configured: true },
+        status: {
+          configured: true,
+          server: "https://ntfy.sh",
+          topic: "safe-topic",
+          token_configured: true,
+          configuration_state: "CONFIGURED",
+          diagnostic: null,
+          reloaded_at: 1_700_000_000_000,
+        },
       };
     } else if (request.type === "GET_NOTIFICATION_JOURNAL") {
       payload = { type: "NOTIFICATION_JOURNAL", entries: [] };
@@ -346,10 +351,6 @@ class FakeSocket implements ApiSocket {
 
 function body(request: RequestInit): Record<string, unknown> {
   return JSON.parse(String(request.body ?? "{}")) as Record<string, unknown>;
-}
-
-function bearer(request: RequestInit): string | null {
-  return new Headers(request.headers).get("authorization")?.replace(/^Bearer /, "") ?? null;
 }
 
 function json(value: unknown, status = 200): Response {
@@ -402,7 +403,7 @@ function workerRegistry(machineId = "worker-machine"): RegistryMachine {
 }
 
 describe("apiAdapter authentication", () => {
-  it("bootstraps the single owner and stores only the browser session token", async () => {
+  it("bootstraps the single owner without exposing a browser credential to storage", async () => {
     const { adapter, storage } = setup(null);
 
     await expect(adapter.auth.getState()).resolves.toMatchObject({ status: "setup" });
@@ -410,7 +411,7 @@ describe("apiAdapter authentication", () => {
       adapter.auth.setup("bootstrap-token", "correct horse battery staple"),
     ).resolves.toMatchObject({ status: "signedIn" });
 
-    expect(storage.getItem("sentinal.sessionToken")).toBe("session-token-1");
+    expect(storage.getItem("sentinal.sessionToken")).toBeNull();
     expect(storage.getItem("sentinal.daemonToken")).toBeNull();
   });
 
@@ -634,7 +635,7 @@ describe("apiAdapter authentication", () => {
     await adapter.auth.login("correct horse battery staple");
 
     await adapter.auth.changePassword("correct horse battery staple", "a different secure passphrase");
-    expect(storage.getItem("sentinal.sessionToken")).toBe("session-token-2");
+    expect(storage.getItem("sentinal.sessionToken")).toBeNull();
     await adapter.auth.logout();
 
     expect(storage.getItem("sentinal.sessionToken")).toBeNull();
@@ -817,7 +818,7 @@ describe("apiAdapter multi-Machine routing", () => {
     for (const socket of sockets) {
       const endpoint = new URL(socket.url);
       expect(endpoint.origin).toBe("ws://daemon.test");
-      expect(endpoint.searchParams.get("token")).toMatch(/^session-token-/);
+      expect(endpoint.searchParams.get("token")).toBeNull();
       expect(socket.url).not.toContain("a".repeat(64));
       expect(socket.url).not.toContain("b".repeat(64));
     }

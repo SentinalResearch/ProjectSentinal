@@ -19,7 +19,7 @@ function reply(status: number, body?: unknown) {
 }
 
 describe("registry API client", () => {
-  it("sends only the owner Session bearer and never stores the code", async () => {
+  it("uses the HttpOnly cookie boundary and never stores the code", async () => {
     const store = storage("owner-session");
     const fetcher = vi.fn().mockResolvedValue(
       reply(200, { code_id: "pc_1", code: "7KQ4M-2XZ9C", expires_at: 1, connect_command: "sentinal connect https://c.example.ts.net" }),
@@ -32,7 +32,8 @@ describe("registry API client", () => {
     const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/v1/pairing/codes");
     expect(init.method).toBe("POST");
-    expect((init.headers as Record<string, string>).authorization).toBe("Bearer owner-session");
+    expect((init.headers as Record<string, string>).authorization).toBeUndefined();
+    expect(init.credentials).toBe("same-origin");
     expect([...store.values.values()]).toEqual(["owner-session"]);
   });
 

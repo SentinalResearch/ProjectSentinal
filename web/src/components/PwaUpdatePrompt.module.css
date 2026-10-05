@@ -1,0 +1,23 @@
+.prompt {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  color: var(--text-1);
+  background: var(--bg-2);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.prompt button {
+  color: var(--bg-0);
+  background: var(--text-1);
+  border: 0;
+  padding: 8px 10px;
+  cursor: pointer;
+}

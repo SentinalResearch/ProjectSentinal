@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { createWorkerSession, e2eEnv as env, linkSecrets, sentinal } from "./support/adopt.mjs";
+import { createWorkerSession, e2eEnv as env, linkSecrets, reportCommand, sentinal } from "./support/adopt.mjs";
 
 const password = "test-password-for-playwright";
 test.use({ viewport: { width: 390, height: 844 } });
@@ -60,6 +60,42 @@ test("two workers enroll, rename, and revoke independently with no secret in the
   );
   expect(workerSessionA.id).toBe(1);
   expect(workerSessionB.id).toBe(1);
+
+  // Real structured Command Events on both workers drive the ntfy outbox.
+  reportCommand(workerA, "Notification worker A", 0);
+  reportCommand(workerB, "Notification worker B", 3);
+  type NtfyEntry = { title: string; body: string; click: string | null; tokenConfigured: boolean };
+  const notificationRows = async (): Promise<NtfyEntry[]> => {
+    const response = await page.request.get("http://127.0.0.1:7440/journal");
+    return response.json() as Promise<NtfyEntry[]>;
+  };
+  await expect.poll(async () => (await notificationRows()).length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2);
+  const delivered = (await notificationRows()).slice(-2);
+  expect(delivered.map((entry) => entry.click)).toEqual(expect.arrayContaining([
+    expect.stringContaining(encodeURIComponent(`${workerSessionA.machine_id}:`)),
+    expect.stringContaining(encodeURIComponent(`${workerSessionB.machine_id}:`)),
+  ]));
+  expect(JSON.stringify(delivered)).not.toContain("structured-notification-test");
+  expect(JSON.stringify(delivered)).not.toContain("fake-private-token");
+  expect(delivered.every((entry) => entry.tokenConfigured)).toBe(true);
+
+  await page.goto("/app/settings/notifications");
+  await expect(page.getByText(/DELIVERY HISTORY & PREVIEW/)).toBeVisible();
+  await expect(page.getByText(/phone appearance is controlled by ntfy/)).toBeVisible();
+  await expect(page.getByText(/Notification worker A — completed/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/Notification worker B — failed/)).toBeVisible();
+
+  // An expired/login boundary returns to the exact composite notification target.
+  const click = delivered.find((entry) => entry.click?.includes(encodeURIComponent(workerSessionA.machine_id)))?.click;
+  expect(click).toBeTruthy();
+  const clickPath = new URL(click!).pathname;
+  await page.request.post("/api/v1/auth/browser/logout");
+  await page.goto(clickPath);
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: /Sign in/ }).click();
+  await expect(page.getByRole("heading", { name: "Notification worker A" })).toBeVisible({ timeout: 10_000 });
+  expect(decodeURIComponent(new URL(page.url()).pathname)).toContain(`/app/sessions/${workerSessionA.machine_id}:`);
 
   await page.getByTitle("Overview").last().click();
   await expect(page.getByText("Worker A routed session", { exact: true })).toBeVisible({ timeout: 10_000 });
@@ -144,6 +180,7 @@ test("two workers enroll, rename, and revoke independently with no secret in the
     ...linkSecrets(env("SENTINAL_E2E_WORKER_B_ROOT")),
   ];
   for (const secret of secrets) expect(stored).not.toContain(secret);
-  // Only the owner Session and the theme preference are ever stored.
-  expect(Object.keys(JSON.parse(stored)).sort()).toEqual(["sentinal.sessionToken", "sentinal.theme"]);
+  // The owner Session is HttpOnly; JavaScript storage contains only preferences.
+  expect(Object.keys(JSON.parse(stored)).sort()).toEqual(["sentinal.theme"]);
+  expect(browserSockets.every((url) => new URL(url).searchParams.get("token") === null)).toBe(true);
 });

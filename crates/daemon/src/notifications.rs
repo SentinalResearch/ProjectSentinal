@@ -1,29 +1,43 @@
-//! Event-driven ntfy delivery with per-Session rules and deterministic deduplication.
+//! Event-driven ntfy delivery with persistent retry state and safe presentation.
 
+mod config;
+mod delivery;
+mod presentation;
+mod runtime;
+
+use config::ConfigSnapshot;
+use presentation::Presentation;
 use protocol::{
-    CaptureLevel, Event, EventKind, MachineId, NotificationJournalEntry, NotificationRuleSet,
-    NotificationRules, NotificationStatus, SessionId, SessionNotificationRule, Timestamp,
+    CaptureLevel, Event, EventKind, MachineId, NotificationConfigurationState,
+    NotificationDeliveryState, NotificationJournalEntry, NotificationRuleSet, NotificationRules,
+    NotificationStatus, SessionId, SessionNotificationRule, Timestamp,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs,
+    future::Future,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, RwLock},
+    pin::Pin,
+    sync::{Arc, RwLock},
 };
+use store::{NewNotificationDelivery, NotificationDelivery, Store};
 
 const DEDUP_MS: i64 = 5 * 60 * 1_000;
-const MAX_JOURNAL: usize = 100;
+const MAX_PENDING: u32 = 256;
+const JOURNAL_LIMIT: u32 = 1_000;
+const JOURNAL_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
+pub(super) const DELIVERY_BATCH: u32 = 32;
+pub(super) const DELIVERY_CONCURRENCY: usize = 4;
+pub(super) const RETRY_DELAYS_MS: [i64; 3] = [5_000, 30_000, 120_000];
 
 /// Injectable notification clock.
 pub type NotificationClock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
+/// Trusted current control origin, or `None` when this Machine is not linked.
+pub type ControlOrigin = Arc<dyn Fn() -> Option<String> + Send + Sync>;
 
-#[derive(Debug, Clone, Deserialize)]
-struct NotifyConfig {
-    server: String,
-    topic: String,
-    token: Option<String>,
-}
+pub(super) type SendFuture = Pin<Box<dyn Future<Output = SendResult> + Send>>;
+pub(super) type NotificationSender = Arc<dyn Fn(OutboundRequest) -> SendFuture + Send + Sync>;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct StoredRules {
@@ -33,50 +47,61 @@ struct StoredRules {
     sessions: HashMap<SessionId, NotificationRuleSet>,
 }
 
-/// Local notification rules and delivery client for one Machine.
+#[derive(Debug, Clone)]
+pub(super) struct OutboundRequest {
+    url: String,
+    token: Option<String>,
+    presentation: Presentation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SendResult {
+    Accepted,
+    Timeout,
+    ConnectionFailed,
+    RateLimited(Option<u64>),
+    ClientError,
+    ServerError,
+}
+
+/// Local notification rules, outbox, and delivery client for one Machine.
 #[derive(Clone)]
 pub struct NotificationService {
     machine_id: MachineId,
-    config: Option<NotifyConfig>,
+    machine_name: String,
+    config_path: PathBuf,
+    owner_uid: u32,
+    development: bool,
+    config: Arc<RwLock<ConfigSnapshot>>,
     rules_path: PathBuf,
     rules: Arc<RwLock<StoredRules>>,
-    dedup: Arc<Mutex<HashMap<(SessionId, &'static str), Timestamp>>>,
-    journal: Arc<Mutex<Vec<NotificationJournalEntry>>>,
-    next_id: Arc<Mutex<u64>>,
+    store: Arc<Store>,
     clock: NotificationClock,
-    client: reqwest::Client,
+    control_origin: ControlOrigin,
+    sender: NotificationSender,
+    delivery_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl NotificationService {
-    /// Load optional ntfy configuration and persisted rules without exposing the token.
+    /// Load configuration and rules, reporting redacted diagnostics.
+    #[allow(clippy::too_many_arguments)]
     pub fn load(
         config_path: &Path,
         rules_path: PathBuf,
         machine_id: MachineId,
+        machine_name: String,
+        owner_uid: u32,
+        development: bool,
+        store: Arc<Store>,
+        control_origin: ControlOrigin,
         clock: NotificationClock,
     ) -> (Self, Vec<String>) {
-        let mut diagnostics = Vec::new();
-        let config = match fs::read_to_string(config_path) {
-            Ok(text) => match toml::from_str::<NotifyConfig>(&text) {
-                Ok(config) if valid_config(&config) => Some(config),
-                Ok(_) => {
-                    diagnostics.push(format!(
-                        "{}: server must be HTTPS (plain HTTP only to loopback or Tailscale), topic must be a safe non-empty segment",
-                        config_path.display()
-                    ));
-                    None
-                }
-                Err(error) => {
-                    diagnostics.push(format!("{}: {error}", config_path.display()));
-                    None
-                }
-            },
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => {
-                diagnostics.push(format!("{}: {error}", config_path.display()));
-                None
-            }
-        };
+        let snapshot = config::load(config_path, owner_uid, development, clock());
+        let mut diagnostics = snapshot
+            .diagnostic
+            .as_ref()
+            .map(|value| vec![format!("{}: {value}", config_path.display())])
+            .unwrap_or_default();
         let rules = match fs::read_to_string(&rules_path) {
             Ok(text) => serde_json::from_str(&text).unwrap_or_else(|error| {
                 diagnostics.push(format!("{}: {error}", rules_path.display()));
@@ -88,33 +113,70 @@ impl NotificationService {
                 StoredRules::default()
             }
         };
+        let (sender, client_error) = delivery::reqwest_sender();
+        if let Some(error) = client_error {
+            diagnostics.push(error);
+        }
         (
             Self {
                 machine_id,
-                config,
+                machine_name,
+                config_path: config_path.to_path_buf(),
+                owner_uid,
+                development,
+                config: Arc::new(RwLock::new(snapshot)),
                 rules_path,
                 rules: Arc::new(RwLock::new(rules)),
-                dedup: Arc::new(Mutex::new(HashMap::new())),
-                journal: Arc::new(Mutex::new(Vec::new())),
-                next_id: Arc::new(Mutex::new(1)),
+                store,
                 clock,
-                client: reqwest::Client::new(),
+                control_origin,
+                sender,
+                delivery_lock: Arc::new(tokio::sync::Mutex::new(())),
             },
             diagnostics,
         )
     }
 
+    #[cfg(test)]
+    fn with_sender(mut self, sender: NotificationSender) -> Self {
+        self.sender = sender;
+        self
+    }
+
+    /// Reload `notify.toml` atomically and return the secret-free status.
+    pub fn reload_config(&self) -> NotificationStatus {
+        let mut snapshot = config::load(
+            &self.config_path,
+            self.owner_uid,
+            self.development,
+            (self.clock)(),
+        );
+        if let Ok(mut current) = self.config.write() {
+            if snapshot.reloaded_at.is_none() {
+                snapshot.reloaded_at = current.reloaded_at;
+            }
+            *current = snapshot;
+        }
+        self.status()
+    }
+
     /// Secret-free configuration shown in Settings.
     pub fn status(&self) -> NotificationStatus {
+        let Ok(snapshot) = self.config.read() else {
+            return unavailable_status("notification configuration lock is unavailable");
+        };
         NotificationStatus {
-            configured: self.config.is_some(),
-            server: self.config.as_ref().map(|config| config.server.clone()),
-            topic: self.config.as_ref().map(|config| config.topic.clone()),
-            token_configured: self
+            configured: snapshot.config.is_some(),
+            server: snapshot.config.as_ref().map(|value| value.server.clone()),
+            topic: snapshot.config.as_ref().map(|value| value.topic.clone()),
+            token_configured: snapshot
                 .config
                 .as_ref()
-                .and_then(|config| config.token.as_ref())
+                .and_then(|value| value.token.as_ref())
                 .is_some(),
+            configuration_state: Some(snapshot.state),
+            diagnostic: snapshot.diagnostic.clone(),
+            reloaded_at: snapshot.reloaded_at,
         }
     }
 
@@ -158,159 +220,151 @@ impl NotificationService {
                 }
                 None => rules.default = value,
             }
-            serde_json::to_string_pretty(&*rules).map_err(|error| error.to_string())?
+            serde_json::to_vec_pretty(&*rules).map_err(|error| error.to_string())?
         };
         if let Some(parent) = self.rules_path.parent() {
             crate::private_fs::ensure_private_dir(parent).map_err(|error| error.to_string())?;
         }
-        fs::write(&self.rules_path, text).map_err(|error| {
-            format!(
-                "failed to write notification rules '{}': {error}",
-                self.rules_path.display()
-            )
-        })
+        let mut options = crate::private_fs::private_file_options();
+        options.write(true).create(true).truncate(true);
+        use std::io::Write;
+        options
+            .open(&self.rules_path)
+            .and_then(|mut file| file.write_all(&text).and_then(|()| file.sync_all()))
+            .map_err(|error| {
+                format!(
+                    "failed to write notification rules '{}': {error}",
+                    self.rules_path.display()
+                )
+            })
     }
 
-    /// Return newest journal entries first.
-    pub fn journal(&self) -> Vec<NotificationJournalEntry> {
-        self.journal
-            .lock()
-            .map(|entries| entries.iter().rev().cloned().collect())
-            .unwrap_or_default()
-    }
-
-    /// Apply rules and deduplication, then deliver one structured Event through ntfy.
-    ///
-    /// `capture` is the Session's capture level: an Event its capture cannot
-    /// support as evidence never notifies, whatever the rules say.
-    pub async fn process(
-        &self,
-        event: &Event,
-        capture: CaptureLevel,
-        machine: &str,
-        label: &str,
-    ) -> bool {
-        if !capture.supports_evidence(&event.kind) || !self.should_send(event) {
-            return false;
+    /// Record a decision for one structured Event without performing network I/O.
+    pub fn enqueue(&self, event: &Event, capture: CaptureLevel) -> Result<bool, String> {
+        if !capture.supports_evidence(&event.kind) {
+            return Ok(false);
         }
-        let text = format!("{machine} · {label}: {}", short_text(&event.kind));
-        let delivered = match &self.config {
-            Some(config) => {
-                let url = format!("{}/{}", config.server.trim_end_matches('/'), config.topic);
-                let mut request = self.client.post(url).body(text.clone());
-                if let Some(token) = &config.token {
-                    request = request.bearer_auth(token);
-                }
-                request
-                    .send()
-                    .await
-                    .is_ok_and(|response| response.status().is_success())
-            }
-            None => false,
+        let Some(category) = presentation::category(&event.kind) else {
+            return Ok(false);
         };
-        self.record(event, text, delivered);
-        delivered
-    }
-
-    fn should_send(&self, event: &Event) -> bool {
         let enabled = self
             .rules
             .read()
-            .ok()
+            .map_err(|_| "notification rules lock poisoned".to_string())
             .map(|rules| {
-                rules
+                let rules = rules
                     .sessions
                     .get(&event.session_id)
                     .copied()
-                    .unwrap_or(rules.default)
-            })
-            .is_some_and(|rules| category_enabled(rules, &event.kind));
-        if !enabled || matches!(event.kind, EventKind::CommandFinished { .. }) {
-            return enabled;
-        }
-        let key = (event.session_id, kind_key(&event.kind));
+                    .unwrap_or(rules.default);
+                category_enabled(rules, &event.kind)
+            })?;
+        let configured = self
+            .config
+            .read()
+            .map(|value| value.state == NotificationConfigurationState::Configured)
+            .unwrap_or(false);
+        let state = if !enabled {
+            NotificationDeliveryState::RuleDisabled
+        } else if !configured {
+            NotificationDeliveryState::NotConfigured
+        } else {
+            NotificationDeliveryState::Queued
+        };
         let now = (self.clock)();
-        let Ok(mut dedup) = self.dedup.lock() else {
-            return false;
-        };
-        if dedup
-            .get(&key)
-            .is_some_and(|previous| now.0.saturating_sub(previous.0) < DEDUP_MS)
-        {
-            return false;
-        }
-        dedup.insert(key, now);
-        true
+        self.store
+            .prune_notification_deliveries(Timestamp(now.0.saturating_sub(JOURNAL_RETENTION_MS)))
+            .map_err(|error| error.to_string())?;
+        let deduplicate_since = (state == NotificationDeliveryState::Queued
+            && !matches!(event.kind, EventKind::CommandFinished { .. }))
+        .then_some(Timestamp(now.0.saturating_sub(DEDUP_MS)));
+        let record = self
+            .store
+            .record_notification_delivery(&NewNotificationDelivery {
+                event_id: event.id,
+                machine_id: self.machine_id.clone(),
+                session_id: event.session_id,
+                category,
+                state,
+                at: now,
+                deduplicate_since,
+                pending_limit: MAX_PENDING,
+            })
+            .map_err(|error| error.to_string())?;
+        Ok(record.state == NotificationDeliveryState::Queued)
     }
 
-    fn record(&self, event: &Event, text: String, delivered: bool) {
-        let Ok(mut next_id) = self.next_id.lock() else {
-            return;
-        };
-        let entry = NotificationJournalEntry {
-            id: *next_id,
-            machine_id: self.machine_id.clone(),
-            session_id: event.session_id,
+    /// Return newest journal entries first, rendered from structured Events.
+    pub fn journal(&self) -> Vec<NotificationJournalEntry> {
+        self.store
+            .notification_deliveries(JOURNAL_LIMIT)
+            .map(|records| {
+                records
+                    .into_iter()
+                    .map(|record| self.journal_entry(record))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn journal_entry(&self, record: NotificationDelivery) -> NotificationJournalEntry {
+        let text = self
+            .store
+            .notification_event(record.event_id)
+            .ok()
+            .flatten()
+            .and_then(|event| {
+                let title = self
+                    .store
+                    .session(record.session_id)
+                    .ok()
+                    .flatten()
+                    .and_then(|session| session.title);
+                presentation::render(
+                    &event.kind,
+                    &self.machine_name,
+                    title.as_deref(),
+                    &self.machine_id,
+                    record.session_id,
+                    (self.control_origin)().as_deref(),
+                )
+                .map(|value| format!("{}: {}", value.title, value.body))
+            })
+            .unwrap_or_else(|| format!("Sentinal: Session {} notification", record.session_id.0));
+        NotificationJournalEntry {
+            id: record.id,
+            machine_id: record.machine_id,
+            session_id: record.session_id,
             text,
-            at: (self.clock)(),
-            delivered,
-        };
-        *next_id = next_id.saturating_add(1);
-        drop(next_id);
-        if let Ok(mut journal) = self.journal.lock() {
-            journal.push(entry);
-            if journal.len() > MAX_JOURNAL {
-                journal.remove(0);
-            }
+            at: record.updated_at,
+            delivered: record.state == NotificationDeliveryState::Delivered,
+            event_id: Some(record.event_id),
+            category: Some(record.category),
+            state: Some(record.state),
+            attempts: Some(record.attempts),
+            result_class: record.result_class,
+            request_bytes: record.request_bytes,
         }
     }
 }
 
-fn valid_config(config: &NotifyConfig) -> bool {
-    let scheme_ok = config.server.starts_with("https://")
-        || config
-            .server
-            .strip_prefix("http://")
-            .is_some_and(private_http_host);
-    scheme_ok
-        && !config.server.contains('@')
-        && !config.topic.is_empty()
-        && config.topic.len() <= 256
-        && config
-            .topic
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || "-_".contains(character))
-}
-
-/// Plain HTTP would expose the token and event text on the wire, so it is
-/// allowed only to loopback or a Tailscale (100.64.0.0/10) address, where
-/// the transport is local or WireGuard-encrypted.
-fn private_http_host(rest: &str) -> bool {
-    let authority = rest.split('/').next().unwrap_or_default();
-    let host = if let Some(bracketed) = authority.strip_prefix('[') {
-        bracketed.split(']').next().unwrap_or_default()
-    } else {
-        authority.split(':').next().unwrap_or_default()
-    };
-    if host == "localhost" {
-        return true;
-    }
-    match host.parse::<std::net::IpAddr>() {
-        Ok(std::net::IpAddr::V4(ip)) => {
-            let [a, b, ..] = ip.octets();
-            ip.is_loopback() || (a == 100 && (64..128).contains(&b))
-        }
-        Ok(std::net::IpAddr::V6(ip)) => ip.is_loopback(),
-        Err(_) => false,
+fn unavailable_status(message: &str) -> NotificationStatus {
+    NotificationStatus {
+        configured: false,
+        server: None,
+        topic: None,
+        token_configured: false,
+        configuration_state: Some(NotificationConfigurationState::Invalid),
+        diagnostic: Some(message.into()),
+        reloaded_at: None,
     }
 }
 
-/// The rule categories; the default set matches `EventKind::notifies_by_default`.
 fn category_enabled(rules: NotificationRuleSet, kind: &EventKind) -> bool {
     match kind {
         EventKind::CommandFinished { exit_code: 0, .. } => rules.finished,
         EventKind::CommandFinished { .. } | EventKind::ErrorDetected { .. } => rules.error,
-        EventKind::ResourceHigh { percent, .. } => rules.error && *percent >= 95.0,
+        EventKind::ResourceHigh { .. } => rules.error,
         EventKind::PossiblyStalled { .. } => rules.stalled,
         EventKind::WaitingForInput { .. } => rules.waiting,
         EventKind::CheckpointCreated { .. } => rules.checkpoint,
@@ -319,88 +373,7 @@ fn category_enabled(rules: NotificationRuleSet, kind: &EventKind) -> bool {
     }
 }
 
-fn kind_key(kind: &EventKind) -> &'static str {
-    match kind {
-        EventKind::CommandStarted { .. } => "COMMAND_STARTED",
-        EventKind::CommandFinished { .. } => "COMMAND_FINISHED",
-        EventKind::ProcessStarted { .. } => "PROCESS_STARTED",
-        EventKind::ProcessExited { .. } => "PROCESS_EXITED",
-        EventKind::ProgressUpdated { .. } => "PROGRESS_UPDATED",
-        EventKind::WarningDetected { .. } => "WARNING_DETECTED",
-        EventKind::ErrorDetected { .. } => "ERROR_DETECTED",
-        EventKind::ResourceHigh { .. } => "RESOURCE_HIGH",
-        EventKind::WaitingForInput { .. } => "WAITING_FOR_INPUT",
-        EventKind::PossiblyStalled { .. } => "POSSIBLY_STALLED",
-        EventKind::CheckpointCreated { .. } => "CHECKPOINT_CREATED",
-        EventKind::ServerStarted { .. } => "SERVER_STARTED",
-    }
-}
-
-fn short_text(kind: &EventKind) -> String {
-    match kind {
-        EventKind::CommandFinished { exit_code, .. } => {
-            format!("command finished with exit {exit_code}")
-        }
-        // The message is a raw output line and may hold secrets.
-        EventKind::ErrorDetected { .. } => "error detected".into(),
-        EventKind::ResourceHigh { resource, percent } => {
-            format!("{resource:?} usage is {percent:.0}%")
-        }
-        EventKind::WaitingForInput { .. } => "waiting for input".into(),
-        EventKind::PossiblyStalled { silent_for_ms } => {
-            format!("possibly stalled for {} seconds", silent_for_ms.0 / 1_000)
-        }
-        EventKind::CheckpointCreated { path } => format!("checkpoint created: {path}"),
-        EventKind::ProgressUpdated {
-            current,
-            total,
-            unit,
-        } => format!(
-            "progress: {current}{} {unit}",
-            total.map_or_else(String::new, |total| format!("/{total}"))
-        ),
-        _ => "needs attention".into(),
-    }
-}
-
-/// Deliver every Session Event through `service`, labelled with the Session
-/// title or its latest Command text, until the Event stream closes.
-pub fn spawn_notifier(
-    service: NotificationService,
-    mut events: tokio::sync::broadcast::Receiver<Event>,
-    store: Arc<store::Store>,
-    machine: String,
-) {
-    tokio::spawn(async move {
-        loop {
-            match events.recv().await {
-                Ok(event) => {
-                    // A Session the store does not know has no evidence to report.
-                    let Some(session) = store.session(event.session_id).ok().flatten() else {
-                        continue;
-                    };
-                    let label = session
-                        .title
-                        .or_else(|| {
-                            store
-                                .history(Some(event.session_id), 1)
-                                .ok()
-                                .and_then(|commands| commands.into_iter().next())
-                                .map(|command| command.text)
-                        })
-                        .unwrap_or_else(|| format!("Session {}", event.session_id.0));
-                    let _ = service
-                        .process(&event, session.capture, &machine, &label)
-                        .await;
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                    tracing::warn!(skipped, "notification Event stream lagged");
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-            }
-        }
-    });
-}
+pub use runtime::{spawn_notification_workers, spawn_notifier};
 
 #[cfg(test)]
 mod tests;

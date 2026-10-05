@@ -4,6 +4,7 @@ mod audit;
 mod bootstrap;
 mod manifest;
 mod routes;
+mod web;
 
 pub use manifest::{ManifestError, ReleaseManifest, ReleaseTarget, TargetArch, TargetOs};
 
@@ -66,6 +67,7 @@ pub struct PackageService {
     downloads: Arc<Semaphore>,
     rate: Arc<Mutex<RateWindow>>,
     owner_uid: u32,
+    web_root: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -82,6 +84,9 @@ impl PackageService {
             let path = config.directory.join(child);
             prepare_private_directory(&path, owner_uid)?;
         }
+        if let Some(web_root) = config.web_root.as_deref() {
+            validate_web_directory(web_root, owner_uid)?;
+        }
         Ok(Self {
             audit: PackageAudit::new(&config.directory),
             root: config.directory,
@@ -93,6 +98,7 @@ impl PackageService {
                 requests: 0,
             })),
             owner_uid,
+            web_root: config.web_root,
         })
     }
 
@@ -177,8 +183,40 @@ pub fn package_router(service: PackageService) -> Router {
             get(routes::release_manifest),
         )
         .route("/packages/v1/artifacts/{file}", get(routes::artifact))
-        .fallback(routes::not_found)
+        .fallback(web::serve)
         .with_state(service)
+}
+
+fn validate_web_directory(path: &FilePath, owner_uid: u32) -> Result<(), PackageServiceError> {
+    let metadata = fs::symlink_metadata(path).map_err(|source| PackageServiceError::File {
+        operation: "inspect web root",
+        path: path.to_path_buf(),
+        source,
+    })?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() || !is_owned_by(&metadata, owner_uid)
+    {
+        return Err(PackageServiceError::UnsafeDirectory {
+            path: path.to_path_buf(),
+            reason: format!("expected an owner uid {owner_uid} real directory"),
+        });
+    }
+    let index = path.join("index.html");
+    let index_metadata =
+        fs::symlink_metadata(&index).map_err(|source| PackageServiceError::File {
+            operation: "inspect web entry point",
+            path: index.clone(),
+            source,
+        })?;
+    if !index_metadata.is_file()
+        || index_metadata.file_type().is_symlink()
+        || !is_owned_by(&index_metadata, owner_uid)
+    {
+        return Err(PackageServiceError::UnsafeDirectory {
+            path: index,
+            reason: "expected an owner-controlled regular index.html".into(),
+        });
+    }
+    Ok(())
 }
 
 async fn read_manifest(

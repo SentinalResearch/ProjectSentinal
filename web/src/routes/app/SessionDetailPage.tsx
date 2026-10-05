@@ -54,9 +54,20 @@ export function SessionDetailPage() {
   if (loading) return <div className={styles.page}>Loading…</div>;
 
   if (!session) {
+    const separator = id?.lastIndexOf(":") ?? -1;
+    const requestedMachineId = separator > 0 ? id?.slice(0, separator) : undefined;
+    const requestedSessionId = separator > 0 ? id?.slice(separator + 1) : id;
+    const requestedMachine = machines.find((candidate) => candidate.id === requestedMachineId);
+    const unavailable = requestedMachine && requestedMachine.status !== "ONLINE";
     return (
       <div className={styles.notFound}>
-        <p>Session not found.</p>
+        <h1>Session {requestedSessionId ?? "unknown"}</h1>
+        <p>
+          {requestedMachine
+            ? `${requestedMachine.name} · ${unavailable ? `Machine ${requestedMachine.status.toLowerCase()}` : "Session missing"}`
+            : `Machine ${requestedMachineId ?? "unknown"} is not enrolled or is no longer available.`}
+        </p>
+        <p>The notification still points to this exact Machine and will not open a same-numbered Session elsewhere.</p>
         <button type="button" className={styles.breadcrumbMachine} onClick={() => navigate("/app/overview")}>
           Back to Overview
         </button>

@@ -209,7 +209,7 @@ async fn wrong_token_is_unauthorized() {
 }
 
 #[tokio::test]
-async fn websocket_query_token_passes_authentication() {
+async fn production_websocket_rejects_query_tokens() {
     let client: SocketAddr = "100.64.0.2:5000".parse().unwrap();
     let response = router(state())
         .layer(MockConnectInfo(client))
@@ -226,7 +226,7 @@ async fn websocket_query_token_passes_authentication() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::UPGRADE_REQUIRED);
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
     let unauthorized = router(state())
         .layer(MockConnectInfo(client))
@@ -239,6 +239,113 @@ async fn websocket_query_token_passes_authentication() {
         .await
         .unwrap();
     assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn browser_login_uses_http_only_cookie_without_returning_the_token() {
+    let client: SocketAddr = "100.64.0.2:5000".parse().unwrap();
+    let app = router(state()).layer(MockConnectInfo(client));
+    let setup = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/setup")
+                .header(AUTHORIZATION, "Bearer correct-token")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"password":"correct horse battery staple"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(setup.status(), StatusCode::OK);
+
+    let login = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/browser/login")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({"password":"correct horse battery staple"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(login.status(), StatusCode::OK);
+    let cookie = login
+        .headers()
+        .get("set-cookie")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(cookie.starts_with("__Host-sentinal_owner="));
+    assert!(cookie.contains("HttpOnly"));
+    assert!(cookie.contains("Secure"));
+    assert!(cookie.contains("SameSite=Strict"));
+    let pair = cookie.split(';').next().unwrap();
+    let body = to_bytes(login.into_body(), usize::MAX).await.unwrap();
+    let info: AuthSessionInfo = serde_json::from_slice(&body).unwrap();
+    assert!(info.expires_at.0 > 0);
+    assert!(!String::from_utf8_lossy(&body).contains("token"));
+
+    let access = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/sessions")
+                .header("cookie", pair)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(access.status(), StatusCode::OK);
+
+    let websocket = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/ws")
+                .header("cookie", pair)
+                .header("connection", "upgrade")
+                .header("upgrade", "websocket")
+                .header("sec-websocket-version", "13")
+                .header("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ==")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    // `oneshot` has no Hyper transport upgrade handle. Reaching Axum's
+    // WebSocket extractor (426), rather than auth middleware (401), proves
+    // the cookie authorized the upgrade path; Playwright covers the real 101.
+    assert_eq!(websocket.status(), StatusCode::UPGRADE_REQUIRED);
+
+    let logout = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/browser/logout")
+                .header("cookie", pair)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(logout.status(), StatusCode::NO_CONTENT);
+    assert!(logout
+        .headers()
+        .get("set-cookie")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .contains("Max-Age=0"));
 }
 
 #[tokio::test]

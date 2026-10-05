@@ -85,10 +85,12 @@ function NotificationRules() {
         </div>
       </header>
 
-      <div className={styles.previewWrap}>
+      <div className={styles.previewWrap} aria-live="polite">
         {statuses.map((status) => (
           <span key={status.machineId}>
-            {machines.find((machine) => machine.id === status.machineId)?.name ?? status.machineId}: {status.configured
+            {machines.find((machine) => machine.id === status.machineId)?.name ?? status.machineId}: {status.configurationState === "INVALID"
+              ? `invalid configuration${status.diagnostic ? ` — ${status.diagnostic}` : ""}`
+              : status.configured
               ? `${status.server}/${status.topic}${status.tokenConfigured ? " · token configured" : ""}`
               : "notify.toml not configured"}
           </span>
@@ -152,14 +154,26 @@ function NotificationRules() {
       </div>
 
       <div className={styles.previewWrap}>
-        <span className={styles.overline}>PREVIEW</span>
+        <span className={styles.overline}>DELIVERY HISTORY &amp; PREVIEW</span>
+        <p>Preview only — phone appearance is controlled by ntfy and your operating system.</p>
         <div className={styles.previewGrid}>
           {journal.map((n) => (
-            <div key={n.id} className={styles.previewCard} style={{ boxShadow: `inset 3px 0 0 ${previewAccent(n.text)}` }}>
+            <div
+              key={n.id}
+              className={styles.previewCard}
+              role={n.state === "PERMANENTLY_FAILED" ? "alert" : "status"}
+              style={{ boxShadow: `inset 3px 0 0 ${previewAccent(n.text)}` }}
+            >
               <span className={styles.previewSender}>Sentinal</span>
               <span className={styles.previewText}>{n.text}</span>
+              <span className={styles.machineOs}>
+                {[n.category, n.state, n.attempts === undefined ? undefined : `${n.attempts} attempt${n.attempts === 1 ? "" : "s"}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
             </div>
           ))}
+          {journal.length === 0 && <p>No stored notification decisions yet.</p>}
         </div>
       </div>
     </>

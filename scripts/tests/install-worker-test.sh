@@ -33,7 +33,7 @@ make_release() {
     v3) release_version=0.0.3 ;;
     *) release_version=0.0.9 ;;
   esac
-  mkdir -p "$root/bin" "$root/shell/external" "$root/shell/vendor"
+  mkdir -p "$root/bin" "$root/shell/external" "$root/shell/vendor" "$root/web/assets"
   printf '#!/usr/bin/env bash\necho sentinal-%s\n' "$version" >"$root/bin/sentinal"
   printf '#!/usr/bin/env bash\necho sentinald-%s\n' "$version" >"$root/bin/sentinald"
   chmod 755 "$root/bin/sentinal" "$root/bin/sentinald"
@@ -44,6 +44,10 @@ make_release() {
   printf 'pty bash %s\n' "$version" >"$root/shell/ta.bash"
   printf 'pty fish %s\n' "$version" >"$root/shell/ta.fish"
   printf 'vendor %s\n' "$version" >"$root/shell/vendor/bash-preexec.sh"
+  printf '<main>web %s</main>\n' "$version" >"$root/web/index.html"
+  printf '{}\n' >"$root/web/manifest.webmanifest"
+  printf 'const release = "%s";\n' "$version" >"$root/web/sw.js"
+  printf 'console.log("%s")\n' "$version" >"$root/web/assets/app-test.js"
   cat >"$root/BUILD.json" <<EOF
 {"schema_version":1,"version":"$release_version","git_commit":"test","source_date_epoch":1,"target":"aarch64-apple-darwin","protocol_version":1}
 EOF
@@ -102,6 +106,7 @@ assert_contains "$fresh_output" 'Worker bind: 100.90.80.70:17420'
 [[ -x "$prefix/bin/sentinald" ]] || fail 'sentinald was not installed executable'
 assert_file_contains "$prefix/bin/sentinal" 'sentinal-v1'
 assert_file_contains "$prefix/share/sentinal/shell/external/sentinal.zsh" 'zsh hook v1'
+assert_file_contains "$prefix/share/sentinal/web/index.html" 'web v1'
 assert_file_contains "$prefix/share/sentinal/release.json" '"version": "0.0.1"'
 assert_file_contains "$config/daemon.toml" 'bind = "100.90.80.70:17420"'
 assert_file_contains "$config/daemon.toml" "data_dir = \"$data\""
@@ -135,6 +140,7 @@ make_release "$release" v2
 reinstall_output="$(install_worker macos "$release" "$prefix" "$config" "$data" "$service_log")"
 assert_contains "$reinstall_output" 'Preserved existing daemon config'
 assert_file_contains "$prefix/bin/sentinal" 'sentinal-v2'
+assert_file_contains "$prefix/share/sentinal/web/index.html" 'web v2'
 assert_file_contains "$config/daemon.toml" '# retained operator setting'
 assert_file_contains "$config/token" 'machine-token'
 assert_file_contains "$config/auth.json" 'password-hash'
@@ -164,6 +170,7 @@ SENTINAL_INSTALL_PLATFORM=macos SENTINAL_SERVICE_TEST_LOG="$service_log" \
     --config-dir "$config" --data-dir "$data" --bind 100.90.80.70 \
     --rollback 0.0.1 >/dev/null
 assert_file_contains "$prefix/bin/sentinal" 'sentinal-v1'
+assert_file_contains "$prefix/share/sentinal/web/index.html" 'web v1'
 assert_file_contains "$prefix/share/sentinal/release.json" '"version": "0.0.1"'
 
 # A service failure restores the previous programs and release metadata.
@@ -179,6 +186,7 @@ fi
 assert_contains "$output" 'service failed to start; restored 0.0.1'
 assert_file_contains "$prefix/bin/sentinal" 'sentinal-v1'
 assert_file_contains "$prefix/share/sentinal/release.json" '"version": "0.0.1"'
+assert_file_contains "$prefix/share/sentinal/web/index.html" 'web v1'
 
 linux_prefix="$test_root/linux prefix"
 linux_config="$test_root/linux config"
