@@ -90,10 +90,24 @@ for unsafe_worker in 0.0.0.0 :: 10.0.0.7 100.63.255.255; do
   assert_contains "$output" 'is not a Tailscale IPv4 address'
 done
 
-if output="$(SENTINAL_TAILSCALE_IP=100.64.0.1 "$control_launcher" --dry-run 2>&1)"; then
-  fail 'control accepted a missing WORKER_IP'
+mkdir -p "$test_root/config with spaces"
+cat >"$test_root/config with spaces/daemon.toml" <<'EOF'
+bind = "127.0.0.1:17420"
+allowed_origins = ["http://100.64.12.34:14173"]
+
+[control]
+enabled = true
+public_url = "https://control.example.ts.net"
+EOF
+local_control_output="$(run_dry "$control_launcher")"
+assert_contains "$local_control_output" 'Persistent control: http://127.0.0.1:17420'
+assert_contains "$local_control_output" 'VITE_DAEMON_PROXY_TARGET=http://127.0.0.1:17420'
+assert_not_contains "$local_control_output" 'Selected worker:'
+
+if output="$(SENTINAL_TAILSCALE_IP=100.64.0.1 SENTINAL_CONFIG_DIR="$test_root/missing-config" "$control_launcher" --dry-run 2>&1)"; then
+  fail 'control accepted a missing persistent config without WORKER_IP'
 fi
-assert_contains "$output" 'WORKER_IP=100.x.y.z is required'
+assert_contains "$output" 'persistent daemon config was not found'
 
 for bad_port in 0 65536 abc; do
   if output="$(SENTINAL_TAILSCALE_IP=100.64.0.1 SENTINAL_DAEMON_PORT="$bad_port" "$agent_launcher" --dry-run 2>&1)"; then

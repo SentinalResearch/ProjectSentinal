@@ -313,6 +313,18 @@ control$ just control WORKER_IP=100.x.y.z
 control URL and selected worker. None of these commands falls back to
 fixtures or localhost. Use `--dry-run` to inspect each role.
 
+For the normal persistent multi-Machine control, configure the installed
+daemon with `[control]` as above and run:
+
+```console
+control$ just control
+```
+
+With no `WORKER_IP`, the launcher requires an installed config with the
+control role enabled, reads its loopback or Tailscale bind, and starts only
+the real-data Vite dashboard. This avoids running a second daemon against the
+same Session store and private Unix socket.
+
 ## Service operations
 
 Linux user service:

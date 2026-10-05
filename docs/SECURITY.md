@@ -55,8 +55,9 @@ checkbox are complete. The live remediation status is in `AUDIT_TRACKER.md`.
   still read that shell's memory; that is inside the user's own trust boundary.
 
 `just network` is the combined development path for remote browser testing.
-`just agent` binds only the worker daemon; `just control WORKER_IP=...` binds
-only Vite and proxies HTTP/WebSocket traffic to that one worker. Every role
+`just agent` binds only the worker daemon; `just control` binds only Vite and
+proxies to the installed persistent control. The compatibility form
+`just control WORKER_IP=...` proxies to one direct worker. Every role
 asks Tailscale for its Machine's IPv4 address, validates all addresses are in
 `100.64.0.0/10`, rejects occupied/malformed ports, and never falls back to a
 wildcard, ordinary LAN, fixtures, or localhost. Same-origin Vite proxying

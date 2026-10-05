@@ -55,10 +55,17 @@ $ just network --dry-run
 Useful overrides are `SENTINAL_TAILSCALE_IP`, `SENTINAL_DAEMON_PORT`,
 `SENTINAL_WEB_PORT`, `SENTINAL_DATA_DIR`, and `SENTINAL_CONFIG_DIR`.
 
-### Separate worker and control roles
+### Persistent control dashboard and direct-worker compatibility
 
-For the Milestone 1c two-Machine shape, the worker runs only the daemon and
-the control Machine runs only Vite:
+When this Machine's installed daemon has `[control]` enabled, start only its
+real-data dashboard. The launcher reads the daemon bind from the preserved
+config and does not start a second daemon:
+
+```console
+control$ just control
+```
+
+For the older Milestone 1c direct-worker shape, select one worker explicitly:
 
 ```console
 worker$ just agent
@@ -67,10 +74,10 @@ control$ just control WORKER_IP=100.x.y.z
 
 Both commands bind only to the exact local Tailscale IPv4. `just control`
 always selects the real API adapter and proxies HTTP and WebSocket traffic to
-the one named worker; it never starts a local daemon or falls back to mock
-data. The source-tree `just agent` prints the explicit `SENTINAL_URL` needed
-by a CLI in another terminal. An installed CLI instead discovers the worker
-bind from its persistent daemon config.
+the installed control or explicitly named worker; it never starts a daemon or
+falls back to mock data. The source-tree `just agent` prints the explicit
+`SENTINAL_URL` needed by a CLI in another terminal. An installed CLI instead
+discovers the worker bind from its persistent daemon config.
 
 Install or upgrade the worker with `just install-worker`; remove programs and
 the user service with `just uninstall-worker`. Config and data are preserved

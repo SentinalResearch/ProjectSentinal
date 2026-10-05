@@ -66,7 +66,7 @@ network *args:
 agent *args:
     bash scripts/run-agent.sh {{args}}
 
-# Start only the real-data control UI for one selected worker
+# Start the real-data UI for the installed control, or one selected worker
 control *args:
     bash scripts/run-control.sh {{args}}
 
