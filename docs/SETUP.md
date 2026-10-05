@@ -323,7 +323,9 @@ control$ just control
 With no `WORKER_IP`, the launcher requires an installed config with the
 control role enabled, reads its loopback or Tailscale bind, and starts only
 the real-data Vite dashboard. This avoids running a second daemon against the
-same Session store and private Unix socket.
+same Session store and private Unix socket. For compatibility, an explicit
+`WORKER_IP` equal to the current Machine also resolves to that installed
+control instead of trying its loopback-only daemon through the Tailscale IP.
 
 ## Service operations
 

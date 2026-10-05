@@ -37,23 +37,32 @@ main() {
     esac
   done
   local tailscale_ip daemon_port web_port vite_bin target target_label
+  local config_dir config_file use_persistent=false
   tailscale_ip="$(sentinal_resolve_local_ip "$dry_run")"
   daemon_port="${SENTINAL_DAEMON_PORT:-7420}"
   web_port="${SENTINAL_WEB_PORT:-5173}"
   sentinal_validate_port web "$web_port"
   vite_bin="$(sentinal_resolve_vite_bin "$REPO_ROOT")"
+  config_dir="${SENTINAL_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/terminal-agent}"
+  config_file="$config_dir/daemon.toml"
 
-  if [[ -n "$worker_ip" ]]; then
+  if [[ -z "$worker_ip" ]]; then
+    [[ -f "$config_file" ]] || sentinal_die "persistent daemon config was not found at '$config_file'; pass WORKER_IP=100.x.y.z for direct-worker mode"
+    config_has_control_role "$config_file" || sentinal_die "persistent daemon config '$config_file' does not enable [control]"
+    use_persistent=true
+  else
     sentinal_validate_tailscale_ipv4 "$worker_ip"
+    if [[ "$worker_ip" == "$tailscale_ip" && -f "$config_file" ]] && config_has_control_role "$config_file"; then
+      use_persistent=true
+    fi
+  fi
+
+  if [[ "$use_persistent" == false ]]; then
     sentinal_validate_port daemon "$daemon_port"
     target="http://$worker_ip:$daemon_port"
     target_label="Selected worker: $target"
   else
-    local config_dir config_file bind host port
-    config_dir="${SENTINAL_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/terminal-agent}"
-    config_file="$config_dir/daemon.toml"
-    [[ -f "$config_file" ]] || sentinal_die "persistent daemon config was not found at '$config_file'; pass WORKER_IP=100.x.y.z for direct-worker mode"
-    config_has_control_role "$config_file" || sentinal_die "persistent daemon config '$config_file' does not enable [control]"
+    local bind host port
     bind="$(read_config_bind "$config_file")"
     [[ -n "$bind" && "$bind" == *:* ]] || sentinal_die "persistent daemon config '$config_file' has no supported IPv4 bind"
     host="${bind%:*}"

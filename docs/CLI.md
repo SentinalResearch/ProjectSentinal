@@ -78,6 +78,9 @@ the installed control or explicitly named worker; it never starts a daemon or
 falls back to mock data. The source-tree `just agent` prints the explicit
 `SENTINAL_URL` needed by a CLI in another terminal. An installed CLI instead
 discovers the worker bind from its persistent daemon config.
+If `WORKER_IP` names the current Machine and its installed daemon has the
+control role, the launcher uses that daemon's configured bind automatically;
+an old same-Machine command therefore cannot bypass a loopback-only control.
 
 Install or upgrade the worker with `just install-worker`; remove programs and
 the user service with `just uninstall-worker`. Config and data are preserved

@@ -104,6 +104,11 @@ assert_contains "$local_control_output" 'Persistent control: http://127.0.0.1:17
 assert_contains "$local_control_output" 'VITE_DAEMON_PROXY_TARGET=http://127.0.0.1:17420'
 assert_not_contains "$local_control_output" 'Selected worker:'
 
+same_machine_control_output="$(run_dry "$control_launcher" WORKER_IP=100.64.12.34)"
+assert_contains "$same_machine_control_output" 'Persistent control: http://127.0.0.1:17420'
+assert_contains "$same_machine_control_output" 'VITE_DAEMON_PROXY_TARGET=http://127.0.0.1:17420'
+assert_not_contains "$same_machine_control_output" 'Selected worker:'
+
 if output="$(SENTINAL_TAILSCALE_IP=100.64.0.1 SENTINAL_CONFIG_DIR="$test_root/missing-config" "$control_launcher" --dry-run 2>&1)"; then
   fail 'control accepted a missing persistent config without WORKER_IP'
 fi
