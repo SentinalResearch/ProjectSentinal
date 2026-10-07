@@ -342,9 +342,10 @@ async fn production_web_shell_has_safe_fallback_headers_and_api_precedence() {
     fs::write(web.join("manifest.webmanifest"), b"{}").unwrap();
     fs::write(
         web.join("service-worker.js"),
-        b"self.addEventListener('fetch',()=>{})",
+        b"importScripts('/push-safety.js')",
     )
     .unwrap();
+    fs::write(web.join("push-safety.js"), b"self.SentinalPushSafety = {}").unwrap();
     fs::write(web.join("assets/app-a1b2c3.js"), b"console.log('app')").unwrap();
     fs::write(web.join("secret.txt"), b"must not be exposed").unwrap();
     let oversized = fs::File::create(web.join("assets/oversized.js")).unwrap();
@@ -398,6 +399,23 @@ async fn production_web_shell_has_safe_fallback_headers_and_api_precedence() {
     );
     assert_eq!(
         asset.headers()["content-type"],
+        "text/javascript; charset=utf-8"
+    );
+
+    let push_safety = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/push-safety.js")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(push_safety.status(), StatusCode::OK);
+    assert_eq!(push_safety.headers()["cache-control"], "no-cache");
+    assert_eq!(
+        push_safety.headers()["content-type"],
         "text/javascript; charset=utf-8"
     );
 

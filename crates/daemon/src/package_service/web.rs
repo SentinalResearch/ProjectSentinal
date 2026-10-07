@@ -50,7 +50,7 @@ fn selected_file(path: &str) -> Option<SelectedFile> {
             cache: "no-cache",
         });
     }
-    if matches!(path, "/sw.js" | "/service-worker.js") {
+    if matches!(path, "/sw.js" | "/service-worker.js" | "/push-safety.js") {
         return Some(SelectedFile {
             relative: path[1..].into(),
             content_type: "text/javascript; charset=utf-8",
