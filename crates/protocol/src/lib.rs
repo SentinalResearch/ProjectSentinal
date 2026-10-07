@@ -68,8 +68,12 @@ pub use message::{
 pub use metric::{GpuMetrics, MachineMetrics, SessionMetrics};
 pub use notification::{
     NotificationCategory, NotificationConfigurationState, NotificationDeliveryState,
+    NotificationFacts, NotificationIntent, NotificationIntentAcknowledgement,
+    NotificationIntentBatch, NotificationIntentRejection, NotificationIntentRejectionCode,
     NotificationJournalEntry, NotificationResultClass, NotificationRuleSet, NotificationRules,
-    NotificationStatus, SessionNotificationRule,
+    NotificationStatus, PushProviderMode, PushProviderModeRequest, PushPublicKey,
+    PushSubscriptionInfo, PushSubscriptionKeys, PushSubscriptionList, PushSubscriptionRequest,
+    PushSubscriptionState, SessionNotificationRule,
 };
 pub use process::{tree_totals, Process, ProcessState, ProcessTotals};
 pub use recipe::{Recipe, RecipeParam};

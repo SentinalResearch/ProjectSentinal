@@ -1,0 +1,58 @@
+{
+  "intent_batch": {
+    "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+    "sent_at": 1791302400000,
+    "intents": [
+      {
+        "intent_id": "ni_6b73df5d0f6e6cd52c6d9bdfc5be0b9db961e2c829e88f0f9d61444e84ebbe23",
+        "event_id": 902,
+        "session_id": 128,
+        "occurred_at": 1791302395000,
+        "session_label": "Qwen Training",
+        "facts": { "kind": "WAITING" }
+      },
+      {
+        "intent_id": "ni_658b9b0267bd935864a00cf29fc9a18c06de202d5caa52a61dcacc3b26fd884b",
+        "event_id": 903,
+        "session_id": 128,
+        "occurred_at": 1791302399000,
+        "session_label": "Qwen Training",
+        "facts": { "kind": "RESOURCE_HIGH", "resource": "GPU", "percent": 96.0 }
+      }
+    ]
+  },
+  "intent_acknowledgement": {
+    "accepted": ["ni_6b73df5d0f6e6cd52c6d9bdfc5be0b9db961e2c829e88f0f9d61444e84ebbe23"],
+    "duplicates": ["ni_658b9b0267bd935864a00cf29fc9a18c06de202d5caa52a61dcacc3b26fd884b"],
+    "rejected": []
+  },
+  "public_key": {
+    "key_id": "vpk_2b928e5b4d66",
+    "public_key": "BBO8P4XQnN8nJzC5xwLZW7SkHV4gTBS3H3Yc4XAv9kvfnK_wvVdLR0HiMyPmVL7XdnO2jLB6zM7DczAELuKQzYU",
+    "subject_origin": "https://sentinal-control.example.ts.net"
+  },
+  "provider_mode_request": { "mode": "WEB_PUSH" },
+  "subscription_request": {
+    "device_label": "Sohith iPhone",
+    "endpoint": "https://push.example.invalid/wpush/v2/opaque-capability",
+    "expiration_time": null,
+    "keys": {
+      "p256dh": "BBO8P4XQnN8nJzC5xwLZW7SkHV4gTBS3H3Yc4XAv9kvfnK_wvVdLR0HiMyPmVL7XdnO2jLB6zM7DczAELuKQzYU",
+      "auth": "AAECAwQFBgcICQoLDA0ODw"
+    }
+  },
+  "subscription_list": {
+    "provider_mode": "WEB_PUSH",
+    "devices": [
+      {
+        "subscription_id": "ps_c1e83d0f5f1e4c66",
+        "device_label": "Sohith iPhone",
+        "state": "ACTIVE",
+        "created_at": 1791302400000,
+        "updated_at": 1791302400000,
+        "last_success_at": null,
+        "expiration_time": null
+      }
+    ]
+  }
+}

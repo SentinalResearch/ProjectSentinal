@@ -8,6 +8,8 @@ export type NotificationDeliveryState =
   | "DEDUPLICATED"
   | "NOT_CONFIGURED"
   | "QUEUED"
+  | "FORWARD_QUEUED"
+  | "CONTROL_ACCEPTED"
   | "RETRYING"
   | "DELIVERED"
   | "PERMANENTLY_FAILED";

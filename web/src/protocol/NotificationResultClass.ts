@@ -5,6 +5,9 @@
  */
 export type NotificationResultClass =
   | "ACCEPTED"
+  | "CONTROL_ACCEPTED"
+  | "SUBSCRIPTION_EXPIRED"
+  | "PAYLOAD_TOO_LARGE"
   | "TIMEOUT"
   | "CONNECTION_FAILED"
   | "RATE_LIMITED"

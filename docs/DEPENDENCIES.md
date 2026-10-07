@@ -17,6 +17,8 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `insta` (dev) | watcher | Reviewable Event snapshots from saved real-world logs |
 | `sha2`, `hmac` | daemon | Machine-link credential hashes and keyed pairing-code hashes (4.0, approved 2026-10-02) |
 | `reqwest` (`rustls-tls`, `json`, no default features) | daemon | Worker-to-control HTTPS for pairing exchange, heartbeat, refresh, and disconnect (4.0, approved 2026-10-02) |
+| `web-push-native` 0.5 (`vapid`, no defaults) | daemon | Pure-Rust RFC Web Push encryption and VAPID request construction for the control-owned Push gateway (4.D, approved 2026-10-06) |
+| `base64ct` 1.8 | daemon | Strict base64url encoding/decoding for VAPID and browser Push key material (4.D, approved 2026-10-06) |
 
 ## Approved for later milestones
 

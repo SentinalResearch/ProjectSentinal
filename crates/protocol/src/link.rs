@@ -322,6 +322,11 @@ pub struct LinkHeartbeatResponse {
     pub next_heartbeat_ms: u64,
     /// Whether the worker should refresh its credentials now.
     pub refresh_due: bool,
+    /// Whether this worker should forward notification intents to the control.
+    ///
+    /// Absent when talking to a pre-4.D control and therefore treated as false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notification_ingress: Option<bool>,
 }
 
 /// Worker → control: rotate both credentials.

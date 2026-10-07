@@ -4,6 +4,7 @@ mod error;
 mod lineage;
 mod log_cursors;
 mod metrics;
+mod native_push;
 mod notification_deliveries;
 mod records;
 pub mod registry;
@@ -22,6 +23,10 @@ use std::{
 pub use error::StoreError;
 pub use log_cursors::StoredLogCursor;
 pub use metrics::{MinuteMetric, RawMetricSample};
+pub use native_push::{
+    NewNotificationIntentOutbox, NotificationIntentOutboxInsert, PushDelivery,
+    StoredNotificationIntent, StoredPushSubscription,
+};
 pub use notification_deliveries::{NewNotificationDelivery, NotificationDelivery};
 
 const MIGRATIONS: &[(u32, &str)] = &[
@@ -33,6 +38,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
         5,
         include_str!("../migrations/005_notification_deliveries.sql"),
     ),
+    (6, include_str!("../migrations/006_native_push.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.

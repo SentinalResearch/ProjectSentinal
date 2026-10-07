@@ -46,7 +46,7 @@ fn migration_and_delivery_journal_survive_reopen() {
     ));
     {
         let store = Store::open(&path).unwrap();
-        assert_eq!(store.schema_version().unwrap(), 5);
+        assert_eq!(store.schema_version().unwrap(), 6);
         store.insert_event(&event(1, 1_000)).unwrap();
         let record = store
             .record_notification_delivery(&queued(1, 1_000))
@@ -185,5 +185,43 @@ fn shutdown_requeues_pending_and_retention_never_prunes_pending_work() {
     assert_eq!(
         rows[0].result_class,
         Some(NotificationResultClass::Shutdown)
+    );
+}
+
+#[test]
+fn worker_acknowledgement_advances_only_the_matching_forwarded_event() {
+    let store = Store::open_in_memory().unwrap();
+    for id in 1..=2 {
+        store.insert_event(&event(id, id as i64)).unwrap();
+        let mut delivery = queued(id, id as i64);
+        delivery.state = NotificationDeliveryState::ForwardQueued;
+        store.record_notification_delivery(&delivery).unwrap();
+    }
+
+    assert!(store
+        .update_notification_delivery_for_event(
+            EventId(1),
+            NotificationDeliveryState::ControlAccepted,
+            NotificationResultClass::ControlAccepted,
+            Timestamp(50),
+        )
+        .unwrap());
+    assert!(!store
+        .update_notification_delivery_for_event(
+            EventId(99),
+            NotificationDeliveryState::ControlAccepted,
+            NotificationResultClass::ControlAccepted,
+            Timestamp(50),
+        )
+        .unwrap());
+
+    let rows = store.notification_deliveries(10).unwrap();
+    assert_eq!(rows[0].event_id, EventId(2));
+    assert_eq!(rows[0].state, NotificationDeliveryState::ForwardQueued);
+    assert_eq!(rows[1].event_id, EventId(1));
+    assert_eq!(rows[1].state, NotificationDeliveryState::ControlAccepted);
+    assert_eq!(
+        rows[1].result_class,
+        Some(NotificationResultClass::ControlAccepted)
     );
 }

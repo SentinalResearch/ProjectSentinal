@@ -21,4 +21,10 @@ export type LinkHeartbeatResponse = {
    * Whether the worker should refresh its credentials now.
    */
   refresh_due: boolean;
+  /**
+   * Whether this worker should forward notification intents to the control.
+   *
+   * Absent when talking to a pre-4.D control and therefore treated as false.
+   */
+  notification_ingress?: boolean | null;
 };

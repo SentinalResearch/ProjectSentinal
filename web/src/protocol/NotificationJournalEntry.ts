@@ -32,7 +32,7 @@ export type NotificationJournalEntry = {
    */
   at: Timestamp;
   /**
-   * Whether ntfy accepted the request.
+   * Whether the selected external provider accepted the request.
    */
   delivered: boolean;
   /**

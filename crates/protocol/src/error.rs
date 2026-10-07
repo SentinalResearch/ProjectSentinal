@@ -197,6 +197,15 @@ pub enum ProtocolError {
         reason: &'static str,
     },
 
+    /// A native-notification HTTP field failed its shape or value rules.
+    #[error("{field} {reason}")]
+    InvalidNotificationField {
+        /// Field containing the rejected value.
+        field: &'static str,
+        /// Stable reason that never repeats a secret value.
+        reason: &'static str,
+    },
+
     /// The JSON could not be parsed into the expected type.
     #[error("invalid JSON: {0}")]
     Json(String),

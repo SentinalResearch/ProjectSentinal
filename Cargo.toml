@@ -35,6 +35,8 @@ sha2 = "0.10"
 hmac = "0.12"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 insta = "1"
+web-push-native = { version = "0.5.0", default-features = false, features = ["vapid"] }
+base64ct = { version = "1.8.3", features = ["alloc", "std"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

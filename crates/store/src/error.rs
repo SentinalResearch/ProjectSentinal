@@ -39,6 +39,34 @@ pub enum StoreError {
         /// Missing record identifier.
         id: u64,
     },
+    /// An update targeted a text-identified record that does not exist.
+    #[error("store has no {kind} '{id}'")]
+    MissingText {
+        /// Record category.
+        kind: &'static str,
+        /// Missing stable identifier.
+        id: String,
+    },
+    /// The bounded durable worker intent queue cannot accept another item.
+    #[error(
+        "notification intent outbox is full ({rows}/{maximum_rows} rows, {bytes}/{maximum_bytes} bytes)"
+    )]
+    PushOutboxFull {
+        /// Current rows.
+        rows: u32,
+        /// Current encoded bytes.
+        bytes: u64,
+        /// Configured maximum rows.
+        maximum_rows: u32,
+        /// Configured maximum bytes.
+        maximum_bytes: u64,
+    },
+    /// The single owner already has the maximum active Push devices.
+    #[error("push subscription limit {maximum} reached")]
+    PushDeviceLimit {
+        /// Maximum active devices.
+        maximum: u32,
+    },
     /// A normal Session insert attempted to claim a predecessor.
     #[error("Session {session_id} lineage must be inserted through insert_continuation")]
     LineageInsertRequired {

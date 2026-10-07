@@ -180,6 +180,27 @@ impl Store {
         Ok(())
     }
 
+    /// Update the local journal row for one Event after native control acknowledgement.
+    pub fn update_notification_delivery_for_event(
+        &self,
+        event_id: EventId,
+        state: NotificationDeliveryState,
+        result_class: NotificationResultClass,
+        updated_at: Timestamp,
+    ) -> Result<bool, StoreError> {
+        Ok(self.lock()?.execute(
+            "UPDATE notification_deliveries
+             SET state=?1,next_attempt_at=NULL,result_class=?2,updated_at=?3
+             WHERE event_id=?4 AND state='FORWARD_QUEUED'",
+            params![
+                enum_name(state)?,
+                enum_name(result_class)?,
+                updated_at.0,
+                to_sql_id(event_id.0)?,
+            ],
+        )? > 0)
+    }
+
     /// Return due queued/retrying deliveries oldest first.
     pub fn due_notification_deliveries(
         &self,
