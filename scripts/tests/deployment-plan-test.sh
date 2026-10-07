@@ -40,4 +40,11 @@ require_text "$enrollment_prompt" 'must not appear in argv'
 
 require_text "$repo_root/prompts/README.md" '03h-milestone-1c1-tailnet-bootstrap.md'
 
+web_build_line="$(grep -nF '    pnpm -C web build' "$repo_root/justfile" | head -n 1 | cut -d: -f1 || true)"
+installer_test_line="$(grep -nF '    bash scripts/tests/install-worker-test.sh' "$repo_root/justfile" | head -n 1 | cut -d: -f1 || true)"
+[[ -n "$web_build_line" ]] || fail 'just check must build the production web bundle'
+[[ -n "$installer_test_line" ]] || fail 'just check must run the worker installer test'
+(( web_build_line < installer_test_line )) || \
+  fail 'just check must build the production web bundle before installer validation'
+
 echo 'deployment plan test: passed'
