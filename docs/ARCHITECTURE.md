@@ -145,3 +145,19 @@ Each generation is replayed into a separate xterm instance so historical ANSI
 state cannot affect another generation. Only the latest live generation can
 receive input or resize requests. Ancestor output remains in its original
 per-Session log and is never copied into a descendant PTY or log.
+
+## Native notification flow
+
+Eligible stored Events become closed, privacy-safe notification intents. An
+enrolled worker persists an intent in its SQLite outbox and uploads it with its
+existing Machine-link credential. The control derives the Machine identity,
+accepts each idempotency ID once, and creates one independent delivery per
+active owner browser subscription.
+
+Only the control owns the VAPID private key and browser subscriptions. Its
+provider scheduler encrypts the bounded payload, re-resolves and rejects unsafe
+provider addresses on every attempt, pins approved DNS answers, refuses
+redirects, and persists retry state outside Event and PTY paths. Provider mode
+is mutually exclusive: `WEB_PUSH`, `NTFY_LEGACY`, or `DISABLED`. Future APNs
+and FCM providers may reuse intent, policy, routing, and journal semantics, but
+their credentials and device tokens remain provider-specific.

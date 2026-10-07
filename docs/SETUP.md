@@ -529,6 +529,44 @@ command in `docs/progress/milestone-1c.md`.
 8. Restart the service and verify finished output still replays. Record that
    any live FULL Session was interrupted, as expected before Reliability R1.
 
+## Native Web Push setup and recovery
+
+Open the production PWA at the control's Tailnet HTTPS origin. In **Settings →
+Notifications**, press **Enable notifications on this device**. That visible
+gesture requests permission, registers the browser-managed subscription, and
+selects `WEB_PUSH`. On iOS, install Sentinal on the Home Screen first; support
+still depends on the installed OS/browser version.
+
+The control creates its VAPID key on the first owner key/subscription action:
+
+```console
+$ stat ~/.config/terminal-agent/push-vapid.json   # owner-only 0600
+```
+
+Back up that file with the control SQLite database while `sentinald` is
+stopped. Losing or rotating it invalidates existing subscriptions, so devices
+must subscribe again. Reinstall, upgrade, and normal uninstall preserve both.
+Never print the private key, endpoint, browser keys, Machine credentials, or
+notification database rows.
+
+`notify.toml` remains intact. Provider selection is exclusive, so `WEB_PUSH`
+does not also send the same intent through ntfy. Removing one device affects
+only its subscription; logout and owner-password changes retain subscriptions
+until explicit removal.
+
+When troubleshooting, distinguish Event/rule decision, worker outbox, control
+acceptance, retrying, provider accepted, expired device, and permanent failure.
+Provider acceptance does not prove a phone displayed the notification. The
+control needs outbound Internet; notification taps also need Tailscale access
+to load the private control PWA.
+
+The Notifications page reads secret-free provider state from
+`GET /api/v1/push/deliveries`. `CONTROL_ACCEPTED` means a worker intent was
+durably accepted by the control; only `DELIVERED` means the selected browser
+push provider accepted the encrypted request. Neither state proves that the
+phone displayed it. Subscription endpoints and browser keys are never returned
+by this resource.
+
 ## Current boundaries
 
 - Machine enrollment, isolated heartbeats/revocation, concurrent aggregation,

@@ -244,6 +244,20 @@ prompt, and see the stable Machine ID appear under that display name.
 phone; tapping it signs in when necessary and opens that exact Machine and
 Session in the production Tailnet PWA.
 
+## Milestone 4.D — Native Push Gateway
+- [x] Approve the control-owned Web Push, worker outbox, subscription, key-lifecycle, SSRF, dependency, and ntfy-migration design
+- [x] Keep VAPID keys and browser subscriptions owner-only on the control Machine
+- [x] Forward eligible structured notification intents from enrolled workers over authenticated Machine links
+- [x] Deliver encrypted Web Push through a bounded persistent provider queue without blocking Event or PTY paths
+- [x] Add explicit PWA permission, device subscription, removal, refresh, and notification-click behavior
+- [x] Preserve the 4.C rules, privacy-safe presentation, deduplication, journal, and exact namespaced Session routing
+- [x] Retain ntfy only through the approved explicit compatibility/migration policy, with no accidental duplicate delivery
+- [ ] Prove production PWA delivery on a real phone and record unavailable native-app/APNs/FCM coverage honestly
+
+**Demo:** install the production Sentinal PWA, subscribe it from Settings,
+produce a stored Event on either enrolled Machine, receive an encrypted push
+without an ntfy server, and tap it to open the exact Machine and Session.
+
 ## Reliability R1 — Daemon-restart-resilient FULL Sessions
 - [ ] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation
 - [ ] A per-Session owner keeps the PTY and log alive while `sentinald` restarts

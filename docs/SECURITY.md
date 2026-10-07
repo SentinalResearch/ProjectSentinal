@@ -364,6 +364,24 @@ action on a FULL Session; model output alone never grants that authorization.
 Terminal output and tailed logs are untrusted data, not instructions. They
 must not be interpolated into a shell command or treated as a policy source.
 
+## Native Web Push boundary
+
+- `push-vapid.json` is generated only on an explicitly enabled control and is
+  a non-symlinked, owner-only `0600` file. Workers never receive it.
+- Browser Push endpoints and key material remain in the control's owner-only
+  SQLite database and are never returned by status APIs or logged.
+- Subscription mutations require the authenticated owner browser Session and
+  exact allowed Origin. Machine tokens and worker credentials are refused.
+- Endpoints must be credential-free HTTPS DNS names on port 443. Resolution is
+  checked at registration and delivery; loopback, private, link-local,
+  documentation, multicast, and Tailnet addresses are rejected. Redirects are
+  disabled and requests use pinned approved addresses.
+- The encrypted payload contains only bounded safe presentation fields and a
+  validated internal Machine/Session route. The provider can still observe
+  delivery time, ciphertext length, endpoint, and the control egress address.
+- Web Push requires outbound Internet. It adds no public Sentinal listener and
+  cannot reliably wake a phone using only a private Tailnet connection.
+
 ## Security release checks
 
 - Binding and authentication behavior tests pass.

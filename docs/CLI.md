@@ -366,6 +366,18 @@ over the private local socket.
 - Sentinal never signals, traces, or writes to an adopted process; its exit
   code is always shown as unknown.
 
+## Native notification operations
+
+Native Web Push is managed from the authenticated production PWA under
+**Settings → Notifications**. Permission is never requested at startup or by a
+CLI command. The page subscribes the current browser, selects Web Push, lists
+secret-free device labels/state/last-success time, and removes one device.
+
+There is intentionally no command that places a VAPID private key, Push
+endpoint, browser authentication key, or provider credential in argv or shell
+history. A future native-app provider uses separate APNs/FCM tokens; browser
+Web Push subscriptions cannot be reused as native device tokens.
+
 ## Environment
 
 | Variable | Status | Meaning |
