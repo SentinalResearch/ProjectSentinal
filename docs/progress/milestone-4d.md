@@ -710,10 +710,11 @@ recorded here against one candidate commit.
   contained two accepted encrypted deliveries for control Session 18
   (`ERROR` and `STALLED`, one attempt each, bounded request sizes 820 and 836
   bytes). The owner confirmed that a notification appeared on the real phone.
-- This is useful pre-candidate evidence, not the final real-device run: the
-  implementation is still a dirty working tree based on `2249111`, so no
-  exact candidate commit or release parity is claimed. The phone OS/browser,
-  notification-click route, and lock-screen appearance remain unrecorded.
+- This remains useful pre-candidate phone evidence rather than the final
+  real-device run. The implementation is now committed through candidate
+  `64fa901`, but that exact candidate has not yet been installed on all three
+  real Machines. The phone OS/browser, notification-click route, and
+  lock-screen appearance remain unrecorded.
 - The browser suite now has a compile-time-only `e2e-test-support` provider.
   Default/release builds cannot enable it. The suite gives every fake daemon
   isolated config/data and gives the control an isolated VAPID key path; it
@@ -721,21 +722,25 @@ recorded here against one candidate commit.
 
 ## Remaining acceptance work
 
-- Commit the reviewed 4.D implementation, build/install that exact candidate
-  on the control and both workers, and record release/OS/Tailscale parity.
+- Build/install candidate `64fa901` on the control and both workers, and record
+  release/OS/Tailscale parity.
 - Produce success, failure, and waiting Events on the real MacBook and Linux
   workers; confirm one privacy-safe phone notification for each expected rule.
 - Record sanitized phone OS/browser, display, click/login, exact namespaced
   Session routing, and read-only/live behavior.
 - Exercise offline control/worker recovery and a second device when available.
-- Run the final `just acceptance` candidate after the real-device evidence is
-  recorded. Automated tests deliberately use no public Push provider.
+- Repeat `just acceptance` if the candidate changes while recording the
+  real-device evidence. Automated tests deliberately use no public Push
+  provider.
 
 ## Automated implementation evidence — 2026-10-07
 
 - `just check`: passed. This includes formatting, Clippy with warnings denied,
-  the Rust workspace, current TypeScript generation, 149 web tests, 20 eval
-  tests, and all deployment/package shell tests.
+  the Rust workspace, current TypeScript generation, 150 web tests, the eval
+  tests present in the working tree, a production PWA build, and all
+  deployment/package shell tests. The production build now runs before the
+  installer and package tests so a clean checkout cannot borrow stale
+  `web/dist` assets.
 - Native Push Playwright: 6 tests passed against the production web build,
   one control, and two isolated workers. The new flow creates a standards-valid
   synthetic subscription, switches explicitly from ntfy to `WEB_PUSH`, waits
@@ -744,8 +749,11 @@ recorded here against one candidate commit.
   the production service worker's `push` handler, and proves login returns to
   each exact composite Machine/Session identity. The provider transport and
   DNS resolver are compile-time-only fakes; no public provider is contacted.
-- `just acceptance`: passed after the service-worker safety tests were added;
-  its final browser summary was `5 passed (31.0s)`.
+- Candidate `64fa901` was exported to an isolated archive. Its complete check
+  phase passed without relying on a committed `web/dist`, and its production
+  Playwright suite passed separately with `6 passed (58.3s)`. The normal
+  repository invocation of `just acceptance` then passed with final browser
+  summary `6 passed (57.6s)`.
 - Native Push tests cover additive contract validation, migration, VAPID file
   safety, endpoint/DNS rejection, encrypted payload round-trip, subscription
   API authorization/redaction, provider delivery, provider request byte
