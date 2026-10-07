@@ -9,6 +9,9 @@ publish.workspace = true
 [features]
 default = []
 nvidia = ["dep:nvml-wrapper"]
+# Offline browser acceptance only. Release builds do not include the fake
+# resolver/provider path, so runtime configuration cannot enable it.
+e2e-test-support = []
 
 [dependencies]
 argon2.workspace = true
@@ -34,6 +37,8 @@ nvml-wrapper = { workspace = true, optional = true }
 sha2.workspace = true
 hmac.workspace = true
 reqwest.workspace = true
+web-push-native.workspace = true
+base64ct.workspace = true
 
 [dev-dependencies]
 tower.workspace = true

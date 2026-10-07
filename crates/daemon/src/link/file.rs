@@ -33,6 +33,8 @@ pub(super) struct LinkFile {
     pub(super) heartbeat_interval_ms: u64,
     pub(super) sequence: u64,
     pub(super) last_heartbeat_at: Option<Timestamp>,
+    #[serde(default)]
+    pub(super) notification_ingress: bool,
 }
 
 impl LinkFile {
@@ -63,6 +65,7 @@ impl LinkFile {
             heartbeat_interval_ms,
             sequence: 0,
             last_heartbeat_at: None,
+            notification_ingress: false,
         }
     }
 
@@ -75,6 +78,7 @@ impl LinkFile {
         self.credential_expires_at = None;
         self.control_machine_id = None;
         self.paired_at = None;
+        self.notification_ingress = false;
     }
 }
 

@@ -22,7 +22,9 @@ use protocol::{
         LinkExchangeResponse, LinkFailureCode, LinkHeartbeatRequest, LinkHeartbeatResponse,
         LinkIdentity, LinkMachineInfo, LinkRefreshRequest, LinkRefreshResponse, LocalLinkState,
     },
-    LocalErrorCode, LocalRequest, LocalResponse, MachineId, Os, Secret, Timestamp,
+    LocalErrorCode, LocalRequest, LocalResponse, MachineId, NotificationDeliveryState,
+    NotificationIntentAcknowledgement, NotificationIntentBatch, NotificationResultClass, Os,
+    Secret, Timestamp,
 };
 use std::{
     path::PathBuf,
@@ -32,6 +34,7 @@ use std::{
     },
     time::Duration,
 };
+use store::Store;
 
 /// Consecutive failed heartbeats before the control is reported unreachable.
 const UNREACHABLE_AFTER: u32 = 3;
@@ -62,6 +65,106 @@ pub struct LinkSettings {
     pub audit_dir: PathBuf,
     /// Run heartbeats on a timer (tests drive them instead).
     pub background: bool,
+}
+
+/// Start the durable worker native-notification outbox uploader.
+pub fn spawn_notification_intent_uploader(
+    link: LinkManager,
+    store: Arc<Store>,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        loop {
+            tokio::select! {
+                _ = shutdown.changed() => break,
+                _ = interval.tick() => {
+                    if !link.notification_ingress() {
+                        continue;
+                    }
+                    let now = (link.inner.clock)();
+                    let due = match store.due_notification_intents(now, 32) {
+                        Ok(due) => due,
+                        Err(error) => {
+                            tracing::warn!(%error, "native notification outbox scan failed");
+                            continue;
+                        }
+                    };
+                    if due.is_empty() {
+                        continue;
+                    }
+                    let machine_id = match link.machine_id() {
+                        Ok(machine_id) => machine_id,
+                        Err(error) => {
+                            tracing::warn!(%error, "native notification identity unavailable");
+                            continue;
+                        }
+                    };
+                    let batch = NotificationIntentBatch {
+                        machine_id,
+                        sent_at: now,
+                        intents: due.iter().map(|row| row.intent.clone()).collect(),
+                    };
+                    match link.upload_notification_intents(&batch).await {
+                        Ok(acknowledgement) => {
+                            let mut resolved = Vec::new();
+                            for intent_id in acknowledgement
+                                .accepted
+                                .iter()
+                                .chain(acknowledgement.duplicates.iter())
+                            {
+                                if let Some(row) = due.iter().find(|row| row.intent.intent_id == *intent_id) {
+                                    if let Err(error) = store.update_notification_delivery_for_event(
+                                        row.intent.event_id,
+                                        NotificationDeliveryState::ControlAccepted,
+                                        NotificationResultClass::ControlAccepted,
+                                        now,
+                                    ) {
+                                        tracing::warn!(%error, "native notification journal acknowledgement was not persisted");
+                                    }
+                                }
+                                resolved.push(intent_id.clone());
+                            }
+                            for rejection in acknowledgement.rejected {
+                                if let Some(row) = due.iter().find(|row| row.intent.intent_id == rejection.intent_id) {
+                                    if let Err(error) = store.update_notification_delivery_for_event(
+                                        row.intent.event_id,
+                                        NotificationDeliveryState::PermanentlyFailed,
+                                        NotificationResultClass::ClientError,
+                                        now,
+                                    ) {
+                                        tracing::warn!(%error, "native notification rejection was not persisted");
+                                    }
+                                }
+                                resolved.push(rejection.intent_id);
+                            }
+                            if let Err(error) = store.acknowledge_notification_intents(&resolved) {
+                                tracing::warn!(%error, "native notification acknowledgement was not persisted");
+                            }
+                        }
+                        Err(error) => {
+                            for row in due {
+                                let attempts = row.attempts.saturating_add(1);
+                                let exponent = attempts.saturating_sub(1).min(6);
+                                let delay = 5_000_i64.saturating_mul(1_i64 << exponent);
+                                let next = Timestamp(now.0.saturating_add(delay.min(300_000)));
+                                if let Err(store_error) = store.reschedule_notification_intent(
+                                    &row.intent.intent_id,
+                                    attempts,
+                                    next,
+                                    "CONTROL_UNREACHABLE",
+                                    now,
+                                ) {
+                                    tracing::warn!(%store_error, "native notification retry was not persisted");
+                                }
+                            }
+                            tracing::warn!(code = ?error.code, "native notification upload failed");
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 /// A link operation that failed, mapped to a local-socket error.
@@ -128,6 +231,52 @@ impl LinkManager {
             .as_ref()
             .map(|identity| identity.machine_id.clone())
             .map_err(Clone::clone)
+    }
+
+    /// Whether the last authenticated heartbeat enabled native intent ingress.
+    pub fn notification_ingress(&self) -> bool {
+        self.read_link()
+            .ok()
+            .flatten()
+            .is_some_and(|link| link.state == StoredState::Active && link.notification_ingress)
+    }
+
+    /// Upload one bounded intent batch using the existing Machine credential.
+    pub async fn upload_notification_intents(
+        &self,
+        batch: &NotificationIntentBatch,
+    ) -> Result<NotificationIntentAcknowledgement, LinkFailure> {
+        let link = self
+            .read_link()?
+            .ok_or_else(|| LinkFailure::new(LocalErrorCode::NotConnected, "not connected"))?;
+        let credential = link
+            .worker_credential
+            .as_ref()
+            .filter(|_| link.state == StoredState::Active && link.notification_ingress)
+            .ok_or_else(|| {
+                LinkFailure::new(
+                    LocalErrorCode::NotConnected,
+                    "native notification ingress is unavailable",
+                )
+            })?;
+        self.inner
+            .client
+            .post(
+                &link.control_url,
+                "/api/v1/link/notification-intents",
+                Some(credential.expose()),
+                batch,
+            )
+            .await
+            .map_err(|error| {
+                LinkFailure::new(LocalErrorCode::ControlUnreachable, error.to_string())
+            })?
+            .ok_or_else(|| {
+                LinkFailure::new(
+                    LocalErrorCode::ControlUnreachable,
+                    "empty notification acknowledgement",
+                )
+            })
     }
 
     /// Answer one local-socket link request.
@@ -367,6 +516,7 @@ impl LinkManager {
                 link.display_name = Some(response.display_name);
                 link.last_heartbeat_at = Some(now);
                 link.heartbeat_interval_ms = response.next_heartbeat_ms;
+                link.notification_ingress = response.notification_ingress.unwrap_or(false);
                 self.write_link(&link)?;
                 if response.refresh_due {
                     self.refresh(&mut link, &machine_id, &credential).await?;

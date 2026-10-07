@@ -208,6 +208,37 @@ fn presentation_never_copies_output_prompt_command_or_checkpoint_path() {
 }
 
 #[test]
+fn native_sink_receives_only_closed_structured_facts() {
+    let root = private_root("native");
+    let store = store_with_session();
+    let detected = event(
+        9,
+        EventKind::ErrorDetected {
+            message: "secret terminal output".into(),
+        },
+    );
+    store.insert_event(&detected).unwrap();
+    let (service, _) = service(&root, store, Arc::new(|| Timestamp(2_000)));
+    let captured = Arc::new(Mutex::new(None));
+    let capture = captured.clone();
+    let service = service.with_native_sink(Arc::new(move |intent, _| {
+        *capture.lock().unwrap() = Some(intent.clone());
+        Ok(Some(NativeNotificationState::ForwardQueued))
+    }));
+
+    assert!(service.enqueue(&detected, CaptureLevel::Full).unwrap());
+    let intent = captured.lock().unwrap().clone().unwrap();
+    assert_eq!(intent.facts, NotificationFacts::Error);
+    let encoded = serde_json::to_string(&intent).unwrap();
+    assert!(!encoded.contains("secret terminal output"));
+    assert_eq!(
+        service.journal()[0].state,
+        Some(NotificationDeliveryState::ForwardQueued)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn every_supported_category_has_stable_appearance() {
     let cases = [
         (

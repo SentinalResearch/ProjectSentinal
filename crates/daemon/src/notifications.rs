@@ -9,8 +9,9 @@ use config::ConfigSnapshot;
 use presentation::Presentation;
 use protocol::{
     CaptureLevel, Event, EventKind, MachineId, NotificationConfigurationState,
-    NotificationDeliveryState, NotificationJournalEntry, NotificationRuleSet, NotificationRules,
-    NotificationStatus, SessionId, SessionNotificationRule, Timestamp,
+    NotificationDeliveryState, NotificationFacts, NotificationIntent, NotificationJournalEntry,
+    NotificationRuleSet, NotificationRules, NotificationStatus, SessionId, SessionNotificationRule,
+    Timestamp,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,6 +36,23 @@ pub(super) const RETRY_DELAYS_MS: [i64; 3] = [5_000, 30_000, 120_000];
 pub type NotificationClock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
 /// Trusted current control origin, or `None` when this Machine is not linked.
 pub type ControlOrigin = Arc<dyn Fn() -> Option<String> + Send + Sync>;
+/// Optional durable native-Push ingress selected dynamically by provider state.
+pub type NativeNotificationSink = Arc<
+    dyn Fn(&NotificationIntent, Timestamp) -> Result<Option<NativeNotificationState>, String>
+        + Send
+        + Sync,
+>;
+
+/// Durable point reached by a native notification intent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeNotificationState {
+    /// Worker outbox is waiting for control acknowledgement.
+    ForwardQueued,
+    /// Control accepted the intent and created provider work.
+    ControlAccepted,
+    /// This control explicitly disabled external notification delivery.
+    Disabled,
+}
 
 pub(super) type SendFuture = Pin<Box<dyn Future<Output = SendResult> + Send>>;
 pub(super) type NotificationSender = Arc<dyn Fn(OutboundRequest) -> SendFuture + Send + Sync>;
@@ -79,6 +97,7 @@ pub struct NotificationService {
     clock: NotificationClock,
     control_origin: ControlOrigin,
     sender: NotificationSender,
+    native_sink: Option<NativeNotificationSink>,
     delivery_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -131,10 +150,17 @@ impl NotificationService {
                 clock,
                 control_origin,
                 sender,
+                native_sink: None,
                 delivery_lock: Arc::new(tokio::sync::Mutex::new(())),
             },
             diagnostics,
         )
+    }
+
+    /// Attach native-Push ingress without changing the legacy ntfy loader.
+    pub fn with_native_sink(mut self, sink: NativeNotificationSink) -> Self {
+        self.native_sink = Some(sink);
+        self
     }
 
     #[cfg(test)]
@@ -259,14 +285,38 @@ impl NotificationService {
                     .unwrap_or(rules.default);
                 category_enabled(rules, &event.kind)
             })?;
-        let configured = self
+        let ntfy_configured = self
             .config
             .read()
             .map(|value| value.state == NotificationConfigurationState::Configured)
             .unwrap_or(false);
+        let session_label = self
+            .store
+            .session(event.session_id)
+            .map_err(|error| error.to_string())?
+            .and_then(|session| session.title)
+            .and_then(safe_session_label);
+        let intent = notification_intent(&self.machine_id, event, session_label)?;
+        let native_state = if enabled {
+            self.native_sink
+                .as_ref()
+                .map(|sink| sink(&intent, (self.clock)()))
+                .transpose()?
+                .flatten()
+        } else {
+            None
+        };
         let state = if !enabled {
             NotificationDeliveryState::RuleDisabled
-        } else if !configured {
+        } else if let Some(native) = native_state {
+            match native {
+                NativeNotificationState::ForwardQueued => NotificationDeliveryState::ForwardQueued,
+                NativeNotificationState::ControlAccepted => {
+                    NotificationDeliveryState::ControlAccepted
+                }
+                NativeNotificationState::Disabled => NotificationDeliveryState::NotConfigured,
+            }
+        } else if !ntfy_configured {
             NotificationDeliveryState::NotConfigured
         } else {
             NotificationDeliveryState::Queued
@@ -275,8 +325,12 @@ impl NotificationService {
         self.store
             .prune_notification_deliveries(Timestamp(now.0.saturating_sub(JOURNAL_RETENTION_MS)))
             .map_err(|error| error.to_string())?;
-        let deduplicate_since = (state == NotificationDeliveryState::Queued
-            && !matches!(event.kind, EventKind::CommandFinished { .. }))
+        let deduplicate_since = (matches!(
+            state,
+            NotificationDeliveryState::Queued
+                | NotificationDeliveryState::ForwardQueued
+                | NotificationDeliveryState::ControlAccepted
+        ) && !matches!(event.kind, EventKind::CommandFinished { .. }))
         .then_some(Timestamp(now.0.saturating_sub(DEDUP_MS)));
         let record = self
             .store
@@ -291,7 +345,12 @@ impl NotificationService {
                 pending_limit: MAX_PENDING,
             })
             .map_err(|error| error.to_string())?;
-        Ok(record.state == NotificationDeliveryState::Queued)
+        Ok(matches!(
+            record.state,
+            NotificationDeliveryState::Queued
+                | NotificationDeliveryState::ForwardQueued
+                | NotificationDeliveryState::ControlAccepted
+        ))
     }
 
     /// Return newest journal entries first, rendered from structured Events.
@@ -346,6 +405,61 @@ impl NotificationService {
             request_bytes: record.request_bytes,
         }
     }
+}
+
+fn notification_intent(
+    machine_id: &MachineId,
+    event: &Event,
+    session_label: Option<String>,
+) -> Result<NotificationIntent, String> {
+    let facts = match &event.kind {
+        EventKind::CommandFinished { exit_code, .. } => NotificationFacts::CommandFinished {
+            exit_code: *exit_code,
+        },
+        EventKind::ErrorDetected { .. } => NotificationFacts::Error,
+        EventKind::WaitingForInput { .. } => NotificationFacts::Waiting,
+        EventKind::PossiblyStalled { silent_for_ms } => NotificationFacts::Stalled {
+            silent_for_ms: silent_for_ms.0,
+        },
+        EventKind::ResourceHigh { resource, percent } => NotificationFacts::ResourceHigh {
+            resource: *resource,
+            percent: *percent,
+        },
+        EventKind::CheckpointCreated { .. } => NotificationFacts::Checkpoint,
+        EventKind::ProgressUpdated {
+            current,
+            total,
+            unit,
+        } => NotificationFacts::Progress {
+            current: *current,
+            total: *total,
+            unit: unit.clone(),
+        },
+        _ => return Err("Event has no native notification facts".into()),
+    };
+    let identity = format!("{}:{}:{}", machine_id.0, event.id.0, event.session_id.0);
+    let intent = NotificationIntent {
+        intent_id: format!("ni_{}", crate::link_crypto::sha256_hex(&identity)),
+        event_id: event.id,
+        session_id: event.session_id,
+        occurred_at: event.at,
+        session_label,
+        facts,
+    };
+    intent.validate().map_err(|error| error.to_string())?;
+    Ok(intent)
+}
+
+fn safe_session_label(value: String) -> Option<String> {
+    let candidate = NotificationIntent {
+        intent_id: format!("ni_{}", "0".repeat(64)),
+        event_id: protocol::EventId(1),
+        session_id: SessionId(1),
+        occurred_at: Timestamp(0),
+        session_label: Some(value.clone()),
+        facts: NotificationFacts::Waiting,
+    };
+    candidate.validate().is_ok().then_some(value)
 }
 
 fn unavailable_status(message: &str) -> NotificationStatus {

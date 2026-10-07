@@ -20,7 +20,8 @@ use protocol::{
         LinkStatus, MachineCapability, MachineRole, PairingCode, PairingCodeState,
         PairingCodeStatus, RegistryMachine, RegistryMachines, RegistryStatus,
     },
-    MachineId, Os, Secret, Timestamp,
+    MachineId, NotificationIntentAcknowledgement, NotificationIntentBatch, Os, PushProviderMode,
+    Secret, Timestamp,
 };
 use secrets::{ControlSecrets, PresentedCredential};
 use std::{
@@ -42,6 +43,7 @@ const MAX_CLOCK_SKEW_MS: i64 = 5 * 60 * 1_000;
 const CREDENTIAL_LIFETIME_MS: i64 = 90 * 24 * 60 * 60 * 1_000;
 const REFRESH_WITHIN_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
 const REFRESH_GRACE_MS: i64 = 60_000;
+const NOTIFICATION_MAX_AGE_MS: i64 = 7 * 24 * 60 * 60 * 1_000;
 
 type Clock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
 
@@ -428,7 +430,50 @@ impl ControlService {
             display_name,
             next_heartbeat_ms: self.settings.heartbeat_interval_ms,
             refresh_due: link.expires_at.0 - now.0 < REFRESH_WITHIN_MS,
+            notification_ingress: Some(
+                self.store.push_provider_mode().ok() == Some(PushProviderMode::WebPush),
+            ),
         })
+    }
+
+    /// Authenticate and durably accept one bounded worker notification batch.
+    pub fn accept_notification_intents(
+        &self,
+        bearer: &str,
+        batch: NotificationIntentBatch,
+    ) -> Result<NotificationIntentAcknowledgement, ControlFailure> {
+        let now = (self.clock)();
+        self.authenticate(bearer, &batch.machine_id, now)?;
+        if self
+            .store
+            .push_provider_mode()
+            .map_err(ControlFailure::internal)?
+            != PushProviderMode::WebPush
+        {
+            return Err(ControlFailure::new(
+                409,
+                LinkFailureCode::InvalidRequest,
+                "native notification ingress is disabled on this control",
+            ));
+        }
+        let acknowledgement = self
+            .store
+            .accept_notification_intents(&batch, now, NOTIFICATION_MAX_AGE_MS, MAX_CLOCK_SKEW_MS)
+            .map_err(ControlFailure::internal)?;
+        let metadata = format!(
+            "accepted={},duplicates={},rejected={},bytes={}",
+            acknowledgement.accepted.len(),
+            acknowledgement.duplicates.len(),
+            acknowledgement.rejected.len(),
+            serde_json::to_vec(&batch).map_or(0, |bytes| bytes.len())
+        );
+        self.audit.machine(
+            now,
+            "NOTIFICATION_INTENTS",
+            &batch.machine_id,
+            Some(&metadata),
+        );
+        Ok(acknowledgement)
     }
 
     /// Rotate both credentials of a link.

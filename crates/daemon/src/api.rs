@@ -13,6 +13,7 @@ use crate::{
     link::LinkManager,
     notifications::NotificationService,
     origin::OriginPolicy,
+    push::gateway::PushGateway,
     recipes::RecipeCatalog,
     session_manager::{Attachment, CreateSession, SessionManager},
 };
@@ -48,6 +49,7 @@ pub struct AppState {
     development: bool,
     recipes: RecipeCatalog,
     notifications: Option<NotificationService>,
+    push: Option<PushGateway>,
     insights: Option<MachineInsights>,
 }
 
@@ -69,6 +71,7 @@ impl AppState {
             development: false,
             recipes,
             notifications: None,
+            push: None,
             insights: None,
         }
     }
@@ -118,6 +121,12 @@ impl AppState {
     /// Install local notification rules and delivery for this daemon.
     pub fn with_notifications(mut self, notifications: NotificationService) -> Self {
         self.notifications = Some(notifications);
+        self
+    }
+
+    /// Install the control-owned native Push gateway.
+    pub fn with_push(mut self, push: Option<PushGateway>) -> Self {
+        self.push = push;
         self
     }
 
@@ -373,6 +382,7 @@ pub fn router(state: AppState) -> Router {
         state.behind_tailscale_serve,
         state.development,
     )
+    .with_push(state.push.clone())
     .router();
     let origins = state.origins.clone();
     Router::new()

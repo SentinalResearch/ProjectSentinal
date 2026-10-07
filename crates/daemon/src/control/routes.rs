@@ -9,12 +9,13 @@ use super::{proxy, ControlFailure, ControlService};
 use crate::{
     api::auth_routes::{bearer_from_headers, credential_from_headers},
     auth::{AuthManager, CredentialKind},
+    push::gateway::{PushGateway, PushGatewayError},
 };
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, put},
     Json, Router,
 };
 use protocol::{
@@ -22,12 +23,12 @@ use protocol::{
         LinkDisconnectRequest, LinkExchangeRequest, LinkFailure, LinkFailureCode,
         LinkHeartbeatRequest, LinkRefreshRequest, RenameMachineRequest,
     },
-    MachineId,
+    MachineId, NotificationIntentBatch, PushProviderModeRequest, PushSubscriptionRequest,
 };
 use std::net::SocketAddr;
 
 /// Link bodies are small; anything larger is refused before parsing.
-const MAX_LINK_BODY_BYTES: usize = 16 * 1024;
+const MAX_LINK_BODY_BYTES: usize = 64 * 1024;
 
 /// State for the control routes.
 #[derive(Clone)]
@@ -36,6 +37,7 @@ pub struct ControlRoutes {
     auth: AuthManager,
     behind_tailscale_serve: bool,
     development: bool,
+    push: Option<PushGateway>,
 }
 
 impl ControlRoutes {
@@ -51,7 +53,14 @@ impl ControlRoutes {
             auth,
             behind_tailscale_serve,
             development,
+            push: None,
         }
+    }
+
+    /// Attach the optional control-owned native Push gateway.
+    pub fn with_push(mut self, push: Option<PushGateway>) -> Self {
+        self.push = push;
+        self
     }
 
     /// Build the router.
@@ -72,6 +81,22 @@ impl ControlRoutes {
             .route("/api/v1/link/heartbeat", post(heartbeat))
             .route("/api/v1/link/refresh", post(refresh))
             .route("/api/v1/link/disconnect", post(disconnect))
+            .route(
+                "/api/v1/link/notification-intents",
+                post(notification_intents),
+            )
+            .route("/api/v1/push/public-key", get(push_public_key))
+            .route("/api/v1/push/deliveries", get(push_deliveries))
+            .route(
+                "/api/v1/push/subscriptions",
+                get(push_subscriptions).post(push_subscribe),
+            )
+            .route("/api/v1/push/subscriptions/refresh", post(push_subscribe))
+            .route(
+                "/api/v1/push/subscriptions/{subscription_id}",
+                axum::routing::delete(push_unsubscribe),
+            )
+            .route("/api/v1/push/provider", put(push_provider))
             .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES))
             .with_state(self)
             .merge(proxy)
@@ -105,6 +130,17 @@ impl ControlRoutes {
                 "sign in as the owner first",
             )),
         }
+    }
+
+    fn owner_push(&self, headers: &HeaderMap) -> Result<&PushGateway, ControlFailure> {
+        self.owner(headers)?;
+        self.push.as_ref().ok_or_else(|| {
+            ControlFailure::new(
+                404,
+                LinkFailureCode::NotControl,
+                "native Push is available only on the control Machine",
+            )
+        })
     }
 
     /// Tailscale user when published by Tailscale Serve, else the peer address.
@@ -205,6 +241,96 @@ async fn heartbeat(
         }
         Err(failure) => failure_response(failure),
     }
+}
+
+async fn notification_intents(
+    State(routes): State<ControlRoutes>,
+    headers: HeaderMap,
+    Json(request): Json<NotificationIntentBatch>,
+) -> Response {
+    match routes.control() {
+        Ok(control) => reply(control.accept_notification_intents(
+            bearer_from_headers(&headers).unwrap_or_default(),
+            request,
+        )),
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn push_public_key(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Response {
+    match routes.owner_push(&headers) {
+        Ok(push) => push_reply(push.public_key()),
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn push_subscriptions(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Response {
+    match routes.owner_push(&headers) {
+        Ok(push) => push_reply(push.subscriptions()),
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn push_deliveries(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Response {
+    match routes.owner_push(&headers) {
+        Ok(push) => push_reply(push.delivery_history()),
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn push_subscribe(
+    State(routes): State<ControlRoutes>,
+    headers: HeaderMap,
+    Json(request): Json<PushSubscriptionRequest>,
+) -> Response {
+    match routes.owner_push(&headers) {
+        Ok(push) => push_reply(push.subscribe(request).await),
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn push_unsubscribe(
+    State(routes): State<ControlRoutes>,
+    headers: HeaderMap,
+    Path(subscription_id): Path<String>,
+) -> Response {
+    match routes.owner_push(&headers) {
+        Ok(push) => match push.unsubscribe(&subscription_id) {
+            Ok(()) => StatusCode::NO_CONTENT.into_response(),
+            Err(error) => push_error(error),
+        },
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn push_provider(
+    State(routes): State<ControlRoutes>,
+    headers: HeaderMap,
+    Json(request): Json<PushProviderModeRequest>,
+) -> Response {
+    match routes.owner_push(&headers) {
+        Ok(push) => push_reply(push.set_provider_mode(request.mode)),
+        Err(failure) => failure_response(failure),
+    }
+}
+
+fn push_reply<T: serde::Serialize>(result: Result<T, PushGatewayError>) -> Response {
+    match result {
+        Ok(value) => Json(value).into_response(),
+        Err(error) => push_error(error),
+    }
+}
+
+fn push_error(error: PushGatewayError) -> Response {
+    let (status, code) = match error {
+        PushGatewayError::Invalid(_) | PushGatewayError::Endpoint(_) => {
+            (422, LinkFailureCode::InvalidRequest)
+        }
+        PushGatewayError::NotFound(_) => (404, LinkFailureCode::NotFound),
+        PushGatewayError::NoDevices => (409, LinkFailureCode::InvalidRequest),
+        PushGatewayError::Internal => (500, LinkFailureCode::Internal),
+    };
+    failure_response(ControlFailure::new(status, code, error.to_string()))
 }
 
 async fn refresh(

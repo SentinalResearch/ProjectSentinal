@@ -9,21 +9,26 @@ use crate::{
     control::{ControlService, ControlSettings},
     identity,
     insights::{HostFacts, MachineInsights},
-    link::{LinkManager, LinkSettings},
+    link::{spawn_notification_intent_uploader, LinkManager, LinkSettings},
     local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{process_tree, MetricsSampler, ResourceDebouncer},
-    notifications::{spawn_notification_workers, spawn_notifier, NotificationService},
+    notifications::{
+        spawn_notification_workers, spawn_notifier, NativeNotificationState, NotificationService,
+    },
     origin::OriginPolicy,
     package_service::{package_router, PackageService, PackageServiceError},
     private_fs::ensure_private_dir,
     process_probe::ProcessProbe,
     pty::{FakePty, PtyBackend, RealPty},
+    push::delivery::spawn_push_delivery_worker,
+    push::gateway::{PushGateway, PushGatewaySettings},
     recipes::RecipeCatalog,
     session_manager::{SessionManager, SessionManagerConfig, SessionManagerError},
 };
 use protocol::{
     link::{LinkEndpoint, LocalLinkState},
-    LocalRequest, Machine, MachineId, MachineRole, MachineStatus, Os, Resource, Timestamp,
+    LocalRequest, Machine, MachineId, MachineRole, MachineStatus, NotificationIntentBatch, Os,
+    Resource, Timestamp,
 };
 use std::{
     collections::HashMap,
@@ -33,7 +38,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use store::{Store, StoreError};
+use store::{NewNotificationIntentOutbox, Store, StoreError};
 
 /// Errors that stop the daemon from starting or serving.
 #[derive(Debug, thiserror::Error)]
@@ -218,6 +223,21 @@ pub async fn run() -> Result<(), DaemonError> {
         Arc::new(RealPty)
     };
     let daemon_uid = current_uid(&config.local_socket)?;
+    let push = config.control.as_ref().map(|control| {
+        let settings = PushGatewaySettings {
+            key_file: push_key_file(&home),
+            subject_origin: control.public_url.clone(),
+            owner_uid: daemon_uid,
+        };
+        #[cfg(feature = "e2e-test-support")]
+        if std::env::var_os("SENTINAL_E2E_ACCEPT_PUSH").as_deref()
+            == Some(std::ffi::OsStr::new("1"))
+        {
+            tracing::warn!("using compile-time Web Push acceptance transport");
+            return crate::push::e2e::accepted_gateway(store.clone(), settings, Arc::new(now));
+        }
+        PushGateway::new(store.clone(), settings, Arc::new(now))
+    });
     let watcher_adapters = load_adapters(&home.join(".config/terminal-agent/adapters"))?;
     let sessions = SessionManager::with_store(
         backend,
@@ -292,6 +312,49 @@ pub async fn run() -> Result<(), DaemonError> {
         control_origin,
         Arc::new(now),
     );
+    let native_store = store.clone();
+    let native_machine_id = machine.id.clone();
+    let native_link = link.clone();
+    let native_push = push.clone();
+    let notifications = notifications.with_native_sink(Arc::new(move |intent, at| {
+        if native_push
+            .as_ref()
+            .is_some_and(PushGateway::notification_ingress)
+        {
+            native_store
+                .accept_notification_intents(
+                    &NotificationIntentBatch {
+                        machine_id: native_machine_id.clone(),
+                        sent_at: at,
+                        intents: vec![intent.clone()],
+                    },
+                    at,
+                    7 * 24 * 60 * 60 * 1_000,
+                    5 * 60 * 1_000,
+                )
+                .map_err(|error| error.to_string())?;
+            return Ok(Some(NativeNotificationState::ControlAccepted));
+        }
+        if native_push
+            .as_ref()
+            .is_some_and(|gateway| gateway.provider_mode() == protocol::PushProviderMode::Disabled)
+        {
+            return Ok(Some(NativeNotificationState::Disabled));
+        }
+        if native_link.notification_ingress() {
+            native_store
+                .record_notification_intent_outbox(&NewNotificationIntentOutbox {
+                    machine_id: native_machine_id.clone(),
+                    intent: intent.clone(),
+                    at,
+                    pending_limit: 256,
+                    pending_bytes_limit: 512 * 1024,
+                })
+                .map_err(|error| error.to_string())?;
+            return Ok(Some(NativeNotificationState::ForwardQueued));
+        }
+        Ok(None)
+    }));
     for diagnostic in notification_diagnostics {
         tracing::warn!(reason = %diagnostic, "notification configuration ignored");
     }
@@ -303,6 +366,10 @@ pub async fn run() -> Result<(), DaemonError> {
     );
     let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
     spawn_notification_workers(notifications.clone(), server_shutdown_rx.clone());
+    spawn_notification_intent_uploader(link.clone(), store.clone(), server_shutdown_rx.clone());
+    if let Some(gateway) = push.clone() {
+        spawn_push_delivery_worker(gateway, server_shutdown_rx.clone());
+    }
     let state = AppState::new(sessions, machine, auth)
         .with_insights(insights)
         .with_origins(origins)
@@ -310,6 +377,7 @@ pub async fn run() -> Result<(), DaemonError> {
         .with_link(link)
         .with_recipes(recipes)
         .with_notifications(notifications)
+        .with_push(push)
         .with_tailscale_serve(config.behind_tailscale_serve)
         .with_development(config.development);
     let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
@@ -406,6 +474,14 @@ pub async fn run() -> Result<(), DaemonError> {
     local_task.await.map_err(DaemonError::LocalTask)??;
     signal_task.abort();
     server_result
+}
+
+fn push_key_file(home: &std::path::Path) -> PathBuf {
+    #[cfg(feature = "e2e-test-support")]
+    if let Some(path) = std::env::var_os("SENTINAL_E2E_VAPID_KEY_FILE") {
+        return PathBuf::from(path);
+    }
+    home.join(".config/terminal-agent/push-vapid.json")
 }
 
 async fn wait_for_shutdown(mut shutdown: tokio::sync::watch::Receiver<bool>) {
