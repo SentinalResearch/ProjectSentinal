@@ -391,6 +391,11 @@
   gap: 10px;
 }
 
+.notificationEnableButton {
+  align-self: flex-start;
+  min-width: 260px;
+}
+
 .previewGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -563,6 +568,11 @@
 
   .smallBtn {
     height: 36px;
+  }
+
+  .notificationEnableButton {
+    width: 100%;
+    min-width: 0;
   }
 }
 

@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 
+import { Button } from "../../components/Button";
 import { dataAdapter } from "../../data";
+import { pushApi, subscribeCurrentBrowser } from "../../data/api/push";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { JournalNotification, NotificationDeliveryStatus, NotificationRuleSet, NotificationRules } from "../../data/types";
+import type { PushSubscriptionList } from "../../protocol/PushSubscriptionList";
 import styles from "./SettingsPage.module.css";
 
 const KINDS: (keyof NotificationRuleSet)[] = ["finished", "error", "stalled", "waiting", "checkpoint", "progress"];
@@ -27,12 +30,72 @@ function NotificationRules() {
   const [journal, setJournal] = useState<JournalNotification[]>([]);
   const [statuses, setStatuses] = useState<NotificationDeliveryStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [push, setPush] = useState<PushSubscriptionList | null>(null);
+  const [pushStatus, setPushStatus] = useState("Checking browser Push…");
+  const [pushBusy, setPushBusy] = useState(false);
 
   useEffect(() => {
     dataAdapter.notifications.getRules().then(setRules);
     dataAdapter.notifications.getJournal().then(setJournal);
+    pushApi
+      .history()
+      .then((entries) =>
+        setJournal((current) => [
+          ...entries.map((entry) => ({
+            id: `push-${entry.id}`,
+            text: entry.text,
+            machineId: entry.machine_id,
+            sessionId: `${entry.machine_id}:${entry.session_id}`,
+            category: entry.category ?? undefined,
+            state: entry.state ?? undefined,
+            attempts: entry.attempts ?? undefined,
+            at: entry.at,
+            delivered: entry.delivered,
+            resultClass: entry.result_class ?? undefined,
+            requestBytes: entry.request_bytes ?? undefined,
+          })),
+          ...current.filter((entry) => !entry.id.startsWith("push-")),
+        ]),
+      )
+      .catch(() => undefined);
     dataAdapter.notifications.getStatus().then(setStatuses);
+    pushApi
+      .list()
+      .then((value) => {
+        setPush(value);
+        setPushStatus(value.devices.length === 0 ? "No browser is subscribed." : "Browser Push is ready.");
+      })
+      .catch(() => setPushStatus("Native Push is available only from the authenticated control PWA."));
   }, []);
+
+  async function enablePush() {
+    setPushBusy(true);
+    setError(null);
+    try {
+      await subscribeCurrentBrowser("This browser");
+      setPush(await pushApi.setProvider("WEB_PUSH"));
+      setPushStatus("This browser is active. Provider acceptance is not proof that the phone displayed it.");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not enable browser Push.");
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function removeDevice(subscriptionId: string) {
+    setPushBusy(true);
+    setError(null);
+    try {
+      await pushApi.unsubscribe(subscriptionId);
+      const value = await pushApi.list();
+      setPush(value);
+      setPushStatus(value.devices.length === 0 ? "No browser is subscribed." : "Browser Push is ready.");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not remove this browser.");
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   if (!rules) return <div className={styles.tabLoading}>Loading…</div>;
 
@@ -103,6 +166,34 @@ function NotificationRules() {
         </p>
       )}
 
+      <section className={styles.previewWrap} aria-live="polite">
+        <span className={styles.overline}>NATIVE WEB PUSH</span>
+        <p>{pushStatus}</p>
+        <p>
+          Permission is requested only when you press Enable. On iPhone, install Sentinal to the Home Screen first.
+        </p>
+        <Button
+          variant="primary"
+          loading={pushBusy}
+          loadingLabel="Enabling notifications…"
+          className={styles.notificationEnableButton}
+          onClick={() => void enablePush()}
+        >
+          Enable notifications on this device
+        </Button>
+        {push?.devices.map((device) => (
+          <div key={device.subscription_id} className={styles.previewCard}>
+            <span className={styles.previewText}>{device.device_label}</span>
+            <span className={styles.machineOs}>
+              {device.state} · last success {device.last_success_at === null ? "not yet" : new Date(device.last_success_at).toLocaleString()}
+            </span>
+            <button type="button" disabled={pushBusy} onClick={() => void removeDevice(device.subscription_id)}>
+              Remove device
+            </button>
+          </div>
+        ))}
+      </section>
+
       <div className={styles.tableScroll}>
         <div className={styles.notifHeadRow}>
           <span>SESSION</span>
@@ -155,7 +246,7 @@ function NotificationRules() {
 
       <div className={styles.previewWrap}>
         <span className={styles.overline}>DELIVERY HISTORY &amp; PREVIEW</span>
-        <p>Preview only — phone appearance is controlled by ntfy and your operating system.</p>
+        <p>Preview only — phone appearance is controlled by ntfy or the browser push service and your operating system.</p>
         <div className={styles.previewGrid}>
           {journal.map((n) => (
             <div

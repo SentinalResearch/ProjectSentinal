@@ -15,7 +15,7 @@ mkdirSync(testRoot, { recursive: true, mode: 0o700 });
  * One isolated daemon: every token, identity, link, credential, data, and
  * socket path lives under the test root, never in the real home directory.
  */
-function daemon(name, port, extra) {
+function daemon(name, port, extra, nativePush = false) {
   const root = join(testRoot, name);
   mkdirSync(root, { recursive: true, mode: 0o700 });
   const token = join(root, "token");
@@ -50,7 +50,7 @@ function daemon(name, port, extra) {
   return {
     root,
     socket: join(root, "run", "sentinald.sock"),
-    command: `TA_CONFIG=${config} TA_AUTH_FILE=${auth} TA_FAKE_PTY=1 cargo run -p daemon --bin sentinald`,
+    command: `${nativePush ? `SENTINAL_E2E_ACCEPT_PUSH=1 SENTINAL_E2E_VAPID_KEY_FILE=${join(root, "push-vapid.json")} ` : ""}TA_CONFIG=${config} TA_AUTH_FILE=${auth} TA_FAKE_PTY=1 cargo run -p daemon ${nativePush ? "--features e2e-test-support " : ""}--bin sentinald`,
     health: `http://127.0.0.1:${port}/api/v1/health`,
   };
 }
@@ -62,7 +62,7 @@ const control = daemon("control", 7421, [
   "enabled = true",
   'public_url = "http://127.0.0.1:7421"',
   "heartbeat_interval_ms = 300",
-]);
+], true);
 const workerA = daemon("worker-a", 7431, []);
 const workerB = daemon("worker-b", 7432, []);
 
@@ -101,6 +101,7 @@ export default defineConfig({
     { name: "smoke", testMatch: "session-smoke.spec.ts" },
     { name: "adopted", testMatch: "adopted-log.spec.ts", dependencies: ["smoke"] },
     { name: "enrollment", testMatch: "enrollment.spec.ts", dependencies: ["adopted"] },
+    { name: "native-push", testMatch: "native-push.spec.ts", dependencies: ["enrollment"] },
   ],
   webServer: [
     {

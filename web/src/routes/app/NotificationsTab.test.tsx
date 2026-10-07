@@ -42,6 +42,14 @@ describe("NotificationsTab", () => {
     expect(await cell("Qwen Training on RTX-PC: progress")).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("presents native notification enablement as the primary action", async () => {
+    renderNotifications();
+
+    const button = await screen.findByRole("button", { name: "Enable notifications on this device" });
+    expect(button.className).toContain("primary");
+    expect(button).toBeEnabled();
+  });
+
   it("a Session without an override follows its own Machine's default only", async () => {
     renderNotifications();
     const user = userEvent.setup();

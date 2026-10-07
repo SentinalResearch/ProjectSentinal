@@ -38,4 +38,7 @@ export function reportCommand(
   exitCode?: number,
 ): void;
 
+/** Return only the persisted native-Push policy bit, never link credentials. */
+export function notificationIngress(root: string): boolean;
+
 export function e2eEnv(name: string): string;

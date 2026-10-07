@@ -102,20 +102,35 @@ export function reportCommand(socket, title, exitCode = 0) {
   const binary = join(repo, "target", "debug", "sentinal");
   const pid = process.pid;
   const common = ["hook", "report"];
+  const sequence = String(nextSequence(socket));
   const environment = {
     ...process.env,
     SENTINAL_SOCKET: socket,
     SENTINAL_HOOK_TEXT: "printf structured-notification-test",
     SENTINAL_TITLE: title,
   };
-  execFileSync(binary, [...common, "start", "--pid", String(pid), "--shell", "/bin/sh", "--seq", "1"], {
+  execFileSync(binary, [...common, "start", "--pid", String(pid), "--shell", "/bin/sh", "--seq", sequence], {
     env: environment,
     stdio: "ignore",
   });
-  execFileSync(binary, [...common, "finish", "--pid", String(pid), "--shell", "/bin/sh", "--seq", "1", "--exit", String(exitCode)], {
+  execFileSync(binary, [...common, "finish", "--pid", String(pid), "--shell", "/bin/sh", "--seq", sequence, "--exit", String(exitCode)], {
     env: environment,
     stdio: "ignore",
   });
+}
+
+const reportSequences = new Map();
+
+function nextSequence(socket) {
+  const value = (reportSequences.get(socket) ?? 0) + 1;
+  reportSequences.set(socket, value);
+  return value;
+}
+
+/** Read only the worker's persisted provider-policy bit; never return link credentials. */
+export function notificationIngress(root) {
+  const link = JSON.parse(readFileSync(join(root, "link.json"), "utf8"));
+  return link.notification_ingress === true;
 }
 
 /** Environment value set by playwright.config.mjs. */

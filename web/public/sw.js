@@ -1,6 +1,9 @@
 // Release packaging replaces this marker with the exact immutable release ID.
 const CACHE = "sentinal-__SENTINAL_RELEASE_ID__";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/app-icon.svg"];
+importScripts("/push-safety.js");
+
+const SHELL = ["/", "/manifest.webmanifest", "/icons/app-icon.svg", "/push-safety.js"];
+const { safeNotificationRoute, safePushPayload } = self.SentinalPushSafety;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -40,4 +43,35 @@ self.addEventListener("fetch", (event) => {
   if (SHELL.includes(url.pathname)) {
     event.respondWith(caches.match(event.request).then((cached) => cached ?? fetch(event.request)));
   }
+});
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    Promise.resolve().then(() => {
+      const payload = safePushPayload(event.data?.text(), self.location.origin);
+      if (!payload) return undefined;
+      return self.registration.showNotification(payload.title, {
+        body: payload.body,
+        tag: `sentinal-${String(payload.category ?? "event").slice(0, 32)}`,
+        data: { route: payload.route },
+      });
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const route = safeNotificationRoute(event.notification.data?.route, self.location.origin);
+  if (!route) return;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
+      for (const client of clients) {
+        if (new URL(client.url).origin === self.location.origin) {
+          await client.navigate(route);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(route);
+    }),
+  );
 });
