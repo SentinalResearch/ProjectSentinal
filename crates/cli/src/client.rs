@@ -127,7 +127,24 @@ impl std::fmt::Debug for DaemonClient {
 
 impl DaemonClient {
     /// Connect using the bearer token stored at `token_path`.
-    pub async fn connect(url: &str, token_path: &std::path::Path) -> Result<Self, ClientError> {
+    pub async fn connect(
+        urls: &[String],
+        token_path: &std::path::Path,
+    ) -> Result<Self, ClientError> {
+        let mut last_error = None;
+        for url in urls {
+            match Self::connect_one(url, token_path).await {
+                Ok(client) => return Ok(client),
+                Err(error) => last_error = Some(error),
+            }
+        }
+        Err(last_error.unwrap_or_else(|| ClientError::Url {
+            url: String::new(),
+            message: "no daemon URLs provided".into(),
+        }))
+    }
+
+    async fn connect_one(url: &str, token_path: &std::path::Path) -> Result<Self, ClientError> {
         let token = std::fs::read_to_string(token_path)
             .map_err(|source| ClientError::TokenFile {
                 path: token_path.to_path_buf(),

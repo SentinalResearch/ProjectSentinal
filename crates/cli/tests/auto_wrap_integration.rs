@@ -54,7 +54,7 @@ fn check_entry(daemon: &Daemon, shell: &str) {
     assert!(!inside.contains("id=none"), "{shell}: {inside}");
 
     let sessions = tokio::runtime::Handle::current().block_on(async {
-        let mut client = DaemonClient::connect(&daemon.url, &daemon.token)
+        let mut client = DaemonClient::connect(std::slice::from_ref(&daemon.url), &daemon.token)
             .await
             .unwrap();
         match client.request(ClientRequest::ListSessions).await.unwrap() {

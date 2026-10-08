@@ -35,6 +35,29 @@ pub enum DaemonUrlError {
     },
 }
 
+/// URLs to try in order: the resolved URL, then loopback on the same port when
+/// the daemon binds a non-loopback address (a control and worker sharing one
+/// Machine can be reachable only on loopback).
+pub fn candidates(
+    explicit: Option<&str>,
+    config_path: &Path,
+) -> Result<Vec<String>, DaemonUrlError> {
+    let url = resolve(explicit, config_path)?;
+    let mut urls = vec![url.clone()];
+    if explicit.is_none() {
+        let port = url
+            .strip_prefix("ws://")
+            .and_then(|rest| rest.split('/').next())
+            .and_then(|authority| authority.parse::<SocketAddr>().ok())
+            .filter(|address| !address.ip().is_loopback())
+            .map(|address| address.port());
+        if let Some(port) = port {
+            urls.push(format!("ws://127.0.0.1:{port}/api/v1/ws"));
+        }
+    }
+    Ok(urls)
+}
+
 /// Resolve an explicit URL or derive one from the local daemon bind.
 pub fn resolve(explicit: Option<&str>, config_path: &Path) -> Result<String, DaemonUrlError> {
     if let Some(url) = explicit {

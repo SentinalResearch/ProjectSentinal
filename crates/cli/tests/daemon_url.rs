@@ -69,3 +69,26 @@ fn malformed_config_and_bind_are_named_errors() {
     assert!(error.contains("localhost:7420"), "{error}");
     fs::remove_file(bad_bind).unwrap();
 }
+
+#[test]
+fn candidates_add_a_loopback_fallback_on_the_configured_port() {
+    let config = temp_file("candidates.toml");
+    std::fs::write(&config, "bind = \"100.74.239.89:7444\"\n").unwrap();
+    assert_eq!(
+        cli::daemon_url::candidates(None, &config).unwrap(),
+        vec![
+            "ws://100.74.239.89:7444/api/v1/ws".to_string(),
+            "ws://127.0.0.1:7444/api/v1/ws".to_string()
+        ]
+    );
+    std::fs::write(&config, "bind = \"127.0.0.1:7420\"\n").unwrap();
+    assert_eq!(
+        cli::daemon_url::candidates(None, &config).unwrap(),
+        vec!["ws://127.0.0.1:7420/api/v1/ws".to_string()]
+    );
+    assert_eq!(
+        cli::daemon_url::candidates(Some("ws://example.test/api/v1/ws"), &config).unwrap(),
+        vec!["ws://example.test/api/v1/ws".to_string()]
+    );
+    fs::remove_file(config).unwrap();
+}

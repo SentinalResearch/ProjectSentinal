@@ -98,7 +98,9 @@ fn process_alive(pid: u32) -> bool {
 }
 
 async fn sessions(url: &str, token: &Path) -> Vec<Session> {
-    let mut client = DaemonClient::connect(url, token).await.unwrap();
+    let mut client = DaemonClient::connect(&[url.to_string()], token)
+        .await
+        .unwrap();
     match client.request(ClientRequest::ListSessions).await.unwrap() {
         DaemonMessage::Sessions { sessions } => sessions,
         other => panic!("unexpected {other:?}"),
@@ -200,7 +202,9 @@ async fn watch_integration() {
     let before_close = last_tick(&first.seen);
 
     // The real PTY output is converted to persisted training Events and Health.
-    let mut event_client = DaemonClient::connect(&url, &token).await.unwrap();
+    let mut event_client = DaemonClient::connect(std::slice::from_ref(&url), &token)
+        .await
+        .unwrap();
     let events = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let events = match event_client
@@ -282,7 +286,9 @@ async fn watch_integration() {
     assert!(status.success(), "attach exited with {status:?}");
 
     // 5. The initial Command was recorded exactly once.
-    let mut client = DaemonClient::connect(&url, &token).await.unwrap();
+    let mut client = DaemonClient::connect(std::slice::from_ref(&url), &token)
+        .await
+        .unwrap();
     match client
         .request(ClientRequest::GetHistory {
             session_id: Some(session.id),

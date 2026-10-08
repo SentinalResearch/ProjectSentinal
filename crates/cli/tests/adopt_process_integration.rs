@@ -26,7 +26,7 @@ fn sentinal() -> &'static Path {
 }
 
 async fn sessions(daemon: &Daemon) -> Vec<Session> {
-    let mut client = DaemonClient::connect(&daemon.url, &daemon.token)
+    let mut client = DaemonClient::connect(std::slice::from_ref(&daemon.url), &daemon.token)
         .await
         .unwrap();
     match client.request(ClientRequest::ListSessions).await.unwrap() {
@@ -173,7 +173,7 @@ async fn adopt_process_integration() {
     assert!(metrics.totals.rss_bytes > 0);
 
     // Read-only: a remote kill is refused and the process keeps running.
-    let mut client = DaemonClient::connect(&daemon.url, &daemon.token)
+    let mut client = DaemonClient::connect(std::slice::from_ref(&daemon.url), &daemon.token)
         .await
         .unwrap();
     let refused = client

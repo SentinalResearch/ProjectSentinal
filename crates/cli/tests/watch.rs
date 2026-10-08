@@ -294,7 +294,7 @@ fn create_request() -> ClientRequest {
 }
 
 async fn connect(url: &str, token: &Path) -> Result<DaemonClient, ClientError> {
-    DaemonClient::connect(url, token).await
+    DaemonClient::connect(&[url.to_string()], token).await
 }
 
 #[tokio::test]

@@ -62,12 +62,12 @@ async fn dispatch(
         } => return Ok(crate::update::run(check, rollback, prefix, out)?),
         Command::Hook { action } => return Ok(crate::hook_command::run(action, out, err).await),
         Command::Auto { action } => {
-            let url = if matches!(&action, AutoAction::Enter { .. }) {
-                resolve_daemon_url(cli.url.as_deref())?
+            let urls = if matches!(&action, AutoAction::Enter { .. }) {
+                resolve_daemon_urls(cli.url.as_deref())?
             } else {
-                cli.url.unwrap_or_default()
+                cli.url.into_iter().collect()
             };
-            return Ok(crate::auto_command::run(action, &url, cli.token_file, out, err).await);
+            return Ok(crate::auto_command::run(action, &urls, cli.token_file, out, err).await);
         }
         Command::Connect {
             control_url,
@@ -124,12 +124,12 @@ async fn dispatch(
         Some(path) => path,
         None => default_token_file()?,
     };
-    let url = resolve_daemon_url(cli.url.as_deref())?;
+    let urls = resolve_daemon_urls(cli.url.as_deref())?;
     if let Command::Watch { title, command } = cli.command {
-        return watch(&url, &token_file, title, command, err).await;
+        return watch(&urls, &token_file, title, command, err).await;
     }
 
-    let mut client = DaemonClient::connect(&url, &token_file).await?;
+    let mut client = DaemonClient::connect(&urls, &token_file).await?;
     match cli.command {
         Command::List => match client.request(ClientRequest::ListSessions).await? {
             DaemonMessage::Sessions { sessions } => {
@@ -229,7 +229,7 @@ async fn dispatch(
 }
 
 async fn watch(
-    url: &str,
+    urls: &[String],
     token_file: &std::path::Path,
     title: Option<String>,
     command: Option<Vec<String>>,
@@ -265,7 +265,7 @@ async fn watch(
         }
         WatchPlan::Create(request) => {
             let (client, session) =
-                create_session(|| DaemonClient::connect(url, token_file), request).await?;
+                create_session(|| DaemonClient::connect(urls, token_file), request).await?;
             let id = session.id.0;
             let end = client
                 .attach(session.id)
@@ -289,15 +289,15 @@ fn default_token_file() -> Result<PathBuf, AppError> {
         .ok_or(AppError::MissingHome)
 }
 
-fn resolve_daemon_url(explicit: Option<&str>) -> Result<String, AppError> {
+fn resolve_daemon_urls(explicit: Option<&str>) -> Result<Vec<String>, AppError> {
     if let Some(url) = explicit {
-        return Ok(url.to_owned());
+        return Ok(vec![url.to_owned()]);
     }
     let config = std::env::var_os("HOME")
         .map(PathBuf::from)
         .map(|home| home.join(".config/terminal-agent/daemon.toml"))
         .ok_or(AppError::MissingHome)?;
-    Ok(daemon_url::resolve(None, &config)?)
+    Ok(daemon_url::candidates(None, &config)?)
 }
 
 fn print_unexpected(err: &mut dyn Write, message: DaemonMessage) {

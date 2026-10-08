@@ -23,14 +23,14 @@ use std::{
 /// Run one auto-wrap operation.
 pub async fn run(
     action: AutoAction,
-    url: &str,
+    urls: &[String],
     token_file: Option<PathBuf>,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> ExitCode {
     let result = match action {
         AutoAction::Enter { shell, shell_path } => {
-            return ExitCode::from(enter(url, token_file, &shell, &shell_path).await);
+            return ExitCode::from(enter(urls, token_file, &shell, &shell_path).await);
         }
         AutoAction::On { shell, rc } => edit(shell, rc, true, out),
         AutoAction::Off { shell, rc } => edit(shell, rc, false, out),
@@ -79,7 +79,7 @@ fn configured_skip_vars() -> Vec<(String, String)> {
         .collect()
 }
 
-async fn enter(url: &str, token_file: Option<PathBuf>, shell: &str, shell_path: &str) -> u8 {
+async fn enter(urls: &[String], token_file: Option<PathBuf>, shell: &str, shell_path: &str) -> u8 {
     let started = Instant::now();
     let hook_shell = HookShell::from_shell_path(shell);
     if skip_reason(&capture_env(hook_shell, true)).is_some() {
@@ -107,7 +107,7 @@ async fn enter(url: &str, token_file: Option<PathBuf>, shell: &str, shell_path: 
         command: None,
     };
     let created = within(ENTRY_DEADLINE, async {
-        let mut client = DaemonClient::connect(url, &token_file).await.ok()?;
+        let mut client = DaemonClient::connect(urls, &token_file).await.ok()?;
         match client.request(request).await.ok()? {
             DaemonMessage::SessionUpdated { session } => Some((client, session)),
             _ => None,

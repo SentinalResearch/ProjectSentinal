@@ -17,7 +17,7 @@ use support::{find_shell, wait_until, Daemon, ShellTerm};
 const OUTPUT_MARKER: &str = "COMMANDS-CAPTURE-MUST-NOT-STORE-THIS";
 
 async fn request(daemon: &Daemon, request: ClientRequest) -> DaemonMessage {
-    let mut client = DaemonClient::connect(&daemon.url, &daemon.token)
+    let mut client = DaemonClient::connect(std::slice::from_ref(&daemon.url), &daemon.token)
         .await
         .unwrap();
     client.request(request).await.unwrap()
