@@ -9,3 +9,6 @@ Use `docs/AUDIT_TRACKER.md` for the current repository-wide verification
 record and release blockers. New milestone reports must record the tested
 commit, exact commands, host/OS information for manual runs, and any external
 prerequisite that prevented a check.
+
+V2 exploration: [`v2-translator-eval.md`](v2-translator-eval.md) records the
+translator benchmark, model comparison, and first fine-tune (2026-10-04).

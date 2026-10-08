@@ -14,6 +14,92 @@ cargo run -q -p watcher --example eval_baseline -- eval/data/test.jsonl > baseli
 python3 eval/score.py eval/data/test.jsonl baseline.jsonl --edges
 ```
 
+## Running an OpenAI-compatible model
+
+`run_model.py` calls a vLLM, llama.cpp, or other OpenAI-compatible server and
+writes the prediction JSONL consumed by `score.py`. Start with `dev.jsonl` and
+change prompts or inference settings only against that split:
+
+```sh
+python3 eval/run_model.py eval/data/dev.jsonl \
+  --base-url http://POP_OS_TAILSCALE_IP:8343/ \
+  --model Qwen/Qwen3-4B \
+  --output qwen3-4b-dev.jsonl \
+  --concurrency 4
+
+python3 eval/score.py eval/data/dev.jsonl qwen3-4b-dev.jsonl \
+  --edges \
+  --json qwen3-4b-dev-report.json \
+  --failures qwen3-4b-dev-failures.jsonl
+```
+
+A bare `IP:port`, server root, or `/v1` URL is accepted. When the server
+advertises exactly one model, `--model` may be omitted. vLLM normally serves
+one loaded model per process, so restart it with the next model and use a
+different output file for each comparison. `--limit 3` provides a cheap smoke
+test, while `--resume` keeps completed predictions after an interrupted run.
+
+For an authenticated server, place the key in an owner-only file rather than
+the command line:
+
+```sh
+python3 eval/run_model.py eval/data/dev.jsonl \
+  --base-url http://POP_OS_TAILSCALE_IP:8343/ \
+  --api-key-file /tmp/sentinal-qwen-api-key \
+  --output qwen-dev.jsonl
+```
+
+The runner sends only each record's `suite` and `input` fields. It never sends
+`expected`, `optional`, or `forbidden` labels to the model. A prediction is
+written and flushed after every response, including transport and parsing
+failures, so the scorer can distinguish a failed response from a missing
+example.
+
+Every prediction also records the reply's `raw` text (first 2,000 characters),
+`finish_reason`, and token counts. A model that "returns zero calls" can then be
+told apart from one whose output was never parsed. In the 2026-10-04 run, the
+270M models were served with the Hermes tool parser, and Gemma 3's chat
+template dropped the tools, so their zeros measured the setup, not the models.
+
+## Fine-tuning and the compact format
+
+A fine-tuned model learns the functions from examples, so it doesn't need the
+full `tools.json` schema in every prompt. [`compact.py`](compact.py) defines a
+short instruction and a JSON-array reply, about 5× fewer tokens. Training and
+evaluation import the same module, so the model is always tested in the format
+it learned.
+
+```sh
+python3 eval/generate.py --train 5000
+# on the GPU machine (torch, transformers, trl, datasets)
+python3 eval/finetune/train_sft.py --model Qwen/Qwen3-0.6B \
+  --train eval/data/train.jsonl --dev eval/data/dev.jsonl --output runs/qwen3-0.6b-sft
+vllm serve runs/qwen3-0.6b-sft --served-model-name sentinal-qwen3-0.6b --dtype bfloat16 --port 8345
+python3 eval/run_model.py eval/data/dev.jsonl --format compact --concurrency 16 \
+  --base-url http://127.0.0.1:8345 --model sentinal-qwen3-0.6b --output sft-dev.jsonl
+```
+
+The training script:
+- renders prompts with the model's own chat template, with thinking disabled,
+  exactly as vLLM serves them;
+- computes loss on the answer only;
+- refuses any record from the test split.
+
+Choose settings on `dev`, then run `test` once.
+
+**Measured 2026-10-04** (details in
+[`docs/progress/v2-translator-eval.md`](../docs/progress/v2-translator-eval.md)):
+
+| System | Split | F1 | Secret leaks | p50 latency |
+|---|---|---|---|---|
+| Deterministic rules | test | 0.317 | 0 | — |
+| Qwen3-4B, prompted | dev | 0.561 | 2 | 1,454 ms |
+| Qwen3-0.6B, fine-tuned (42.6 min, one RTX 5060 Ti) | test | 0.978 | 0 | 293 ms |
+
+The fine-tuned model scores 0.909 on held-out formats and 0.914 on the 8 real
+logs. Train and test share one generator, so a hand-labelled set of real
+captured screens is the next decision metric.
+
 ## The task
 
 **Translate.** The input is the command and the current screen (last 40 lines).

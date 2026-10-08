@@ -23,3 +23,6 @@
 .env.*
 !web/.env.demo
 !web/.env.test
+
+# Local evaluation runs and model outputs
+/tmp/
