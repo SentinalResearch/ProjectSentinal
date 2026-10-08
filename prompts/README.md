@@ -34,6 +34,7 @@ model) to build the whole system, one milestone at a time.
 | 4.C | `05c-milestone-4c-notification-mobile-acceptance.md` | Real ntfy delivery, production PWA, phone appearance and navigation |
 | 4.D | `05d-milestone-4d-native-push-gateway.md` | Control-owned Web Push now, provider boundary for future native apps |
 | 4.E | `05e-milestone-4e-v1-install-discovery-private-pilot.md` | Normal-person install, Tailnet discovery, approval pairing, private cloud pilot |
+| 4.F | `05f-milestone-4f-mobile-web.md` | Mobile web experience from `sentinal-mobile-handoff/`: tab bar, phone screens, terminal, sheets |
 | 5 | `06-milestone-5-projects-autocomplete.md` | Projects, command library, autocomplete |
 | 6 | `07-milestone-6-intelligence-foundation.md` | Agent tool API, datasets, evals, baselines |
 | 7 | `08-milestone-7-finetune-agent.md` | Fine-tuned small model, heartbeat, journal (**V2**) |
@@ -45,7 +46,8 @@ the agent infer wire, pairing, push-security, dependency, or PTY-ownership
 decisions.
 
 The recommended path from the current repository is 1b.E → 1c → 1c.1 → 1d →
-3 → 1b.D → 4.0 → 4.A → 4.B → 4.C → 4.D → 4.E. R1 is a separate reliability project:
+3 → 1b.D → 4.0 → 4.A → 4.B → 4.C → 4.D → 4.F → 4.E. 4.F comes before 4.E so
+the clean-install pilot and real-phone acceptance exercise the phone screens. R1 is a separate reliability project:
 schedule it before a production-stability claim, but do not mix it into
 watcher or dashboard work.
 

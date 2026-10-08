@@ -273,6 +273,19 @@ select the discovered private control, approve the matching request in the PWA,
 then Watch a Command and receive its notification. Publish one update and
 apply or roll it back from the exact Machine without exposing credentials.
 
+## Milestone 4.F — Mobile web experience
+- [ ] Approve the screen inventory, breakpoint, navigation, data-gap, sheet, and phone-terminal plan
+- [ ] Phone shell below 768 px: bottom tab bar, back bars, safe areas; desktop unchanged
+- [ ] Notification path: Overview, Session detail, Waiting, Opened-from-failure, Terminal + key bar, Ctrl-C sheet
+- [ ] Lists: Terminals stack, History + filters sheet, Recipes, Run Recipe
+- [ ] More: Machines, Notifications chips, Account, Theme; public Landing, Features, Sign in
+- [ ] Production Playwright at 390×844, 320×568, and landscape with per-screen screenshots
+- [ ] Record real-iPhone acceptance of every screen and the push → exact Session path
+
+**Demo:** tap a push on an iPhone, land on the phone Session screen for that
+exact Machine and Session, answer its prompt or open the full-screen terminal,
+and confirm Ctrl-C from a bottom sheet — with the desktop layout unchanged.
+
 ## Reliability R1 — Daemon-restart-resilient FULL Sessions
 - [ ] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation
 - [ ] A per-Session owner keeps the PTY and log alive while `sentinald` restarts

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sentinal — mobile</title>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#E9E8E3}*{box-sizing:border-box}a{color:var(--accent-fg);text-decoration:none}a:hover{text-decoration:underline}</style>
+</helmet>
+<div ref="{{ rootRef }}" style="--bg-0:#F7F6F2; --bg-1:#EFEEE9; --bg-2:#E4E3DD; --text-1:#0A0A0A; --text-2:#4A4A46; --text-3:#5E5E5A; --line:#D9D8D2; --line-strong:#8A8984; --accent:#2A44E0; --accent-fg:#2A44E0; --canvas:#E9E8E3; min-height:100vh; background:var(--canvas); padding:64px; display:flex; flex-direction:column; gap:88px; font-family:'Archivo',system-ui,sans-serif; font-size:15px; line-height:21px; color:var(--text-1); font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased">
+
+<header style="display:flex; flex-direction:column; gap:10px; max-width:900px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--accent-fg)">sentinal · mobile · 390 × 844</span>
+<span style="font-size:56px; line-height:56px; font-weight:800; letter-spacing:-0.045em">Mobile, rebuilt for the thumb.</span>
+<span style="font-size:17px; line-height:25px; color:var(--text-2); text-wrap:pretty">The desktop sidebar becomes a bottom tab bar. Tables become stacked rows with the state on its own line, so badges never overlap titles. Split view becomes a stack of live terminals. Every touch target is at least 44 pt, and destructive actions use a confirm sheet.</span>
+</header>
+
+<section style="display:flex; flex-direction:column; gap:28px">
+<div style="display:flex; align-items:baseline; gap:16px; border-top:2px solid var(--text-1); padding-top:14px"><span style="font-size:28px; font-weight:800; letter-spacing:-0.03em">A · Public site</span><span style="font-size:14px; color:var(--text-2)">What visitors see before signing in</span></div>
+<div style="display:flex; flex-wrap:wrap; gap:48px; align-items:flex-start">
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">A1 · Landing</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:56px; flex:none; display:flex; align-items:center; gap:10px; padding:0 20px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="var(--text-1)" stroke-width="3.4" stroke-linecap="square"></path><circle cx="18" cy="18.5" r="3.4" fill="var(--accent)"></circle></svg>
+<span style="font-size:18px; font-weight:800; letter-spacing:-0.02em">Sentinal</span>
+<span style="margin-left:auto; width:44px; height:44px; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--text-2)">◐</span>
+<span style="height:44px; padding:0 14px; display:flex; align-items:center; font-size:15px; font-weight:700">Sign in</span>
+</div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:22px; padding:28px 20px 0">
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent-fg)">local-first · self-hosted</span>
+<span style="font-size:46px; line-height:44px; font-weight:800; letter-spacing:-0.05em">Every terminal, every machine, <span style="color:var(--text-3)">at a glance.</span></span>
+<span style="font-size:17px; line-height:25px; color:var(--text-2); text-wrap:pretty">A local-first control plane for the long jobs you run on your own machines. Start something, walk away, check it from any browser.</span>
+<div style="display:flex; flex-direction:column; gap:10px">
+<span style="height:52px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#FFFFFF; font-size:16px; font-weight:700">Sign in</span>
+<span style="height:52px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px var(--line-strong); font-size:16px; font-weight:700">Set up this server</span>
+</div>
+<div style="display:flex; flex-direction:column; background:var(--bg-1); padding:4px 16px; margin-top:6px">
+<sc-for list="{{ needs2 }}" as="x" hint-placeholder-count="2"><div style="display:flex; align-items:center; gap:12px; min-height:56px; border-bottom:1px solid var(--line)"><span style="display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; background:{{ x.bg }}; color:#0A0A0A; font-size:11px; font-weight:700; letter-spacing:0.04em; white-space:nowrap; flex:none"><span>{{ x.g }}</span>{{ x.s }}</span><span style="flex:1; min-width:0; font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ x.title }}</span><span style="font-size:12px; color:var(--text-3); flex:none">{{ x.m }}</span></div></sc-for>
+</div>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">A2 · Features (scroll)</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:56px; flex:none; display:flex; align-items:center; gap:10px; padding:0 20px; border-bottom:1px solid var(--line)">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="var(--text-1)" stroke-width="3.4" stroke-linecap="square"></path><circle cx="18" cy="18.5" r="3.4" fill="var(--accent)"></circle></svg>
+<span style="font-size:18px; font-weight:800; letter-spacing:-0.02em">Sentinal</span>
+<span style="margin-left:auto; height:40px; padding:0 14px; display:flex; align-items:center; background:var(--text-1); color:var(--bg-0); font-size:14px; font-weight:700">Sign in</span>
+</div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:40px; padding:32px 20px 0">
+<div style="display:flex; flex-direction:column; gap:14px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent-fg)">01 / 04</span>
+<span style="font-size:34px; line-height:34px; font-weight:800; letter-spacing:-0.04em">What am I running?</span>
+<span style="font-size:16px; line-height:23px; color:var(--text-2)">Every session on every machine, in one list. What needs you comes first.</span>
+<div style="display:flex; flex-direction:column; border-top:2px solid var(--text-1)">
+<sc-for list="{{ rtx }}" as="x" hint-placeholder-count="3"><div style="display:flex; flex-direction:column; gap:5px; padding:12px 0; border-bottom:1px solid var(--line)"><div style="display:flex; align-items:center; justify-content:space-between; gap:8px"><span style="display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; background:{{ x.bg }}; color:#0A0A0A; font-size:11px; font-weight:700; letter-spacing:0.04em; white-space:nowrap"><span>{{ x.g }}</span>{{ x.s }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">{{ x.d }}</span></div><span style="font-size:16px; font-weight:700">{{ x.title }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ x.cmd }}</span></div></sc-for>
+</div>
+</div>
+<div style="display:flex; flex-direction:column; gap:14px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent-fg)">02 / 04</span>
+<span style="font-size:34px; line-height:34px; font-weight:800; letter-spacing:-0.04em">How is it going?</span>
+<div style="display:flex; align-items:baseline; gap:12px"><span style="font-size:72px; line-height:68px; font-weight:800; letter-spacing:-0.05em">68 %</span><span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-2)">epoch 68/100</span></div>
+<span style="height:6px; background:var(--bg-2); display:block"><span style="display:block; width:68%; height:100%; background:var(--accent)"></span></span>
+</div>
+</div>
+</div></div>
+
+</div>
+</section>
+
+<section style="display:flex; flex-direction:column; gap:28px">
+<div style="display:flex; align-items:baseline; gap:16px; border-top:2px solid var(--text-1); padding-top:14px"><span style="font-size:28px; font-weight:800; letter-spacing:-0.03em">B · Watch</span><span style="font-size:14px; color:var(--text-2)">Sign in, glance, answer, act</span></div>
+<div style="display:flex; flex-wrap:wrap; gap:48px; align-items:flex-start">
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">B1 · Sign in</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:28px; padding:0 24px 120px">
+<svg width="64" height="64" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="var(--text-1)" stroke-width="3.4" stroke-linecap="square"></path><circle cx="18" cy="18.5" r="3.4" fill="var(--accent)"></circle></svg>
+<span style="font-size:40px; line-height:40px; font-weight:800; letter-spacing:-0.045em">Welcome back.</span>
+<div style="display:flex; flex-direction:column; gap:8px">
+<span style="font-size:13px; font-weight:700">Password</span>
+<div style="height:56px; display:flex; align-items:center; gap:10px; padding:0 8px 0 16px; box-shadow:inset 0 0 0 2px var(--accent); background:var(--bg-0)"><span style="flex:1; display:flex; gap:8px"><span style="width:10px; height:10px; border-radius:5px; background:var(--text-1)"></span><span style="width:10px; height:10px; border-radius:5px; background:var(--text-1)"></span><span style="width:10px; height:10px; border-radius:5px; background:var(--text-1)"></span><span style="width:10px; height:10px; border-radius:5px; background:var(--text-1)"></span><span style="width:10px; height:10px; border-radius:5px; background:var(--text-1)"></span><span style="width:10px; height:10px; border-radius:5px; background:var(--text-1)"></span></span><span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:var(--text-2)">Show</span></div>
+</div>
+<span style="height:56px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#FFFFFF; font-size:17px; font-weight:700">Sign in</span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">sentinal.local · admin</span>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">B2 · Overview</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:18px; padding:12px 20px 0">
+<div style="display:flex; align-items:flex-end; justify-content:space-between"><div style="display:flex; flex-direction:column; gap:4px"><span style="font-size:34px; line-height:36px; font-weight:800; letter-spacing:-0.04em">Overview</span><span style="font-size:14px; color:var(--text-2)">6 sessions · 3 machines</span></div><span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--text-1); color:var(--bg-0); font-size:22px">+</span></div>
+<div style="display:flex; gap:8px; overflow:hidden; margin-right:-20px">
+<sc-for list="{{ machines }}" as="m" hint-placeholder-count="3"><div style="flex:none; height:44px; display:flex; align-items:center; gap:8px; padding:0 14px; box-shadow:inset 0 0 0 1px var(--line); color:{{ m.fg }}; font-size:14px; font-weight:700"><span style="width:8px; height:8px; background:{{ m.dot }}; box-shadow:inset 0 0 0 1.5px {{ m.ring }}"></span>{{ m.name }}<span style="font-weight:500; color:var(--text-3)">{{ m.n }}</span></div></sc-for>
+</div>
+<div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--text-1); padding-bottom:8px"><span style="font-size:17px; font-weight:800">Needs you</span><span style="height:22px; min-width:22px; padding:0 6px; display:flex; align-items:center; justify-content:center; background:#FFD000; color:#0A0A0A; font-size:12px; font-weight:800">3</span></div>
+<div style="display:flex; flex-direction:column; gap:10px; margin-top:-8px">
+<div style="background:var(--bg-1); box-shadow:inset 0 3px 0 #FFD000; padding:16px 14px 14px; display:flex; flex-direction:column; gap:10px">
+<div style="display:flex; align-items:center; justify-content:space-between"><span style="display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; background:#FFD000; color:#0A0A0A; font-size:11px; font-weight:700; letter-spacing:0.04em">? WAITING</span><span style="font-size:12px; color:var(--text-3)">Mac Mini</span></div>
+<span style="font-size:17px; font-weight:700">npm install</span>
+<div style="display:flex; gap:6px"><span style="flex:1; min-width:0; height:48px; display:flex; align-items:center; padding:0 12px; background:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:14px">Continue? [y/N]</span><span style="width:52px; height:48px; display:flex; align-items:center; justify-content:center; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700">y</span><span style="width:52px; height:48px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1.5px var(--line-strong); font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700">n</span></div>
+</div>
+<sc-for list="{{ needsRest }}" as="x" hint-placeholder-count="2"><div style="background:var(--bg-1); box-shadow:inset 0 3px 0 {{ x.bg }}; padding:16px 14px 14px; display:flex; flex-direction:column; gap:6px"><div style="display:flex; align-items:center; justify-content:space-between"><span style="display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; background:{{ x.bg }}; color:#0A0A0A; font-size:11px; font-weight:700; letter-spacing:0.04em"><span>{{ x.g }}</span>{{ x.s }}</span><span style="font-size:12px; color:var(--text-3)">{{ x.m }}</span></div><span style="font-size:17px; font-weight:700">{{ x.title }}</span><span style="font-size:13px; color:var(--text-2)">{{ x.sub }}</span></div></sc-for>
+</div>
+<div style="display:flex; align-items:baseline; gap:8px; border-bottom:2px solid var(--text-1); padding-bottom:8px; margin-top:6px"><span style="font-size:17px; font-weight:800">RTX-PC</span><span style="font-size:12px; color:var(--text-3)">RTX 4090 · online</span></div>
+<sc-for list="{{ rtx }}" as="x" hint-placeholder-count="3"><div style="display:flex; flex-direction:column; gap:5px; padding:4px 0 12px; border-bottom:1px solid var(--line)"><div style="display:flex; align-items:center; justify-content:space-between; gap:8px"><span style="display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; background:{{ x.bg }}; color:#0A0A0A; font-size:11px; font-weight:700; letter-spacing:0.04em; white-space:nowrap"><span>{{ x.g }}</span>{{ x.s }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">{{ x.d }}</span></div><span style="font-size:16px; font-weight:700">{{ x.title }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ x.cmd }}</span></div></sc-for>
+</div>
+<div style="height:83px; flex:none; display:grid; grid-template-columns:repeat(5,1fr); border-top:1px solid var(--line); background:var(--bg-0); padding-bottom:26px">
+<sc-for list="{{ tabsO }}" as="t" hint-placeholder-count="5"><div style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:{{ t.c }}; font-size:10px; font-weight:{{ t.w }}"><span style="font-size:19px; line-height:20px">{{ t.i }}</span>{{ t.l }}</div></sc-for>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">B3 · Session detail</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:44px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 8px"><span style="height:44px; padding:0 8px; display:flex; align-items:center; font-size:17px; color:var(--accent-fg)">‹ Overview</span><span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:800">⋯</span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:20px; padding:4px 20px 0">
+<div style="display:flex; flex-direction:column; gap:8px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">RTX-PC / TIM</span>
+<span style="font-size:30px; line-height:32px; font-weight:800; letter-spacing:-0.04em">Qwen Training</span>
+<div style="display:flex; gap:6px; flex-wrap:wrap"><span style="display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; background:#29D35F; color:#0A0A0A; font-size:11px; font-weight:700; letter-spacing:0.04em">● RUNNING</span><span style="display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; box-shadow:inset 0 0 0 1.5px #1E9E47; color:#1E9E47; font-size:11px; font-weight:700; letter-spacing:0.04em">✓ HEALTHY</span><span style="display:inline-flex; align-items:center; height:24px; padding:0 8px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)">1h31m</span></div>
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)">python train.py --config moe.yaml</span>
+</div>
+<div style="display:flex; flex-direction:column; gap:10px">
+<div style="display:flex; align-items:baseline; justify-content:space-between"><span style="font-size:64px; line-height:60px; font-weight:800; letter-spacing:-0.05em">68 %</span><span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-2)">epoch 68/100</span></div>
+<span style="height:6px; background:var(--bg-2); display:block"><span style="display:block; width:68%; height:100%; background:var(--accent)"></span></span>
+</div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); box-shadow:0 0 0 1px var(--line)">
+<sc-for list="{{ metrics }}" as="k" hint-placeholder-count="4"><div style="background:var(--bg-0); padding:12px 14px; display:flex; flex-direction:column; gap:4px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">{{ k.l }}</span><span style="font-size:24px; line-height:26px; font-weight:800; letter-spacing:-0.03em">{{ k.v }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-2)">{{ k.f }}</span></div></sc-for>
+</div>
+<div style="display:flex; flex-direction:column; gap:8px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">HEALTH · EVIDENCE</span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; line-height:20px; padding:12px 14px; background:var(--bg-1)">loss improving for 5 checks · GPU 96 % · last output 8s ago</span>
+</div>
+<div style="display:flex; flex-direction:column">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding-bottom:6px; border-bottom:2px solid var(--text-1)">EVENTS</span>
+<sc-for list="{{ events }}" as="e" hint-placeholder-count="3"><div style="display:flex; gap:12px; align-items:center; min-height:44px; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; font-size:12px"><span style="color:var(--text-3); width:38px; flex:none">{{ e.t }}</span><span style="flex:1; min-width:0; display:flex; flex-direction:column"><span style="font-size:10px; font-weight:700; color:{{ e.c }}">{{ e.k }}</span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ e.d }}</span></span></div></sc-for>
+</div>
+</div>
+<div style="flex:none; display:flex; gap:8px; padding:12px 20px 34px; border-top:1px solid var(--line); background:var(--bg-0)"><span style="flex:1; height:52px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#FFFFFF; font-size:16px; font-weight:700">Open terminal</span><span style="width:96px; height:52px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1.5px #D12A20; color:#D12A20; font-size:16px; font-weight:700">Stop</span></div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">B4 · Waiting for input</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:44px; flex:none; display:flex; align-items:center; padding:0 8px"><span style="height:44px; padding:0 8px; display:flex; align-items:center; font-size:17px; color:var(--accent-fg)">‹ Overview</span></div>
+<div style="flex:1; display:flex; flex-direction:column; gap:20px; padding:8px 20px 0">
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">MAC MINI</span>
+<span style="font-size:30px; line-height:32px; font-weight:800; letter-spacing:-0.04em; margin-top:-12px">npm install</span>
+<span style="align-self:flex-start; display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 8px; background:#FFD000; color:#0A0A0A; font-size:11px; font-weight:700; letter-spacing:0.04em">? WAITING FOR INPUT</span>
+<div style="display:flex; flex-direction:column; gap:8px; margin-top:12px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">PROMPT</span>
+<span style="min-height:120px; display:flex; align-items:center; padding:0 20px; background:#0C0C0C; color:#F2F2F0; font-family:'JetBrains Mono',monospace; font-size:28px; line-height:36px">Continue? [y/N]</span></div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px"><span style="height:80px; display:flex; align-items:center; justify-content:center; background:var(--text-1); color:var(--bg-0); font-family:'JetBrains Mono',monospace; font-size:34px; font-weight:700">y</span><span style="height:80px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1.5px var(--line-strong); font-family:'JetBrains Mono',monospace; font-size:34px; font-weight:700">n</span></div>
+<span style="height:52px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px var(--line-strong); font-size:16px; font-weight:700">Open terminal</span>
+<span style="font-size:13px; line-height:19px; color:var(--text-2)">Sends the key and Enter to the session. Anything else needs the terminal.</span>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">B5 · From a notification: failed pytest</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700; background:#FF3B2F; color:#0A0A0A"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:none; background:#FF3B2F; color:#0A0A0A; padding:10px 20px 22px; display:flex; flex-direction:column; gap:10px">
+<span style="height:44px; display:flex; align-items:center; font-size:17px; margin-left:-4px">‹ Overview</span>
+<span style="font-size:12px; font-weight:800; letter-spacing:0.08em">✕ FAILED · RTX-PC</span>
+<span style="font-size:30px; line-height:32px; font-weight:800; letter-spacing:-0.04em">3 failures in molecule correspondence tests</span>
+</div>
+<div style="flex:1; display:flex; flex-direction:column; gap:20px; padding:20px 20px 0">
+<div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:22px; font-weight:800">pytest</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-2)">pytest tests/ · MentalAnimAItion</span></div>
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); box-shadow:0 0 0 1px var(--line)">
+<div style="background:var(--bg-0); padding:12px; display:flex; flex-direction:column; gap:2px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">FAILED</span><span style="font-size:28px; font-weight:800; color:#D12A20">3</span></div>
+<div style="background:var(--bg-0); padding:12px; display:flex; flex-direction:column; gap:2px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">PASSED</span><span style="font-size:28px; font-weight:800">182</span></div>
+<div style="background:var(--bg-0); padding:12px; display:flex; flex-direction:column; gap:2px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">TIME</span><span style="font-size:28px; font-weight:800">42s</span></div>
+</div>
+<div style="display:flex; flex-direction:column; gap:8px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">LAST OUTPUT</span>
+<span style="display:flex; flex-direction:column; padding:14px; background:#0C0C0C; color:#D4D4D0; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:19px"><span>$ pytest tests/</span><span style="color:#FF6B61">3 failed, 182 passed in 42s</span><span style="color:#A6A6A2">failures: molecule correspondence tests</span></span></div>
+</div>
+<div style="flex:none; display:flex; flex-direction:column; gap:8px; padding:12px 20px 34px"><span style="height:52px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#FFFFFF; font-size:16px; font-weight:700">Open terminal</span><span style="height:52px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px var(--line-strong); font-size:16px; font-weight:700">See how it passed last time</span></div>
+</div></div>
+
+</div>
+</section>
+
+<section style="display:flex; flex-direction:column; gap:28px">
+<div style="display:flex; align-items:baseline; gap:16px; border-top:2px solid var(--text-1); padding-top:14px"><span style="font-size:28px; font-weight:800; letter-spacing:-0.03em">C · Terminals</span><span style="font-size:14px; color:var(--text-2)">The terminal stays plain dark in both themes</span></div>
+<div style="display:flex; flex-wrap:wrap; gap:48px; align-items:flex-start">
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">C1 · Terminal + key bar</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:#0A0A0A; color:#F2F2F0; box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:52px; flex:none; display:flex; align-items:center; gap:8px; padding:0 8px 0 4px; border-bottom:1px solid #262626">
+<span style="height:44px; padding:0 10px; display:flex; align-items:center; font-size:15px; font-weight:700; color:#8C9EFF">‹ Detach</span>
+<span style="flex:1; min-width:0; display:flex; flex-direction:column"><span style="font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">Qwen Training</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#8A8A86">RTX-PC · ~/Projects/TIM</span></span>
+<span style="display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 7px; background:#29D35F; color:#0A0A0A; font-size:10px; font-weight:700; letter-spacing:0.04em">● RUNNING</span>
+</div>
+<div style="flex:1; min-height:0; padding:12px 14px; font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:19px; color:#D4D4D0; display:flex; flex-direction:column; justify-content:flex-end; background:#0C0C0C">
+<sc-for list="{{ termLines }}" as="l" hint-placeholder-count="8"><span style="color:{{ l.c }}; white-space:pre">{{ l.t }}</span></sc-for>
+<span style="display:inline-block; width:8px; height:16px; background:#D4D4D0; margin-top:2px"></span>
+</div>
+<div style="flex:none; display:flex; gap:6px; padding:8px; background:#161616; border-top:1px solid #262626; overflow:hidden">
+<sc-for list="{{ keys }}" as="k" hint-placeholder-count="7"><span style="flex:none; min-width:44px; height:44px; padding:0 10px; display:flex; align-items:center; justify-content:center; background:{{ k.bg }}; color:{{ k.c }}; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700">{{ k.k }}</span></sc-for>
+</div>
+<div style="flex:none; height:260px; background:#262626; padding:8px 4px 34px; display:flex; flex-direction:column; gap:10px">
+<sc-for list="{{ kbRows }}" as="r" hint-placeholder-count="4"><div style="display:flex; justify-content:center; gap:6px; padding:0 {{ r.pad }}"><sc-for list="{{ r.k }}" as="c" hint-placeholder-count="10"><span style="flex:1; height:42px; border-radius:6px; background:#4A4A4A; color:#F2F2F0; display:flex; align-items:center; justify-content:center; font-size:16px">{{ c }}</span></sc-for></div></sc-for>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">C2 · Ctrl‑C confirm</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:#0A0A0A; color:#F2F2F0; box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:1; padding:64px 14px; font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:19px; color:#D4D4D0; display:flex; flex-direction:column; opacity:.35"><sc-for list="{{ termLines }}" as="l" hint-placeholder-count="8"><span style="white-space:pre">{{ l.t }}</span></sc-for></div>
+<div style="position:absolute; inset:0; background:rgba(0,0,0,.55)"></div>
+<div style="position:absolute; left:0; right:0; bottom:0; background:var(--bg-0); color:var(--text-1); padding:10px 20px 38px; display:flex; flex-direction:column; gap:16px">
+<span style="align-self:center; width:40px; height:5px; border-radius:3px; background:var(--line-strong)"></span>
+<span style="font-size:24px; line-height:28px; font-weight:800; letter-spacing:-0.03em">Send Ctrl‑C to Qwen Training?</span>
+<span style="font-size:15px; line-height:22px; color:var(--text-2)">This interrupts <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-1)">python train.py</span> on RTX-PC. It has been running for 1h31m and is at epoch 68/100.</span>
+<span style="height:52px; display:flex; align-items:center; justify-content:center; background:#D12A20; color:#FFFFFF; font-size:16px; font-weight:700">Send Ctrl‑C</span>
+<span style="height:52px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px var(--line-strong); font-size:16px; font-weight:700">Cancel</span>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">C3 · Terminals (split view on phone)</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:14px; padding:12px 20px 0">
+<div style="display:flex; align-items:flex-end; justify-content:space-between"><div style="display:flex; flex-direction:column; gap:4px"><span style="font-size:34px; line-height:36px; font-weight:800; letter-spacing:-0.04em">Terminals</span><span style="font-size:14px; color:var(--text-2)">4 open · tap one to go full screen</span></div><span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--text-1); color:var(--bg-0); font-size:22px">+</span></div>
+<sc-for list="{{ panes }}" as="p" hint-placeholder-count="4"><div style="display:flex; flex-direction:column; background:#0C0C0C; box-shadow:0 0 0 1px {{ p.hi }}">
+<div style="height:40px; display:flex; align-items:center; gap:8px; padding:0 12px; background:#111111; border-bottom:1px solid #262626"><span style="display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 6px; background:{{ p.bg }}; color:#0A0A0A; font-size:10px; font-weight:700; letter-spacing:0.04em; white-space:nowrap"><span>{{ p.g }}</span>{{ p.s }}</span><span style="flex:1; min-width:0; color:#F2F2F0; font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ p.title }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#8A8A86">{{ p.m }}</span></div>
+<div style="padding:10px 12px; display:flex; flex-direction:column; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:18px; color:#A6A6A2"><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ p.l1 }}</span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:{{ p.c2 }}">{{ p.l2 }}</span></div>
+</div></sc-for>
+</div>
+<div style="height:83px; flex:none; display:grid; grid-template-columns:repeat(5,1fr); border-top:1px solid var(--line); background:var(--bg-0); padding-bottom:26px">
+<sc-for list="{{ tabsT }}" as="t" hint-placeholder-count="5"><div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:{{ t.c }}; font-size:10px; font-weight:{{ t.w }}"><span style="font-size:19px; line-height:20px">{{ t.i }}</span>{{ t.l }}</div></sc-for>
+</div>
+</div></div>
+
+</div>
+</section>
+
+<section style="display:flex; flex-direction:column; gap:28px">
+<div style="display:flex; align-items:baseline; gap:16px; border-top:2px solid var(--text-1); padding-top:14px"><span style="font-size:28px; font-weight:800; letter-spacing:-0.03em">D · History &amp; recipes</span><span style="font-size:14px; color:var(--text-2)">How did I run this last time?</span></div>
+<div style="display:flex; flex-wrap:wrap; gap:48px; align-items:flex-start">
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">D1 · History</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:14px; padding:12px 20px 0">
+<span style="font-size:34px; line-height:36px; font-weight:800; letter-spacing:-0.04em">History</span>
+<div style="height:48px; display:flex; align-items:center; gap:10px; padding:0 14px; box-shadow:inset 0 0 0 1px var(--line-strong)"><span style="font-size:16px; color:var(--text-3)">⌕</span><span style="font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--text-3)">Search commands</span></div>
+<div style="display:flex; gap:8px; overflow:hidden; margin-right:-20px">
+<sc-for list="{{ filters }}" as="f" hint-placeholder-count="4"><span style="flex:none; height:36px; padding:0 12px; display:flex; align-items:center; gap:6px; background:{{ f.bg }}; color:{{ f.fg }}; box-shadow:inset 0 0 0 1px {{ f.bd }}; font-size:13px; font-weight:700">{{ f.l }}</span></sc-for>
+</div>
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding-top:6px; border-bottom:2px solid var(--text-1); padding-bottom:6px">TODAY</span>
+<sc-for list="{{ hist }}" as="h" hint-placeholder-count="4"><div style="display:flex; align-items:center; gap:12px; min-height:64px; border-bottom:1px solid var(--line); margin-top:-14px"><span style="width:28px; height:28px; flex:none; display:flex; align-items:center; justify-content:center; background:{{ h.bg }}; color:#0A0A0A; font-size:13px; font-weight:800">{{ h.g }}</span><span style="flex:1; min-width:0; display:flex; flex-direction:column; gap:3px"><span style="font-family:'JetBrains Mono',monospace; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ h.cmd }}</span><span style="font-size:12px; color:var(--text-3)">{{ h.meta }}</span></span><span style="width:44px; height:44px; flex:none; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800; color:var(--text-2)">⋯</span></div></sc-for>
+</div>
+<div style="height:83px; flex:none; display:grid; grid-template-columns:repeat(5,1fr); border-top:1px solid var(--line); background:var(--bg-0); padding-bottom:26px">
+<sc-for list="{{ tabsH }}" as="t" hint-placeholder-count="5"><div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:{{ t.c }}; font-size:10px; font-weight:{{ t.w }}"><span style="font-size:19px; line-height:20px">{{ t.i }}</span>{{ t.l }}</div></sc-for>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">D2 · Filters sheet</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none"></div>
+<div style="padding:12px 20px"><span style="font-size:34px; line-height:36px; font-weight:800; letter-spacing:-0.04em">History</span></div>
+<div style="position:absolute; inset:0; background:rgba(10,10,10,.5)"></div>
+<div style="position:absolute; left:0; right:0; bottom:0; background:var(--bg-0); padding:10px 20px 38px; display:flex; flex-direction:column; gap:18px">
+<span style="align-self:center; width:40px; height:5px; border-radius:3px; background:var(--line-strong)"></span>
+<div style="display:flex; align-items:center; justify-content:space-between"><span style="font-size:22px; font-weight:800; letter-spacing:-0.02em">Filters</span><span style="height:44px; display:flex; align-items:center; font-size:15px; font-weight:700; color:var(--accent-fg)">Reset</span></div>
+<sc-for list="{{ sheet }}" as="g" hint-placeholder-count="4"><div style="display:flex; flex-direction:column; gap:8px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">{{ g.l }}</span><div style="display:flex; flex-wrap:wrap; gap:6px"><sc-for list="{{ g.o }}" as="o" hint-placeholder-count="3"><span style="height:40px; padding:0 14px; display:flex; align-items:center; background:{{ o.bg }}; color:{{ o.fg }}; box-shadow:inset 0 0 0 1px {{ o.bd }}; font-size:14px; font-weight:700">{{ o.t }}</span></sc-for></div></div></sc-for>
+<span style="height:52px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#FFFFFF; font-size:16px; font-weight:700; margin-top:4px">Show 1 result</span>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">D3 · Recipes</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:14px; padding:12px 20px 0">
+<div style="display:flex; align-items:flex-end; justify-content:space-between"><span style="font-size:34px; line-height:36px; font-weight:800; letter-spacing:-0.04em">Recipes</span><span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:var(--text-1); color:var(--bg-0); font-size:22px">+</span></div>
+<sc-for list="{{ recipes }}" as="c" hint-placeholder-count="3"><div style="display:flex; flex-direction:column; margin-top:8px">
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding-bottom:6px; border-bottom:2px solid var(--text-1)">{{ c.cat }}</span>
+<sc-for list="{{ c.items }}" as="r" hint-placeholder-count="1"><div style="display:flex; align-items:center; gap:12px; min-height:72px; border-bottom:1px solid var(--line)"><span style="flex:1; min-width:0; display:flex; flex-direction:column; gap:3px"><span style="font-size:17px; font-weight:700">{{ r.n }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ r.t }}</span><span style="font-size:12px; color:var(--text-2)">{{ r.m }}</span></span><span style="font-size:20px; color:var(--text-3)">›</span></div></sc-for>
+</div></sc-for>
+</div>
+<div style="height:83px; flex:none; display:grid; grid-template-columns:repeat(5,1fr); border-top:1px solid var(--line); background:var(--bg-0); padding-bottom:26px">
+<sc-for list="{{ tabsR }}" as="t" hint-placeholder-count="5"><div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:{{ t.c }}; font-size:10px; font-weight:{{ t.w }}"><span style="font-size:19px; line-height:20px">{{ t.i }}</span>{{ t.l }}</div></sc-for>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">D4 · Run recipe</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:44px; flex:none; display:flex; align-items:center; padding:0 8px"><span style="height:44px; padding:0 8px; display:flex; align-items:center; font-size:17px; color:var(--accent-fg)">‹ Recipes</span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:16px; padding:4px 20px 0">
+<span style="font-size:28px; line-height:30px; font-weight:800; letter-spacing:-0.04em">Qwen vLLM Server</span>
+<div style="display:flex; flex-direction:column">
+<sc-for list="{{ params }}" as="p" hint-placeholder-count="3"><div style="display:flex; flex-direction:column; gap:6px; padding:10px 0; border-bottom:1px solid var(--line)"><div style="display:flex; justify-content:space-between"><span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700">{{ p.k }}</span><span style="font-size:12px; color:var(--text-3)">default</span></div><span style="height:48px; display:flex; align-items:center; padding:0 12px; box-shadow:inset 0 0 0 1px var(--line-strong); font-family:'JetBrains Mono',monospace; font-size:15px">{{ p.v }}</span></div></sc-for>
+</div>
+<div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">TARGET MACHINE</span>
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:2px"><span style="height:48px; display:flex; align-items:center; justify-content:center; background:var(--text-1); color:var(--bg-0); font-size:14px; font-weight:700">RTX-PC</span><span style="height:48px; display:flex; align-items:center; justify-content:center; background:var(--bg-1); font-size:14px; font-weight:700">Mac Mini</span><span style="height:48px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--bg-1); color:var(--text-3); font-size:14px; font-weight:700; line-height:16px">MacBook<span style="font-size:10px; font-weight:500">offline</span></span></div></div>
+<div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3)">COMMAND</span>
+<span style="padding:14px; background:#0C0C0C; color:#D4D4D0; font-family:'JetBrains Mono',monospace; font-size:13px; line-height:20px"><span style="color:#8A8A86">RTX-PC $ </span>vllm serve Qwen/Qwen3-8B --port 8000 --max-model-len 32768</span></div>
+</div>
+<div style="flex:none; padding:12px 20px 34px; border-top:1px solid var(--line)"><span style="height:52px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#FFFFFF; font-size:16px; font-weight:700">Run on RTX-PC</span></div>
+</div></div>
+
+</div>
+</section>
+
+<section style="display:flex; flex-direction:column; gap:28px">
+<div style="display:flex; align-items:baseline; gap:16px; border-top:2px solid var(--text-1); padding-top:14px"><span style="font-size:28px; font-weight:800; letter-spacing:-0.03em">E · More &amp; settings</span><span style="font-size:14px; color:var(--text-2)">Everything the desktop sidebar held</span></div>
+<div style="display:flex; flex-wrap:wrap; gap:48px; align-items:flex-start">
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">E1 · More</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:22px; padding:12px 20px 0">
+<span style="font-size:34px; line-height:36px; font-weight:800; letter-spacing:-0.04em">More</span>
+<div style="display:flex; flex-direction:column"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding-bottom:6px; border-bottom:2px solid var(--text-1)">MACHINES</span>
+<sc-for list="{{ machines }}" as="m" hint-placeholder-count="3"><div style="display:flex; align-items:center; gap:12px; min-height:52px; border-bottom:1px solid var(--line); color:{{ m.fg }}"><span style="width:10px; height:10px; flex:none; background:{{ m.dot }}; box-shadow:inset 0 0 0 1.5px {{ m.ring }}"></span><span style="flex:1; font-size:16px; font-weight:700">{{ m.name }}</span><span style="font-size:13px; color:var(--text-3)">{{ m.st }}</span></div></sc-for></div>
+<div style="display:flex; flex-direction:column"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding-bottom:6px; border-bottom:2px solid var(--text-1)">PROJECTS</span>
+<div style="display:flex; align-items:center; min-height:52px; border-bottom:1px solid var(--line)"><span style="flex:1; font-size:16px; font-weight:700">TIM</span><span style="font-size:20px; color:var(--text-3)">›</span></div>
+<div style="display:flex; align-items:center; min-height:52px; border-bottom:1px solid var(--line)"><span style="flex:1; font-size:16px; font-weight:700">MentalAnimAItion</span><span style="font-size:20px; color:var(--text-3)">›</span></div></div>
+<div style="display:flex; flex-direction:column"><span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); padding-bottom:6px; border-bottom:2px solid var(--text-1)">SETTINGS</span>
+<sc-for list="{{ settingsRows }}" as="s" hint-placeholder-count="3"><div style="display:flex; align-items:center; min-height:52px; border-bottom:1px solid var(--line)"><span style="flex:1; font-size:16px; font-weight:700">{{ s }}</span><span style="font-size:20px; color:var(--text-3)">›</span></div></sc-for>
+<div style="display:flex; align-items:center; min-height:60px; border-bottom:1px solid var(--line); gap:12px"><span style="flex:1; font-size:16px; font-weight:700">Theme</span><div style="display:grid; grid-template-columns:repeat(3,auto); box-shadow:inset 0 0 0 1px var(--line-strong)"><span style="height:36px; padding:0 12px; display:flex; align-items:center; font-size:13px; font-weight:700">Light</span><span style="height:36px; padding:0 12px; display:flex; align-items:center; background:var(--text-1); color:var(--bg-0); font-size:13px; font-weight:700">Dark</span><span style="height:36px; padding:0 12px; display:flex; align-items:center; font-size:13px; font-weight:700">Auto</span></div></div></div>
+<div style="display:flex; align-items:center; gap:12px"><span style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:var(--text-1); color:var(--bg-0); font-weight:800">A</span><span style="flex:1; font-size:16px; font-weight:700">admin</span><span style="height:44px; display:flex; align-items:center; font-size:15px; font-weight:700; color:#D12A20">Sign out</span></div>
+</div>
+<div style="height:83px; flex:none; display:grid; grid-template-columns:repeat(5,1fr); border-top:1px solid var(--line); background:var(--bg-0); padding-bottom:26px">
+<sc-for list="{{ tabsM }}" as="t" hint-placeholder-count="5"><div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:{{ t.c }}; font-size:10px; font-weight:{{ t.w }}"><span style="font-size:19px; line-height:20px">{{ t.i }}</span>{{ t.l }}</div></sc-for>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">E2 · Machines &amp; tokens</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:44px; flex:none; display:flex; align-items:center; padding:0 8px"><span style="height:44px; padding:0 8px; display:flex; align-items:center; font-size:17px; color:var(--accent-fg)">‹ More</span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:14px; padding:4px 20px 0">
+<span style="font-size:30px; line-height:32px; font-weight:800; letter-spacing:-0.04em">Machines</span>
+<span style="font-size:14px; line-height:20px; color:var(--text-2)">Each machine has a permanent ID and its own revocable token.</span>
+<span style="height:52px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#FFFFFF; font-size:16px; font-weight:700">Pair a machine</span>
+<sc-for list="{{ machineCards }}" as="m" hint-placeholder-count="3"><div style="display:flex; flex-direction:column; gap:8px; padding:14px; background:var(--bg-1)">
+<div style="display:flex; align-items:center; gap:10px"><span style="width:10px; height:10px; flex:none; background:{{ m.dot }}; box-shadow:inset 0 0 0 1.5px {{ m.ring }}"></span><span style="flex:1; min-width:0; font-size:18px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ m.name }}</span><span style="height:22px; padding:0 8px; display:flex; align-items:center; box-shadow:inset 0 0 0 1px var(--line-strong); font-size:10px; font-weight:800; letter-spacing:0.08em">{{ m.role }}</span></div>
+<span style="font-size:13px; color:var(--text-2)">{{ m.hw }}</span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-3)">{{ m.st }}</span>
+<span style="align-self:flex-start; height:40px; display:flex; align-items:center; font-size:14px; font-weight:700; color:#D12A20">Revoke token</span>
+</div></sc-for>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">E3 · Notifications</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:44px; flex:none; display:flex; align-items:center; padding:0 8px"><span style="height:44px; padding:0 8px; display:flex; align-items:center; font-size:17px; color:var(--accent-fg)">‹ More</span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:16px; padding:4px 20px 0">
+<span style="font-size:30px; line-height:32px; font-weight:800; letter-spacing:-0.04em">Notifications</span>
+<div style="display:flex; align-items:center; gap:12px; padding:14px; background:var(--bg-1)"><span style="flex:1; display:flex; flex-direction:column; gap:2px"><span style="font-size:16px; font-weight:700">Push on this phone</span><span style="font-size:12px; color:var(--text-3)">Active · installed to Home Screen</span></span><span style="width:52px; height:32px; flex:none; border-radius:16px; background:#29D35F; position:relative"><span style="position:absolute; right:3px; top:3px; width:26px; height:26px; border-radius:13px; background:#FFFFFF"></span></span></div>
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); border-bottom:2px solid var(--text-1); padding-bottom:6px">PER SESSION · TAP TO TOGGLE</span>
+<sc-for list="{{ notif }}" as="n" hint-placeholder-count="4"><div style="display:flex; flex-direction:column; gap:10px; padding:0 0 14px; border-bottom:1px solid var(--line); margin-top:-4px"><div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px"><span style="font-size:16px; font-weight:700">{{ n.n }}</span><span style="font-size:12px; color:var(--text-3)">{{ n.m }}</span></div><div style="display:flex; flex-wrap:wrap; gap:6px"><sc-for list="{{ n.t }}" as="o" hint-placeholder-count="5"><span style="height:36px; padding:0 10px; display:flex; align-items:center; gap:5px; background:{{ o.bg }}; color:{{ o.fg }}; box-shadow:inset 0 0 0 1px {{ o.bd }}; font-size:13px; font-weight:700">{{ o.t }}</span></sc-for></div></div></sc-for>
+</div>
+</div></div>
+
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-3)">E4 · Account</span>
+<div style="width:390px; height:844px; flex:none; position:relative; overflow:hidden; border-radius:44px; background:var(--bg-0); box-shadow:0 0 0 1px var(--line-strong), 0 40px 80px -40px rgba(0,0,0,.35); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="height:44px; flex:none; display:flex; align-items:center; padding:0 8px"><span style="height:44px; padding:0 8px; display:flex; align-items:center; font-size:17px; color:var(--accent-fg)">‹ More</span></div>
+<div style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:16px; padding:4px 20px 0">
+<span style="font-size:30px; line-height:32px; font-weight:800; letter-spacing:-0.04em">Account</span>
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); border-bottom:2px solid var(--text-1); padding-bottom:6px; margin-top:6px">CHANGE PASSWORD</span>
+<sc-for list="{{ pwFields }}" as="f" hint-placeholder-count="3"><div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:13px; font-weight:700">{{ f }}</span><span style="height:48px; box-shadow:inset 0 0 0 1px var(--line-strong)"></span></div></sc-for>
+<span style="height:52px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 2px var(--text-1); font-size:16px; font-weight:700">Update password</span>
+<span style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text-3); border-bottom:2px solid var(--text-1); padding-bottom:6px; margin-top:10px">SIGNED-IN BROWSERS</span>
+<div style="display:flex; align-items:center; gap:12px; min-height:56px; border-bottom:1px solid var(--line); margin-top:-16px"><span style="flex:1; display:flex; flex-direction:column"><span style="font-size:16px; font-weight:700">This phone</span><span style="font-size:12px; color:var(--text-3)">Active now</span></span><span style="height:40px; padding:0 14px; display:flex; align-items:center; box-shadow:inset 0 0 0 1px var(--line-strong); font-size:14px; font-weight:700">Sign out</span></div>
+</div>
+</div></div>
+
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  rootRef = React.createRef();
+  THEMES = {
+    light: { 'bg-0':'#F7F6F2','bg-1':'#EFEEE9','bg-2':'#E4E3DD','text-1':'#0A0A0A','text-2':'#4A4A46','text-3':'#5E5E5A','line':'#D9D8D2','line-strong':'#8A8984','accent':'#2A44E0','accent-fg':'#2A44E0','canvas':'#E9E8E3' },
+    dark: { 'bg-0':'#0A0A0A','bg-1':'#111111','bg-2':'#1C1C1C','text-1':'#F2F2F0','text-2':'#A6A6A2','text-3':'#8A8A86','line':'#262626','line-strong':'#6B6B67','accent':'#3D5AFE','accent-fg':'#8C9EFF','canvas':'#161616' }
+  };
+  componentDidMount() { this.apply(); }
+  componentDidUpdate() { this.apply(); }
+  apply() { const el = this.rootRef.current; if (!el) return; const t = this.THEMES[this.props.theme === 'dark' ? 'dark' : 'light']; for (const k in t) el.style.setProperty('--' + k, t[k]); document.body.style.background = t.canvas; }
+  renderVals() {
+    const C = { RUNNING:'#29D35F', WAITING:'#FFD000', STALLED:'#FF8A00', FAILED:'#FF3B2F', COMPLETED:'#36C5E8', IDLE:'#9C9C98', INTERRUPTED:'#FF5CA8' };
+    const G = { RUNNING:'●', WAITING:'?', STALLED:'‖', FAILED:'✕', COMPLETED:'✓', IDLE:'–', INTERRUPTED:'■' };
+    const S = (s, o) => Object.assign({ s, bg: C[s], g: G[s] }, o);
+    const tabs = a => [['▦','Overview'],['❐','Terminals'],['↺','History'],['≡','Recipes'],['⋯','More']].map(([i,l], k) => ({ i, l, c: k === a ? 'var(--accent-fg)' : 'var(--text-3)', w: k === a ? 800 : 600 }));
+    const chip = (t, on) => ({ t, bg: on ? 'var(--text-1)' : 'transparent', fg: on ? 'var(--bg-0)' : 'var(--text-1)', bd: on ? 'var(--text-1)' : 'var(--line-strong)' });
+    const tog = on => ['Finished','Error','Stalled','Checkpoint','Progress'].map((t, i) => chip((on[i] ? '✓ ' : '') + t, on[i]));
+    return {
+      rootRef: this.rootRef,
+      needs2: [S('FAILED', { title:'pytest', m:'RTX-PC' }), S('WAITING', { title:'npm install', m:'Mac Mini' })],
+      needsRest: [S('FAILED', { title:'pytest', m:'RTX-PC', sub:'3 failed · 182 passed · 42s' }), S('STALLED', { title:'Compression', m:'Mac Mini', sub:'no output 14m · CPU 0 % · 78 % confidence' })],
+      rtx: [S('RUNNING', { title:'Qwen Training', cmd:'python train.py --config moe.yaml', d:'1h31m' }), S('RUNNING', { title:'vLLM', cmd:'vllm serve Qwen/Qwen3-8B --port 8000', d:':8000' }), S('IDLE', { title:'shell', cmd:'~/Projects/TIM', d:'' })],
+      machines: [
+        { name:'RTX-PC', n:'4', st:'online · 4', fg:'var(--text-1)', dot:'#29D35F', ring:'#29D35F' },
+        { name:'Mac Mini', n:'2', st:'online · 2', fg:'var(--text-1)', dot:'#29D35F', ring:'#29D35F' },
+        { name:'MacBook', n:'14m', st:'offline · 14m ago', fg:'var(--text-3)', dot:'transparent', ring:'var(--text-3)' }],
+      tabsO: tabs(0), tabsT: tabs(1), tabsH: tabs(2), tabsR: tabs(3), tabsM: tabs(4),
+      metrics: [{ l:'LOSS', v:'0.37', f:'from 0.41' }, { l:'GPU', v:'96 %', f:'RTX 4090' }, { l:'VRAM', v:'21.4 GB', f:'of 24 GB' }, { l:'LAST OUTPUT', v:'8s', f:'ago' }],
+      events: [{ t:'14:13', k:'PROGRESS', d:'epoch 68/100', c:'var(--text-2)' }, { t:'14:02', k:'WARNING', d:'VRAM usage high', c:'#B38F00' }, { t:'13:58', k:'RESOURCE_HIGH', d:'VRAM 96.5 %', c:'#B38F00' }, { t:'13:41', k:'CHECKPOINT_CREATED', d:'ckpt/epoch_37.pt', c:'var(--text-2)' }],
+      termLines: [['$ python train.py --config moe.yaml','#F2F2F0'],['epoch 62/100  loss 0.40'],['epoch 63/100  loss 0.40'],['saved ckpt/epoch_37.pt','#A6A6A2'],['epoch 64/100  loss 0.39'],['epoch 65/100  loss 0.39'],['epoch 66/100  loss 0.39'],['epoch 67/100  loss 0.38'],['epoch 68/100  loss 0.37']].map(([t, c]) => ({ t, c: c || '#D4D4D0' })),
+      keys: [['Ctrl‑C','#3A1513','#FF6B61'],['Esc'],['Tab'],['↑'],['↓'],['y'],['n']].map(([k, bg, c]) => ({ k, bg: bg || '#262626', c: c || '#F2F2F0' })),
+      kbRows: [{ k:'qwertyuiop'.split(''), pad:'0px' }, { k:'asdfghjkl'.split(''), pad:'18px' }, { k:['⇧'].concat('zxcvbnm'.split(''), ['⌫']), pad:'0px' }, { k:['123','space','return'], pad:'0px' }],
+      panes: [
+        S('RUNNING', { title:'Qwen Training', m:'RTX-PC', l1:'epoch 67/100  loss 0.38', l2:'epoch 68/100  loss 0.37', c2:'#D4D4D0', hi:'#3D5AFE' }),
+        S('RUNNING', { title:'vLLM', m:'RTX-PC', l1:'INFO  Started server process', l2:'INFO  Uvicorn running on :8000', c2:'#D4D4D0', hi:'#262626' }),
+        S('FAILED', { title:'pytest', m:'RTX-PC', l1:'$ pytest tests/', l2:'3 failed, 182 passed in 42s', c2:'#FF6B61', hi:'#262626' }),
+        S('WAITING', { title:'npm install', m:'Mac Mini', l1:'$ npm install', l2:'Continue? [y/N]', c2:'#FFD000', hi:'#262626' })],
+      filters: [chip('All machines ▾', false), chip('All projects ▾', false), chip('Any result ▾', false), chip('Any date ▾', false)].map(f => ({ l: f.t, bg: f.bg, fg: f.fg, bd: f.bd })),
+      hist: [S('COMPLETED', { cmd:'cargo build', meta:'RTX-PC · 31s' }), S('FAILED', { cmd:'pytest tests/', meta:'RTX-PC · MentalAnimAItion · 42s' }), S('COMPLETED', { cmd:'python benchmark.py', meta:'RTX-PC · 18m' }), S('RUNNING', { cmd:'python train.py --config moe.yaml', meta:'RTX-PC · TIM · running' })],
+      sheet: [
+        { l:'MACHINE', o:[chip('All', false), chip('RTX-PC', true), chip('Mac Mini', false), chip('MacBook', false)] },
+        { l:'PROJECT', o:[chip('All', true), chip('TIM', false), chip('MentalAnimAItion', false)] },
+        { l:'RESULT', o:[chip('All', false), chip('Success', false), chip('Failed', true), chip('Running', false)] },
+        { l:'DATE', o:[chip('Today', true), chip('7 days', false), chip('30 days', false), chip('All time', false)] }],
+      recipes: [
+        { cat:'SERVERS', items:[{ n:'Qwen vLLM Server', t:'vllm serve {model} --port {port} --max-model-len {context}', m:'RTX-PC · 3 parameters' }] },
+        { cat:'TESTS', items:[{ n:'pytest', t:'pytest tests/', m:'RTX-PC · MentalAnimAItion' }] },
+        { cat:'TRAINING', items:[{ n:'Qwen Training', t:'python train.py --config moe.yaml', m:'RTX-PC · TIM' }] }],
+      params: [{ k:'model', v:'Qwen/Qwen3-8B' }, { k:'port', v:'8000' }, { k:'context', v:'32768' }],
+      settingsRows: ['Machines & tokens', 'Notifications', 'Account'],
+      machineCards: [
+        { name:'RTX-PC', role:'WORKER', hw:'Linux · Ryzen 9 · 64 GB · RTX 4090 24 GB', st:'online · token active', dot:'#29D35F', ring:'#29D35F' },
+        { name:'Mac Mini', role:'CONTROL', hw:'macOS · M2 Pro · 32 GB', st:'online · this server', dot:'#29D35F', ring:'#29D35F' },
+        { name:'MacBook', role:'WORKER', hw:'macOS · M3 · 16 GB', st:'offline · last seen 14m ago', dot:'transparent', ring:'var(--text-3)' }],
+      notif: [
+        { n:'Default for new sessions', m:'all machines', t: tog([1,1,1,0,0]) },
+        { n:'Qwen Training', m:'RTX-PC', t: tog([1,1,1,1,0]) },
+        { n:'pytest', m:'RTX-PC', t: tog([1,1,0,0,0]) },
+        { n:'npm install', m:'Mac Mini', t: tog([1,1,1,0,0]) }],
+      pwFields: ['Current password', 'New password', 'Confirm new password']
+    };
+  }
+}
+</script>
+</body>
+</html>
