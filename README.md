@@ -84,9 +84,24 @@ Useful development commands:
 just network --dry-run       # inspect the Tailscale launch configuration
 just network                 # daemon + real-data UI on one Tailnet Machine
 just agent                   # worker daemon only
-just control WORKER_IP=100.x.y.z
+just control                 # UI for this Machine's installed control daemon
+just control WORKER_IP=100.x.y.z  # compatibility: UI for one direct worker
 just demo                    # explicitly fixture-backed UI
 ```
+
+The offline model benchmark can call an OpenAI-compatible server without
+enabling models in the product. Start with the development split, then score
+the resulting predictions:
+
+```bash
+python3 eval/run_model.py eval/data/dev.jsonl \
+  --base-url http://POP_OS_TAILSCALE_IP:8343/ \
+  --output model-dev.jsonl
+python3 eval/score.py eval/data/dev.jsonl model-dev.jsonl --edges
+```
+
+See [`eval/README.md`](eval/README.md) for authentication, resumable runs, and
+the frozen-test discipline.
 
 These are source-tree development paths. A production-built PWA service is a
 remaining V1 release gate.
@@ -134,7 +149,7 @@ as a public-internet deployment path.
 | `crates/cli` | `sentinal` command-line client |
 | `web` | React, xterm.js, mobile PWA, Vitest, Playwright |
 | `recipes` | Built-in Recipe TOML files |
-| `eval` | Deterministic intelligence dataset generation and scoring |
+| `eval` | Deterministic intelligence datasets, OpenAI-compatible model runs, and scoring |
 | `design_handoff_sentinal` | Source design references and assets |
 | `marketing/ad` | Reproducible source for product films |
 | `docs` | Architecture, security, setup, roadmap, and progress evidence |

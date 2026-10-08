@@ -258,6 +258,21 @@ Session in the production Tailnet PWA.
 produce a stored Event on either enrolled Machine, receive an encrypted push
 without an ntfy server, and tap it to open the exact Machine and Session.
 
+## Milestone 4.E — V1 installation, discovery, and private pilot
+- [ ] Approve the release trust, installer formats, discovery, approval-pairing contract, and private-VM threat model
+- [ ] Ship normal installers for the approved macOS/Linux targets plus a verified curl/archive fallback
+- [ ] Add idempotent `sentinal setup` for CONTROL, WORKER, and manual recovery paths
+- [ ] Discover controls only from bounded Tailscale peer data and verified MagicDNS HTTPS origins
+- [ ] Add expiring click-to-approve pairing with matching verification words and code fallback
+- [ ] Publish and verify private stable/beta releases, Machine-scoped update status, rollback, and data preservation
+- [ ] Deploy one single-tenant control on a small Tailnet VM with no public Sentinal port
+- [ ] Complete clean-state Mac/Linux install → discover → approve → Watch → push → update acceptance
+
+**Demo:** install a worker without editing configuration, run `sentinal setup`,
+select the discovered private control, approve the matching request in the PWA,
+then Watch a Command and receive its notification. Publish one update and
+apply or roll it back from the exact Machine without exposing credentials.
+
 ## Reliability R1 — Daemon-restart-resilient FULL Sessions
 - [ ] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation
 - [ ] A per-Session owner keeps the PTY and log alive while `sentinald` restarts
@@ -267,7 +282,10 @@ without an ntfy server, and tap it to open the exact Machine and Session.
 
 ## V2 — Intelligence
 - [ ] Tool API for the agent (same permissions as a user, capped at Level 2)
-- [ ] Eval harness with hand-labelled sets
+- [x] Synthetic screen-translator eval harness, rules baseline, model runner, and scorer (`eval/`)
+- [ ] Hand-labelled real-screen eval set (100–200 captured screens) as the decision metric
+- [x] First fine-tune: Qwen3-0.6B screen translator, F1 0.978 synthetic test / 0.914 real logs (`docs/progress/v2-translator-eval.md`)
+- [ ] Guarded translator in the product: constrained decoding, grounding, secret/URL cleaning, numeric checks
 - [ ] Fine-tune small model (FunctionGemma 270M / Qwen3-0.6B) for
       NL → tool call routing, then command classification, then triage
 - [ ] Heartbeat, journal, summaries
