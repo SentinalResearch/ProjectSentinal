@@ -98,6 +98,7 @@ impl SessionManager {
     pub fn publish_metrics(&self, metrics: SessionMetrics) -> Result<(), SessionManagerError> {
         let observation = watcher::MetricsObservation {
             cpu_percent: metrics.totals.cpu_percent,
+            cpu_machine_percent: None,
             gpu_percent: None,
             ram_percent: None,
             vram_percent: None,

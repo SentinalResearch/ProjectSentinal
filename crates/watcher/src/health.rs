@@ -66,8 +66,10 @@ impl HealthTracker {
     }
 
     fn apply_metrics(&mut self, metrics: &crate::MetricsObservation) {
+        // Per-core CPU can exceed 100% on a multi-core Machine; pressure is
+        // judged by the share of the whole Machine.
         let peak = [
-            Some(metrics.cpu_percent),
+            metrics.cpu_machine_percent,
             metrics.gpu_percent,
             metrics.ram_percent,
             metrics.vram_percent,

@@ -28,6 +28,8 @@ pub struct TrainingState {
 pub struct TrainingAdapter {
     state: TrainingState,
     last_val_loss: Option<f64>,
+    /// Total seen per progress unit; a changed total starts a new run.
+    totals: Vec<(String, u64)>,
 }
 
 impl TrainingAdapter {
@@ -45,7 +47,30 @@ impl TrainingAdapter {
                 trend: LossTrend::Unknown,
             },
             last_val_loss: None,
+            totals: Vec::new(),
         }
+    }
+
+    /// A unit's total changed (e.g. a printed sample said 10000 steps, the real
+    /// run says 759): numbers read so far belong to something else.
+    fn start_series_if_new(&mut self, unit: &str, total: u64) {
+        match self.totals.iter_mut().find(|(known, _)| known == unit) {
+            Some((_, known_total)) if *known_total == total => {}
+            Some((_, known_total)) => {
+                *known_total = total;
+                self.reset_scalars();
+            }
+            None => self.totals.push((unit.to_owned(), total)),
+        }
+    }
+
+    fn reset_scalars(&mut self) {
+        self.state.last_loss = None;
+        self.state.first_loss = None;
+        self.state.best_val_loss = None;
+        self.state.learning_rate = None;
+        self.state.trend = LossTrend::Unknown;
+        self.last_val_loss = None;
     }
 }
 
@@ -96,6 +121,7 @@ impl WatcherAdapter for TrainingAdapter {
         };
         let mut events = Vec::new();
         if let Some((current, total, unit)) = progress(line) {
+            self.start_series_if_new(&unit, total);
             self.state.current = Some(current);
             self.state.total = Some(total);
             self.state.unit = Some(unit.clone());
@@ -139,14 +165,89 @@ impl WatcherAdapter for TrainingAdapter {
 
 fn progress(line: &str) -> Option<(u64, u64, String)> {
     let lower = line.to_ascii_lowercase();
-    for (label, unit) in [("epoch", "epoch"), ("step", "step")] {
+    for (label, unit) in [("epoch", "epoch"), ("step", "step"), ("iter ", "iter")] {
         if let Some(index) = lower.find(label) {
             if let Some((current, total)) = first_fraction(&line[index + label.len()..]) {
                 return Some((current, total, unit.into()));
             }
+            // "120/500 steps": the count written just before the unit.
+            if let Some((current, total)) = trailing_fraction(&line[..index]) {
+                return Some((current, total, unit.into()));
+            }
         }
     }
-    first_fraction(line).map(|(current, total)| (current, total, "step".into()))
+    bar_fraction(line)
+        .or_else(|| keras_fraction(line))
+        .map(|(current, total)| (current, total, "step".into()))
+}
+
+/// Keras-style `120/500 [=====>....]` starting the line.
+fn keras_fraction(line: &str) -> Option<(u64, u64)> {
+    let text = strip_ansi(line);
+    let text = text.trim_start();
+    let (token, rest) = text.split_once(char::is_whitespace)?;
+    let bar = rest.trim_start().strip_prefix('[')?;
+    if !bar.starts_with(['=', '>', '.']) {
+        return None;
+    }
+    let (current, total) = token.split_once('/')?;
+    Some((current.parse().ok()?, total.parse().ok()?))
+}
+
+/// `value` without terminal colour/style escape sequences.
+fn strip_ansi(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character == '\x1b' && chars.peek() == Some(&'[') {
+            chars.next();
+            for next in chars.by_ref() {
+                if next.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            out.push(character);
+        }
+    }
+    out
+}
+
+/// `N/M` from a tqdm-style bar (`45%|████| 450/1000 [...]`) whose label is
+/// empty or about training. Loading, tokenizing, mapping, downloading and
+/// evaluation bars are other work, and a bare `N/M` elsewhere is not progress.
+fn bar_fraction(line: &str) -> Option<(u64, u64)> {
+    let bar = line.find("%|")?;
+    let label_end = line[..bar]
+        .trim_end_matches(|character: char| character.is_ascii_digit() || character == '.');
+    let label = strip_ansi(label_end)
+        .trim()
+        .trim_end_matches(':')
+        .to_ascii_lowercase();
+    // Work around training, even when the label also says "train"
+    // ("Tokenizing train dataset", "Adding EOS to train dataset").
+    let other_work = [
+        "dataset", "tokeniz", "map", "load", "download", "fetch", "eval", "valid", "test",
+        "predict", "build", "writ", "sav", "adding", "dropping", "truncat", "filter", "shard",
+        "convert", "process",
+    ];
+    let training = ["train", "epoch", "step", "iter", "batch"];
+    if !label.is_empty()
+        && (other_work.iter().any(|word| label.contains(word))
+            || !training.iter().any(|word| label.contains(word)))
+    {
+        return None;
+    }
+    let after = &line[bar + 2..];
+    let close = after.find('|')?;
+    first_fraction(&after[close + 1..])
+}
+
+/// `N/M` ending `value` (ignoring trailing spaces).
+fn trailing_fraction(value: &str) -> Option<(u64, u64)> {
+    let token = value.trim_end().rsplit(char::is_whitespace).next()?;
+    let (current, total) = token.split_once('/')?;
+    Some((current.parse().ok()?, total.parse().ok()?))
 }
 
 fn first_fraction(value: &str) -> Option<(u64, u64)> {

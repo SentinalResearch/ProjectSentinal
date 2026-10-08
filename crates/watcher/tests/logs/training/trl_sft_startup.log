@@ -1,0 +1,28 @@
+{"train_examples": 4040, "dev_examples": 286, "train_tokens": 1674911, "tokens_p50": 342, "tokens_max": 2749, "over_max_length": 3}
+FIRST EXAMPLE >>>
+<|im_start|>system
+Translate the terminal state into Sentinal calls. Reply with a JSON array only, [] when nothing applies.<|im_end|>
+<|im_start|>user
+Command: python train.py --config configs/qwen.yaml
+Source: screen
+Screen:
+level=info msg=train step=500/10000 loss=2.36 grad_norm=1.2 learning_rate=0.0002
+level=info msg=train step=4500/10000 loss=1.4608 grad_norm=1.013 learning_rate=0.000155
+Checkpoint saved: checkpoints/epoch_6000.pt
+level=info msg=train step=8500/10000 loss=0.5513 grad_norm=1.870 learning_rate=0.000115<|im_end|>
+<|im_start|>assistant
+<think>
+</think>
+[{"name":"progress_updated","args":{"current":8500,"total":10000,"unit":"step"}},{"name":"metric_reported","args":{"name":"loss","value":0.5513}}]<|im_end|>
+<<<
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights: 100%|██████████| 311/311 [00:00<00:00, 2667.02it/s]
+Adding EOS to train dataset:   0%|          | 0/4040 [00:00<?, ? examples/s]Adding EOS to train dataset: 100%|██████████| 4040/4040 [00:00<00:00, 114572.90 examples/s]
+Tokenizing train dataset: 100%|██████████| 4040/4040 [00:02<00:00, 1565.38 examples/s]
+Map (num_proc=8): 100%|██████████| 4040/4040 [00:01<00:00, 3101.22 examples/s]
+Building labels for eval dataset: 100%|██████████| 286/286 [00:00<00:00, 4284.27 examples/s]
+  0%|          | 0/759 [00:00<?, ?it/s]  0%|          | 1/759 [00:04<50:12,  3.97s/it]  0%|          | 2/759 [00:07<47:12,  3.74s/it]
+{'loss': '0.6001', 'grad_norm': '13.82', 'learning_rate': '7.826e-06', 'entropy': '0.2674', 'num_tokens': '6.789e+04', 'mean_token_accuracy': '0.8823', 'epoch': '0.03953'}
+  1%|▏         | 10/759 [00:40<49:02,  3.93s/it]
+{'loss': '0.2134', 'grad_norm': '2.1', 'learning_rate': '1.5e-05', 'epoch': '0.07905'}
+  3%|▎         | 20/759 [01:19<48:55,  3.97s/it]

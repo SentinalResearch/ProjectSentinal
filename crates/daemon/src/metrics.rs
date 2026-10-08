@@ -249,6 +249,11 @@ fn nvidia_snapshot() -> (Vec<GpuMetrics>, HashMap<u32, u64>) {
     (metrics, gpu_by_pid)
 }
 
+/// A Session's per-core CPU sum as a share of the whole Machine (0–100).
+pub fn machine_cpu_share(per_core_percent: f32, logical_cores: u32) -> f32 {
+    (per_core_percent / logical_cores.max(1) as f32).clamp(0.0, 100.0)
+}
+
 /// The host's CPU model and total RAM in bytes, for the static Machine description.
 pub fn host_hardware() -> (String, u64) {
     let mut system = System::new();
@@ -268,6 +273,15 @@ fn cpu_label(brand: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cpu_share_divides_per_core_percent_by_logical_cores() {
+        assert_eq!(machine_cpu_share(538.0, 12), 538.0 / 12.0);
+        assert_eq!(machine_cpu_share(100.0, 1), 100.0);
+        // Sampling jitter never reports more than the whole Machine.
+        assert_eq!(machine_cpu_share(1_250.0, 12), 100.0);
+        assert_eq!(machine_cpu_share(50.0, 0), 50.0);
+    }
 
     #[test]
     fn cpu_label_trims_and_falls_back_to_unknown() {

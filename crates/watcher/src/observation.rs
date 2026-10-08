@@ -8,8 +8,12 @@ pub const MAX_OUTPUT_LINE_BYTES: usize = 8 * 1024;
 /// Resource values needed for deterministic watcher decisions.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetricsObservation {
-    /// Aggregate Session CPU percentage.
+    /// Aggregate Session CPU as a sum of per-core percentages (can exceed 100);
+    /// used to tell an active process from an idle one.
     pub cpu_percent: f32,
+    /// Session CPU as a share of the whole Machine (0–100), when the core
+    /// count is known; used for resource pressure.
+    pub cpu_machine_percent: Option<f32>,
     /// Aggregate GPU utilization when a Session uses a GPU.
     pub gpu_percent: Option<f32>,
     /// Session RAM as a percentage of Machine RAM when known.
@@ -66,6 +70,7 @@ impl Observation {
             at,
             kind: ObservationKind::MetricsSample(MetricsObservation {
                 cpu_percent,
+                cpu_machine_percent: None,
                 gpu_percent,
                 ram_percent: None,
                 vram_percent: None,

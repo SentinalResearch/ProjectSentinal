@@ -258,7 +258,12 @@ pub async fn run() -> Result<(), DaemonError> {
         HostFacts::detect(config.bind.to_string(), now()),
         Some(store.clone()),
     );
-    spawn_metric_sampler(sessions.clone(), store.clone(), insights.clone());
+    spawn_metric_sampler(
+        sessions.clone(),
+        store.clone(),
+        insights.clone(),
+        machine.cpu_cores,
+    );
     spawn_external_monitor(sessions.clone());
     let local_socket =
         UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
@@ -532,7 +537,12 @@ fn spawn_external_monitor(sessions: SessionManager) {
     });
 }
 
-fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>, insights: MachineInsights) {
+fn spawn_metric_sampler(
+    sessions: SessionManager,
+    store: Arc<Store>,
+    insights: MachineInsights,
+    logical_cores: u32,
+) {
     tokio::spawn(async move {
         let mut sampler = MetricsSampler::new();
         let mut debouncers = HashMap::<protocol::SessionId, ResourceDebouncer>::new();
@@ -590,7 +600,11 @@ fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>, insights: M
                     (metrics.totals.gpu_mem_bytes > 0 && vram_total > 0).then(|| {
                         (metrics.totals.gpu_mem_bytes as f64 / vram_total as f64 * 100.0) as f32
                     });
-                let mut values = vec![(Resource::Cpu, metrics.totals.cpu_percent)];
+                // Alerts and health judge CPU as a share of the Machine; the
+                // per-core sum (top's convention) can pass 100% on many cores.
+                let cpu_share =
+                    crate::metrics::machine_cpu_share(metrics.totals.cpu_percent, logical_cores);
+                let mut values = vec![(Resource::Cpu, cpu_share)];
                 if let Some(percent) = ram_percent {
                     values.push((Resource::Ram, percent));
                 }
@@ -616,6 +630,7 @@ fn spawn_metric_sampler(sessions: SessionManager, store: Arc<Store>, insights: M
                 }
                 let resources = watcher::MetricsObservation {
                     cpu_percent: metrics.totals.cpu_percent,
+                    cpu_machine_percent: Some(cpu_share),
                     gpu_percent: session_gpu_percent,
                     ram_percent,
                     vram_percent,
