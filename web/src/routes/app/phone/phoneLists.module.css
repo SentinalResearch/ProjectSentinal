@@ -1,0 +1,436 @@
+/* Phone Terminals, History, and Recipes (MOBILE_SPEC.md C3, D1–D4). */
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.plus {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 24px;
+}
+
+/* C3 */
+
+.cardStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.terminalCard {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #0c0c0c;
+  color: #d4d4d0;
+  text-decoration: none;
+  box-shadow: inset 0 0 0 1px #262626;
+}
+
+.terminalCard[data-focused="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent-fg);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid #262626;
+}
+
+.cardTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: #f2f2f0;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMachine {
+  flex: none;
+  max-width: 45%;
+  margin-left: auto;
+  overflow: hidden;
+  color: #8a8a86;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardLines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 52px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.cardLines > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* D1/D2 */
+
+.search {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--bg-1);
+  color: var(--text-1);
+  font-size: 15px;
+  -webkit-appearance: none;
+}
+
+.chipRow {
+  display: flex;
+  gap: 8px;
+  margin: 0 -20px;
+  padding: 0 20px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chip {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+
+.groupHead {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: var(--rule-heavy) solid var(--text-1);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  border-bottom: 1px solid var(--line);
+}
+
+.stateSquare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.historyText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.historyCommand {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyMeta {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moreButton {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 20px;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% - 6px);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-1);
+}
+
+.menu > button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 15px;
+  text-align: left;
+}
+
+.menu > button:disabled {
+  color: var(--text-3);
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--text-2);
+}
+
+.sheetGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheetLabel {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wrapChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sheetActions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.primaryButton,
+.outlineButton {
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.primaryButton {
+  width: 100%;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.primaryButton:disabled {
+  background: var(--bg-2);
+  color: var(--text-3);
+}
+
+.outlineButton {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+}
+
+/* D3/D4 */
+
+.recipeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-1);
+  text-decoration: none;
+}
+
+.recipeText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.recipeName {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.chevron {
+  color: var(--text-3);
+  font-size: 22px;
+}
+
+.runForm {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.overline {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.detailTitle {
+  margin: 6px 0 0;
+  font-size: 30px;
+  line-height: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.params {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.param {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.paramKey {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.paramInput {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--bg-1);
+  color: var(--text-1);
+  font-size: 15px;
+}
+
+.paramHint {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.paramError {
+  margin: 0;
+  color: var(--s-failed-fg);
+  font-size: 13px;
+}
+
+.paramWarning {
+  color: var(--s-waiting-fg);
+  font-size: 13px;
+}
+
+.segmented {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  margin-top: 8px;
+  border: 1px solid var(--line-strong);
+}
+
+.segment {
+  min-height: 48px;
+  padding: 0 6px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segment[aria-checked="true"] {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+
+.segment:disabled {
+  color: var(--text-3);
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview code {
+  padding: 12px;
+  background: #0c0c0c;
+  color: #d4d4d0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.stickyRun {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-0);
+}
+
+.chip:active,
+.primaryButton:active,
+.outlineButton:active,
+.moreButton:active {
+  background: var(--bg-2);
+}

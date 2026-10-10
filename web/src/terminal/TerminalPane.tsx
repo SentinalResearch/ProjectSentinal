@@ -59,6 +59,8 @@ export interface TerminalPaneProps {
   onDimensionsChange?: (cols: number, rows: number) => void;
   /** Force a historical generation read-only even if persisted state is malformed. */
   forceReadOnly?: boolean;
+  /** Add the phone key bar's y / n answer keys (MOBILE_SPEC.md C1). */
+  withAnswerKeys?: boolean;
   /** Maximum decompressed saved bytes this pane may fetch. */
   replayLimitBytes?: number;
   className?: string;
@@ -69,6 +71,11 @@ const KEYS: [label: string, bytes: number[]][] = [
   ["Tab", [9]],
   ["↑", [27, 91, 65]],
   ["↓", [27, 91, 66]],
+];
+
+const ANSWER_KEYS: [label: string, bytes: number[]][] = [
+  ["y", [121]],
+  ["n", [110]],
 ];
 
 /**
@@ -90,6 +97,7 @@ export function TerminalPane({
   forceReadOnly = false,
   replayLimitBytes,
   className,
+  withAnswerKeys = false,
 }: TerminalPaneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -288,7 +296,7 @@ export function TerminalPane({
           <button type="button" className={`${styles.key} ${styles.ctrlC}`} onClick={onRequestInterrupt}>
             Ctrl‑C
           </button>
-          {KEYS.map(([label, bytes]) => (
+          {(withAnswerKeys ? [...KEYS, ...ANSWER_KEYS] : KEYS).map(([label, bytes]) => (
             <button key={label} type="button" className={styles.key} onClick={() => pressKey(label, bytes)}>
               {label}
             </button>

@@ -1,0 +1,512 @@
+/* Phone Overview, Session, and terminal screens (MOBILE_SPEC.md B2–B5, C1–C2). */
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.plus {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 24px;
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  margin: 0 -20px;
+  padding: 0 20px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  min-height: 36px;
+  padding: 0 12px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  box-shadow: inset 0 0 0 1.5px var(--s-disconnected-fg);
+}
+
+.dot[data-online="true"] {
+  background: var(--s-running);
+  box-shadow: none;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: var(--rule-heavy) solid var(--text-1);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.needsCount {
+  color: var(--s-waiting-fg);
+}
+
+.machineName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.machineState {
+  flex: none;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.needsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.needsCard {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1);
+}
+
+.needsOpen {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 44px;
+  padding: 14px 14px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  text-align: left;
+}
+
+.needsFact {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.promptRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.promptText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.answerKey {
+  flex: none;
+  width: 52px;
+  height: 48px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-1);
+  text-decoration: none;
+}
+
+.rowStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 22px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.rowTitle {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowCommand {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty,
+.muted {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+/* B3–B5 */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.detailHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overline {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: 30px;
+  line-height: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.healthBadge {
+  padding: 2px 8px;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.command {
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bigNumber {
+  font-size: 64px;
+  line-height: 60px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+.track {
+  height: 6px;
+  background: var(--line);
+}
+
+.fill {
+  height: 100%;
+  background: var(--s-running);
+}
+
+.metricGrid,
+.statGrid {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.metricGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.statGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.metricCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  background: var(--bg-1);
+}
+
+.metricValue {
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidence p {
+  margin: 6px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.waiting {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.waitingOverline {
+  color: var(--s-waiting-fg);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.promptBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  background: #0c0c0c;
+  color: #d4d4d0;
+}
+
+.bigPrompt {
+  font-size: 22px;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+.bigAnswers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.bigAnswer {
+  height: 80px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-1);
+  color: var(--text-1);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.failureBand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 20px;
+  background: var(--s-failed);
+  color: #0a0a0a;
+}
+
+.lastOutput {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stickyActions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-0);
+}
+
+.primaryButton,
+.destructiveButton,
+.outlineButton,
+.stopButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.primaryButton {
+  flex: 1;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.stopButton {
+  flex: none;
+  width: 96px;
+  border: 1.5px solid var(--destructive);
+  background: transparent;
+  color: var(--destructive);
+}
+
+.destructiveButton {
+  width: 100%;
+  border: 0;
+  background: var(--destructive);
+  color: #fff;
+}
+
+.outlineButton {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+}
+
+.sheetText {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 21px;
+}
+
+.primaryButton:active,
+.destructiveButton:active,
+.outlineButton:active,
+.stopButton:active,
+.bigAnswer:active,
+.answerKey:active {
+  background: var(--bg-2);
+  transform: scale(0.96);
+}
+
+/* C1 */
+
+.terminalScreen {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-top: var(--safe-top);
+  background: #0c0c0c;
+  color: #d4d4d0;
+}
+
+.terminalHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 12px;
+  border-bottom: 1px solid #262626;
+}
+
+.detach {
+  flex: none;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: #8c9eff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.terminalTitle {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.terminalTitle > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminalTitle strong {
+  color: #f2f2f0;
+  font-size: 15px;
+}
+
+.terminalBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: var(--safe-bottom);
+}
+
+.terminalMissing {
+  padding: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton:active,
+  .destructiveButton:active,
+  .outlineButton:active,
+  .stopButton:active,
+  .bigAnswer:active,
+  .answerKey:active {
+    transform: none;
+  }
+}

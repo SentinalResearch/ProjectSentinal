@@ -1,0 +1,170 @@
+/* Phone Machines and Notifications (MOBILE_SPEC.md E2, E3). */
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--bg-1);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cardName {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roleTag {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 6px;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.cardMeta {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardStatus {
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cardStatus[data-online="true"] {
+  color: var(--s-running-fg);
+}
+
+.cardActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.textButton,
+.destructiveText {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.textButton {
+  color: var(--accent-fg);
+}
+
+.destructiveText {
+  color: var(--destructive);
+}
+
+.error {
+  margin: 0;
+  color: var(--s-failed-fg);
+  font-size: 13px;
+}
+
+.sheetText {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 21px;
+}
+
+.destructiveButton,
+.outlineButton {
+  width: 100%;
+  min-height: 52px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.destructiveButton {
+  border: 0;
+  background: var(--destructive);
+  color: #fff;
+}
+
+.outlineButton {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+}
+
+.overline {
+  margin: 20px 0 4px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.ruleRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ruleRow[data-default="true"] {
+  padding: 12px;
+  background: var(--bg-1);
+}
+
+.ruleName {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.chip {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--text-1);
+  background: var(--text-1);
+  color: var(--bg-0);
+}

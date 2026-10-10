@@ -3,7 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { createWorkerSession, e2eEnv as env, linkSecrets, reportCommand, sentinal } from "./support/adopt.mjs";
 
 const password = "test-password-for-playwright";
-test.use({ viewport: { width: 390, height: 844 } });
+// Desktop layout: this spec drives the sidebar and the Machines table. Phone
+// layouts (tab bar, Machine cards, Recipe launch) are covered by mobile.spec.ts.
+test.use({ viewport: { width: 1280, height: 900 } });
 
 async function signIn(page: Page) {
   await page.goto("/login");
@@ -107,8 +109,8 @@ test("two workers enroll, rename, and revoke independently with no secret in the
   await page.getByText("Worker B routed session", { exact: true }).click();
   await expect(page.getByText("attached", { exact: true })).toBeVisible();
 
-  // The phone-sized PWA loads worker-local Recipe catalogs and launches only
-  // through the selected catalog owner.
+  // The PWA loads worker-local Recipe catalogs and launches only through the
+  // selected catalog owner.
   await page.goto("/app/recipes");
   const cargoRecipes = page.getByRole("button").filter({ hasText: "cargo test" });
   await expect(cargoRecipes).toHaveCount(3, { timeout: 10_000 });

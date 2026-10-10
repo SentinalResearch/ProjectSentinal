@@ -9,7 +9,9 @@ import { dataAdapter } from "../../data";
 import { formatSessionDuration, formatSessionFact, needsAttention } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { Machine, Session } from "../../data/types";
+import { useIsPhone } from "../../hooks/useViewport";
 import { MachinePanel } from "./MachinePanel";
+import { PhoneOverview } from "./phone/PhoneOverview";
 import styles from "./OverviewPage.module.css";
 
 function needsFact(session: Session): string {
@@ -38,6 +40,10 @@ function onActivateKey(handler: () => void) {
 }
 
 export function OverviewPage() {
+  return useIsPhone() ? <PhoneOverview /> : <DesktopOverview />;
+}
+
+function DesktopOverview() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { machines, sessions, loading } = useLiveData();

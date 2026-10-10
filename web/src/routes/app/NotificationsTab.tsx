@@ -6,6 +6,8 @@ import { pushApi, subscribeCurrentBrowser } from "../../data/api/push";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { JournalNotification, NotificationDeliveryStatus, NotificationRuleSet, NotificationRules } from "../../data/types";
 import type { PushSubscriptionList } from "../../protocol/PushSubscriptionList";
+import { useIsPhone } from "../../hooks/useViewport";
+import { RuleChips } from "./phone/RuleChips";
 import styles from "./SettingsPage.module.css";
 
 const KINDS: (keyof NotificationRuleSet)[] = ["finished", "error", "stalled", "waiting", "checkpoint", "progress"];
@@ -33,6 +35,7 @@ function NotificationRules() {
   const [push, setPush] = useState<PushSubscriptionList | null>(null);
   const [pushStatus, setPushStatus] = useState("Checking browser Push…");
   const [pushBusy, setPushBusy] = useState(false);
+  const isPhone = useIsPhone();
 
   useEffect(() => {
     dataAdapter.notifications.getRules().then(setRules);
@@ -187,13 +190,16 @@ function NotificationRules() {
             <span className={styles.machineOs}>
               {device.state} · last success {device.last_success_at === null ? "not yet" : new Date(device.last_success_at).toLocaleString()}
             </span>
-            <button type="button" disabled={pushBusy} onClick={() => void removeDevice(device.subscription_id)}>
+            <Button disabled={pushBusy} onClick={() => void removeDevice(device.subscription_id)}>
               Remove device
-            </button>
+            </Button>
           </div>
         ))}
       </section>
 
+      {isPhone ? (
+        <RuleChips rows={rows} ruleFor={ruleFor} onToggle={(id, machineId, kind) => void toggle(id, machineId, kind)} />
+      ) : (
       <div className={styles.tableScroll}>
         <div className={styles.notifHeadRow}>
           <span>SESSION</span>
@@ -243,6 +249,8 @@ function NotificationRules() {
           );
         })}
       </div>
+
+      )}
 
       <div className={styles.previewWrap}>
         <span className={styles.overline}>DELIVERY HISTORY &amp; PREVIEW</span>

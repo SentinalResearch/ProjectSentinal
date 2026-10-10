@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 
 import { LiveDataProvider } from "../../data/LiveDataContext";
+import { useIsPhone } from "../../hooks/useViewport";
+import { TabBar } from "./phone/TabBar";
+import phone from "./phone/phone.module.css";
 import { Sidebar } from "./Sidebar";
 import styles from "./AppShell.module.css";
 
@@ -15,6 +18,7 @@ const COLLAPSE_BREAKPOINT = 1200;
  */
 export function AppShell() {
   const navigate = useNavigate();
+  const isPhone = useIsPhone();
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < COLLAPSE_BREAKPOINT);
   const narrowRef = useRef(window.innerWidth < COLLAPSE_BREAKPOINT);
 
@@ -42,6 +46,21 @@ export function AppShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [navigate]);
+
+  // Phones get the bottom tab bar and never the sidebar or its icon rail.
+  // LiveDataProvider stays above the switch so rotation keeps live data.
+  if (isPhone) {
+    return (
+      <LiveDataProvider>
+        <div className={phone.shell}>
+          <main className={phone.main}>
+            <Outlet />
+          </main>
+          <TabBar />
+        </div>
+      </LiveDataProvider>
+    );
+  }
 
   return (
     <LiveDataProvider>

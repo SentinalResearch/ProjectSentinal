@@ -11,6 +11,8 @@ import { LandingRecipes } from "./LandingRecipes";
 import { LandingShowcase } from "./LandingShowcase";
 import { LandingStates } from "./LandingStates";
 import styles from "./LandingPage.module.css";
+import { useIsPhone } from "../../hooks/useViewport";
+import { PhoneLanding } from "./PhoneLanding";
 
 /**
  * design_handoff_sentinal/design/SentinalLanding.dc.html — the public marketing
@@ -18,6 +20,10 @@ import styles from "./LandingPage.module.css";
  * document body, per the design.
  */
 export function LandingPage() {
+  return useIsPhone() ? <PhoneLanding /> : <DesktopLanding />;
+}
+
+function DesktopLanding() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const scrollRef = useRef<HTMLDivElement | null>(null);

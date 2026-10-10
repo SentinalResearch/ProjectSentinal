@@ -5,6 +5,8 @@ import { CaptureBadge } from "../../components/CaptureBadge";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { useLiveData } from "../../data/LiveDataContext";
+import { useIsPhone } from "../../hooks/useViewport";
+import { PhoneTerminals } from "./phone/PhoneTerminals";
 import { SplitPane } from "./SplitPane";
 import styles from "./SplitViewPage.module.css";
 
@@ -17,6 +19,10 @@ const LAYOUTS = [2, 3, 4] as const;
 
 /** design_handoff_sentinal/design/SentinalSplit.dc.html */
 export function SplitViewPage() {
+  return useIsPhone() ? <PhoneTerminals /> : <DesktopSplitView />;
+}
+
+function DesktopSplitView() {
   const [searchParams] = useSearchParams();
   const focus = searchParams.get("focus");
   const { machines, sessions, loading } = useLiveData();

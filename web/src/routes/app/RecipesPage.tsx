@@ -4,32 +4,13 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { MockBadge } from "../../components/MockBadge";
 import { dataAdapter, isMockData } from "../../data";
-import { extractPort } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
 import { escapeTemplateLiteral, previewTemplate } from "../../data/recipeTemplate";
 import type { Recipe } from "../../data/types";
+import { useIsPhone } from "../../hooks/useViewport";
+import { PhoneRecipes, PhoneRunRecipe } from "./phone/PhoneRecipes";
+import { portWarnings, validateParam } from "./recipeRules";
 import styles from "./RecipesPage.module.css";
-
-const TERMINAL_STATES = new Set(["COMPLETED", "FAILED", "INTERRUPTED"]);
-
-/**
- * Param validation is keyed by what the param's *name* implies (port/context/model),
- * not by recipe id — see SentinalRecipes.dc.html's own `errs` logic, generalized so a
- * future recipe with the same kinds of params validates the same way.
- */
-function validateParam(key: string, value: string): string | undefined {
-  const k = key.toLowerCase();
-  if (k.includes("port")) {
-    return /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535 ? undefined : "Port must be 1–65535";
-  }
-  if (k.includes("context") || k.includes("len")) {
-    return /^\d+$/.test(value) && Number(value) > 0 ? undefined : "Must be a positive integer";
-  }
-  if (k.includes("model")) {
-    return value.trim() ? undefined : "Required";
-  }
-  return undefined;
-}
 
 /** design_handoff_sentinal/design/SentinalRecipes.dc.html */
 export function RecipesPage() {
@@ -38,7 +19,9 @@ export function RecipesPage() {
 
 function RecipeCatalog() {
   const { id } = useParams<{ id?: string }>();
+  const isPhone = useIsPhone();
   if (id === "new") return <SaveRecipeForm />;
+  if (isPhone) return id ? <PhoneRunRecipe id={id} /> : <PhoneRecipes />;
   return <RecipeCatalogView id={id} />;
 }
 
@@ -84,15 +67,7 @@ function RecipeCatalogView({ id }: { id?: string }) {
 
   const targetMachine = machines.find((m) => m.id === machineId);
 
-  const warnings: Record<string, string> = {};
-  for (const k of paramKeys) {
-    if (!k.toLowerCase().includes("port") || errors[k]) continue;
-    const port = values[k];
-    const inUse = sessions.some(
-      (s) => s.machine === machineId && !TERMINAL_STATES.has(s.state) && extractPort(s) === port,
-    );
-    if (inUse) warnings[k] = `:${port} is already used on ${targetMachine?.name ?? machineId}`;
-  }
+  const warnings = portWarnings(paramKeys, values, errors, sessions, machineId, targetMachine?.name ?? machineId);
 
   const preview = recipe ? previewTemplate(recipe.template, values) : "";
   const blocked = !recipe || hasErrors || running || !machineId || targetMachine?.status !== "ONLINE";

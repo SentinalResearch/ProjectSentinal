@@ -27,6 +27,8 @@ import { SessionHistoryTerminals } from "./SessionHistoryTerminals";
 import { SessionCommands } from "./SessionCommands";
 import { ResourceBars } from "./ResourceBars";
 import styles from "./SessionDetailPage.module.css";
+import { useIsPhone } from "../../hooks/useViewport";
+import { PhoneSessionDetail } from "./phone/PhoneSessionDetail";
 
 const INTERRUPTIBLE = new Set(["RUNNING", "WAITING", "STALLED"]);
 /** design_handoff_sentinal/design/SentinalSession.dc.html */
@@ -39,6 +41,10 @@ const SECTION_LABELS: Record<CaptureLevel, string> = {
 };
 
 export function SessionDetailPage() {
+  return useIsPhone() ? <PhoneSessionDetail /> : <DesktopSessionDetail />;
+}
+
+function DesktopSessionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { machines, sessions, loading } = useLiveData();

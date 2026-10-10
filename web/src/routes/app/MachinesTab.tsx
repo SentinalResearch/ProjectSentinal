@@ -5,6 +5,8 @@ import { RegistryError } from "../../data/adapter";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import { AddMachineDialog } from "./AddMachineDialog";
+import { useIsPhone } from "../../hooks/useViewport";
+import { PhoneMachineCards } from "./phone/PhoneMachineCards";
 import styles from "./SettingsPage.module.css";
 
 export interface MachinesTabProps {
@@ -26,6 +28,7 @@ type Load =
 export function MachinesTab({ pollMs }: MachinesTabProps) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [adding, setAdding] = useState(false);
+  const isPhone = useIsPhone();
 
   const reload = useCallback(async () => {
     try {
@@ -65,7 +68,11 @@ export function MachinesTab({ pollMs }: MachinesTabProps) {
           {load.message}
         </p>
       ) : (
-        <RegistryTable machines={load.machines} onChanged={reload} />
+        isPhone ? (
+          <PhoneMachineCards machines={load.machines} onChanged={reload} />
+        ) : (
+          <RegistryTable machines={load.machines} onChanged={reload} />
+        )
       )}
 
       {adding && (

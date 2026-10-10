@@ -102,6 +102,8 @@ export default defineConfig({
     { name: "adopted", testMatch: "adopted-log.spec.ts", dependencies: ["smoke"] },
     { name: "enrollment", testMatch: "enrollment.spec.ts", dependencies: ["adopted"] },
     { name: "native-push", testMatch: "native-push.spec.ts", dependencies: ["enrollment"] },
+    // Phone layouts last, after the other specs have created Sessions and Recipes.
+    { name: "mobile", testMatch: "mobile.spec.ts", dependencies: ["native-push"] },
   ],
   webServer: [
     {

@@ -11,6 +11,8 @@ import { HistoryPage } from "./routes/app/HistoryPage";
 import { RecipesPage } from "./routes/app/RecipesPage";
 import { SettingsPage } from "./routes/app/SettingsPage";
 import { LandingPage } from "./routes/landing/LandingPage";
+import { MoreRoute } from "./routes/app/phone/MorePage";
+import { SessionTerminalRoute } from "./routes/app/phone/PhoneTerminal";
 import { PublicAuthGuard, RequireAuth } from "./routes/guards";
 
 export function AppRouter() {
@@ -29,11 +31,13 @@ export function AppRouter() {
             <Route index element={<OverviewPage />} />
             <Route path="overview" element={<OverviewPage />} />
             <Route path="sessions/:id" element={<SessionDetailPage />} />
+            <Route path="sessions/:id/terminal" element={<SessionTerminalRoute />} />
             <Route path="split" element={<SplitViewPage />} />
             <Route path="projects/:id" element={<ProjectPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="recipes" element={<RecipesPage />} />
             <Route path="recipes/:id" element={<RecipesPage />} />
+            <Route path="more" element={<MoreRoute />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/:tab" element={<SettingsPage />} />
           </Route>
