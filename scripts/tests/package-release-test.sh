@@ -129,4 +129,48 @@ if find "$package_dir/.staging" -mindepth 1 -print -quit | grep -q .; then
   fail 'publisher left staging files behind'
 fi
 
+# Binaries the builder compiles itself are normalised, even under a umask of
+# 0002 (Ubuntu's default with user-private groups). Supplied --bin-dir
+# binaries are still refused when group-writable.
+source_copy="$test_root/source copy"
+mkdir -p "$source_copy/web/dist" "$source_copy/scripts/lib" "$source_copy/packaging"
+cp "$repo_root/LICENSE" "$source_copy/"
+cp -R "$repo_root/shell" "$source_copy/shell"
+cp -R "$repo_root/packaging/systemd" "$repo_root/packaging/launchd" "$source_copy/packaging/"
+cp "$repo_root/scripts/install-worker.sh" "$source_copy/scripts/"
+cp "$repo_root/scripts/lib/install-common.sh" "$repo_root/scripts/lib/launch-common.sh" "$source_copy/scripts/lib/"
+for asset in index.html manifest.webmanifest sw.js; do
+  printf 'asset %s\n' "$asset" >"$source_copy/web/dist/$asset"
+done
+fake_tools="$test_root/fake tools"
+mkdir -p "$fake_tools"
+cat >"$fake_tools/cargo" <<'EOF'
+#!/bin/sh
+target=""
+while [ "$#" -gt 0 ]; do
+  [ "$1" = "--target" ] && target="$2"
+  shift
+done
+mkdir -p "target/$target/release"
+for name in sentinal sentinald; do
+  printf '#!/bin/sh\necho %s\n' "$name" >"target/$target/release/$name"
+  chmod 775 "target/$target/release/$name"
+done
+EOF
+chmod 755 "$fake_tools/cargo"
+built_dir="$test_root/built by cargo"
+(umask 0002 && PATH="$fake_tools:$PATH" "$builder" --version 0.0.3 --target x86_64-apple-darwin \
+  --source-dir "$source_copy" --output "$built_dir" --source-date-epoch 1790712002 >/dev/null) ||
+  fail 'builder refused binaries it compiled itself under umask 0002'
+built_listing="$(tar -tvzf "$built_dir/sentinal-worker-0.0.3-x86_64-apple-darwin.tar.gz" sentinal-worker/bin/sentinald)"
+[[ "$built_listing" == -rwxr-xr-x* ]] || fail "built binary mode is not 0755: $built_listing"
+
+writable_bins="$test_root/writable bins"
+make_fake_bins "$writable_bins" writable
+chmod 775 "$writable_bins/sentinal"
+if "$builder" --version 0.0.4 --target x86_64-apple-darwin \
+  --bin-dir "$writable_bins" --output "$test_root/writable" 2>/dev/null; then
+  fail 'builder accepted a group-writable supplied binary'
+fi
+
 echo 'package release test: passed'

@@ -54,6 +54,9 @@ if [[ -z "$bin_dir" ]]; then
   (cd "$source_dir" && cargo build --locked --offline --release --target "$target" \
     -p daemon --bin sentinald -p cli --bin sentinal)
   bin_dir="$source_dir/target/$target/release"
+  # Binaries this script just compiled inherit the caller's umask (often 0002
+  # on Ubuntu). Normalise them; supplied --bin-dir binaries are still checked.
+  chmod go-w "$bin_dir/sentinal" "$bin_dir/sentinald"
 else
   sentinal_package_require_absolute binary "$bin_dir"
 fi

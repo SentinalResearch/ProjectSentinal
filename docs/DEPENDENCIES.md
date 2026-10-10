@@ -44,5 +44,19 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 (client-side application routes), `@fontsource/archivo` and
 `@fontsource/jetbrains-mono` (self-host the approved UI fonts)
 
+## Release automation (GitHub Actions)
+Build-time only; nothing here ships inside Sentinal. Each action is pinned to a
+full commit SHA in `.github/workflows/release.yml`, and
+`scripts/tests/release-workflow-test.sh` refuses an unpinned one.
+
+| Action | Why |
+|---|---|
+| `actions/checkout` | Check out the tagged commit, without persisting credentials |
+| `actions/setup-node` | Node 22 for the production PWA build (pnpm through corepack) |
+| `actions/attest-build-provenance` | Sigstore-signed build provenance per artifact, verified by the control before publishing |
+| `actions/upload-artifact`, `actions/download-artifact` | Move per-target artifacts to the release job |
+
+The runners also use `musl-tools` (Ubuntu apt) to link the Linux musl targets.
+
 ## Intelligence (V2)
 `llama.cpp` (server), `fastapi`, `transformers`, `trl`, `peft`, `datasets`

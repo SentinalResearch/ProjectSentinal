@@ -59,6 +59,7 @@ check:
     bash scripts/tests/deployment-plan-test.sh
     bash scripts/tests/package-release-test.sh
     bash scripts/tests/notification-examples-test.sh
+    bash scripts/tests/release-workflow-test.sh
 
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:
