@@ -821,6 +821,19 @@ milestone's primary acceptance requirement.
   with this fix because doing so interrupts live FULL Sessions.
 - `just check` passed after the fix. The web summary was 45 files / 196 tests;
   the notification acceptance script reported `PASS`.
+- A later real-device run created Session 28 and one stored successful Command
+  Event. The control sent one encrypted delivery to each of two active Apple
+  Push subscriptions; both reached `DELIVERED / ACCEPTED` in one attempt and
+  the worker outbox drained to zero. The owner confirmed that the newly
+  installed Home Screen PWA displayed the notification after deleting and
+  reinstalling the stale bookmark.
+- That run exposed an app-shell update defect: an installed worker could reach
+  `waiting` before the page received its `UPDATE_READY` message, leaving the
+  previous worker active indefinitely. The update prompt now detects an
+  already-waiting worker and follows `updatefound` state changes. The worker
+  also announces readiness to uncontrolled in-scope windows. This preserves
+  the explicit owner-controlled refresh while avoiding PWA reinstallation for
+  ordinary upgrades.
 
 ## Dependency resolution audit
 

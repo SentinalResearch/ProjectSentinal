@@ -8,7 +8,7 @@ const { safeNotificationRoute, safePushPayload } = self.SentinalPushSafety;
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(async () => {
-      const clients = await self.clients.matchAll({ type: "window" });
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       for (const client of clients) client.postMessage({ type: "UPDATE_READY" });
     }),
   );

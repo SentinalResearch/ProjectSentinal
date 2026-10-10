@@ -8,13 +8,39 @@ export function PwaUpdatePrompt() {
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+    const serviceWorkers = navigator.serviceWorker;
+    let disposed = false;
+    let registration: ServiceWorkerRegistration | undefined;
+    let installing: ServiceWorker | null = null;
+
+    const detectWaitingWorker = () => {
+      if (!disposed && registration?.waiting) setReady(true);
+    };
+    const installationChanged = () => detectWaitingWorker();
+    const updateFound = () => {
+      installing?.removeEventListener("statechange", installationChanged);
+      installing = registration?.installing ?? null;
+      installing?.addEventListener("statechange", installationChanged);
+      detectWaitingWorker();
+    };
     const receive = (event: MessageEvent<unknown>) => {
       if (typeof event.data === "object" && event.data !== null && "type" in event.data && event.data.type === "UPDATE_READY") {
         setReady(true);
       }
     };
-    navigator.serviceWorker.addEventListener("message", receive);
-    return () => navigator.serviceWorker.removeEventListener("message", receive);
+    serviceWorkers.addEventListener("message", receive);
+    void serviceWorkers.getRegistration().then((current) => {
+      if (disposed || current === undefined) return;
+      registration = current;
+      registration.addEventListener("updatefound", updateFound);
+      updateFound();
+    });
+    return () => {
+      disposed = true;
+      serviceWorkers.removeEventListener("message", receive);
+      registration?.removeEventListener("updatefound", updateFound);
+      installing?.removeEventListener("statechange", installationChanged);
+    };
   }, []);
 
   if (!ready) return null;
