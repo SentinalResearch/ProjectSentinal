@@ -119,13 +119,15 @@ impl WatcherAdapter for GenericAdapter {
 }
 
 fn prompt_line(line: &str) -> Option<String> {
-    let trimmed = line.trim_end_matches(['\r', '\n']);
+    // Real prompts usually leave the cursor after a space ("Continue? [y/N] ").
+    let unterminated = line.trim_end_matches(['\r', '\n']);
+    let trimmed = unterminated.trim_end();
     let lower = trimmed.to_ascii_lowercase();
     let exact_suffix = lower.ends_with("[y/n]")
         || lower.ends_with("(yes/no)")
         || lower.ends_with("password:")
         || lower.ends_with("press any key")
-        || line.ends_with("? ");
+        || (trimmed.ends_with('?') && trimmed.len() < unterminated.len());
     exact_suffix.then(|| trimmed.to_string())
 }
 

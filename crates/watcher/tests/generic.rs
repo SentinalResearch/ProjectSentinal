@@ -28,6 +28,32 @@ fn prompt_requires_exact_shape_and_two_quiet_seconds() {
 }
 
 #[test]
+fn prompts_with_the_usual_trailing_space_still_wait() {
+    for (line, expected) in [
+        ("Continue? [y/N] ", "Continue? [y/N]"),
+        ("Proceed (yes/no) ", "Proceed (yes/no)"),
+        ("Password:  ", "Password:"),
+        ("Overwrite file?\t ", "Overwrite file?"),
+    ] {
+        let mut generic = GenericAdapter::new(DurationMs(600_000));
+        generic.observe(&Observation::output(Timestamp(0), line));
+        assert!(
+            matches!(
+                generic.observe(&Observation::tick(Timestamp(2_000))).as_slice(),
+                [EventKind::WaitingForInput { prompt: Some(prompt) }] if prompt == expected
+            ),
+            "{line:?} should be a waiting prompt"
+        );
+    }
+
+    let mut finished = GenericAdapter::new(DurationMs(600_000));
+    finished.observe(&Observation::output(Timestamp(0), "Did it work? yes "));
+    assert!(finished
+        .observe(&Observation::tick(Timestamp(3_000)))
+        .is_empty());
+}
+
+#[test]
 fn idle_cpu_and_gpu_stall_but_busy_gpu_does_not() {
     let mut stalled = GenericAdapter::new(DurationMs(600_000));
     stalled.observe(&Observation::output(Timestamp(0), "working"));
