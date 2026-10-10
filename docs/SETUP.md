@@ -325,10 +325,10 @@ pipeline; they do not call notification APIs or insert Events directly. The
 launcher stages the selected program in an owner-only temporary runtime
 directory before starting Watch. This keeps a launchd-owned macOS worker out
 of privacy-protected source checkouts such as `~/Desktop`, which it cannot read
-merely because Terminal.app can. The training example writes one tiny file
-under that runtime directory's `artifacts/` folder before announcing its
-checkpoint. Checkpoint and progress rules are off by default and must be
-enabled for that Session when those categories are under test.
+merely because Terminal.app can. The watched shell starts in `$HOME`; only the
+demo executable and training checkpoint use the private runtime directory.
+Checkpoint and progress rules are off by default and must be enabled for that
+Session when those categories are under test.
 
 Detach with `Ctrl+J` after starting the waiting test. The stored structured
 Event drives delivery; notification text never copies the terminal line or

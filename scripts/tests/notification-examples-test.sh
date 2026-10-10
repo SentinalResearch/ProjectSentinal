@@ -53,13 +53,16 @@ fake_sentinal="$temp_dir/fake-sentinal"
 printf '#!/bin/sh\nprintf "cwd=<%%s>\\n" "$PWD"\nprintf "<%%s>\\n" "$@"\n' >"$fake_sentinal"
 chmod 700 "$fake_sentinal"
 runtime_dir="$temp_dir/runtime"
+shell_cwd="$temp_dir/shell-home"
+mkdir -p "$shell_cwd"
 launch_output="$(
   SENTINAL_BIN="$fake_sentinal" \
     SENTINAL_DEMO_RUNTIME_DIR="$runtime_dir" \
+    SENTINAL_DEMO_SHELL_CWD="$shell_cwd" \
     bash "$launcher" waiting
 )"
-[[ "$launch_output" == *"cwd=<$runtime_dir>"* ]] ||
-  fail "launcher did not move Watch out of the repository cwd"
+[[ "$launch_output" == *"cwd=<$shell_cwd>"* ]] ||
+  fail "launcher left the watched shell in its private staging directory"
 [[ "$launch_output" == *"<watch>"* ]] || fail "launcher did not request Watch"
 [[ "$launch_output" == *"<Notification waiting>"* ]] || fail "launcher lost the title argument"
 [[ "$launch_output" == *"<$runtime_dir/notification_command_demo.py>"* ]] ||

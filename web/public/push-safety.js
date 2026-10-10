@@ -36,9 +36,11 @@
       !route ||
       !boundedSafeText(payload.title, 100) ||
       !boundedSafeText(payload.body, 240) ||
-      !boundedSafeText(payload.category, 32)
+      !boundedSafeText(payload.category, 32) ||
+      !Number.isSafeInteger(payload.at) ||
+      payload.at <= 0
     ) return null;
-    return { title: payload.title, body: payload.body, category: payload.category, route };
+    return { title: payload.title, body: payload.body, category: payload.category, at: payload.at, route };
   }
 
   scope.SentinalPushSafety = Object.freeze({ safeNotificationRoute, safePushPayload });

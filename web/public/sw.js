@@ -52,7 +52,9 @@ self.addEventListener("push", (event) => {
       if (!payload) return undefined;
       return self.registration.showNotification(payload.title, {
         body: payload.body,
-        tag: `sentinal-${String(payload.category ?? "event").slice(0, 32)}`,
+        // Server-side policy already deduplicates logical Events. A unique tag
+        // prevents Apple from silently replacing later Events in one category.
+        tag: `sentinal-${payload.category.slice(0, 32)}-${payload.at}`,
         data: { route: payload.route },
       });
     }),

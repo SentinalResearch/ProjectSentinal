@@ -6,6 +6,7 @@ interface PushSafety {
     title: string;
     body: string;
     category: string;
+    at: number;
     route: string;
   } | null;
 }
@@ -39,16 +40,20 @@ describe("service-worker Push safety", () => {
       title: "Sentinal · Worker",
       body: "Training — waiting for input",
       category: "WAITING",
+      at: 1_700_000_000_000,
       route: "/app/sessions/machine%3A7",
     };
     expect(safe(JSON.stringify(payload), origin)).toEqual({
       title: payload.title,
       body: payload.body,
       category: payload.category,
+      at: payload.at,
       route: payload.route,
     });
     expect(safe(JSON.stringify({ ...payload, title: "bad\ntitle" }), origin)).toBeNull();
     expect(safe(JSON.stringify({ ...payload, body: "x".repeat(241) }), origin)).toBeNull();
+    expect(safe(JSON.stringify({ ...payload, at: 0 }), origin)).toBeNull();
+    expect(safe(JSON.stringify({ ...payload, at: "123" }), origin)).toBeNull();
     expect(safe("not-json", origin)).toBeNull();
   });
 });

@@ -106,7 +106,7 @@ test("stored Events from two workers reach native Push delivery and exact Sessio
       PushEvent: new (type: string, init: { data: string }) => Event;
       dispatchEvent(event: Event): boolean;
     };
-    return new Promise<{ title: string; body: string; route: string }>((resolve, reject) => {
+    return new Promise<{ title: string; body: string; route: string; tag: string }>((resolve, reject) => {
       const deadline = setTimeout(() => reject(new Error("service worker did not display Push")), 100);
       Object.defineProperty(scope.registration, "showNotification", {
         configurable: true,
@@ -116,6 +116,7 @@ test("stored Events from two workers reach native Push delivery and exact Sessio
             title,
             body: options.body ?? "",
             route: String((options.data as { route?: unknown } | undefined)?.route ?? ""),
+            tag: options.tag ?? "",
           });
         },
       });
@@ -127,13 +128,14 @@ test("stored Events from two workers reach native Push delivery and exact Sessio
     body: "Native Push worker A Event — completed successfully",
     category: "COMPLETED",
     priority: "DEFAULT",
-    at: Date.now(),
+    at: 1_700_000_000_000,
     route,
   });
   expect(displayed).toEqual({
     title: "Sentinal · Native Push worker A",
     body: "Native Push worker A Event — completed successfully",
     route,
+    tag: "sentinal-COMPLETED-1700000000000",
   });
 
   await page.request.post("/api/v1/auth/browser/logout");

@@ -20,13 +20,18 @@ else
   mkdir -p "$runtime_dir"
   chmod 700 "$runtime_dir"
 fi
+shell_cwd="${SENTINAL_DEMO_SHELL_CWD:-${HOME:-}}"
+if [[ -z "$shell_cwd" || ! -d "$shell_cwd" ]]; then
+  echo "sentinal notification demo: shell cwd is not an existing directory: ${shell_cwd:-<unset>}" >&2
+  exit 2
+fi
 
 case "$scenario" in
   success|failure|waiting)
     install -m 700 \
       "$repo_root/scripts/examples/notification_command_demo.py" \
       "$runtime_dir/notification_command_demo.py"
-    cd "$runtime_dir"
+    cd "$shell_cwd"
     exec "$sentinal_bin" watch -t "Notification ${scenario}" -- \
       python3 -u "$runtime_dir/notification_command_demo.py" "$scenario"
     ;;
@@ -34,9 +39,10 @@ case "$scenario" in
     install -m 700 \
       "$repo_root/scripts/examples/notification_training_demo.py" \
       "$runtime_dir/notification_training_demo.py"
-    cd "$runtime_dir"
+    cd "$shell_cwd"
     exec "$sentinal_bin" watch -t "Notification training" -- \
-      python3 -u "$runtime_dir/notification_training_demo.py"
+      python3 -u "$runtime_dir/notification_training_demo.py" \
+      --output-dir "$runtime_dir/artifacts"
     ;;
   *)
     echo "usage: scripts/run-notification-demo.sh success|failure|waiting|training" >&2

@@ -44,9 +44,9 @@ bash scripts/run-notification-demo.sh training
 The launcher copies the selected example into a new owner-only runtime
 directory and starts Watch there. This is intentional: on macOS a launchd
 worker does not inherit Terminal.app's permission to read a checkout under a
-privacy-protected folder such as `~/Desktop`. The retained Session displays
-the runtime cwd, and macOS removes these temporary directories on its normal
-cleanup schedule.
+privacy-protected folder such as `~/Desktop`. The watched shell starts in
+`$HOME`, not the private staging directory, and macOS removes the staged files
+on its normal temporary-directory cleanup schedule.
 
 `success`, `failure`, and `waiting` use categories enabled by default. For the
 waiting case, leave the prompt unanswered and detach with `Ctrl+J`; reattach
@@ -58,5 +58,5 @@ are under test; Command completion remains enabled by default.
 
 The scripts intentionally do not simulate resource pressure or a stalled
 process. Those acceptance cases must come from real Metrics and elapsed time.
-The runtime path is visible in the Session cwd if its checkpoint needs manual
+The checkpoint path is printed by the training demo if it needs manual
 inspection.

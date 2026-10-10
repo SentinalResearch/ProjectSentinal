@@ -733,7 +733,14 @@ recorded here against one candidate commit.
 - Corrected Session 23 stored `COMMAND_STARTED` and `COMMAND_FINISHED`, the
   control accepted its `COMPLETED` intent, and Web Push delivery reached
   `DELIVERED / ACCEPTED` in one attempt (829 request bytes). Phone display
-  confirmation for this exact delivery remains an owner acceptance step.
+  confirmation for this exact delivery failed even though Apple accepted it.
+- The service worker was assigning every delivery in a category one shared
+  tag (for example `sentinal-COMPLETED`). Apple could replace a previous
+  notification without presenting another alert. The service worker now uses
+  the already validated Event timestamp in the tag, while server-side policy
+  remains responsible for logical deduplication. The safety parser rejects a
+  missing, non-integer, or non-positive timestamp. Production phone display
+  after installing this web build remains an owner acceptance step.
 
 ## Remaining acceptance work
 
