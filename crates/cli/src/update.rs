@@ -89,6 +89,17 @@ pub enum UpdateError {
         /// Process error.
         source: std::io::Error,
     },
+    /// The installed release records no control to update from.
+    #[error(
+        "this installation has no update origin ('{}' names no control_url). On the control, \
+         publish new releases with `just receive-release`; on a worker, reinstall once from \
+         its control's https://…ts.net/install.sh",
+        path.display()
+    )]
+    NoOrigin {
+        /// Release metadata path.
+        path: PathBuf,
+    },
     /// The verified bootstrap returned failure.
     #[error("verified install script failed with {0}")]
     ScriptFailed(std::process::ExitStatus),
@@ -101,7 +112,7 @@ pub fn run(
     prefix: Option<PathBuf>,
     out: &mut dyn std::io::Write,
 ) -> Result<ExitCode, UpdateError> {
-    let _ = writeln!(out, "sentinal {}", env!("CARGO_PKG_VERSION"));
+    let _ = writeln!(out, "sentinal {}", crate::version::VERSION.as_str());
     let prefix = match prefix {
         Some(prefix) => prefix,
         None => installed_prefix()?,
@@ -207,9 +218,8 @@ fn read_origin(path: &Path) -> Result<String, UpdateError> {
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
-        .ok_or_else(|| UpdateError::InvalidState {
+        .ok_or_else(|| UpdateError::NoOrigin {
             path: path.to_path_buf(),
-            reason: "missing string control_url; reinstall from the Tailnet URL first".into(),
         })
 }
 

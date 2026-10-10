@@ -60,6 +60,7 @@ check:
     bash scripts/tests/package-release-test.sh
     bash scripts/tests/notification-examples-test.sh
     bash scripts/tests/release-workflow-test.sh
+    bash scripts/tests/receive-release-test.sh
 
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:
@@ -88,6 +89,10 @@ package-worker version target output="dist":
 # Atomically publish one worker artifact to the private package directory
 publish-worker version package_dir artifact:
     bash scripts/publish-worker-release.sh publish --version {{version}} --package-dir {{package_dir}} --artifact {{artifact}}
+
+# On the control: receive a GitHub release, verify provenance and hashes, publish it, and update this control
+receive-release version *args:
+    bash scripts/receive-release.sh --version {{version}} {{args}}
 
 # Move the stable package pointer to an existing immutable release
 rollback-worker version package_dir:

@@ -183,6 +183,24 @@ refused. `<data_dir>/packages/package-audit.jsonl` contains only timestamp,
 route, release/target, status, and byte count—never headers, queries,
 credentials, or terminal data.
 
+### Releases from GitHub (control)
+
+Tagged releases are built by `.github/workflows/release.yml` on GitHub-hosted
+Linux and macOS runners, attested with GitHub build provenance, and left as a
+draft Release for the owner to review and publish. On the control, from a
+checkout of this repository:
+
+```console
+control$ just receive-release 0.1.16
+```
+
+This downloads every supported target, checks `SHA256SUMS`, each archive's
+`BUILD.json`, and `gh attestation verify` (GitHub CLI 2.49 or newer). Then it
+publishes to the Tailnet package channel, moving `stable` last, and updates
+the control's own programs. Workers keep updating from the control with
+`sentinal update`; they never contact GitHub. `--hash-only` publishes without
+provenance verification and prints a warning. `--no-self-update` only publishes.
+
 ## Enroll a worker
 
 ### Make one Machine the control

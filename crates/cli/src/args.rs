@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 /// Sentinal: persistent, observable terminal Sessions.
 #[derive(Debug, Parser)]
-#[command(name = "sentinal", version, about)]
+#[command(name = "sentinal", version = crate::version::VERSION.as_str(), about)]
 pub struct Cli {
     /// Daemon WebSocket URL.
     #[arg(long, env = "SENTINAL_URL")]

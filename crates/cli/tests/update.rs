@@ -156,6 +156,42 @@ fn update_rejects_unsafe_origin_and_oversized_script() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("exceeds 65536 bytes"));
 }
 
+#[test]
+#[cfg(unix)]
+fn update_names_the_real_version_and_explains_a_missing_origin() {
+    let root = TestDir::new();
+    let prefix = root.0.join("prefix");
+    fs::create_dir_all(prefix.join("share/sentinal")).unwrap();
+    fs::write(
+        prefix.join("share/sentinal/release.json"),
+        r#"{"schema_version":1,"version":"0.1.15","target":"x86_64-unknown-linux-musl"}"#,
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_sentinal"))
+        .args(["update", "--check", "--prefix", prefix.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.starts_with("sentinal 0.0.1 (development build)"),
+        "{stdout}"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("has no update origin"), "{stderr}");
+    assert!(stderr.contains("just receive-release"), "{stderr}");
+    assert!(stderr.contains("install.sh"), "{stderr}");
+
+    let version = Command::new(env!("CARGO_BIN_EXE_sentinal"))
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&version.stdout).trim(),
+        "sentinal 0.0.1 (development build)"
+    );
+}
+
 #[cfg(unix)]
 fn write_executable(path: &Path, contents: &str) {
     fs::write(path, contents).unwrap();

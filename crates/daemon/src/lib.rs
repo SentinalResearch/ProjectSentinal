@@ -1,5 +1,12 @@
 //! Persistent terminal sessions and the daemon API.
 
+/// The release this daemon was built for (`SENTINAL_RELEASE_VERSION` from the
+/// release build), or the package version for development builds.
+pub const DAEMON_VERSION: &str = match option_env!("SENTINAL_RELEASE_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 pub mod adapter_config;
 pub mod api;
 pub mod audit;

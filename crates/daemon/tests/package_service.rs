@@ -223,7 +223,11 @@ async fn serves_manifest_install_script_and_exact_immutable_artifact() {
     let script = String::from_utf8(script.to_vec()).unwrap();
     assert!(script.contains("https://sentinal-control.example.ts.net"));
     assert!(script.contains(SHA));
-    assert!(script.contains("State: UNPAIRED"));
+    assert!(script.contains("NOT CONNECTED"));
+    assert!(
+        !script.contains("State: UNPAIRED"),
+        "the real link state is reported"
+    );
     assert!(script.contains("Settings → Machines → Add Machine"));
     assert!(
         !script.contains("--code"),
@@ -533,11 +537,14 @@ fn generated_bootstrap_verifies_archive_before_running_installer() {
     let release = root.0.join("release/sentinal-worker");
     fs::create_dir_all(release.join("bin")).unwrap();
     fs::create_dir_all(release.join("scripts")).unwrap();
-    write_executable(&release.join("bin/sentinal"), "#!/bin/sh\nexit 0\n");
+    write_executable(
+        &release.join("bin/sentinal"),
+        "#!/bin/sh\n[ \"$1 $2 $3\" = 'connection status --json' ] || exit 2\nprintf '{\"state\": \"%s\", \"control_url\": \"https://sentinal-control.example.ts.net\"}\\n' \"${SENTINAL_TEST_LINK_STATE:-NOT_CONNECTED}\"\n",
+    );
     write_executable(&release.join("bin/sentinald"), "#!/bin/sh\nexit 0\n");
     write_executable(
         &release.join("scripts/install-worker.sh"),
-        "#!/bin/sh\nprintf '%s\\n' \"$*\" >\"$SENTINAL_TEST_INSTALL_LOG\"\n",
+        "#!/bin/sh\nif [ \"${SENTINAL_TEST_INSTALL_FAIL:-}\" = 1 ]; then echo 'service failed to start; restored 0.1.14'; exit 1; fi\nprintf '%s\\n' \"$*\" >\"$SENTINAL_TEST_INSTALL_LOG\"\n",
     );
     let archive = root.0.join("worker.tar.gz");
     let tar_status = Command::new("tar")
@@ -615,7 +622,16 @@ cp "$SENTINAL_TEST_ARCHIVE" "$output"
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("State: UNPAIRED"));
+    for step in [
+        "[1/4] Downloading",
+        "[2/4] Verifying",
+        "[3/4] Installing",
+        "[4/4] Checking",
+    ] {
+        assert!(stdout.contains(step), "missing {step}: {stdout}");
+    }
+    assert!(stdout.contains("NOT CONNECTED"), "{stdout}");
+    assert!(stdout.contains("sentinal connect https://sentinal-control.example.ts.net"));
     let invocation = fs::read_to_string(&install_log).unwrap();
     assert!(invocation.contains("install --release-dir"));
     assert!(invocation.contains("--bind 100.90.80.70"));
@@ -630,12 +646,42 @@ cp "$SENTINAL_TEST_ARCHIVE" "$output"
         .env("PATH", &path)
         .env("SENTINAL_TEST_ARCHIVE", &archive)
         .env("SENTINAL_TEST_INSTALL_LOG", &custom_install_log)
+        .env("SENTINAL_TEST_LINK_STATE", "ACTIVE")
         .output()
         .unwrap();
     assert!(
         custom.status.success(),
         "{}",
         String::from_utf8_lossy(&custom.stderr)
+    );
+    let custom_stdout = String::from_utf8_lossy(&custom.stdout);
+    assert!(
+        custom_stdout.contains("connected to https://sentinal-control.example.ts.net"),
+        "{custom_stdout}"
+    );
+    assert!(!custom_stdout.contains("NOT CONNECTED"), "{custom_stdout}");
+    assert!(
+        custom_stdout.contains("PATH"),
+        "a prefix outside PATH gets a hint: {custom_stdout}"
+    );
+
+    let failed = Command::new("/bin/sh")
+        .arg(&script)
+        .env("PATH", &path)
+        .env("SENTINAL_TEST_ARCHIVE", &archive)
+        .env("SENTINAL_TEST_INSTALL_LOG", root.0.join("unused.log"))
+        .env("SENTINAL_TEST_INSTALL_FAIL", "1")
+        .output()
+        .unwrap();
+    assert!(!failed.status.success());
+    let failed_stderr = String::from_utf8_lossy(&failed.stderr);
+    assert!(
+        failed_stderr.contains("service failed to start; restored 0.1.14"),
+        "{failed_stderr}"
+    );
+    assert!(
+        failed_stderr.contains("installation failed"),
+        "{failed_stderr}"
     );
     let custom_invocation = fs::read_to_string(&custom_install_log).unwrap();
     assert!(custom_invocation.contains(&format!("--prefix {}", custom_prefix.display())));

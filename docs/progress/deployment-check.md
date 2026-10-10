@@ -224,3 +224,16 @@ Apple signing and notarization stay out of scope (no Apple Developer account).
 - MacBook updated 0.1.13 → 0.1.14 from the pilot's `install.sh` (review-first
   form). Installed sha256 `53173bdf…` matches the build. No live Sessions
   were interrupted (only old interrupted records existed).
+
+### Fixed for 0.1.16 (from the pilot)
+
+| Finding | Fix |
+|---|---|
+| 1 Packager rejects its own binaries under umask 0002 | Builder normalises modes of binaries it compiled; supplied binaries still refused |
+| 4/5/8 Manual publish steps, "UNPAIRED" after every install | `just receive-release`: download, verify SHA256SUMS + BUILD.json + GitHub provenance, publish, update the control. `install.sh` prints four steps, a progress bar, and the real link state. |
+| `doctor` always printed `Pairing: UNPAIRED` | Real role, link state (never credentials), version, and update origin |
+| `doctor` could not find Tailscale on macOS | PATH, then the app-bundle CLI; `SENTINAL_TAILSCALE_CLI` overrides |
+| `sentinal 0.0.1` everywhere | Release builds stamp `SENTINAL_RELEASE_VERSION`/`SENTINAL_GIT_COMMIT`: `sentinal 0.1.16 (abc1234)`; the daemon reports the release to the registry |
+| VM `update --check`: "missing control_url" | Clear no-origin error that points the control to `just receive-release` |
+| `sentinal: command not found` after install | Installer and `install.sh` print a PATH hint |
+| Ubuntu `gh` 2.45 lacks `attestation` | `receive-release` refuses without gh 2.49+ unless `--hash-only` is explicit |

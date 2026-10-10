@@ -139,9 +139,26 @@ sentinal update --rollback VERSION [--prefix DIR]
 ```
 
 `doctor` reads local installation/configuration state and invokes the native
-service manager and Tailscale status commands. It makes no enrollment request
-and reports `Pairing: UNPAIRED` until the worker is explicitly enrolled with
-`sentinal connect`.
+service manager and Tailscale status commands. It makes no network request and
+changes nothing. Besides Binaries, Config, Tailscale, and Service it prints:
+
+- `Version`: the installed release and target;
+- `Role`: `WORKER`, or `CONTROL (<public URL>)`;
+- `Pairing`: `CONNECTED to <control> as <name>`, `NOT CONNECTED`, or `REVOKED`,
+  read from the link file. It never prints a credential. A control prints
+  "not needed on the control".
+- `Updates`: the worker's control origin and channel, or `just receive-release` on a control.
+
+Tailscale is found on `PATH`, then inside the macOS app bundle
+(`/Applications/Tailscale.app/Contents/MacOS/Tailscale`).
+
+`sentinal --version` prints the release and short commit stamped by the
+release build, for example `sentinal 0.1.16 (ac92ae5)`. Source builds print
+`0.0.1 (development build)`.
+
+Install and update print four steps: Downloading (with a progress bar in a
+terminal), Verifying, Installing, and Checking. Checking reports the real link
+state after the restart, and prints a `PATH` hint when `<prefix>/bin` is not on `PATH`.
 
 `update` reads the credential-free HTTPS `.ts.net` origin from
 `<prefix>/share/sentinal/release.json`, downloads the same bounded bootstrap
@@ -390,6 +407,7 @@ Web Push subscriptions cannot be reused as native device tokens.
 | `SENTINAL_TOKEN_FILE` | current | bearer token file (same as `--token-file`) |
 | `SENTINAL_AUTO_GUARD` | current | set in every AUTO_WRAP shell; any value stops auto-wrap |
 | `SENTINAL_AUTO_SKIP` | current | comma-separated variable names; auto-wrap skips when any is set |
+| `SENTINAL_TAILSCALE_CLI` | current | explicit Tailscale CLI path for `install.sh` and `sentinal doctor` |
 | `SENTINAL_TAILSCALE_IP` | development | overrides local IPv4 discovery for `just network`, `agent`, or `control`; still validated as `100.64.0.0/10` |
 | `SENTINAL_DAEMON_PORT` | development | worker daemon port used by launch roles (default `7420`) |
 | `SENTINAL_WEB_PORT` | development | Vite port used by web launch roles (default `5173`) |

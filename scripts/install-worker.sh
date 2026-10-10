@@ -193,6 +193,13 @@ if [[ -e "$config_file" || -L "$config_file" ]]; then
   [[ -f "$config_file" && ! -L "$config_file" ]] || sentinal_install_die "existing daemon config '$config_file' is not a regular file"
 fi
 
+print_path_hint() {
+  case ":${PATH:-}:" in
+    *":$bin_dir:"*) ;;
+    *) echo "Add $bin_dir to PATH to use the sentinal command, for example: export PATH=\"$bin_dir:\$PATH\"" ;;
+  esac
+}
+
 if [[ "$dry_run" == true ]]; then
   echo "DRY RUN — Sentinal worker installation"
   [[ -z "$build_command" ]] || echo "cd $(printf '%q' "$source_dir") && $build_command"
@@ -208,6 +215,7 @@ if [[ "$dry_run" == true ]]; then
   else
     echo "Service installation: disabled"
   fi
+  print_path_hint
   exit 0
 fi
 
@@ -326,3 +334,4 @@ else
   echo "Service: $service_file"
 fi
 echo "FULL Sessions are interrupted when sentinald restarts until Reliability R1 lands."
+print_path_hint

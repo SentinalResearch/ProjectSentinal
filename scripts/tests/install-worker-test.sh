@@ -229,6 +229,7 @@ source_output="$(
 )"
 assert_contains "$source_output" 'cargo build --locked --offline --release'
 assert_contains "$source_output" 'Service installation: disabled'
+assert_contains "$source_output" "Add $test_root/source dry/bin to PATH"
 
 if output="$(
   SENTINAL_INSTALL_PLATFORM=linux "$installer" install \

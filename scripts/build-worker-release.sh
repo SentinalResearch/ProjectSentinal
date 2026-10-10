@@ -51,7 +51,11 @@ fi
 
 if [[ -z "$bin_dir" ]]; then
   command -v cargo >/dev/null 2>&1 || sentinal_package_die "cargo is required to build worker binaries"
-  (cd "$source_dir" && cargo build --locked --offline --release --target "$target" \
+  # Stamp the release into the binaries so `sentinal --version` and the
+  # registry report it instead of the unchanging Cargo package version.
+  (cd "$source_dir" && SENTINAL_RELEASE_VERSION="$version" \
+    SENTINAL_GIT_COMMIT="$(git -C "$source_dir" rev-parse --verify HEAD 2>/dev/null || printf 'unknown')" \
+    cargo build --locked --offline --release --target "$target" \
     -p daemon --bin sentinald -p cli --bin sentinal)
   bin_dir="$source_dir/target/$target/release"
   # Binaries this script just compiled inherit the caller's umask (often 0002

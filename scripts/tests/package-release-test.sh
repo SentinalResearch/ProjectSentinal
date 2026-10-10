@@ -152,6 +152,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 mkdir -p "target/$target/release"
+printf '%s %s\n' "${SENTINAL_RELEASE_VERSION:-unset}" "${SENTINAL_GIT_COMMIT:-unset}" >"target/stamp"
 for name in sentinal sentinald; do
   printf '#!/bin/sh\necho %s\n' "$name" >"target/$target/release/$name"
   chmod 775 "target/$target/release/$name"
@@ -164,6 +165,9 @@ built_dir="$test_root/built by cargo"
   fail 'builder refused binaries it compiled itself under umask 0002'
 built_listing="$(tar -tvzf "$built_dir/sentinal-worker-0.0.3-x86_64-apple-darwin.tar.gz" sentinal-worker/bin/sentinald)"
 [[ "$built_listing" == -rwxr-xr-x* ]] || fail "built binary mode is not 0755: $built_listing"
+read -r stamped_version stamped_commit <"$source_copy/target/stamp"
+[[ "$stamped_version" == 0.0.3 ]] || fail "cargo did not receive SENTINAL_RELEASE_VERSION (got '$stamped_version')"
+[[ -n "$stamped_commit" && "$stamped_commit" != unset ]] || fail 'cargo did not receive SENTINAL_GIT_COMMIT' 
 
 writable_bins="$test_root/writable bins"
 make_fake_bins "$writable_bins" writable
