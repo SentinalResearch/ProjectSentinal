@@ -103,7 +103,13 @@ impl WatcherAdapter for GenericAdapter {
                 self.state.stalled = false;
                 Vec::new()
             }
-            ObservationKind::CommandFinished(_) | ObservationKind::ProcessSample(_) => Vec::new(),
+            ObservationKind::CommandFinished(_) => {
+                self.prompt = None;
+                self.state.waiting = false;
+                self.state.stalled = false;
+                Vec::new()
+            }
+            ObservationKind::ProcessSample(_) => Vec::new(),
         }
     }
 

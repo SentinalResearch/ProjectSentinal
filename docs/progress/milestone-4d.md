@@ -724,6 +724,11 @@ recorded here against one candidate commit.
 
 - Build/install candidate `64fa901` on the control and both workers, and record
   release/OS/Tailscale parity.
+- [x] Add dependency-free production acceptance jobs for successful, failed,
+  waiting-for-input, and training/checkpoint Events. Prove their deterministic
+  output and exit behavior in `scripts/tests/notification-examples-test.sh`;
+  document that they enter through `sentinal watch` and never call notification
+  APIs or write database rows directly.
 - Produce success, failure, and waiting Events on the real MacBook and Linux
   workers; confirm one privacy-safe phone notification for each expected rule.
 - Record sanitized phone OS/browser, display, click/login, exact namespaced
@@ -773,6 +778,27 @@ implemented because the approved closed intent/category contract has no `TEST`
 category; reusing another category would make journal data dishonest. Real
 acceptance therefore uses stored structured Session Events, which is also the
 milestone's primary acceptance requirement.
+
+## Production acceptance helper checkpoint — 2026-10-10
+
+- Added two dependency-free Python jobs and one validated launcher covering
+  successful, failed, waiting-for-input, and training/checkpoint observations.
+  They enter through `sentinal watch`; none calls a notification endpoint or
+  inserts an Event/database row. The training job writes the checkpoint before
+  announcing it.
+- Ran the success scenario against the installed Mac mini control. Session 20
+  stored `COMMAND_FINISHED` with exit code 0; the local journal reached
+  `CONTROL_ACCEPTED`, the control intent decision was `ACCEPTED`, and its Web
+  Push delivery reached `DELIVERED` with one attempt and provider result
+  `ACCEPTED`. Phone display confirmation for this run remains a human check.
+- The same run exposed a pre-existing false positive: ten minutes after the
+  Command finished, the idle retained shell emitted `POSSIBLY_STALLED` and sent
+  an unwanted second notification. Command-driven FULL/COMMANDS watcher timers
+  are now gated by an active tracked Command, while adopted PROCESS_LOG stall
+  detection remains enabled. The installed daemon has not yet been restarted
+  with this fix because doing so interrupts live FULL Sessions.
+- `just check` passed after the fix. The web summary was 45 files / 196 tests;
+  the notification acceptance script reported `PASS`.
 
 ## Dependency resolution audit
 

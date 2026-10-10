@@ -31,6 +31,8 @@ pub struct EventEngine {
     last_progress: Option<(Timestamp, Option<f32>)>,
     processes: BTreeMap<u32, String>,
     capture: CaptureLevel,
+    command_activity_required: bool,
+    command_active: bool,
 }
 
 impl EventEngine {
@@ -44,6 +46,8 @@ impl EventEngine {
             last_progress: None,
             processes: BTreeMap::new(),
             capture: CaptureLevel::Full,
+            command_activity_required: false,
+            command_active: command.is_some(),
         };
         if let Some(command) = command {
             engine.select(command);
@@ -57,6 +61,12 @@ impl EventEngine {
         self
     }
 
+    /// Require a tracked running Command before quiet timers may emit Events.
+    pub fn with_command_activity_required(mut self) -> Self {
+        self.command_activity_required = true;
+        self
+    }
+
     /// Change the capture level, e.g. when an adopted log tail starts or stops.
     pub fn set_capture(&mut self, capture: CaptureLevel) {
         self.capture = capture;
@@ -67,10 +77,19 @@ impl EventEngine {
         if let ObservationKind::CommandStarted(command) = &observation.kind {
             self.select(command);
             self.last_progress = None;
+            self.command_active = true;
+        } else if matches!(observation.kind, ObservationKind::CommandFinished(_)) {
+            self.command_active = false;
         }
         let capture = self.capture;
         let mut events = self.process_events(observation);
-        events.extend(self.generic.observe(observation));
+        let quiet_timer = matches!(
+            observation.kind,
+            ObservationKind::MetricsSample(_) | ObservationKind::Tick
+        );
+        if !(self.command_activity_required && !self.command_active && quiet_timer) {
+            events.extend(self.generic.observe(observation));
+        }
         if let Some(adapter) = &mut self.selected {
             events.extend(adapter.observe(observation));
         }

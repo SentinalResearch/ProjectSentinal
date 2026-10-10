@@ -1,7 +1,7 @@
 //! Generic watcher behavior tests.
 
-use protocol::{DurationMs, EventKind, Timestamp};
-use watcher::{GenericAdapter, Observation, WatcherAdapter};
+use protocol::{Command, CommandId, DurationMs, EventKind, MachineId, SessionId, Timestamp};
+use watcher::{EventEngine, GenericAdapter, Observation, ObservationKind, WatcherAdapter};
 
 #[test]
 fn prompt_requires_exact_shape_and_two_quiet_seconds() {
@@ -74,4 +74,35 @@ fn generic_detects_errors_and_warnings() {
         warning.as_slice(),
         [EventKind::WarningDetected { .. }]
     ));
+}
+
+#[test]
+fn command_gated_engine_never_calls_an_idle_shell_stalled() {
+    let mut engine = EventEngine::new(None, Vec::new()).with_command_activity_required();
+
+    engine.observe(&Observation::output(Timestamp(0), "shell prompt"));
+    let before_command = engine.observe(&Observation::metrics(Timestamp(600_000), 1.0, Some(1.0)));
+    assert!(before_command.events.is_empty());
+
+    let mut command = Command::start(
+        CommandId(1),
+        SessionId(1),
+        MachineId("machine".into()),
+        "python work.py",
+        "/work",
+        Timestamp(700_000),
+    );
+    engine.observe(&Observation {
+        at: Timestamp(700_000),
+        kind: ObservationKind::CommandStarted(command.clone()),
+    });
+    engine.observe(&Observation::output(Timestamp(700_001), "working"));
+    command.finish(0, Timestamp(701_000)).unwrap();
+    engine.observe(&Observation {
+        at: Timestamp(701_000),
+        kind: ObservationKind::CommandFinished(command),
+    });
+
+    let after_command = engine.observe(&Observation::metrics(Timestamp(1_301_000), 1.0, Some(1.0)));
+    assert!(after_command.events.is_empty());
 }

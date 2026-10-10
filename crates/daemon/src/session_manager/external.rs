@@ -436,6 +436,16 @@ impl SessionManager {
         });
         let (output, _) = broadcast::channel(1);
         let (structured, _) = broadcast::channel(64);
+        let watcher = watcher::EventEngine::new(
+            watcher_command.as_ref(),
+            self.inner.watcher_adapters.clone(),
+        )
+        .with_capture(capture);
+        let watcher = if capture == CaptureLevel::Commands {
+            watcher.with_command_activity_required()
+        } else {
+            watcher
+        };
         let unsupported = move |operation| PtyError::Operation {
             operation,
             session_id: id,
@@ -461,13 +471,7 @@ impl SessionManager {
                 cwd,
                 self.inner.tracker_ids.clone(),
             )),
-            watcher: Mutex::new(
-                watcher::EventEngine::new(
-                    watcher_command.as_ref(),
-                    self.inner.watcher_adapters.clone(),
-                )
-                .with_capture(capture),
-            ),
+            watcher: Mutex::new(watcher),
             line_framer: Mutex::new(watcher::LineFramer::default()),
             watcher_ids: self.inner.tracker_ids.clone(),
             initial_command: Mutex::new(None),

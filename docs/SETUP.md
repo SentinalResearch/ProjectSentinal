@@ -310,6 +310,22 @@ $ sentinal watch -t "Notification failure" -- sh -c 'exit 7'
 $ sentinal watch -t "Waiting check" -- sh -c 'printf "Continue? [y/N] "; read answer'
 ```
 
+For repeatable production acceptance from a source checkout, the equivalent
+dependency-free examples are:
+
+```console
+$ bash scripts/run-notification-demo.sh success
+$ bash scripts/run-notification-demo.sh failure
+$ bash scripts/run-notification-demo.sh waiting
+$ bash scripts/run-notification-demo.sh training
+```
+
+They create ordinary FULL Sessions and feed the normal Command/watcher/Event
+pipeline; they do not call notification APIs or insert Events directly. The
+training example writes one tiny file under `artifacts/` before announcing its
+checkpoint. Checkpoint and progress rules are off by default and must be
+enabled for that Session when those categories are under test.
+
 Detach with `Ctrl+J` after starting the waiting test. The stored structured
 Event drives delivery; notification text never copies the terminal line or
 Command. Retriable timeout/connection/`429`/`5xx` results use four total
