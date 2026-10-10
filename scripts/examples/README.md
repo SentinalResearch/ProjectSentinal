@@ -41,14 +41,22 @@ bash scripts/run-notification-demo.sh waiting
 bash scripts/run-notification-demo.sh training
 ```
 
+The launcher copies the selected example into a new owner-only runtime
+directory and starts Watch there. This is intentional: on macOS a launchd
+worker does not inherit Terminal.app's permission to read a checkout under a
+privacy-protected folder such as `~/Desktop`. The retained Session displays
+the runtime cwd, and macOS removes these temporary directories on its normal
+cleanup schedule.
+
 `success`, `failure`, and `waiting` use categories enabled by default. For the
 waiting case, leave the prompt unanswered and detach with `Ctrl+J`; reattach
 and answer `y` after the waiting notification arrives. `training` emits
-recognised progress and writes one tiny checkpoint under `artifacts/` before
-announcing it. Enable the Session's **checkpoint** and **progress** notification
-rules if those extra notifications are under test; Command completion remains
-enabled by default.
+recognised progress and writes one tiny checkpoint under the staged runtime
+directory's `artifacts/` folder before announcing it. Enable the Session's
+**checkpoint** and **progress** notification rules if those extra notifications
+are under test; Command completion remains enabled by default.
 
 The scripts intentionally do not simulate resource pressure or a stalled
 process. Those acceptance cases must come from real Metrics and elapsed time.
-Remove the demo `artifacts/` directory after inspecting its checkpoint.
+The runtime path is visible in the Session cwd if its checkpoint needs manual
+inspection.

@@ -720,6 +720,21 @@ recorded here against one candidate commit.
   isolated config/data and gives the control an isolated VAPID key path; it
   never reads or writes the owner's real VAPID key.
 
+## Acceptance checkpoint — 2026-10-10
+
+- Session 21, started from the source checkout under `~/Desktop`, produced no
+  Command Event: its launchd-owned zsh blocked in `getcwd()` before the first
+  prompt because the service does not inherit Terminal.app's protected-folder
+  access. Consequently no notification intent existed; this was not a Web
+  Push delivery failure.
+- The production acceptance launcher now stages its dependency-free program
+  in a private runtime directory before Watch starts. Its regression test
+  proves both the safe cwd and staged executable path.
+- Corrected Session 23 stored `COMMAND_STARTED` and `COMMAND_FINISHED`, the
+  control accepted its `COMPLETED` intent, and Web Push delivery reached
+  `DELIVERED / ACCEPTED` in one attempt (829 request bytes). Phone display
+  confirmation for this exact delivery remains an owner acceptance step.
+
 ## Remaining acceptance work
 
 - Build/install candidate `64fa901` on the control and both workers, and record

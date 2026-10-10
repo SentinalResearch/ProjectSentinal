@@ -50,13 +50,22 @@ training_output="$(cd "$temp_dir" && python3 -u "$training_demo" --epochs 3 --de
   fail "training scenario announced a checkpoint that was not written"
 
 fake_sentinal="$temp_dir/fake-sentinal"
-printf '#!/bin/sh\nprintf "<%%s>\\n" "$@"\n' >"$fake_sentinal"
+printf '#!/bin/sh\nprintf "cwd=<%%s>\\n" "$PWD"\nprintf "<%%s>\\n" "$@"\n' >"$fake_sentinal"
 chmod 700 "$fake_sentinal"
-launch_output="$(SENTINAL_BIN="$fake_sentinal" bash "$launcher" waiting)"
+runtime_dir="$temp_dir/runtime"
+launch_output="$(
+  SENTINAL_BIN="$fake_sentinal" \
+    SENTINAL_DEMO_RUNTIME_DIR="$runtime_dir" \
+    bash "$launcher" waiting
+)"
+[[ "$launch_output" == *"cwd=<$runtime_dir>"* ]] ||
+  fail "launcher did not move Watch out of the repository cwd"
 [[ "$launch_output" == *"<watch>"* ]] || fail "launcher did not request Watch"
 [[ "$launch_output" == *"<Notification waiting>"* ]] || fail "launcher lost the title argument"
-[[ "$launch_output" == *"notification_command_demo.py>"* ]] ||
-  fail "launcher did not use the Command demo"
+[[ "$launch_output" == *"<$runtime_dir/notification_command_demo.py>"* ]] ||
+  fail "launcher did not stage the Command demo in the runtime directory"
+[[ -x "$runtime_dir/notification_command_demo.py" ]] ||
+  fail "launcher did not install a private executable Command demo"
 
 set +e
 invalid_output="$(SENTINAL_BIN="$fake_sentinal" bash "$launcher" unknown 2>&1)"

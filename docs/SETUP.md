@@ -322,7 +322,11 @@ $ bash scripts/run-notification-demo.sh training
 
 They create ordinary FULL Sessions and feed the normal Command/watcher/Event
 pipeline; they do not call notification APIs or insert Events directly. The
-training example writes one tiny file under `artifacts/` before announcing its
+launcher stages the selected program in an owner-only temporary runtime
+directory before starting Watch. This keeps a launchd-owned macOS worker out
+of privacy-protected source checkouts such as `~/Desktop`, which it cannot read
+merely because Terminal.app can. The training example writes one tiny file
+under that runtime directory's `artifacts/` folder before announcing its
 checkpoint. Checkpoint and progress rules are off by default and must be
 enabled for that Session when those categories are under test.
 
