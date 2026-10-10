@@ -23,7 +23,8 @@ sentinal_validate_tailscale_ipv4() {
   local value="$1"
   local first second third fourth extra octet
   IFS=. read -r first second third fourth extra <<<"$value"
-  if [[ -n "${extra:-}" || -z "${fourth:-}" ]]; then
+  # Splitting alone accepts a trailing "." (empty extra); require the exact shape.
+  if [[ ! "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || -n "${extra:-}" || -z "${fourth:-}" ]]; then
     sentinal_die "'$value' is not a Tailscale IPv4 address in 100.64.0.0/10"
   fi
   for octet in "$first" "$second" "$third" "$fourth"; do

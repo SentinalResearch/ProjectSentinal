@@ -164,6 +164,15 @@ if output="$(
 fi
 assert_contains "$output" 'refusing downgrade from 0.0.2 to 0.0.1'
 assert_file_contains "$prefix/bin/sentinal" 'sentinal-v2'
+if output="$(
+  SENTINAL_INSTALL_PLATFORM=macos SENTINAL_SERVICE_TEST_LOG="$service_log" \
+    "$installer" install --release-dir "$rollback_release" --prefix "$prefix" \
+      --config-dir "$config" --data-dir "$data" --bind 100.90.80.70 --rollback '0.0.1.' 2>&1
+)"; then
+  fail 'a rollback version with a trailing dot was accepted'
+fi
+assert_contains "$output" "invalid rollback version '0.0.1.'"
+assert_file_contains "$prefix/bin/sentinal" 'sentinal-v2'
 
 SENTINAL_INSTALL_PLATFORM=macos SENTINAL_SERVICE_TEST_LOG="$service_log" \
   "$installer" install --release-dir "$rollback_release" --prefix "$prefix" \

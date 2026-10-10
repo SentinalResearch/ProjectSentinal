@@ -41,14 +41,22 @@ cat >"$fake_bin/curl" <<'EOF'
 #!/bin/sh
 output=''
 url=''
+follows_redirects=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --output) output="$2"; shift 2 ;;
+    --location) follows_redirects=true; shift ;;
     https://*) url="$1"; shift ;;
     *) shift ;;
   esac
 done
 printf '%s\n' "$url" >>"$SENTINAL_TEST_CURL_LOG"
+# Like GitHub: release downloads redirect; without --location curl saves the
+# empty redirect body and still exits 0.
+if [ "$follows_redirects" = false ] || [ "${SENTINAL_TEST_EMPTY_BODY:-}" = 1 ]; then
+  : >"$output"
+  exit 0
+fi
 case "$url" in
   https://github.com/example/sentinal/releases/download/v0.0.9/*) ;;
   *) exit 22 ;;
@@ -102,6 +110,12 @@ done
 if grep -v '^https://github.com/example/sentinal/releases/download/v0.0.9/' "$SENTINAL_TEST_CURL_LOG" | grep -q .; then
   fail 'downloaded from somewhere other than the exact release'
 fi
+
+# 1b. An empty checksum list (e.g. an unfollowed redirect) is refused clearly.
+if error="$(SENTINAL_TEST_EMPTY_BODY=1 receive "$good" "$fake_bin" --version 0.0.9 --package-dir "$test_root/packages empty" --no-self-update 2>&1)"; then
+  fail 'an empty SHA256SUMS was accepted'
+fi
+[[ "$error" == *"SHA256SUMS is empty or malformed"* ]] || fail "unclear empty-download error: $error"
 
 # 2. A tampered artifact is refused and nothing is published.
 tampered="$test_root/github tampered"
@@ -166,9 +180,11 @@ grep -q '"version": "0.0.9"' "$test_root/home/.local/share/sentinal/release.json
 
 # Bad input is refused before any download.
 : >"$SENTINAL_TEST_CURL_LOG"
-if receive "$good" "$fake_bin" --version 'v0.0.9;rm' --package-dir "$test_root/p" --no-self-update 2>/dev/null; then
-  fail 'an invalid version was accepted'
-fi
+for bad_version in 'v0.0.9;rm' '0.0.9.' '0.0.9..' '.0.0.9' '0.0' '0.0.9.1' '00.0.9' '0.0.9 '; do
+  if receive "$good" "$fake_bin" --version "$bad_version" --package-dir "$test_root/p" --no-self-update 2>/dev/null; then
+    fail "invalid version '$bad_version' was accepted"
+  fi
+done
 [[ ! -s "$SENTINAL_TEST_CURL_LOG" ]] || fail 'downloaded before validating the version'
 
 echo 'receive release test: passed'

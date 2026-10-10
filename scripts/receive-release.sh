@@ -63,7 +63,8 @@ base="https://github.com/$repo/releases/download/v$version"
 
 download() {
   local name="$1" limit="$2"
-  curl --proto '=https' --proto-redir '=https' --tlsv1.2 --max-redirs 3 --fail --silent --show-error \
+  # GitHub serves release assets through a redirect: follow it (HTTPS only).
+  curl --location --proto '=https' --proto-redir '=https' --tlsv1.2 --max-redirs 3 --fail --silent --show-error \
     --max-filesize "$limit" --output "$work/$name" "$base/$name" ||
     sentinal_package_die "could not download $name from release v$version"
 }
@@ -74,6 +75,10 @@ sha256_of() {
 
 echo "Receiving Sentinal $version from $repo"
 download SHA256SUMS "$MAX_SUMS_BYTES"
+# curl reports success for an empty body, so require well-formed lines.
+if [[ ! -s "$work/SHA256SUMS" ]] || grep -qvE '^[0-9a-f]{64}  [A-Za-z0-9._-]+$' "$work/SHA256SUMS"; then
+  sentinal_package_die "SHA256SUMS is empty or malformed; nothing was published"
+fi
 expected_names=()
 for target in "${TARGETS[@]}"; do
   expected_names+=("sentinal-worker-$version-$target.tar.gz")

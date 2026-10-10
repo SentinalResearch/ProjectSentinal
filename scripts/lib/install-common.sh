@@ -12,12 +12,8 @@ sentinal_release_field() {
 }
 
 sentinal_valid_release_version() {
-  local value="$1" major minor patch extra part
-  IFS=. read -r major minor patch extra <<<"$value"
-  [[ -z "${extra:-}" && -n "${major:-}" && -n "${minor:-}" && -n "${patch:-}" ]] || return 1
-  for part in "$major" "$minor" "$patch"; do
-    [[ "$part" =~ ^(0|[1-9][0-9]{0,8})$ ]] || return 1
-  done
+  # The whole string must match; splitting on "." let "0.1.17." through.
+  [[ "$1" =~ ^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$ ]]
 }
 
 sentinal_compare_release_versions() {
