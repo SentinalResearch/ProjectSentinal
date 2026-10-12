@@ -13,6 +13,9 @@ pub const DEFAULT_PROJECTION_OUTBOX_ROWS: u32 = 20_000;
 /// Default maximum encoded projection bytes.
 pub const DEFAULT_PROJECTION_OUTBOX_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_PROJECTION_SNAPSHOT_CHUNKS: u32 = 16;
+const MAX_CONTROL_EVENTS_PER_SESSION: u32 = 32;
+const MAX_CONTROL_EVENTS_PER_MACHINE: u32 = 10_000;
+const MAX_CONTROL_CHANGE_REVISIONS: u32 = 1_000;
 
 /// Bounded worker projection outbox limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -692,6 +695,10 @@ impl Store {
             "DELETE FROM control_projection_state WHERE machine_id=?1",
             [&machine_id.0],
         )?;
+        transaction.execute(
+            "DELETE FROM control_projection_snapshot_chunks WHERE machine_id=?1",
+            [&machine_id.0],
+        )?;
         transaction.commit()?;
         Ok(())
     }
@@ -967,6 +974,27 @@ fn apply_change(
                     serde_json::to_string(event)?
                 ],
             )?;
+            transaction.execute(
+                "DELETE FROM control_projection_events
+                 WHERE machine_id=?1 AND session_id=?2 AND event_id NOT IN (
+                    SELECT event_id FROM control_projection_events
+                    WHERE machine_id=?1 AND session_id=?2
+                    ORDER BY at DESC,event_id DESC LIMIT ?3
+                 )",
+                params![
+                    machine_id.0,
+                    to_sql_id(event.session_id.0)?,
+                    MAX_CONTROL_EVENTS_PER_SESSION
+                ],
+            )?;
+            transaction.execute(
+                "DELETE FROM control_projection_events
+                 WHERE machine_id=?1 AND event_id NOT IN (
+                    SELECT event_id FROM control_projection_events
+                    WHERE machine_id=?1 ORDER BY at DESC,event_id DESC LIMIT ?2
+                 )",
+                params![machine_id.0, MAX_CONTROL_EVENTS_PER_MACHINE],
+            )?;
         }
         ProjectionChange::MetricsReplace { metrics, .. } => {
             let scope = serde_json::to_string(&metrics.scope)?;
@@ -989,6 +1017,13 @@ fn apply_change(
         "INSERT INTO control_projection_changes(machine_id,change_json,committed_at)
          VALUES (?1,?2,?3)",
         params![machine_id.0, serde_json::to_string(change)?, at.0],
+    )?;
+    transaction.execute(
+        "DELETE FROM control_projection_changes WHERE revision NOT IN (
+            SELECT revision FROM control_projection_changes
+            ORDER BY revision DESC LIMIT ?1
+         )",
+        [MAX_CONTROL_CHANGE_REVISIONS],
     )?;
     Ok(())
 }

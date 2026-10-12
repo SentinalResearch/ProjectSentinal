@@ -492,6 +492,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   let projectionReconnect: ReturnType<typeof setTimeout> | null = null;
   let projectionReload: Promise<boolean> | null = null;
   let legacyRefresh: Promise<void> | null = null;
+  let firstLegacyRefresh = true;
   const recipeRoutes = new Map<string, { machineId: string; sourceId: string }>();
 
   const emit = (event: LiveEvent) => {
@@ -780,9 +781,13 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     connection.machine.status !== "AUTH_EXPIRED" && connection.machine.status !== "DISCONNECTED" &&
     connection.machine.status !== "REVOKED";
 
-  const refreshConnection = async (connection: MachineConnection, withSessions: boolean): Promise<void> => {
+  const refreshConnection = async (
+    connection: MachineConnection,
+    withSessions: boolean,
+    skipMachine = false,
+  ): Promise<void> => {
     try {
-      await queryMachine(connection);
+      if (!skipMachine) await queryMachine(connection);
       if (withSessions) await querySessions(connection);
       emit({ type: "MACHINE_UPDATED", machine: connection.machine });
       if (withSessions) for (const session of connection.sessions) emit({ type: "SESSION_UPDATED", session });
@@ -799,11 +804,14 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
 
   const refreshLegacy = async (): Promise<void> => {
     legacyRefresh ??= (async () => {
-      await loadRegistry();
+      const initial = firstLegacyRefresh;
+      firstLegacyRefresh = false;
+      if (!initial) await loadRegistry();
       const at = now();
       const due = [...connections.values()].filter((connection) =>
         queryEligible(connection) && connection.retryAt <= at);
-      await mapConcurrent(due, QUERY_CONCURRENCY, (connection) => refreshConnection(connection, true));
+      await mapConcurrent(due, QUERY_CONCURRENCY, (connection) =>
+        refreshConnection(connection, true, initial && connection.id === controlMachineId));
     })().finally(() => { legacyRefresh = null; });
     await legacyRefresh;
   };
@@ -829,6 +837,16 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     return connection;
   };
 
+  const liveOwner = (sessionId: string, operation: string): MachineConnection => {
+    const connection = owner(sessionId);
+    if (connection.machine.status !== "ONLINE") {
+      throw daemonError(
+        `Machine '${connection.id}' is ${connection.machine.freshness ?? connection.machine.status}; ${operation} requires a live authoritative route`,
+      );
+    }
+    return connection;
+  };
+
   const outputUrl = (sessionId: string, offset: number, limit: number): string => {
     const id = machineId(sessionId);
     const local = localId(sessionId);
@@ -846,6 +864,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       for (const connection of connections.values()) connection.transport.reset();
       connections.clear();
       controlMachineId = null;
+      firstLegacyRefresh = true;
     },
   });
 
@@ -887,7 +906,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     },
     async continueSession(sessionId) {
       await ensureInitialized();
-      const connection = owner(sessionId);
+      const connection = liveOwner(sessionId, "Continue");
       const source = localId(sessionId);
       const message = await connection.transport.request(
         { type: "CONTINUE_SESSION", session_id: source },
@@ -938,7 +957,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       throw daemonError("saved output exceeded the 64 MiB replay limit");
     },
     resolveTerminal(sessionId) {
-      const connection = owner(sessionId);
+      const connection = liveOwner(sessionId, "terminal attach");
       return { websocketUrl: connection.transport.url, localSessionId: localId(sessionId), machineId: connection.id };
     },
     async getRecipes() {
@@ -1043,11 +1062,11 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     },
     async sendInput(sessionId, data) {
       await ensureInitialized();
-      await owner(sessionId).transport.sendBytes(localId(sessionId), encoder.encode(data));
+      await liveOwner(sessionId, "terminal input").transport.sendBytes(localId(sessionId), encoder.encode(data));
     },
     async sendSignal(sessionId, signal) {
       await ensureInitialized();
-      const connection = owner(sessionId);
+      const connection = liveOwner(sessionId, signal === "SIGINT" ? "terminal input" : "kill");
       const local = localId(sessionId);
       if (signal === "SIGINT") {
         await connection.transport.sendBytes(local, new Uint8Array([3]));
@@ -1067,6 +1086,9 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       }
       const connection = connections.get(targetMachineId);
       if (!connection) throw daemonError(`unknown Recipe Machine '${targetMachineId}'`);
+      if (connection.machine.status !== "ONLINE") {
+        throw daemonError(`Machine '${targetMachineId}' is not live; Recipe execution was not attempted`);
+      }
       const reply = await connection.transport.request(
         { type: "RUN_RECIPE", recipe_id: route.sourceId, values: params, session_id: null },
         (message) => message.type === "SESSION_UPDATED" && message.session.machine_id === targetMachineId,
@@ -1078,6 +1100,9 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       await ensureInitialized();
       const connection = connections.get(targetMachineId);
       if (!connection) throw daemonError(`unknown Recipe Machine '${targetMachineId}'`);
+      if (connection.machine.status !== "ONLINE") {
+        throw daemonError(`Machine '${targetMachineId}' is not live; Recipe save was not attempted`);
+      }
       const wire: WireRecipe = {
         id: recipe.sourceId ?? recipe.id,
         name: recipe.name,

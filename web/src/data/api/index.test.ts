@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { decodeTerminalFrame } from "../../frame";
 import type { ClientRequest } from "../../protocol/ClientRequest";
@@ -502,6 +502,38 @@ describe("apiAdapter authentication", () => {
     expect(sockets).toHaveLength(1);
   });
 
+  it("coalesces concurrent legacy initialization and never performs per-Session Event reads", async () => {
+    const { adapter, server, sockets } = setup();
+    await adapter.auth.login("correct horse battery staple");
+
+    await Promise.all([adapter.getMachines(), adapter.getSessions()]);
+
+    expect(server.paths.filter((path) => path === "/api/v1/machines")).toHaveLength(1);
+    expect(sockets).toHaveLength(1);
+    expect(sockets[0].requests.filter((request) => request.type === "GET_MACHINE")).toHaveLength(1);
+    expect(sockets[0].requests.filter((request) => request.type === "LIST_SESSIONS")).toHaveLength(1);
+    expect(sockets[0].requests.some((request) => request.type === "GET_EVENTS")).toBe(false);
+  });
+
+  it("does no two-second full refresh and uses a bounded sixty-second legacy integrity check", async () => {
+    const { adapter, sockets } = setup();
+    await adapter.auth.login("correct horse battery staple");
+    await Promise.all([adapter.getMachines(), adapter.getSessions()]);
+    vi.useFakeTimers();
+    const unsubscribe = adapter.subscribe(() => undefined);
+    await Promise.resolve();
+    const initial = sockets[0].requests.length;
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(sockets[0].requests).toHaveLength(initial);
+
+    await vi.advanceTimersByTimeAsync(55_000);
+    expect(sockets[0].requests.length).toBeGreaterThan(initial);
+    expect(sockets[0].requests.some((request) => request.type === "GET_EVENTS")).toBe(false);
+    unsubscribe();
+    vi.useRealTimers();
+  });
+
   it("hydrates from one control snapshot and one live stream with no worker or Event query", async () => {
     const { adapter, server, sockets } = setup();
     server.projectionSnapshot = controlProjection();
@@ -556,6 +588,20 @@ describe("apiAdapter authentication", () => {
     }));
     expect(sockets).toHaveLength(1);
     unsubscribe();
+  });
+
+  it("fails live actions closed for an offline projected Machine", async () => {
+    const { adapter, server, sockets } = setup();
+    const snapshot = controlProjection();
+    snapshot.machines[1].freshness = "OFFLINE";
+    snapshot.machines[1].registry_status = "OFFLINE";
+    server.projectionSnapshot = snapshot;
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getSessions();
+
+    expect(() => adapter.resolveTerminal("worker-machine:1")).toThrow(/requires a live authoritative route/);
+    await expect(adapter.sendInput("worker-machine:1", "unsafe")).rejects.toThrow(/requires a live authoritative route/);
+    expect(sockets).toHaveLength(1);
   });
 
   it("maps the watcher's training summary onto the Session", () => {

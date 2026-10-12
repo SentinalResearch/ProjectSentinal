@@ -3,8 +3,9 @@
 #![allow(clippy::unwrap_used)]
 
 use protocol::{
-    CaptureLevel, MachineId, ProjectedMetricScope, ProjectedMetrics, ProjectedSession,
-    ProjectionBatch, ProjectionChange, Session, SessionId, Timestamp, PROJECTION_SCHEMA_VERSION,
+    CaptureLevel, Event, EventId, EventKind, MachineId, ProjectedEventSummary,
+    ProjectedMetricScope, ProjectedMetrics, ProjectedSession, ProjectionBatch, ProjectionChange,
+    Session, SessionId, Timestamp, PROJECTION_SCHEMA_VERSION,
 };
 use store::{ProjectionOutboxLimits, Store};
 
@@ -45,6 +46,21 @@ fn metrics(cursor: u64, session_id: u64, cpu_percent: f32) -> ProjectionChange {
             vram_used_bytes: None,
             vram_total_bytes: None,
         },
+    }
+}
+
+fn event(cursor: u64, session_id: u64) -> ProjectionChange {
+    ProjectionChange::EventAppend {
+        cursor,
+        event: ProjectedEventSummary::from_event(&Event {
+            id: EventId(cursor),
+            session_id: SessionId(session_id),
+            command_id: None,
+            at: Timestamp(cursor as i64),
+            kind: EventKind::WarningDetected {
+                message: "not projected".into(),
+            },
+        }),
     }
 }
 
@@ -436,4 +452,31 @@ fn purging_one_machine_projection_preserves_another() {
     assert!(store.projected_sessions(&first, 10).unwrap().is_empty());
     assert!(store.control_projection_state(&first).unwrap().is_none());
     assert_eq!(store.projected_sessions(&second, 10).unwrap().len(), 1);
+}
+
+#[test]
+fn control_projection_retains_only_the_latest_safe_events_per_session() {
+    let store = Store::open_in_memory().unwrap();
+    let machine = MachineId(MACHINE.into());
+    let changes = (1..=40).map(|cursor| event(cursor, 10)).collect::<Vec<_>>();
+    store
+        .apply_projection_batch(
+            &machine,
+            &ProjectionBatch::Delta {
+                schema_version: PROJECTION_SCHEMA_VERSION,
+                machine_id: machine.clone(),
+                source_epoch: EPOCH.into(),
+                base_cursor: 0,
+                through_cursor: 40,
+                sent_at: Timestamp(40),
+                changes,
+            },
+            Timestamp(41),
+        )
+        .unwrap();
+
+    let events = store.projected_events(&machine, 100).unwrap();
+    assert_eq!(events.len(), 32);
+    assert_eq!(events.first().unwrap().id, EventId(40));
+    assert_eq!(events.last().unwrap().id, EventId(9));
 }
