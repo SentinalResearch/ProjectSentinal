@@ -50,6 +50,7 @@ pub struct AppState {
     recipes: RecipeCatalog,
     notifications: Option<NotificationService>,
     push: Option<PushGateway>,
+    release: Option<crate::control::ControlRelease>,
     insights: Option<MachineInsights>,
 }
 
@@ -72,6 +73,7 @@ impl AppState {
             recipes,
             notifications: None,
             push: None,
+            release: None,
             insights: None,
         }
     }
@@ -127,6 +129,12 @@ impl AppState {
     /// Install the control-owned native Push gateway.
     pub fn with_push(mut self, push: Option<PushGateway>) -> Self {
         self.push = push;
+        self
+    }
+
+    /// Install the control's owner-signed release service.
+    pub fn with_release(mut self, release: Option<crate::control::ControlRelease>) -> Self {
+        self.release = release;
         self
     }
 
@@ -383,6 +391,7 @@ pub fn router(state: AppState) -> Router {
         state.development,
     )
     .with_push(state.push.clone())
+    .with_release(state.release.clone())
     .router();
     let origins = state.origins.clone();
     Router::new()

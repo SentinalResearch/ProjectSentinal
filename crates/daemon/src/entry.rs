@@ -390,15 +390,24 @@ pub async fn run() -> Result<(), DaemonError> {
     if let Some(gateway) = push.clone() {
         spawn_push_delivery_worker(gateway, server_shutdown_rx.clone());
     }
+    let mut release = None;
     if config.control.is_some() {
         match sibling_sentinal_bin() {
-            Ok(sentinal_bin) => spawn_release_watch(
-                ReleaseWatchSettings {
-                    data_dir: config.data_dir.clone(),
+            Ok(sentinal_bin) => {
+                spawn_release_watch(
+                    ReleaseWatchSettings {
+                        data_dir: config.data_dir.clone(),
+                        sentinal_bin: sentinal_bin.clone(),
+                    },
+                    server_shutdown_rx.clone(),
+                );
+                release = Some(control_release(
+                    &config,
+                    &config_path,
                     sentinal_bin,
-                },
-                server_shutdown_rx.clone(),
-            ),
+                    sessions.clone(),
+                ));
+            }
             Err(error) => {
                 tracing::error!(%error, "release watch disabled: cannot locate the sentinal CLI binary");
             }
@@ -412,6 +421,7 @@ pub async fn run() -> Result<(), DaemonError> {
         .with_recipes(recipes)
         .with_notifications(notifications)
         .with_push(push)
+        .with_release(release)
         .with_tailscale_serve(config.behind_tailscale_serve)
         .with_development(config.development);
     let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
@@ -519,6 +529,52 @@ fn push_key_file(home: &std::path::Path) -> PathBuf {
 }
 
 /// The `sentinal` CLI binary installed beside this running `sentinald`.
+/// The dashboard's release service: it runs the sibling `sentinal` CLI and
+/// counts live FULL Sessions an update would interrupt.
+fn control_release(
+    config: &DaemonConfig,
+    config_path: &Path,
+    sentinal_bin: PathBuf,
+    sessions: SessionManager,
+) -> crate::control::ControlRelease {
+    let prefix = sentinal_bin
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_default();
+    // systemd stops a unit's whole cgroup on restart; the updater needs its own unit.
+    let detach = if cfg!(target_os = "linux") && which("systemd-run") {
+        crate::control::Detach::SystemdRun
+    } else {
+        crate::control::Detach::ProcessGroup
+    };
+    crate::control::ControlRelease::new(crate::control::ControlReleaseSettings {
+        data_dir: config.data_dir.clone(),
+        config_dir: config_path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default(),
+        prefix,
+        cli: sentinal_bin,
+        detach,
+        live_full_sessions: std::sync::Arc::new(move || {
+            sessions.list().map_or(0, |list| {
+                list.iter()
+                    .filter(|session| {
+                        session.capture == protocol::CaptureLevel::Full
+                            && !session.state.is_finished()
+                    })
+                    .count() as u32
+            })
+        }),
+    })
+}
+
+fn which(program: &str) -> bool {
+    std::env::var_os("PATH")
+        .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join(program).is_file()))
+}
+
 fn sibling_sentinal_bin() -> Result<PathBuf, String> {
     let exe = std::env::current_exe().map_err(|error| error.to_string())?;
     let dir = exe

@@ -5,9 +5,13 @@
 //! credentials; each side keeps only a hash of the one it verifies.
 
 mod proxy;
+mod release;
+mod release_routes;
 pub mod release_watch;
 pub mod routes;
 mod secrets;
+
+pub use release::{ControlRelease, ControlReleaseSettings, Detach};
 
 use crate::{
     link_audit::{LinkAudit, LinkAuditRecord},

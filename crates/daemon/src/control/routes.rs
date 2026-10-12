@@ -48,6 +48,7 @@ pub struct ControlRoutes {
     behind_tailscale_serve: bool,
     development: bool,
     push: Option<PushGateway>,
+    release: Option<super::ControlRelease>,
 }
 
 impl ControlRoutes {
@@ -64,6 +65,7 @@ impl ControlRoutes {
             behind_tailscale_serve,
             development,
             push: None,
+            release: None,
         }
     }
 
@@ -71,6 +73,27 @@ impl ControlRoutes {
     pub fn with_push(mut self, push: Option<PushGateway>) -> Self {
         self.push = push;
         self
+    }
+
+    /// Attach the control's owner-signed release service.
+    pub fn with_release(mut self, release: Option<super::ControlRelease>) -> Self {
+        self.release = release;
+        self
+    }
+
+    /// The release service, for an authenticated owner on the control.
+    pub(super) fn owner_release(
+        &self,
+        headers: &HeaderMap,
+    ) -> Result<&super::ControlRelease, ControlFailure> {
+        self.owner(headers)?;
+        self.release.as_ref().ok_or_else(|| {
+            ControlFailure::new(
+                404,
+                LinkFailureCode::NotControl,
+                "release management is available only on the control Machine",
+            )
+        })
     }
 
     /// Build the router.
@@ -107,6 +130,7 @@ impl ControlRoutes {
                 axum::routing::delete(push_unsubscribe),
             )
             .route("/api/v1/push/provider", put(push_provider))
+            .merge(super::release_routes::routes())
             .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES));
         let projection_routes = Router::new()
             .route("/api/v1/link/projection", post(projection_batch))
@@ -460,7 +484,7 @@ async fn disconnect(
     }
 }
 
-fn reply<T: serde::Serialize>(result: Result<T, ControlFailure>) -> Response {
+pub(super) fn reply<T: serde::Serialize>(result: Result<T, ControlFailure>) -> Response {
     match result {
         Ok(body) => Json(body).into_response(),
         Err(failure) => failure_response(failure),
@@ -486,7 +510,7 @@ fn no_store(mut response: Response) -> Response {
     response
 }
 
-fn failure_response(failure: ControlFailure) -> Response {
+pub(super) fn failure_response(failure: ControlFailure) -> Response {
     let status = StatusCode::from_u16(failure.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     (status, Json::<LinkFailure>(failure.failure)).into_response()
 }
