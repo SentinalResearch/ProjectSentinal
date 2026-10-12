@@ -258,6 +258,20 @@ Session in the production Tailnet PWA.
 produce a stored Event on either enrolled Machine, receive an encrypted push
 without an ntfy server, and tap it to open the exact Machine and Session.
 
+## Milestone 4.D.1 — Incremental aggregation and control read model
+- [ ] Approve the bounded projection contract, stored field classification, retention, and mixed-version behavior
+- [ ] Coalesce direct adapter initialization and replace full Event replay with cursored, on-demand detail reads
+- [ ] Persist and compact an authenticated worker projection outbox with snapshot/resync recovery
+- [ ] Materialize privacy-minimized Machine and Session dashboard state in control SQLite
+- [ ] Hydrate the PWA with one bounded control snapshot and one ordered control-origin live stream
+- [ ] Keep every terminal byte and live action routed to, and authorized by, the owning worker
+- [ ] Prove constant critical-render request counts at 10 Machines / 1,000 Sessions and record real-Machine before/after evidence
+
+**Demo:** reload the production PWA while one worker is offline, immediately
+see both Machines' bounded last-known dashboards from the control, then attach
+to a live Session through its authoritative worker without a per-Session Event
+request storm.
+
 ## Milestone 4.E — V1 installation, discovery, and private pilot
 - [ ] Approve the release trust, installer formats, discovery, approval-pairing contract, and private-VM threat model
 - [ ] Ship normal installers for the approved macOS/Linux targets plus a verified curl/archive fallback
