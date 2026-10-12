@@ -9,3 +9,5 @@
 # primary key and an offline backup key, one per line, e.g.:
 #   sentinal-release namespaces="sentinal-release" ssh-ed25519 AAAA... primary-2026
 # With no key lines, every signed-release check fails closed.
+sentinal-release namespaces="sentinal-release" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDh/5emWYE9VIeyDgnGn719YopSUb4hV3+FP6nK+oG5B sentinal-release-primary
+sentinal-release namespaces="sentinal-release" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID7zSitbsAXiBZemIjmhPwQbjPyR35FmNMbWdeHA2/xX sentinal-release-backup
