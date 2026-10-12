@@ -59,6 +59,10 @@ test("one control, two workers: offline retention, live delta, routed terminal i
   await signIn(page);
   await ensureConnected(page, workerASocket, "Projection accept worker A");
   await ensureConnected(page, workerBSocket, "Projection accept worker B");
+  // Captured now, while both link files still exist — worker B's is deleted
+  // by `sentinal disconnect` below (by design: disconnect, unlike revoke,
+  // still keeps the Machine ID, but the link credential is gone).
+  const linkedSecrets = [...linkSecrets(env("SENTINAL_E2E_WORKER_A_ROOT")), ...linkSecrets(env("SENTINAL_E2E_WORKER_B_ROOT"))];
   const sessionA = await createWorkerSession(workerAUrl, "worker-a-token", "Projection accept session A");
   await createWorkerSession(workerBUrl, "worker-b-token", "Projection accept session B");
 
@@ -125,13 +129,7 @@ test("one control, two workers: offline retention, live delta, routed terminal i
   // --- (8): no secret, no direct worker origin, anywhere in the full captured
   // browser traffic since measurement began ---
   expect(httpRequests.every((r) => ![7431, 7432].includes(Number(new URL(r.url).port)))).toBe(true);
-  const secrets = [
-    "worker-a-token",
-    "worker-b-token",
-    "test-token",
-    ...linkSecrets(env("SENTINAL_E2E_WORKER_A_ROOT")),
-    ...linkSecrets(env("SENTINAL_E2E_WORKER_B_ROOT")),
-  ];
+  const secrets = ["worker-a-token", "worker-b-token", "test-token", ...linkedSecrets];
   const everything = JSON.stringify(httpRequests) + JSON.stringify([...socketFrames.entries()]);
   for (const secret of secrets) expect(everything).not.toContain(secret);
 });

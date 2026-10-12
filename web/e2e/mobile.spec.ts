@@ -88,7 +88,12 @@ test.describe("phone 390×844", () => {
     }
 
     // A Session row: badge and duration on their own line, then the title.
-    const row = page.locator("main a[href^='/app/sessions/']").first();
+    // Targets "Watched job" (created once in session-smoke.spec.ts, never torn
+    // down) specifically, not just the first row: by this point in the chain
+    // adopted-log.spec.ts's reduced-capture Session can legitimately sort
+    // first (most recently updated), and this test needs an attachable
+    // FULL-capture Session for its later "Open terminal" step.
+    const row = page.locator("main a[href^='/app/sessions/']", { hasText: "Watched job" }).first();
     await expect(row).toBeVisible();
     await row.click();
     await expect(page.getByRole("button", { name: "‹ Overview" })).toBeVisible();
