@@ -193,11 +193,40 @@ async fn upload_projection_once(link: &LinkManager, store: &Store) -> Result<(),
     let Some(directive) = link.projection_directive()? else {
         return Ok(());
     };
+    let machine_id = link.machine_id().map_err(identity_failure)?;
+    let epoch = projection_epoch(&machine_id);
+    if directive.action == ProjectionSyncAction::Snapshot {
+        let report = store
+            .projection_sync_report(&machine_id, &epoch)
+            .map_err(internal)?;
+        let records = store
+            .worker_projection_snapshot(&machine_id, &epoch)
+            .map_err(internal)?;
+        let batches = projection_snapshot_batches(
+            &machine_id,
+            &epoch,
+            report.current_cursor,
+            (link.inner.clock)(),
+            records,
+            usize::from(directive.max_changes),
+            directive.max_batch_bytes as usize,
+        )?;
+        for batch in batches {
+            let acknowledgement = link.upload_projection(&batch).await?;
+            if acknowledgement.status == protocol::ProjectionAcknowledgementStatus::ResyncRequired {
+                return Ok(());
+            }
+        }
+        if report.current_cursor > 0 {
+            store
+                .acknowledge_projection_cursor(&machine_id, &epoch, report.current_cursor)
+                .map_err(internal)?;
+        }
+        return Ok(());
+    }
     if directive.action != ProjectionSyncAction::Upload {
         return Ok(());
     }
-    let machine_id = link.machine_id().map_err(identity_failure)?;
-    let epoch = projection_epoch(&machine_id);
     let changes = store
         .projection_changes_after(
             &machine_id,
@@ -233,6 +262,69 @@ async fn upload_projection_once(link: &LinkManager, store: &Store) -> Result<(),
         protocol::ProjectionAcknowledgementStatus::ResyncRequired => {}
     }
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn projection_snapshot_batches(
+    machine_id: &MachineId,
+    source_epoch: &str,
+    snapshot_cursor: u64,
+    sent_at: Timestamp,
+    records: Vec<protocol::ProjectionChange>,
+    maximum_changes: usize,
+    maximum_bytes: usize,
+) -> Result<Vec<ProjectionBatch>, LinkFailure> {
+    if maximum_changes == 0 || maximum_bytes == 0 {
+        return Err(internal(
+            "control advertised an empty projection snapshot bound",
+        ));
+    }
+    if records.is_empty() {
+        return Ok(vec![ProjectionBatch::Snapshot {
+            schema_version: protocol::PROJECTION_SCHEMA_VERSION,
+            machine_id: machine_id.clone(),
+            source_epoch: source_epoch.into(),
+            snapshot_id: format!("ps-{snapshot_cursor}"),
+            snapshot_cursor,
+            chunk_index: 0,
+            final_chunk: true,
+            sent_at,
+            records,
+        }]);
+    }
+    let snapshot_id = format!("ps-{snapshot_cursor}");
+    let mut batches = Vec::new();
+    let mut offset = 0;
+    while offset < records.len() {
+        let mut take = maximum_changes.min(records.len() - offset);
+        loop {
+            let final_chunk = offset + take == records.len();
+            let batch = ProjectionBatch::Snapshot {
+                schema_version: protocol::PROJECTION_SCHEMA_VERSION,
+                machine_id: machine_id.clone(),
+                source_epoch: source_epoch.into(),
+                snapshot_id: snapshot_id.clone(),
+                snapshot_cursor,
+                chunk_index: batches.len() as u32,
+                final_chunk,
+                sent_at,
+                records: records[offset..offset + take].to_vec(),
+            };
+            let encoded = serde_json::to_vec(&batch).map_err(internal)?;
+            if encoded.len() <= maximum_bytes {
+                batches.push(batch);
+                offset += take;
+                break;
+            }
+            if take == 1 {
+                return Err(internal(format!(
+                    "one projection snapshot record exceeds the {maximum_bytes}-byte control bound"
+                )));
+            }
+            take -= 1;
+        }
+    }
+    Ok(batches)
 }
 
 pub(crate) fn projection_epoch(machine_id: &MachineId) -> String {
@@ -887,4 +979,83 @@ fn identity_failure(message: String) -> LinkFailure {
 
 fn internal(message: impl std::fmt::Display) -> LinkFailure {
     LinkFailure::new(LocalErrorCode::Internal, message.to_string())
+}
+
+#[cfg(test)]
+mod projection_tests {
+    use super::*;
+    use protocol::{ProjectedMetricScope, ProjectedMetrics, ProjectionChange, SessionId};
+
+    fn metric(cursor: u64) -> ProjectionChange {
+        ProjectionChange::MetricsReplace {
+            cursor,
+            metrics: ProjectedMetrics {
+                scope: ProjectedMetricScope::Session,
+                session_id: Some(SessionId(cursor)),
+                at: Timestamp(cursor as i64),
+                cpu_percent: cursor as f32,
+                ram_used_bytes: cursor,
+                ram_total_bytes: None,
+                gpu_percent: None,
+                vram_used_bytes: None,
+                vram_total_bytes: None,
+            },
+        }
+    }
+
+    #[test]
+    fn snapshot_batches_are_bounded_ordered_and_finalized_once() {
+        let batches = projection_snapshot_batches(
+            &MachineId("machine-a".into()),
+            "epoch-a",
+            3,
+            Timestamp(10),
+            vec![metric(1), metric(2), metric(3)],
+            2,
+            64 * 1024,
+        )
+        .unwrap();
+        assert_eq!(batches.len(), 2);
+        assert!(matches!(
+            &batches[0],
+            ProjectionBatch::Snapshot {
+                chunk_index: 0,
+                final_chunk: false,
+                records,
+                ..
+            } if records.len() == 2
+        ));
+        assert!(matches!(
+            &batches[1],
+            ProjectionBatch::Snapshot {
+                chunk_index: 1,
+                final_chunk: true,
+                records,
+                ..
+            } if records.len() == 1
+        ));
+    }
+
+    #[test]
+    fn empty_projection_has_one_final_snapshot_chunk() {
+        let batches = projection_snapshot_batches(
+            &MachineId("machine-a".into()),
+            "epoch-a",
+            0,
+            Timestamp(10),
+            vec![],
+            128,
+            64 * 1024,
+        )
+        .unwrap();
+        assert!(matches!(
+            &batches[0],
+            ProjectionBatch::Snapshot {
+                chunk_index: 0,
+                final_chunk: true,
+                records,
+                ..
+            } if records.is_empty()
+        ));
+    }
 }

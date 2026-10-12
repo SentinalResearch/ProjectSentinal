@@ -261,6 +261,56 @@ fn projection_ingress_is_authenticated_machine_bound_and_idempotent() {
 }
 
 #[test]
+fn projection_reconnect_replays_machine_scoped_revisions() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    h.control
+        .accept_projection(credential.expose(), projection_batch(WORKER_A))
+        .unwrap();
+
+    let updates = h.control.projection_updates_after(0).unwrap();
+    assert_eq!(updates.len(), 1);
+    assert!(matches!(
+        &updates[0],
+        protocol::ControlProjectionMessage::ProjectionDelta {
+            machine_id: Some(machine_id),
+            from_revision: 0,
+            to_revision: 1,
+            changes,
+        } if *machine_id == MachineId(WORKER_A.into()) && changes.len() == 1
+    ));
+}
+
+#[test]
+fn revoking_a_machine_purges_its_disposable_projection() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    h.control
+        .accept_projection(credential.expose(), projection_batch(WORKER_A))
+        .unwrap();
+    assert_eq!(
+        h.store
+            .projected_sessions(&MachineId(WORKER_A.into()), 10)
+            .unwrap()
+            .len(),
+        1
+    );
+
+    h.control.revoke(&MachineId(WORKER_A.into())).unwrap();
+
+    assert!(h
+        .store
+        .projected_sessions(&MachineId(WORKER_A.into()), 10)
+        .unwrap()
+        .is_empty());
+    assert!(h
+        .store
+        .control_projection_state(&MachineId(WORKER_A.into()))
+        .unwrap()
+        .is_none());
+}
+
+#[test]
 fn routing_targets_are_machine_scoped_and_revocation_removes_only_one() {
     let h = harness();
     let credential_a = h.pair(WORKER_A, "A");
@@ -316,6 +366,18 @@ fn routing_refuses_an_expired_machine_credential() {
             .failure
             .code,
         LinkFailureCode::Unauthorized
+    );
+    let projected = h
+        .control
+        .projection_snapshot()
+        .unwrap()
+        .machines
+        .into_iter()
+        .find(|machine| machine.machine_id == MachineId(WORKER_A.into()))
+        .unwrap();
+    assert_eq!(
+        projected.freshness,
+        protocol::ProjectionFreshness::AuthExpired
     );
 }
 

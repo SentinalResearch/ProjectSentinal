@@ -5,6 +5,7 @@
 //! credentials; each side keeps only a hash of the one it verifies.
 
 mod proxy;
+pub mod release_watch;
 pub mod routes;
 mod secrets;
 
@@ -52,6 +53,7 @@ const MAX_PROJECTED_MACHINES: usize = 100;
 const MAX_PROJECTED_SESSIONS: u32 = 1_000;
 const MAX_PROJECTED_EVENTS: u32 = 1_000;
 const MAX_PROJECTED_METRICS: u32 = 1_001;
+const MAX_PROJECTION_CATCH_UP: u32 = 1_000;
 
 type Clock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
 
@@ -513,18 +515,21 @@ impl ControlService {
                 .store
                 .control_projection_revision()
                 .map_err(ControlFailure::internal)?;
-            let update = changes.map_or(
-                ControlProjectionMessage::SnapshotRequired {
-                    current_revision: after_revision,
-                    reason: ControlSnapshotReason::RevisionMismatch,
-                },
-                |changes| ControlProjectionMessage::ProjectionDelta {
-                    from_revision: before_revision,
-                    to_revision: after_revision,
-                    changes,
-                },
-            );
-            let _ = self.projection_updates.send(update);
+            if after_revision > before_revision {
+                let update = changes.map_or(
+                    ControlProjectionMessage::SnapshotRequired {
+                        current_revision: after_revision,
+                        reason: ControlSnapshotReason::RevisionMismatch,
+                    },
+                    |changes| ControlProjectionMessage::ProjectionDelta {
+                        machine_id: Some(machine_id.clone()),
+                        from_revision: before_revision,
+                        to_revision: after_revision,
+                        changes,
+                    },
+                );
+                let _ = self.projection_updates.send(update);
+            }
         }
         let metadata = format!(
             "status={:?},cursor={},bytes={}",
@@ -544,6 +549,46 @@ impl ControlService {
         &self,
     ) -> tokio::sync::broadcast::Receiver<ControlProjectionMessage> {
         self.projection_updates.subscribe()
+    }
+
+    /// Return a bounded revision-ordered catch-up for a reconnecting owner stream.
+    pub fn projection_updates_after(
+        &self,
+        after: u64,
+    ) -> Result<Vec<ControlProjectionMessage>, ControlFailure> {
+        let current = self
+            .store
+            .control_projection_revision()
+            .map_err(ControlFailure::internal)?;
+        if after > current {
+            return Ok(vec![ControlProjectionMessage::SnapshotRequired {
+                current_revision: current,
+                reason: ControlSnapshotReason::RevisionMismatch,
+            }]);
+        }
+        let revisions = self
+            .store
+            .control_projection_changes_after(after, MAX_PROJECTION_CATCH_UP + 1)
+            .map_err(ControlFailure::internal)?;
+        if revisions.len() > MAX_PROJECTION_CATCH_UP as usize
+            || revisions
+                .first()
+                .is_some_and(|revision| revision.revision != after.saturating_add(1))
+        {
+            return Ok(vec![ControlProjectionMessage::SnapshotRequired {
+                current_revision: current,
+                reason: ControlSnapshotReason::DeltaBoundExceeded,
+            }]);
+        }
+        Ok(revisions
+            .into_iter()
+            .map(|revision| ControlProjectionMessage::ProjectionDelta {
+                machine_id: Some(revision.machine_id),
+                from_revision: revision.revision.saturating_sub(1),
+                to_revision: revision.revision,
+                changes: vec![revision.change],
+            })
+            .collect())
     }
 
     /// Build one bounded owner dashboard snapshot from local SQLite only.
@@ -570,7 +615,12 @@ impl ControlService {
                 .saturating_sub(MAX_PROJECTED_SESSIONS as usize)
                 as u32;
             omitted_sessions = omitted_sessions.saturating_add(machine_omitted);
-            let freshness = projection_freshness(machine.status, state.as_ref(), now);
+            let credential_expired = machine
+                .credential
+                .as_ref()
+                .is_some_and(|credential| credential.expires_at.0 <= now.0);
+            let freshness =
+                projection_freshness(machine.status, credential_expired, state.as_ref(), now);
             machines.push(ControlProjectedMachine {
                 machine_id: machine.machine_id.clone(),
                 display_name: machine.display_name,
@@ -802,6 +852,9 @@ impl ControlService {
             .revoke_registry_machine(machine_id, now)
             .map_err(ControlFailure::internal)?
             .ok_or_else(not_found)?;
+        self.store
+            .purge_control_projection(machine_id)
+            .map_err(ControlFailure::internal)?;
         self.with_secrets(|secrets| secrets.remove(&links))?;
         self.audit.machine(now, "REVOKED", machine_id, None);
         Ok(())
@@ -1128,9 +1181,13 @@ impl ControlService {
 
 fn projection_freshness(
     registry: RegistryStatus,
+    credential_expired: bool,
     state: Option<&store::ControlProjectionState>,
     now: Timestamp,
 ) -> ProjectionFreshness {
+    if credential_expired {
+        return ProjectionFreshness::AuthExpired;
+    }
     match registry {
         RegistryStatus::Revoked => ProjectionFreshness::Revoked,
         RegistryStatus::Disconnected => ProjectionFreshness::Disconnected,

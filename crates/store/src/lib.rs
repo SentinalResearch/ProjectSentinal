@@ -29,7 +29,7 @@ pub use native_push::{
     StoredNotificationIntent, StoredPushSubscription,
 };
 pub use notification_deliveries::{NewNotificationDelivery, NotificationDelivery};
-pub use projection::{ControlProjectionState, ProjectionOutboxLimits};
+pub use projection::{ControlProjectionRevision, ControlProjectionState, ProjectionOutboxLimits};
 
 const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("../migrations/001_initial.sql")),
@@ -42,6 +42,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
     ),
     (6, include_str!("../migrations/006_native_push.sql")),
     (7, include_str!("../migrations/007_projection.sql")),
+    (8, include_str!("../migrations/008_projection_resync.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.

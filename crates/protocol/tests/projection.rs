@@ -39,6 +39,40 @@ fn every_projection_body_round_trips() {
 }
 
 #[test]
+fn legacy_control_delta_without_machine_identity_still_decodes() {
+    let value = serde_json::json!({
+        "type": "PROJECTION_DELTA",
+        "from_revision": 1,
+        "to_revision": 2,
+        "changes": []
+    });
+    let decoded: ControlProjectionMessage = serde_json::from_value(value).unwrap();
+    assert!(matches!(
+        decoded,
+        ControlProjectionMessage::ProjectionDelta {
+            machine_id: None,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn an_empty_final_snapshot_can_clear_a_control_projection() {
+    let snapshot = ProjectionBatch::Snapshot {
+        schema_version: protocol::PROJECTION_SCHEMA_VERSION,
+        machine_id: MachineId("machine-a".into()),
+        source_epoch: "epoch-a".into(),
+        snapshot_id: "snapshot-a".into(),
+        snapshot_cursor: 0,
+        chunk_index: 0,
+        final_chunk: true,
+        sent_at: Timestamp(1),
+        records: vec![],
+    };
+    snapshot.validate().unwrap();
+}
+
+#[test]
 fn legacy_heartbeat_defaults_to_no_projection_capability() {
     let fixture =
         serde_json::from_str::<Value>(include_str!("fixtures/machine_link.json")).unwrap();

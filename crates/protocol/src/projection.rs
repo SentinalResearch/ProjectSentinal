@@ -501,7 +501,13 @@ impl ProjectionBatch {
                 changes,
                 ..
             } => {
-                validate_batch_header(*schema_version, machine_id, source_epoch, changes.len())?;
+                validate_batch_header(
+                    *schema_version,
+                    machine_id,
+                    source_epoch,
+                    changes.len(),
+                    false,
+                )?;
                 if *through_cursor <= *base_cursor {
                     return Err(invalid(
                         "through_cursor",
@@ -522,10 +528,19 @@ impl ProjectionBatch {
                 source_epoch,
                 snapshot_id,
                 snapshot_cursor,
+                chunk_index,
+                final_chunk,
                 records,
                 ..
             } => {
-                validate_batch_header(*schema_version, machine_id, source_epoch, records.len())?;
+                let empty_final = records.is_empty() && *chunk_index == 0 && *final_chunk;
+                validate_batch_header(
+                    *schema_version,
+                    machine_id,
+                    source_epoch,
+                    records.len(),
+                    empty_final,
+                )?;
                 validate_token("snapshot_id", snapshot_id)?;
                 let mut previous = 0;
                 for record in records {
@@ -549,13 +564,14 @@ fn validate_batch_header(
     machine_id: &MachineId,
     source_epoch: &str,
     change_count: usize,
+    allow_empty: bool,
 ) -> Result<(), ProtocolError> {
     if schema_version != PROJECTION_SCHEMA_VERSION {
         return Err(invalid("schema_version", "is unsupported"));
     }
     validate_token("machine_id", &machine_id.0)?;
     validate_token("source_epoch", source_epoch)?;
-    if change_count == 0 || change_count > MAX_PROJECTION_CHANGES {
+    if (!allow_empty && change_count == 0) || change_count > MAX_PROJECTION_CHANGES {
         return Err(invalid("changes", "must contain between 1 and 128 records"));
     }
     Ok(())
@@ -736,6 +752,9 @@ pub enum ControlSnapshotReason {
 pub enum ControlProjectionMessage {
     /// Ordered committed projection changes.
     ProjectionDelta {
+        /// Machine whose projection changed. Missing only on legacy messages.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        machine_id: Option<MachineId>,
         /// Previous control-view revision.
         from_revision: u64,
         /// New control-view revision.

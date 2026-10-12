@@ -14,7 +14,7 @@ use crate::{
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        ConnectInfo, DefaultBodyLimit, Path, State,
+        ConnectInfo, DefaultBodyLimit, Path, Query, State,
     },
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
@@ -30,6 +30,12 @@ use protocol::{
     ProjectionBatch, PushProviderModeRequest, PushSubscriptionRequest,
 };
 use std::net::SocketAddr;
+
+#[derive(Debug, serde::Deserialize)]
+struct ProjectionLiveQuery {
+    #[serde(default)]
+    after: u64,
+}
 
 /// Link bodies are small; anything larger is refused before parsing.
 const MAX_LINK_BODY_BYTES: usize = 64 * 1024;
@@ -287,15 +293,19 @@ async fn projection_snapshot(State(routes): State<ControlRoutes>, headers: Heade
 async fn projection_live(
     State(routes): State<ControlRoutes>,
     headers: HeaderMap,
+    Query(query): Query<ProjectionLiveQuery>,
     upgrade: WebSocketUpgrade,
 ) -> Response {
     match routes.owner(&headers) {
         Ok(control) => {
             let control = control.clone();
             let receiver = control.subscribe_projection_updates();
-            upgrade
-                .on_upgrade(move |socket| projection_socket(socket, control, receiver))
-                .into_response()
+            match control.projection_updates_after(query.after) {
+                Ok(initial) => upgrade
+                    .on_upgrade(move |socket| projection_socket(socket, control, receiver, initial))
+                    .into_response(),
+                Err(failure) => failure_response(failure),
+            }
         }
         Err(failure) => failure_response(failure),
     }
@@ -305,7 +315,16 @@ async fn projection_socket(
     mut socket: WebSocket,
     control: ControlService,
     mut receiver: tokio::sync::broadcast::Receiver<ControlProjectionMessage>,
+    initial: Vec<ControlProjectionMessage>,
 ) {
+    for message in initial {
+        let Ok(encoded) = serde_json::to_string(&message) else {
+            return;
+        };
+        if socket.send(Message::Text(encoded.into())).await.is_err() {
+            return;
+        }
+    }
     loop {
         let message = match receiver.recv().await {
             Ok(message) => message,
