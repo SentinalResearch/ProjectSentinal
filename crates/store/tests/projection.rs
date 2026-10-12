@@ -67,7 +67,7 @@ fn event(cursor: u64, session_id: u64) -> ProjectionChange {
 #[test]
 fn migration_seven_adds_projection_tables_without_resetting_existing_data() {
     let store = Store::open_in_memory().unwrap();
-    assert_eq!(store.schema_version().unwrap(), 9);
+    assert_eq!(store.schema_version().unwrap(), 10);
     for table in [
         "projection_worker_state",
         "projection_outbox",

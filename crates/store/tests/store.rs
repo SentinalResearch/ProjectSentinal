@@ -63,7 +63,7 @@ fn command(id: u64, session_id: u64, text: &str, at: i64) -> Command {
 #[test]
 fn migrations_from_empty_database_enable_wal_and_create_every_table() {
     let store = Store::open_in_memory().unwrap();
-    assert_eq!(store.schema_version().unwrap(), 9);
+    assert_eq!(store.schema_version().unwrap(), 10);
     assert_eq!(store.journal_mode().unwrap(), "memory");
     for table in [
         "machines",
@@ -341,7 +341,7 @@ fn pre_1b_session_json_loads_with_safe_defaults_and_updates_without_migration() 
     assert_eq!(loaded.capture, protocol::CaptureLevel::Full);
     assert_eq!(loaded.pid, None);
     store.update_session(&loaded).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 9);
+    assert_eq!(store.schema_version().unwrap(), 10);
     drop(store);
     std::fs::remove_file(path).unwrap();
 }
@@ -540,7 +540,7 @@ fn version_one_database_migrates_without_resetting_legacy_sessions() {
     drop(connection);
 
     let store = Store::open(&path).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 9);
+    assert_eq!(store.schema_version().unwrap(), 10);
     assert_eq!(
         store.session(SessionId(1)).unwrap().unwrap().continued_from,
         None

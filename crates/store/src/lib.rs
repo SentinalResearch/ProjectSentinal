@@ -6,6 +6,7 @@ mod log_cursors;
 mod metrics;
 mod native_push;
 mod notification_deliveries;
+pub mod pairing_requests;
 mod projection;
 mod records;
 pub mod registry;
@@ -47,6 +48,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
         9,
         include_str!("../migrations/009_projection_snapshot_required.sql"),
     ),
+    (10, include_str!("../migrations/010_pairing_requests.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.

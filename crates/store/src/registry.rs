@@ -254,51 +254,12 @@ impl Store {
         let Some(code_id) = consumed else {
             return Ok(None);
         };
-        let replaced_links = {
-            let mut statement = transaction.prepare(
-                "UPDATE registry_links SET revoked_at = ?2
-                 WHERE machine_id = ?1 AND revoked_at IS NULL RETURNING link_id",
-            )?;
-            let rows = statement.query_map(params![machine_id, record.now.0], |row| row.get(0))?;
-            rows.collect::<Result<Vec<String>, _>>()?
-        };
-        let machine = &record.machine;
-        transaction.execute(
-            "INSERT INTO registry_machines(machine_id, display_name, role, os, daemon_version,
-                 capabilities_json, endpoint_json, state, paired_at, last_seen, last_sequence)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, 0)
-             ON CONFLICT(machine_id) DO UPDATE SET
-                 os = excluded.os, daemon_version = excluded.daemon_version,
-                 capabilities_json = excluded.capabilities_json, endpoint_json = excluded.endpoint_json,
-                 state = excluded.state, last_sequence = 0",
-            params![
-                machine_id,
-                machine.display_name,
-                role_text(machine.role),
-                machine.os.map(|os| serde_json::to_string(&os)).transpose()?,
-                machine.daemon_version,
-                serde_json::to_string(&machine.capabilities)?,
-                machine.endpoint.as_ref().map(serde_json::to_string).transpose()?,
-                RegistryState::Active.as_str(),
-                machine.paired_at.0,
-            ],
-        )?;
-        let link = &record.link;
-        transaction.execute(
-            "INSERT INTO registry_links(link_id, machine_id, worker_credential_sha256, created_at, expires_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                link.link_id,
-                machine_id,
-                link.worker_credential_sha256,
-                link.created_at.0,
-                link.expires_at.0
-            ],
-        )?;
-        let display_name: String = transaction.query_row(
-            "SELECT display_name FROM registry_machines WHERE machine_id = ?1",
-            [machine_id],
-            |row| row.get(0),
+        let (replaced_links, display_name) = write_link(
+            &transaction,
+            &record.machine,
+            &record.link,
+            record.now,
+            false,
         )?;
         transaction.commit()?;
         Ok(Some(ExchangeOutcome {
@@ -587,6 +548,74 @@ type RawRegistryRow = (
     Option<i64>,
     i64,
 );
+
+/// The registry and link writes shared by code exchange and approval: revoke
+/// the Machine's earlier links, upsert it ACTIVE (keeping an owner rename
+/// unless `rename`), and insert the new link. Returns the revoked link IDs and
+/// the recorded display name.
+pub(crate) fn write_link(
+    transaction: &rusqlite::Transaction<'_>,
+    machine: &RegistryRow,
+    link: &LinkRow,
+    now: Timestamp,
+    rename: bool,
+) -> Result<(Vec<String>, String), StoreError> {
+    let machine_id = &machine.machine_id.0;
+    let replaced_links = {
+        let mut statement = transaction.prepare(
+            "UPDATE registry_links SET revoked_at = ?2
+             WHERE machine_id = ?1 AND revoked_at IS NULL RETURNING link_id",
+        )?;
+        let rows = statement.query_map(params![machine_id, now.0], |row| row.get(0))?;
+        rows.collect::<Result<Vec<String>, _>>()?
+    };
+    transaction.execute(
+        "INSERT INTO registry_machines(machine_id, display_name, role, os, daemon_version,
+             capabilities_json, endpoint_json, state, paired_at, last_seen, last_sequence)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, 0)
+         ON CONFLICT(machine_id) DO UPDATE SET
+             display_name = CASE WHEN ?10 THEN excluded.display_name ELSE display_name END,
+             os = excluded.os, daemon_version = excluded.daemon_version,
+             capabilities_json = excluded.capabilities_json, endpoint_json = excluded.endpoint_json,
+             state = excluded.state, last_sequence = 0",
+        params![
+            machine_id,
+            machine.display_name,
+            role_text(machine.role),
+            machine
+                .os
+                .map(|os| serde_json::to_string(&os))
+                .transpose()?,
+            machine.daemon_version,
+            serde_json::to_string(&machine.capabilities)?,
+            machine
+                .endpoint
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()?,
+            RegistryState::Active.as_str(),
+            machine.paired_at.0,
+            rename,
+        ],
+    )?;
+    transaction.execute(
+        "INSERT INTO registry_links(link_id, machine_id, worker_credential_sha256, created_at, expires_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![
+            link.link_id,
+            machine_id,
+            link.worker_credential_sha256,
+            link.created_at.0,
+            link.expires_at.0
+        ],
+    )?;
+    let display_name: String = transaction.query_row(
+        "SELECT display_name FROM registry_machines WHERE machine_id = ?1",
+        [machine_id],
+        |row| row.get(0),
+    )?;
+    Ok((replaced_links, display_name))
+}
 
 fn raw_registry_row(row: &Row<'_>) -> rusqlite::Result<RawRegistryRow> {
     Ok((
