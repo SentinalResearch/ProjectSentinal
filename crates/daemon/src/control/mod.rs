@@ -5,12 +5,15 @@
 //! credentials; each side keeps only a hash of the one it verifies.
 
 mod proxy;
+mod refresh;
 mod release;
 pub mod release_actions;
 mod release_routes;
 pub mod release_watch;
 pub mod routes;
 mod secrets;
+
+pub use refresh::RefreshFault;
 
 pub use release::{ControlRelease, ControlReleaseSettings, Detach};
 
@@ -22,9 +25,9 @@ use protocol::{
     link::{
         connect_command, normalize_pairing_code, validate_display_name, LinkCredentialInfo,
         LinkEndpoint, LinkExchangeRequest, LinkExchangeResponse, LinkFailure, LinkFailureCode,
-        LinkHeartbeatRequest, LinkHeartbeatResponse, LinkRefreshRequest, LinkRefreshResponse,
-        LinkStatus, MachineCapability, MachineRole, PairingCode, PairingCodeState,
-        PairingCodeStatus, RegistryMachine, RegistryMachines, RegistryStatus,
+        LinkHeartbeatRequest, LinkHeartbeatResponse, LinkStatus, MachineCapability, MachineRole,
+        PairingCode, PairingCodeState, PairingCodeStatus, RegistryMachine, RegistryMachines,
+        RegistryStatus,
     },
     ControlProjectedMachine, ControlProjectionMessage, ControlProjectionSnapshot,
     ControlSnapshotReason, MachineId, NotificationIntentAcknowledgement, NotificationIntentBatch,
@@ -131,6 +134,7 @@ pub struct ControlService {
     secrets: Arc<Mutex<ControlSecrets>>,
     audit: LinkAudit,
     projection_updates: tokio::sync::broadcast::Sender<ControlProjectionMessage>,
+    refresh_fault: Arc<Mutex<Option<RefreshFault>>>,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -173,14 +177,20 @@ impl ControlService {
             })
             .map_err(|error| ControlError(error.to_string()))?;
         let (projection_updates, _) = tokio::sync::broadcast::channel(256);
-        Ok(ControlService {
+        let service = ControlService {
             store,
             audit: LinkAudit::new(&settings.audit_dir, "pairing-audit.jsonl"),
             settings: Arc::new(settings),
             clock,
             secrets: Arc::new(Mutex::new(secrets)),
             projection_updates,
-        })
+            refresh_fault: Arc::new(Mutex::new(None)),
+        };
+        // A refresh interrupted by a crash never reached the worker: undo it.
+        service
+            .reconcile_refresh()
+            .map_err(|failure| ControlError(failure.failure.message))?;
+        Ok(service)
     }
 
     /// This control's Machine ID.
@@ -454,7 +464,9 @@ impl ControlService {
             status: LinkStatus::Active,
             display_name,
             next_heartbeat_ms: self.settings.heartbeat_interval_ms,
-            refresh_due: link.expires_at.0 - now.0 < REFRESH_WITHIN_MS,
+            // A worker still on its previous credential missed a refresh reply.
+            refresh_due: link.expires_at.0 - now.0 < REFRESH_WITHIN_MS
+                || link.worker_credential_sha256 != link_crypto::sha256_hex(bearer),
             notification_ingress: Some(
                 self.store.push_provider_mode().ok() == Some(PushProviderMode::WebPush),
             ),
@@ -781,52 +793,6 @@ impl ControlService {
             Some(&metadata),
         );
         Ok(acknowledgement)
-    }
-
-    /// Rotate both credentials of a link.
-    pub fn refresh(
-        &self,
-        bearer: &str,
-        request: LinkRefreshRequest,
-    ) -> Result<LinkRefreshResponse, ControlFailure> {
-        let now = (self.clock)();
-        let link = self.authenticate(bearer, &request.machine_id, now)?;
-        if !link_crypto::is_credential(request.control_credential.expose()) {
-            return Err(ControlFailure::new(
-                400,
-                LinkFailureCode::InvalidRequest,
-                "control_credential must be 64 hex characters",
-            ));
-        }
-        let worker_credential = link_crypto::new_credential().map_err(ControlFailure::internal)?;
-        let expires_at = Timestamp(now.0 + CREDENTIAL_LIFETIME_MS);
-        self.with_secrets(|secrets| {
-            secrets.insert(
-                &link.link_id,
-                PresentedCredential {
-                    machine_id: request.machine_id.clone(),
-                    control_credential: request.control_credential.clone(),
-                },
-            )
-        })?;
-        self.store
-            .rotate_link(
-                &link.link_id,
-                &link_crypto::sha256_hex(&worker_credential),
-                expires_at,
-                Timestamp(now.0 + REFRESH_GRACE_MS),
-                now,
-            )
-            .map_err(ControlFailure::internal)?;
-        self.audit.append(&LinkAuditRecord {
-            machine_id: Some(&request.machine_id.0),
-            link_id: Some(&link.link_id),
-            ..LinkAuditRecord::new(now, "CREDENTIAL_REFRESHED")
-        });
-        Ok(LinkRefreshResponse {
-            worker_credential: Secret::new(worker_credential),
-            credential_expires_at: expires_at,
-        })
     }
 
     /// A worker ends its own link.

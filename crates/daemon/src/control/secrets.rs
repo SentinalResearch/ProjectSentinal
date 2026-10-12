@@ -2,7 +2,7 @@
 //! credentials the control presents to each worker.
 
 use crate::{link_crypto, private_fs::private_file_options};
-use protocol::{MachineId, Secret};
+use protocol::{MachineId, Secret, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -21,11 +21,26 @@ pub(super) struct PresentedCredential {
     pub(super) control_credential: Secret,
 }
 
+/// A credential refresh between its two writes (F5): what to restore if it
+/// does not complete. Written atomically together with the new credential.
+#[derive(Clone, Serialize, Deserialize)]
+pub(super) struct PendingRefresh {
+    pub(super) link_id: String,
+    /// The credential presented before the refresh (`None`: there was none).
+    pub(super) previous: Option<PresentedCredential>,
+    /// SHA-256 of the worker credential before the refresh.
+    pub(super) previous_sha256: String,
+    /// Expiry of the worker credential before the refresh.
+    pub(super) previous_expires_at: Timestamp,
+}
+
 #[derive(Serialize, Deserialize)]
 struct SecretsFile {
     version: u32,
     pairing_key: Secret,
     links: BTreeMap<String, PresentedCredential>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pending_refresh: Option<PendingRefresh>,
 }
 
 /// In-memory copy of the owner-only secrets file.
@@ -64,6 +79,7 @@ impl ControlSecrets {
                     link_crypto::new_credential().map_err(|error| error.to_string())?,
                 ),
                 links: BTreeMap::new(),
+                pending_refresh: None,
             },
             Err(error) => return Err(format!("cannot read '{}': {error}", path.display())),
         };
@@ -87,6 +103,43 @@ impl ControlSecrets {
         credential: PresentedCredential,
     ) -> Result<(), String> {
         self.file.links.insert(link_id.to_string(), credential);
+        self.persist()
+    }
+
+    /// Present `credential` for `link_id`, recording how to undo it, in one write.
+    pub(super) fn begin_refresh(
+        &mut self,
+        credential: PresentedCredential,
+        pending: PendingRefresh,
+    ) -> Result<(), String> {
+        self.file.links.insert(pending.link_id.clone(), credential);
+        self.file.pending_refresh = Some(pending);
+        self.persist()
+    }
+
+    /// The refresh completed on both sides; forget how to undo it.
+    pub(super) fn commit_refresh(&mut self) -> Result<(), String> {
+        self.file.pending_refresh = None;
+        self.persist()
+    }
+
+    /// A refresh that did not complete, if any.
+    pub(super) fn pending_refresh(&self) -> Option<PendingRefresh> {
+        self.file.pending_refresh.clone()
+    }
+
+    /// Restore the credential presented before an incomplete refresh.
+    pub(super) fn abort_refresh(&mut self) -> Result<(), String> {
+        if let Some(pending) = self.file.pending_refresh.take() {
+            match pending.previous {
+                Some(previous) => {
+                    self.file.links.insert(pending.link_id, previous);
+                }
+                None => {
+                    self.file.links.remove(&pending.link_id);
+                }
+            }
+        }
         self.persist()
     }
 

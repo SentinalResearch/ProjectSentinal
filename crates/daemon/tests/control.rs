@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use daemon::control::{ControlService, ControlSettings};
+use daemon::control::{ControlService, ControlSettings, RefreshFault};
 use protocol::{
     link::{
         LinkEndpoint, LinkExchangeRequest, LinkFailureCode, LinkHeartbeatRequest, LinkMachineInfo,
@@ -1001,6 +1001,103 @@ fn refresh_rotates_both_credentials_with_a_short_grace() {
     assert_eq!(
         h.heartbeat(&refreshed.worker_credential, WORKER_A, 3),
         Ok(())
+    );
+}
+
+fn refresh_request() -> LinkRefreshRequest {
+    LinkRefreshRequest {
+        machine_id: MachineId(WORKER_A.into()),
+        control_credential: Secret::new("d".repeat(64)),
+    }
+}
+
+#[test]
+fn a_refresh_whose_rotation_fails_rolls_back_the_presented_credential() {
+    // F5: the secrets file used to keep the new control credential even when
+    // the SQLite rotation failed, so control → worker calls stopped working.
+    let h = harness();
+    let old = h.pair(WORKER_A, "A");
+    let presented = h.secrets();
+    h.control
+        .inject_refresh_fault(Some(RefreshFault::RotationFails));
+    assert!(h.control.refresh(old.expose(), refresh_request()).is_err());
+    assert_eq!(h.secrets(), presented, "secrets must be exactly as before");
+    h.advance(10 * 60_000);
+    assert_eq!(
+        h.heartbeat(&old, WORKER_A, 1),
+        Ok(()),
+        "the old credential still works"
+    );
+    assert!(h.audit().contains("CREDENTIAL_REFRESH_ROLLED_BACK"));
+}
+
+#[test]
+fn a_crash_mid_refresh_is_rolled_back_when_the_control_restarts() {
+    let h = harness();
+    let old = h.pair(WORKER_A, "A");
+    h.control
+        .inject_refresh_fault(Some(RefreshFault::CrashBeforeCommit));
+    let lost = h.control.refresh(old.expose(), refresh_request());
+    assert!(
+        lost.is_err(),
+        "the worker never receives the new credential"
+    );
+
+    // Restart on the same store and secrets file.
+    let restarted = open(&h.store, &h.clock, &h.dir);
+    h.advance(10 * 60_000);
+    let heartbeat = restarted.heartbeat(
+        old.expose(),
+        LinkHeartbeatRequest {
+            machine_id: MachineId(WORKER_A.into()),
+            sequence: 1,
+            sent_at: h.now(),
+            endpoint: endpoint("100.74.239.89"),
+            daemon_version: "0.0.1".into(),
+            capabilities: vec![MachineCapability::Sessions],
+            projection_sync: None,
+        },
+    );
+    assert!(
+        heartbeat.is_ok(),
+        "the worker's credential must survive the crash"
+    );
+    assert!(
+        !h.secrets().contains(&"d".repeat(64)),
+        "the unreceived control credential is gone"
+    );
+    assert!(!h.secrets().contains("pending_refresh"));
+    assert!(h.audit().contains("CREDENTIAL_REFRESH_ROLLED_BACK"));
+}
+
+#[test]
+fn a_worker_still_on_its_previous_credential_is_told_to_refresh_again() {
+    // A refresh reply lost in transit leaves the worker on its old credential;
+    // during the grace period it must be asked to refresh, not locked out.
+    let h = harness();
+    let old = h.pair(WORKER_A, "A");
+    let refreshed = h.control.refresh(old.expose(), refresh_request()).unwrap();
+    let ask = |credential: &Secret, sequence| {
+        h.control
+            .heartbeat(
+                credential.expose(),
+                LinkHeartbeatRequest {
+                    machine_id: MachineId(WORKER_A.into()),
+                    sequence,
+                    sent_at: h.now(),
+                    endpoint: endpoint("100.74.239.89"),
+                    daemon_version: "0.0.1".into(),
+                    capabilities: vec![MachineCapability::Sessions],
+                    projection_sync: None,
+                },
+            )
+            .unwrap()
+            .refresh_due
+    };
+    assert!(ask(&old, 1), "previous credential → refresh again");
+    assert!(
+        !ask(&refreshed.worker_credential, 2),
+        "current credential → nothing to do"
     );
 }
 
