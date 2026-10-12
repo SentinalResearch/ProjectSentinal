@@ -38,6 +38,7 @@ pub mod message;
 pub mod metric;
 pub mod notification;
 pub mod process;
+pub mod projection;
 pub mod recipe;
 pub mod session;
 pub mod session_log;
@@ -76,6 +77,14 @@ pub use notification::{
     PushSubscriptionState, SessionNotificationRule,
 };
 pub use process::{tree_totals, Process, ProcessState, ProcessTotals};
+pub use projection::{
+    ControlProjectionMessage, ControlProjectionSnapshot, ProjectedCaptureCapabilities,
+    ProjectedEventFacts, ProjectedEventSummary, ProjectedHealth, ProjectedMetricScope,
+    ProjectedMetrics, ProjectedProgressUnit, ProjectedSession, ProjectionAcknowledgement,
+    ProjectionAcknowledgementStatus, ProjectionBatch, ProjectionChange, ProjectionFreshness,
+    ProjectionResyncReason, ProjectionSyncAction, ProjectionSyncDirective, ProjectionSyncReport,
+    MAX_PROJECTION_BATCH_BYTES, MAX_PROJECTION_CHANGES, PROJECTION_SCHEMA_VERSION,
+};
 pub use recipe::{Recipe, RecipeParam};
 pub use session::{CaptureCapabilities, CaptureLevel, Session, SessionOrigin, SessionState};
 pub use session_log::{LogSource, SessionLog};

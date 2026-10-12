@@ -1,0 +1,120 @@
+{
+  "heartbeat_request": {
+    "machine_id": "01M40Q6XWORKER",
+    "sequence": 82,
+    "sent_at": 1791792000000,
+    "endpoint": { "address": "100.66.29.67", "port": 7420, "dns_name": "worker.tailnet.ts.net" },
+    "daemon_version": "0.4.1",
+    "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
+    "projection_sync": { "schema_version": 1, "source_epoch": "pe_01M4D1", "current_cursor": 44, "last_acked_cursor": 41 }
+  },
+  "heartbeat_response": {
+    "status": "ACTIVE",
+    "display_name": "MacBook",
+    "next_heartbeat_ms": 30000,
+    "refresh_due": false,
+    "notification_ingress": true,
+    "projection_sync": { "enabled": true, "schema_version": 1, "committed_cursor": 41, "max_batch_bytes": 262144, "max_changes": 128, "action": "UPLOAD" }
+  },
+  "delta": {
+    "mode": "DELTA",
+    "schema_version": 1,
+    "machine_id": "01M40Q6XWORKER",
+    "source_epoch": "pe_01M4D1",
+    "base_cursor": 41,
+    "through_cursor": 44,
+    "sent_at": 1791792000200,
+    "changes": [
+      {
+        "type": "SESSION_UPSERT",
+        "cursor": 42,
+        "session": {
+          "id": 128,
+          "continued_from": null,
+          "title": "Qwen Training",
+          "state": "RUNNING",
+          "origin": "WATCH",
+          "capture": "FULL",
+          "capabilities": { "can_attach": true, "can_send_input": true, "can_resize": true, "can_kill_daemon_pty": true, "exposes_commands": true, "exposes_terminal_output": true, "exposes_log_output": false, "exposes_metrics": true },
+          "health": { "progress": 68.0, "activity": "GOOD", "resources": "GOOD", "stability": "GOOD", "errors": 0, "overall": "HEALTHY" },
+          "created_at": 1791791900000,
+          "updated_at": 1791792000100,
+          "finished_at": null,
+          "exit_code": null
+        }
+      },
+      {
+        "type": "EVENT_APPEND",
+        "cursor": 43,
+        "event": { "id": 902, "session_id": 128, "at": 1791792000150, "facts": { "category": "PROGRESS", "current": 68, "total": 100, "unit": "EPOCH" } }
+      },
+      {
+        "type": "METRICS_REPLACE",
+        "cursor": 44,
+        "metrics": { "scope": "SESSION", "session_id": 128, "at": 1791792000180, "cpu_percent": 31.0, "ram_used_bytes": 4294967296, "ram_total_bytes": null, "gpu_percent": 96.0, "vram_used_bytes": 21400000000, "vram_total_bytes": null }
+      }
+    ]
+  },
+  "snapshot": {
+    "mode": "SNAPSHOT",
+    "schema_version": 1,
+    "machine_id": "01M40Q6XWORKER",
+    "source_epoch": "pe_01M4D1",
+    "snapshot_id": "ps_01M4D1SYNC",
+    "snapshot_cursor": 52,
+    "chunk_index": 3,
+    "final_chunk": true,
+    "sent_at": 1791792020100,
+    "records": [
+      {
+        "type": "SESSION_UPSERT",
+        "cursor": 52,
+        "session": {
+          "id": 128,
+          "continued_from": null,
+          "title": "Qwen Training",
+          "state": "COMPLETED",
+          "origin": "WATCH",
+          "capture": "FULL",
+          "capabilities": { "can_attach": true, "can_send_input": true, "can_resize": true, "can_kill_daemon_pty": true, "exposes_commands": true, "exposes_terminal_output": true, "exposes_log_output": false, "exposes_metrics": true },
+          "health": null,
+          "created_at": 1791791900000,
+          "updated_at": 1791792020000,
+          "finished_at": 1791792020000,
+          "exit_code": 0
+        }
+      }
+    ]
+  },
+  "acknowledgement": { "status": "ACCEPTED", "source_epoch": "pe_01M4D1", "committed_cursor": 44, "reason": null },
+  "resync": { "status": "RESYNC_REQUIRED", "source_epoch": "pe_01M4D1", "committed_cursor": 38, "reason": "CURSOR_MISMATCH" },
+  "control_snapshot": {
+    "schema_version": 1,
+    "view_revision": 992,
+    "generated_at": 1791792001000,
+    "machines": [
+      {
+        "machine_id": "01M40Q6XWORKER",
+        "display_name": "MacBook",
+        "os": "MACOS",
+        "daemon_version": "0.4.1",
+        "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
+        "registry_status": "ONLINE",
+        "freshness": "STALE",
+        "last_seen": 1791791990000,
+        "observed_at": 1791791980000,
+        "synced_at": 1791791980500,
+        "source_cursor": 44,
+        "sessions": [],
+        "events": [],
+        "metrics": [],
+        "omitted_sessions": 0
+      }
+    ],
+    "omitted_machines": 0,
+    "omitted_sessions": 0,
+    "truncated": false
+  },
+  "control_delta": { "type": "PROJECTION_DELTA", "from_revision": 992, "to_revision": 995, "changes": [] },
+  "snapshot_required": { "type": "SNAPSHOT_REQUIRED", "current_revision": 1210, "reason": "DELTA_BOUND_EXCEEDED" }
+}

@@ -2,6 +2,7 @@
 import type { LinkEndpoint } from "./LinkEndpoint";
 import type { MachineCapability } from "./MachineCapability";
 import type { MachineId } from "./MachineId";
+import type { ProjectionSyncReport } from "./ProjectionSyncReport";
 import type { Timestamp } from "./Timestamp";
 
 /**
@@ -32,4 +33,8 @@ export type LinkHeartbeatRequest = {
    * Capabilities.
    */
   capabilities: Array<MachineCapability>;
+  /**
+   * Optional projection capability and worker cursor state.
+   */
+  projection_sync?: ProjectionSyncReport | null;
 };

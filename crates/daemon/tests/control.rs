@@ -141,6 +141,7 @@ impl Harness {
                     endpoint: endpoint("100.74.239.89"),
                     daemon_version: "0.0.1".into(),
                     capabilities: vec![MachineCapability::Sessions],
+                    projection_sync: None,
                 },
             )
             .map(|_| ())
@@ -550,6 +551,7 @@ fn heartbeats_reject_replays_wrong_machines_skew_and_unknown_credentials() {
             endpoint: endpoint("100.74.239.89"),
             daemon_version: "0.0.1".into(),
             capabilities: vec![],
+            projection_sync: None,
         },
     );
     assert_eq!(
@@ -572,6 +574,7 @@ fn endpoint_changes_are_recorded_and_audited() {
                 endpoint: endpoint("100.100.1.2"),
                 daemon_version: "0.0.1".into(),
                 capabilities: vec![],
+                projection_sync: None,
             },
         )
         .unwrap();

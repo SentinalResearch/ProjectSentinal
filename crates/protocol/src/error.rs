@@ -206,6 +206,15 @@ pub enum ProtocolError {
         reason: &'static str,
     },
 
+    /// A control projection field failed compatibility or bounds validation.
+    #[error("projection {field} {reason}")]
+    InvalidProjectionField {
+        /// Projection field containing the bad input.
+        field: &'static str,
+        /// Stable reason that does not repeat untrusted content.
+        reason: &'static str,
+    },
+
     /// The JSON could not be parsed into the expected type.
     #[error("invalid JSON: {0}")]
     Json(String),

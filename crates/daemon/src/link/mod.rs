@@ -499,6 +499,7 @@ impl LinkManager {
             endpoint: self.inner.settings.endpoint.clone(),
             daemon_version: self.inner.settings.daemon_version.clone(),
             capabilities: all_capabilities(),
+            projection_sync: None,
         };
         let result: Result<Option<LinkHeartbeatResponse>, CallError> = self
             .inner

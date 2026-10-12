@@ -433,6 +433,7 @@ impl ControlService {
             notification_ingress: Some(
                 self.store.push_provider_mode().ok() == Some(PushProviderMode::WebPush),
             ),
+            projection_sync: None,
         })
     }
 

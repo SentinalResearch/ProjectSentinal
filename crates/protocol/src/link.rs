@@ -4,7 +4,9 @@
 //! Machine, and worker daemons. Secrets travel as [`Secret`], whose `Debug`
 //! and `Display` never print the value.
 
-use crate::{MachineId, Os, ProtocolError, Timestamp};
+use crate::{
+    MachineId, Os, ProjectionSyncDirective, ProjectionSyncReport, ProtocolError, Timestamp,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -297,6 +299,9 @@ pub struct LinkHeartbeatRequest {
     pub daemon_version: String,
     /// Capabilities.
     pub capabilities: Vec<MachineCapability>,
+    /// Optional projection capability and worker cursor state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection_sync: Option<ProjectionSyncReport>,
 }
 
 /// State of an accepted link.
@@ -327,6 +332,9 @@ pub struct LinkHeartbeatResponse {
     /// Absent when talking to a pre-4.D control and therefore treated as false.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notification_ingress: Option<bool>,
+    /// Optional control projection synchronization directive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection_sync: Option<ProjectionSyncDirective>,
 }
 
 /// Worker → control: rotate both credentials.
