@@ -8,10 +8,10 @@ mod runtime;
 use config::ConfigSnapshot;
 use presentation::Presentation;
 use protocol::{
-    CaptureLevel, Event, EventKind, MachineId, NotificationCategory,
-    NotificationConfigurationState, NotificationDeliveryState, NotificationFacts,
-    NotificationIntent, NotificationJournalEntry, NotificationRuleSet, NotificationRules,
-    NotificationStatus, SessionId, SessionNotificationRule, SessionOrigin, Timestamp,
+    CaptureLevel, Event, EventKind, MachineId, NotificationConfigurationState,
+    NotificationDeliveryState, NotificationFacts, NotificationIntent, NotificationJournalEntry,
+    NotificationRuleSet, NotificationRules, NotificationStatus, SessionId, SessionNotificationRule,
+    SessionOrigin, Timestamp,
 };
 use serde::{Deserialize, Serialize};
 use std::{
