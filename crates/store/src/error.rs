@@ -171,4 +171,36 @@ pub enum StoreError {
         /// Invalid signed database value.
         value: i64,
     },
+    /// The durable worker projection queue reached its configured bound.
+    #[error(
+        "projection outbox is full ({rows}/{maximum_rows} rows, {bytes}/{maximum_bytes} bytes)"
+    )]
+    ProjectionOutboxFull {
+        /// Current pending rows.
+        rows: u32,
+        /// Current encoded bytes.
+        bytes: u64,
+        /// Maximum pending rows.
+        maximum_rows: u32,
+        /// Maximum pending bytes.
+        maximum_bytes: u64,
+    },
+    /// A projection cursor did not immediately follow durable state.
+    #[error("projection cursor {got} for Machine '{machine_id}' must follow {expected}")]
+    ProjectionCursor {
+        /// Source Machine.
+        machine_id: String,
+        /// Required next cursor.
+        expected: u64,
+        /// Rejected cursor.
+        got: u64,
+    },
+    /// A link-authenticated Machine did not match a projection payload.
+    #[error("projection claims Machine '{claimed}' but link authenticated '{authenticated}'")]
+    ProjectionMachineMismatch {
+        /// Machine derived from the link credential.
+        authenticated: String,
+        /// Machine claimed by the payload.
+        claimed: String,
+    },
 }

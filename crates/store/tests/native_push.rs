@@ -36,9 +36,9 @@ fn subscription(label: &str, endpoint: &str, auth: &str) -> PushSubscriptionRequ
 }
 
 #[test]
-fn migration_six_adds_native_push_tables_without_removing_ntfy_history() {
+fn native_push_tables_survive_later_migrations_without_removing_ntfy_history() {
     let store = Store::open_in_memory().unwrap();
-    assert_eq!(store.schema_version().unwrap(), 6);
+    assert!(store.schema_version().unwrap() >= 6);
     for table in [
         "notification_intent_outbox",
         "control_notification_intents",

@@ -46,7 +46,7 @@ fn migration_and_delivery_journal_survive_reopen() {
     ));
     {
         let store = Store::open(&path).unwrap();
-        assert_eq!(store.schema_version().unwrap(), 6);
+        assert_eq!(store.schema_version().unwrap(), 7);
         store.insert_event(&event(1, 1_000)).unwrap();
         let record = store
             .record_notification_delivery(&queued(1, 1_000))

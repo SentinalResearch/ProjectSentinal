@@ -6,6 +6,7 @@ mod log_cursors;
 mod metrics;
 mod native_push;
 mod notification_deliveries;
+mod projection;
 mod records;
 pub mod registry;
 
@@ -28,6 +29,7 @@ pub use native_push::{
     StoredNotificationIntent, StoredPushSubscription,
 };
 pub use notification_deliveries::{NewNotificationDelivery, NotificationDelivery};
+pub use projection::ProjectionOutboxLimits;
 
 const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("../migrations/001_initial.sql")),
@@ -39,6 +41,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
         include_str!("../migrations/005_notification_deliveries.sql"),
     ),
     (6, include_str!("../migrations/006_native_push.sql")),
+    (7, include_str!("../migrations/007_projection.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.
