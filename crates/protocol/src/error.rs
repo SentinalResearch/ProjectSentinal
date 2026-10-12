@@ -224,6 +224,9 @@ pub enum ProtocolError {
     /// A discovery response was not a compatible control for the probed origin.
     #[error("invalid discovery response: {0}")]
     InvalidDiscovery(&'static str),
+    /// A pairing request had the wrong shape.
+    #[error("invalid pairing request: {0}")]
+    InvalidPairingRequest(&'static str),
 }
 
 impl From<serde_json::Error> for ProtocolError {

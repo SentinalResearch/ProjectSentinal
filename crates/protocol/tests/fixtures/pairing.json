@@ -6,7 +6,122 @@
     "display_name": "Owner's Sentinal",
     "origin": "https://sentinal-pilot.example-tailnet.ts.net",
     "release": "0.1.18",
-    "protocol": { "min": 1, "max": 1 },
-    "pairing": { "approval": false, "code": true }
+    "protocol": {
+      "min": 1,
+      "max": 1
+    },
+    "pairing": {
+      "approval": false,
+      "code": true
+    }
+  },
+  "verification_vector": {
+    "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A",
+    "request_id": "pr_9f2c1a0b7d3e4f51",
+    "control_nonce": "00112233445566778899aabbccddeeff",
+    "request_secret_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "worker_nonce": "ffeeddccbbaa99887766554433221100",
+    "sha256": "e1e7ab047230094ae9073908b634e8d9d0c1ecd664e791a3792b64db3df0bdc5",
+    "words": [
+      "squid",
+      "thistle",
+      "otter",
+      "arrow"
+    ]
+  },
+  "request_create": {
+    "machine": {
+      "machine_id": "01M40Q6XMY22VM973434SCPS90",
+      "display_name": "Owner's MacBook",
+      "os": "MACOS",
+      "daemon_version": "0.1.18",
+      "capabilities": [
+        "SESSIONS",
+        "EVENTS"
+      ]
+    },
+    "endpoint": {
+      "address": "100.101.29.67",
+      "port": 7420,
+      "dns_name": "macbook.example-tailnet.ts.net"
+    },
+    "request_secret_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "worker_nonce": "ffeeddccbbaa99887766554433221100"
+  },
+  "request_created": {
+    "request_id": "pr_9f2c1a0b7d3e4f51",
+    "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A",
+    "control_nonce": "00112233445566778899aabbccddeeff",
+    "expires_at": 1791900600000,
+    "poll_after_ms": 2000
+  },
+  "proof": {
+    "request_id": "pr_9f2c1a0b7d3e4f51",
+    "request_secret_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A"
+  },
+  "request_list": {
+    "requests": [
+      {
+        "request_id": "pr_9f2c1a0b7d3e4f51",
+        "state": "PENDING",
+        "expires_at": 1791900600000,
+        "claimed": {
+          "machine_id": "01M40Q6XMY22VM973434SCPS90",
+          "display_name": "Owner's MacBook",
+          "os": "MACOS",
+          "daemon_version": "0.1.18",
+          "capabilities": [
+            "SESSIONS",
+            "EVENTS"
+          ]
+        },
+        "tailscale": {
+          "node": "macbook",
+          "login": "owner@example.com",
+          "os": "macOS",
+          "address": "100.101.29.67"
+        },
+        "verified": true,
+        "existing_machine": {
+          "display_name": "MacBook",
+          "status": "REVOKED",
+          "last_seen": 1791800000000
+        },
+        "verification_words": [
+          "squid",
+          "thistle",
+          "otter",
+          "arrow"
+        ]
+      }
+    ]
+  },
+  "approval": {
+    "display_name": "Owner's MacBook"
+  },
+  "claim": {
+    "request_secret": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "control_credential": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "claim_pending": {
+    "state": "PENDING",
+    "poll_after_ms": 2000,
+    "link": null
+  },
+  "claim_done": {
+    "state": "CLAIMED",
+    "poll_after_ms": null,
+    "link": {
+      "link_id": "lk_0011223344556677",
+      "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A",
+      "worker_credential": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "credential_expires_at": 1799676540000,
+      "display_name": "Owner's MacBook",
+      "heartbeat_interval_ms": 30000
+    }
+  },
+  "cancel": {
+    "request_secret": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   }
 }

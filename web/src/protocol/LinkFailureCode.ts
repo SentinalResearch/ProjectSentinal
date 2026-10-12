@@ -15,4 +15,7 @@ export type LinkFailureCode =
   | "NOT_FOUND"
   | "RATE_LIMITED"
   | "INVALID_REQUEST"
-  | "INTERNAL";
+  | "INTERNAL"
+  | "MACHINE_ALREADY_LINKED"
+  | "PAIRING_BUSY"
+  | "INVALID_CLAIM";

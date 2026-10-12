@@ -409,11 +409,17 @@ pub enum LinkFailureCode {
     InvalidRequest,
     /// The daemon could not complete the request safely.
     Internal,
+    /// An approval request named a Machine that already has an active link.
+    MachineAlreadyLinked,
+    /// Too many approval requests are pending.
+    PairingBusy,
+    /// A claim or cancel presented the wrong request secret.
+    InvalidClaim,
 }
 
 impl LinkFailureCode {
     /// Every code, in declaration order.
-    pub const ALL: [LinkFailureCode; 12] = [
+    pub const ALL: [LinkFailureCode; 15] = [
         LinkFailureCode::InvalidCode,
         LinkFailureCode::PairingLocked,
         LinkFailureCode::InvalidMachine,
@@ -426,6 +432,9 @@ impl LinkFailureCode {
         LinkFailureCode::RateLimited,
         LinkFailureCode::InvalidRequest,
         LinkFailureCode::Internal,
+        LinkFailureCode::MachineAlreadyLinked,
+        LinkFailureCode::PairingBusy,
+        LinkFailureCode::InvalidClaim,
     ];
 }
 

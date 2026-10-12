@@ -123,6 +123,9 @@
     { "code": "NOT_FOUND", "message": "unknown Machine" },
     { "code": "RATE_LIMITED", "message": "too many pairing codes; try again later" },
     { "code": "INVALID_REQUEST", "message": "display_name must be 1 to 64 characters" },
-    { "code": "INTERNAL", "message": "the control could not complete the request" }
+    { "code": "INTERNAL", "message": "the control could not complete the request" },
+    { "code": "MACHINE_ALREADY_LINKED", "message": "this Machine is already connected; disconnect it first" },
+    { "code": "PAIRING_BUSY", "message": "too many pairing requests are waiting; try again later" },
+    { "code": "INVALID_CLAIM", "message": "the request secret does not match" }
   ]
 }

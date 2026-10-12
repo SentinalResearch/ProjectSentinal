@@ -38,6 +38,7 @@ pub mod message;
 pub mod metric;
 pub mod notification;
 pub mod pairing;
+mod pairing_words;
 pub mod process;
 pub mod projection;
 pub mod recipe;
