@@ -6,6 +6,7 @@
 
 mod proxy;
 mod release;
+pub mod release_actions;
 mod release_routes;
 pub mod release_watch;
 pub mod routes;

@@ -33,6 +33,18 @@ describe("service-worker Push safety", () => {
     ]) expect(safe(route, origin)).toBeNull();
   });
 
+  it("also accepts exactly the Machines settings page for control release notices", () => {
+    const safe = scope.SentinalPushSafety.safeNotificationRoute;
+    expect(safe("/app/settings/machines", origin)).toBe("/app/settings/machines");
+    for (const route of [
+      "/app/settings/account",
+      "/app/settings/machines/x",
+      "/app/settings/machines?x=1",
+      "/app/settings/machines#x",
+      "https://evil.example/app/settings/machines",
+    ]) expect(safe(route, origin)).toBeNull();
+  });
+
   it("accepts the closed safe payload and rejects controls or oversize data", () => {
     const safe = scope.SentinalPushSafety.safePushPayload;
     const payload = {

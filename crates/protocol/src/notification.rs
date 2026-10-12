@@ -51,6 +51,8 @@ pub enum NotificationCategory {
     Checkpoint,
     /// Work reported progress.
     Progress,
+    /// The control's own release (available, updated, or rolled back).
+    Release,
 }
 
 /// Current decision or delivery state for one Event notification.

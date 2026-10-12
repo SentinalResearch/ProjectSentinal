@@ -742,6 +742,56 @@ zero behavioral drift to step 2a), `cargo test --workspace`,
 `scripts/tests/release-workflow-test.sh`, and
 `scripts/tests/receive-release-test.sh` all pass.
 
+### Steps 2b–2d — dashboard control updates (2026-10-12)
+
+**Protocol (`bf67efe`, contract `crates/protocol/tests/release.rs`)**
+- `ControlReleaseView`, `ControlUpdateRequest` (strict version),
+  `ControlUpdateStarted`, `ReleasePolicyRequest`, plus the policy, channel,
+  and update-state enums.
+- `NotificationCategory::Release` (additive).
+
+**Daemon**
+- `c5dc88b` added the daily watch.
+- `3f4bfc1` added `ControlRelease` and the owner-only routes:
+  - `GET /api/v1/control/release`: files only;
+  - `POST …/check` and `PUT …/policy`: run the CLI;
+  - `POST …/update`: only the offered signed release, with consent for live
+    FULL Sessions and none while one runs. It starts
+    `sentinal release update` detached (`systemd-run --user` on Linux, a new
+    process group on macOS) and tracks progress through
+    `release-update.json` (RUNNING → result, UNKNOWN after 15 min).
+- **Step 2d:**
+  - `PushGateway::send_control_notice` sends best-effort Web Push to every
+    active device. The only non-Session route is `/app/settings/machines`,
+    enforced in `SafePushPayload` and in the service worker's
+    `safeNotificationRoute`.
+  - `release_actions::plan` (pure) announces each new signed release and each
+    update result once (`release-notified.json`, 0600).
+  - Under Automatic when idle, it starts the update only inside the window,
+    with no live FULL Session and no update running. A version that already
+    rolled back, failed, or ended UNKNOWN is never retried automatically.
+  - The watch wakes every 15 min (the GitHub check stays daily) and reads
+    local time via `date +%H%M`, so no time-zone dependency is added.
+
+**Web (`58d0aef`)** — `ControlReleaseCard` in Settings → Machines, desktop and
+phone:
+- current version and channel; the offered signed release with notes; an
+  unsigned warning; Check now;
+- the policy and channel segmented controls;
+- a confirmed update (ConfirmDialog on desktop, a sheet on phones) stating
+  that the dashboard reconnects and how many Sessions would be interrupted;
+- polls through the restart to "Updated" or a rollback alert.
+
+**Tests:**
+- `crates/daemon/tests/control_release.rs` (owner-only, check, policy,
+  consent, offered-only, detached update to UPDATED, worker 404);
+- `control_notice.rs`;
+- 6 `release_actions` unit tests;
+- `ControlReleaseCard.test.tsx` (6);
+- `push-safety.test.ts` (the route).
+
+**Not automated yet:** workers updating automatically after the control (step 7).
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

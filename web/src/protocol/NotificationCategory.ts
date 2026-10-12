@@ -11,4 +11,5 @@ export type NotificationCategory =
   | "STALLED"
   | "RESOURCE_HIGH"
   | "CHECKPOINT"
-  | "PROGRESS";
+  | "PROGRESS"
+  | "RELEASE";

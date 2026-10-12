@@ -394,19 +394,24 @@ pub async fn run() -> Result<(), DaemonError> {
     if config.control.is_some() {
         match sibling_sentinal_bin() {
             Ok(sentinal_bin) => {
+                let service = control_release(
+                    &config,
+                    &config_path,
+                    sentinal_bin.clone(),
+                    sessions.clone(),
+                );
                 spawn_release_watch(
                     ReleaseWatchSettings {
                         data_dir: config.data_dir.clone(),
-                        sentinal_bin: sentinal_bin.clone(),
+                        sentinal_bin,
                     },
+                    Some(crate::control::release_watch::ReleaseActors {
+                        release: service.clone(),
+                        push: push.clone(),
+                    }),
                     server_shutdown_rx.clone(),
                 );
-                release = Some(control_release(
-                    &config,
-                    &config_path,
-                    sentinal_bin,
-                    sessions.clone(),
-                ));
+                release = Some(service);
             }
             Err(error) => {
                 tracing::error!(%error, "release watch disabled: cannot locate the sentinal CLI binary");

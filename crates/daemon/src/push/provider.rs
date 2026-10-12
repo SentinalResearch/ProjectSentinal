@@ -227,7 +227,13 @@ fn validate_text(field: &'static str, value: &str, maximum: usize) -> Result<(),
     Ok(())
 }
 
+/// The only non-Session route a notification may open (control release notices).
+pub const RELEASE_NOTICE_ROUTE: &str = "/app/settings/machines";
+
 fn validate_route(route: &str) -> Result<(), PushBuildError> {
+    if route == RELEASE_NOTICE_ROUTE {
+        return Ok(());
+    }
     if route.len() > MAX_ROUTE_BYTES
         || !route.starts_with("/app/sessions/")
         || route.starts_with("//")
@@ -235,7 +241,7 @@ fn validate_route(route: &str) -> Result<(), PushBuildError> {
         || route.chars().any(char::is_control)
     {
         return Err(PushBuildError::Invalid(
-            "route must be one bounded internal Session path",
+            "route must be one bounded internal Session path or the Machines settings page",
         ));
     }
     Ok(())

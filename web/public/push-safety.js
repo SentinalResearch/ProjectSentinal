@@ -10,7 +10,11 @@
     );
   }
 
+  // The only non-Session route: control release notices open Settings → Machines.
+  const RELEASE_NOTICE_ROUTE = "/app/settings/machines";
+
   function safeNotificationRoute(value, origin) {
+    if (value === RELEASE_NOTICE_ROUTE) return RELEASE_NOTICE_ROUTE;
     if (typeof value !== "string" || encoder.encode(value).length > 2048 || !value.startsWith("/app/sessions/")) return null;
     if (value.startsWith("//") || value.includes("\\") || value.includes("#") || value.includes("?")) return null;
     if (/%(?:2f|5c|2e)/iu.test(value)) return null;

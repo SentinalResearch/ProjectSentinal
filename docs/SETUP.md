@@ -244,6 +244,23 @@ Behaviour:
   (`release-watch.json`, `release-policy.json`).
 - `just receive-release` (below) remains for recovery from a checkout.
 
+The dashboard shows the same under **Settings → Machines → Control release**:
+- the installed release and the newest signed one, with Check now;
+- the policy and channel;
+- **Update control**, which asks first and states how many live FULL
+  Sessions would be interrupted.
+
+The daemon runs the update detached (its own `systemd-run --user` unit on
+Linux), so it survives the restart. The page follows it through to
+"Updated" or a rollback alert.
+
+With Web Push enabled, the control sends one notice per new signed release
+and per update result, which opens Settings → Machines.
+
+Under **Automatic when idle**, the control updates itself inside the
+maintenance window (default 03:00–05:00 local) only when no live FULL Session
+runs. It never retries a version that rolled back.
+
 From a checkout, the equivalent low-level command is:
 
 ```console

@@ -6,4 +6,5 @@ pub(crate) mod e2e;
 pub mod endpoint;
 pub mod gateway;
 pub mod key_store;
+mod notice;
 pub mod provider;

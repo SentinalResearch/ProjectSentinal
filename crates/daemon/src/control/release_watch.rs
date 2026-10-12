@@ -38,22 +38,87 @@ struct CheckReport {
     unsigned_found: Option<String>,
 }
 
+/// What the watch acts with after each tick: the dashboard's release service
+/// (to start an automatic update) and the control's Push gateway (notices).
+#[derive(Clone)]
+pub struct ReleaseActors {
+    /// The control's release service.
+    pub release: super::ControlRelease,
+    /// The control's native Push gateway, when configured.
+    pub push: Option<crate::push::gateway::PushGateway>,
+}
+
+/// How often the watch wakes to act (window and result checks are local).
+const TICK: Duration = Duration::from_secs(15 * 60);
+
 /// Start the background release watch; stops when `shutdown` signals true.
-/// Runs one check promptly, then repeats roughly every 24h (± 1h jitter).
+/// Checks GitHub promptly, then roughly every 24h (± 1h jitter). Every 15 min
+/// it also announces new releases and update results once and, under
+/// "Automatic when idle", starts an update inside the window (`release_actions`).
 pub fn spawn_release_watch(
     settings: ReleaseWatchSettings,
+    actors: Option<ReleaseActors>,
     mut shutdown: tokio::sync::watch::Receiver<bool>,
 ) {
     tokio::spawn(async move {
+        let mut next_check = tokio::time::Instant::now();
         loop {
-            run_one_check(&settings).await;
-            let wait = jittered_interval(now_nanos());
+            if tokio::time::Instant::now() >= next_check {
+                run_one_check(&settings).await;
+                next_check = tokio::time::Instant::now() + jittered_interval(now_nanos());
+            }
+            if let Some(actors) = &actors {
+                act(&settings.data_dir, actors).await;
+            }
             tokio::select! {
                 _ = shutdown.changed() => break,
-                _ = tokio::time::sleep(wait) => {}
+                _ = tokio::time::sleep(TICK) => {}
             }
         }
     });
+}
+
+/// Perform this tick's release actions and remember what was announced.
+async fn act(data_dir: &Path, actors: &ReleaseActors) {
+    use super::release_actions::{plan, read_notified, write_notified, ReleaseAction};
+    let view = actors.release.view();
+    let notified = read_notified(data_dir);
+    let (actions, next) = plan(&view, &notified, local_minutes().await);
+    for action in actions {
+        match action {
+            ReleaseAction::Notice(title, body) => {
+                if let Some(push) = &actors.push {
+                    push.send_control_notice(&title, &body).await;
+                }
+            }
+            ReleaseAction::AutoUpdate(version) => {
+                tracing::info!(%version, "release watch: starting the automatic control update");
+                if let Err(failure) = actors.release.launch(&version, &view.current, None) {
+                    tracing::warn!(message = %failure.failure.message, "release watch: automatic update did not start");
+                }
+            }
+        }
+    }
+    if next != notified {
+        if let Err(error) = write_notified(data_dir, &next) {
+            tracing::warn!(%error, "release watch: could not record announced releases");
+        }
+    }
+}
+
+/// Local time of day in minutes, from `date` (no time-zone dependency).
+async fn local_minutes() -> Option<u32> {
+    let output = tokio::time::timeout(
+        Duration::from_secs(5),
+        Command::new("date").arg("+%H%M").output(),
+    )
+    .await
+    .ok()?
+    .ok()?;
+    let text = String::from_utf8(output.stdout).ok()?;
+    let value: u32 = text.trim().parse().ok()?;
+    let (hours, minutes) = (value / 100, value % 100);
+    (hours < 24 && minutes < 60).then_some(hours * 60 + minutes)
 }
 
 /// Read the policy and, unless it is `OFF`, run `sentinal release check
