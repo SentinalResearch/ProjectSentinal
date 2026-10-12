@@ -259,13 +259,15 @@ produce a stored Event on either enrolled Machine, receive an encrypted push
 without an ntfy server, and tap it to open the exact Machine and Session.
 
 ## Milestone 4.D.1 — Incremental aggregation and control read model
-- [ ] Approve the bounded projection contract, stored field classification, retention, and mixed-version behavior
-- [ ] Coalesce direct adapter initialization and replace full Event replay with cursored, on-demand detail reads
-- [ ] Persist and compact an authenticated worker projection outbox with snapshot/resync recovery
-- [ ] Materialize privacy-minimized Machine and Session dashboard state in control SQLite
-- [ ] Hydrate the PWA with one bounded control snapshot and one ordered control-origin live stream
-- [ ] Keep every terminal byte and live action routed to, and authorized by, the owning worker
+- [x] Approve the bounded projection contract, stored field classification, retention, and mixed-version behavior
+- [x] Coalesce direct adapter initialization and replace full Event replay with cursored, on-demand detail reads
+- [x] Persist and compact an authenticated worker projection outbox with snapshot/resync recovery
+- [x] Materialize privacy-minimized Machine and Session dashboard state in control SQLite
+- [x] Hydrate the PWA with one bounded control snapshot and one ordered control-origin live stream
+- [x] Keep every terminal byte and live action routed to, and authorized by, the owning worker
 - [ ] Prove constant critical-render request counts at 10 Machines / 1,000 Sessions and record real-Machine before/after evidence
+  — the 10M/1,000S constant-request-count fixture is done (`web/src/data/api/scale.test.ts`); the real-Machine before/after
+  evidence table in `docs/progress/milestone-4d1.md` is still all `pending` and needs the owner's own hardware
 
 **Demo:** reload the production PWA while one worker is offline, immediately
 see both Machines' bounded last-known dashboards from the control, then attach

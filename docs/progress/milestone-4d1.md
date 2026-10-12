@@ -1,9 +1,12 @@
 # Milestone 4.D.1 progress — Incremental aggregation and control read model
 
-Status: **IMPLEMENTATION IN PROGRESS.** The additive design was approved on
-2026-10-12. Protocol and storage foundations are committed; daemon projection
-sync and the control snapshot/live resources are under implementation. The
-design needs no new dependency and keeps `PROTOCOL_VERSION = 1`.
+Status: **IMPLEMENTED, pending real-Machine acceptance.** The additive design
+was approved on 2026-10-12 and is now fully built and verified against a real
+browser + real daemon processes, including the required production Playwright
+acceptance test (see "Final verification" below). The only thing left is the
+owner's own hardware: the Real-Machine acceptance matrix further down is still
+all `pending`. The design needs no new dependency and keeps
+`PROTOCOL_VERSION = 1`.
 
 ## Plan and proving tests
 
@@ -13,19 +16,26 @@ design needs no new dependency and keeps `PROTOCOL_VERSION = 1`.
    compatibility, rollback, and performance boundaries.
 3. [x] Obtain explicit approval for this proposal, especially the bounded
    storage of owner-authored Session titles on the control.
-4. [ ] Add request-count regression tests, then repair the direct-query path
-   (`web/src/data/api/index.test.ts`, `LiveDataContext.test.tsx`).
+4. [x] Add request-count regression tests, then repair the direct-query path
+   (`web/src/data/api/index.test.ts`, `web/src/data/api/scale.test.ts` for the
+   10-Machine/1,000-Session constant-count fixture specifically).
 5. [x] Add additive projection HTTP/protocol contracts and generated
    TypeScript (`crates/protocol/tests/contract.rs`, hand-written fixtures,
    `just gen-ts --check`).
 6. [x] Add migration 007 and worker/control store behavior
    (`crates/store/tests/projection.rs`).
-7. [ ] Add worker outbox, authenticated ingress, compaction, resync, and
-   isolation (`crates/daemon/tests/projection_sync.rs`, control tests).
-8. [ ] Add the owner snapshot/live stream and PWA cutover (web adapter,
-   service-worker privacy, accessibility, and production Playwright tests).
-9. [ ] Run `just check`, production Playwright, the scale fixture, and the
-   available real-Machine acceptance; update Roadmap and this report.
+7. [x] Add worker outbox, authenticated ingress, compaction, resync, and
+   isolation (`crates/daemon/src/control/`, `crates/daemon/src/
+   projection_runtime.rs`, `crates/daemon/tests/{control,link,
+   enrollment_api}.rs`).
+8. [x] Add the owner snapshot/live stream and PWA cutover (web adapter,
+   `web/src/routes/app/SessionDetailPage.tsx` /
+   `phone/PhoneSessionDetail.tsx`, and
+   `web/e2e/projection-acceptance.spec.ts`).
+9. [x] Run the Rust + web equivalent of `just check`, production Playwright,
+   and the scale fixture; update Roadmap and this report. **Not done:** the
+   real-Machine acceptance matrix below, which needs the owner's own
+   hardware — not run as part of `just check` either.
 
 ## Baseline measurement
 
@@ -626,6 +636,59 @@ Approval of this design approves:
    for offline/disconnected Machines;
 5. a 60-second bounded direct integrity check and labelled old-worker fallback;
 6. the migration/rollback and source-cursor regression behavior above.
+
+## Final verification (2026-10-12)
+
+The design, protocol, store, and daemon/web implementation were already
+committed when this pass started; nothing here changed the approved design.
+Running the production Playwright chain end to end for what appears to be the
+first time since the projection cutover (nothing before had gotten far enough
+to reach later specs, including `web/e2e/projection-acceptance.spec.ts` built
+in this pass) surfaced three real propagation gaps, each fixed and then
+re-verified against a real browser and real daemon processes, not just unit
+tests:
+
+- **Session create/kill/continue had no push into the projection recorder**
+  (only Metrics did, via `observe_projection()`); the recorder's local
+  `sessions.list()` scan — the only way a Session's own changes reached the
+  outbox at all — ran every 10s, past the point where a freshly created
+  Session still looked "missing" in the dashboard. Dropped to 500ms
+  (`crates/daemon/src/projection_runtime.rs`), matching this pipeline's own
+  "wake-driven, 250ms coalescing" cadence (§3) instead of an unrelated
+  placeholder value.
+- **`cwd` is deliberately excluded from the projection** (§1's privacy
+  boundary, by design) — which silently broke the earlier, shipped "Watch
+  fully next time" hint for any reduced-capture Session only ever known via
+  projection, since such Sessions never attach and so never got `cwd` any
+  other way. Added `DataAdapter.refreshSessionDetail()`, an on-open,
+  best-effort authoritative fetch from the owning worker for non-FULL
+  capture Sessions, mirroring what FULL Sessions already get via attach.
+  Considered and rejected making the hint degrade gracefully without `cwd`
+  instead — an existing, intentional test correctly withholds it rather
+  than ever suggesting a `cd`-less command.
+- **Machine disconnect/revoke/rename never notified the live stream at
+  all** — the only existing broadcast call site was the Session/Event/
+  Metrics path; registry changes updated the store but nothing pushed
+  subscribed browsers to refresh short of the unrelated 60s legacy
+  integrity poll. Added `ControlSnapshotReason::REGISTRY_CHANGED`, reusing
+  the already-built `SnapshotRequired` → immediate-resnapshot mechanism.
+
+Two bugs were also found and fixed in the Playwright specs themselves (not
+app code): `mobile.spec.ts` picked the Overview's first Session row assuming
+it would be attachable, which stopped holding once a reduced-capture Session
+could legitimately sort first; and the new acceptance spec's own secret-leak
+sweep read a disconnected worker's `link.json` after `sentinal disconnect`
+had already deleted it.
+
+Evidence: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets
+--all-features -D warnings`, `cargo test --workspace` (clean), `just gen-ts
+--check`, `pnpm -C web check` (48 files / 217 tests) and `pnpm -C web build`
+all pass. A real, full `pnpm exec playwright test` — all 7 projects, 13
+tests, including `projection-acceptance` — passes end to end in about a
+minute. The full `just check` recipe itself was not re-run verbatim (it also
+covers the unrelated shell/release/installer/eval test scripts bundled with
+Milestone 4.E); everything it would run that's relevant to 4.D.1 was run
+directly and is clean.
 
 ## Real-Machine acceptance fields
 
