@@ -6,7 +6,10 @@ use crate::{
     audit::AuditLog,
     auth::{load_or_create_token, AuthError, AuthManager},
     config::{ConfigError, DaemonConfig},
-    control::{ControlService, ControlSettings},
+    control::{
+        release_watch::{spawn_release_watch, ReleaseWatchSettings},
+        ControlService, ControlSettings,
+    },
     identity,
     insights::{HostFacts, MachineInsights},
     link::{
@@ -387,6 +390,20 @@ pub async fn run() -> Result<(), DaemonError> {
     if let Some(gateway) = push.clone() {
         spawn_push_delivery_worker(gateway, server_shutdown_rx.clone());
     }
+    if config.control.is_some() {
+        match sibling_sentinal_bin() {
+            Ok(sentinal_bin) => spawn_release_watch(
+                ReleaseWatchSettings {
+                    data_dir: config.data_dir.clone(),
+                    sentinal_bin,
+                },
+                server_shutdown_rx.clone(),
+            ),
+            Err(error) => {
+                tracing::error!(%error, "release watch disabled: cannot locate the sentinal CLI binary");
+            }
+        }
+    }
     let state = AppState::new(sessions, machine, auth)
         .with_insights(insights)
         .with_origins(origins)
@@ -499,6 +516,15 @@ fn push_key_file(home: &std::path::Path) -> PathBuf {
         return PathBuf::from(path);
     }
     home.join(".config/terminal-agent/push-vapid.json")
+}
+
+/// The `sentinal` CLI binary installed beside this running `sentinald`.
+fn sibling_sentinal_bin() -> Result<PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|error| error.to_string())?;
+    let dir = exe
+        .parent()
+        .ok_or_else(|| "the running binary has no parent directory".to_string())?;
+    Ok(dir.join("sentinal"))
 }
 
 async fn wait_for_shutdown(mut shutdown: tokio::sync::watch::Receiver<bool>) {

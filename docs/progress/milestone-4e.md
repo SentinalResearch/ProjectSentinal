@@ -687,6 +687,61 @@ Evidence: `cargo test -p protocol`, `cargo fmt -p protocol -- --check`,
 `cargo clippy -p protocol --all-targets --all-features -- -D warnings`, and
 `just gen-ts --check` all pass.
 
+### Step 2b — daemon release watch (2026-10-12)
+
+The control's background check for a newer signed release, the "about every
+24h (± 1h jitter), after start" half of §11b point 1. Still open after this:
+the `GET/POST /api/v1/control/release` routes, the dashboard Update-control
+button, Push on results, and automatic-when-idle actually installing
+anything — this piece only watches and logs.
+
+Deliberately **not** a new shared crate and **no changes under `crates/cli`**:
+`sentinal release check --json` (step 2a, already shipped, mutation-tested)
+already does the entire fetch/channel-filter/signature-verify/record job.
+Reimplementing or extracting that logic risked behavioral drift on a
+signature-verification path for no benefit, so the daemon's job is only to
+decide *when* to run it:
+
+- `crates/daemon/src/control/release_watch.rs`: `spawn_release_watch`
+  (`tokio::spawn`, runs one check promptly on start, then loops on
+  `tokio::time::sleep` with a freshly jittered duration each cycle, racing a
+  `tokio::sync::watch::Receiver<bool>` shutdown signal — same shutdown idiom
+  as `spawn_notification_workers`). `run_one_check` reads just the `"policy"`
+  field of `release-watch.json`'s sibling `release-policy.json` (missing/
+  unparsable ⇒ `NOTIFY`, matching the CLI's own default) and, unless it is
+  `OFF`, runs `sentinal release check --json` as a child process (120s
+  timeout, on top of the CLI's own internal 30s per-request bound), logging
+  the parsed result or any failure via `tracing` — never panics, never stops
+  future scheduled checks.
+- Jitter: `BASE_INTERVAL_SECS (24h) - 1h + (seed mod 2h+1s)`, `seed` from
+  wall-clock sub-second nanoseconds. No `rand` dependency: this only needs to
+  spread restart timing across machines, not be unpredictable.
+- `crates/daemon/src/entry.rs`: spawns the watch only when `config.control`
+  is `Some`, resolving the sibling `sentinal` binary via
+  `current_exe()?.parent()`. If that resolution fails, logs
+  `tracing::error!` and continues starting the daemon normally — a control
+  still works without the watch, it just won't auto-discover updates.
+- Tests (`crates/daemon/src/control/release_watch.rs`, inline, `#[cfg(unix)]`,
+  reusing the fake-executable-on-disk technique already used in
+  `crates/cli/tests/release.rs`): `OFF` policy never invokes anything;
+  `NOTIFY`, `AUTOMATIC_WHEN_IDLE`, and a missing policy file all do invoke
+  `release check --json` with exactly those arguments; a nonexistent binary,
+  a nonzero exit, and unparsable stdout each log a warning and return without
+  panicking (and a later valid check still succeeds afterward); the jitter
+  function stays within ±1h across a spread of seeds including `0` and
+  `u32::MAX`.
+
+Evidence: `cargo fmt --all -- --check`, `cargo clippy --workspace
+--all-targets --all-features -- -D warnings`, `cargo test -p daemon` (79 lib
+tests + 8 new release-watch tests, all passing — one unrelated,
+pre-existing, order-sensitive flake in `session_manager.rs`'s
+`unterminated_training_output_persists_watcher_events_and_session_health`
+reproduced and passed in isolation, confirming it predates and is unrelated
+to this change), `cargo test -p cli` (unchanged, still passing — confirms
+zero behavioral drift to step 2a), `cargo test --workspace`,
+`scripts/tests/release-workflow-test.sh`, and
+`scripts/tests/receive-release-test.sh` all pass.
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit
