@@ -21,7 +21,15 @@ pub fn spawn_projection_recorder(
         let epoch = projection_epoch(&machine_id);
         let mut events = sessions.subscribe_events();
         let mut observations = sessions.observe_projection();
-        let mut scan = tokio::time::interval(Duration::from_secs(10));
+        // Session create/kill/continue have no dedicated broadcast into this
+        // recorder (unlike Metrics, which pushes through `observe_projection`);
+        // this scan is how they reach the projection outbox at all. A newly
+        // created Session must be visible to an owner who never attached to
+        // it — including one who never had the browser open — well under a
+        // second, not the old 10s, which a real-browser acceptance run
+        // (`e2e/session-smoke.spec.ts`) showed left recently created Sessions
+        // "missing" for several seconds after creation.
+        let mut scan = tokio::time::interval(Duration::from_millis(500));
         let mut known_sessions = HashMap::<protocol::SessionId, ProjectedSession>::new();
         loop {
             tokio::select! {
