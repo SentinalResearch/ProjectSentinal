@@ -177,6 +177,45 @@ async fn fifth_bad_password_locks_only_that_client_until_clock_advances() {
 }
 
 #[tokio::test]
+async fn rotating_client_keys_hit_a_global_failure_budget() {
+    // F10: behind Tailscale Serve the client key is the loopback
+    // `Tailscale-User-Login` header, which a local process can vary freely.
+    let dir = temp_dir("login-global-budget");
+    let now = Arc::new(AtomicI64::new(1_790_000_000_000));
+    let auth = auth_manager(&dir, now.clone());
+    auth.setup("bootstrap-token", "correct horse battery staple")
+        .await
+        .unwrap();
+
+    let mut locked_at = None;
+    for attempt in 0..20 {
+        match auth
+            .login(&format!("rotating-{attempt}@example"), "wrong password")
+            .await
+        {
+            Err(AuthError::InvalidCredentials { .. }) => {}
+            Err(AuthError::Locked { retry_at }) => {
+                locked_at = Some(retry_at);
+                break;
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+    let retry_at = locked_at.expect("20 failures across rotating keys must lock every client");
+    assert!(matches!(
+        auth.login("a-fresh-key@example", "correct horse battery staple")
+            .await,
+        Err(AuthError::Locked { .. })
+    ));
+    now.store(retry_at.0 + 1, Ordering::Relaxed);
+    assert!(auth
+        .login("a-fresh-key@example", "correct horse battery staple")
+        .await
+        .is_ok());
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
 async fn browser_session_expires_without_sleeping() {
     let dir = temp_dir("session-expiry");
     let now = Arc::new(AtomicI64::new(1_790_000_000_000));

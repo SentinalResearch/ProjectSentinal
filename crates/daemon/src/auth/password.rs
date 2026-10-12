@@ -22,6 +22,10 @@ const MIN_PASSWORD_BYTES: usize = 12;
 const MAX_PASSWORD_BYTES: usize = 1_024;
 const MAX_LOGIN_ATTEMPTS: u32 = 5;
 const LOCKOUT_MS: i64 = 5 * 60 * 1_000;
+/// Failed logins allowed across *all* client keys per window (F10): behind
+/// Tailscale Serve the per-client key is a header a local process can vary.
+const GLOBAL_MAX_FAILURES: usize = 20;
+const GLOBAL_WINDOW_MS: i64 = 15 * 60 * 1_000;
 
 type Clock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
 
@@ -56,6 +60,10 @@ struct AuthState {
     password_hash: Option<String>,
     sessions: Vec<BrowserSession>,
     failures: HashMap<String, LoginFailure>,
+    /// Times of recent failed logins from any client, newest last.
+    global_failures: Vec<Timestamp>,
+    /// Every client is refused until then.
+    global_locked_until: Option<Timestamp>,
 }
 
 /// Single-owner password state shared by daemon API handlers.
@@ -132,6 +140,15 @@ impl AuthManager {
                 .password_hash
                 .clone()
                 .ok_or(AuthError::SetupRequired)?;
+            if let Some(locked_until) = state.global_locked_until {
+                if locked_until.0 > now.0 {
+                    return Err(AuthError::Locked {
+                        retry_at: locked_until,
+                    });
+                }
+                state.global_locked_until = None;
+                state.global_failures.clear();
+            }
             let expired_lock = if let Some(failure) = state.failures.get(client) {
                 if failure
                     .locked_until
@@ -163,6 +180,17 @@ impl AuthManager {
             return self.issue_session(&mut state);
         }
 
+        state
+            .global_failures
+            .retain(|at| now.0.saturating_sub(at.0) < GLOBAL_WINDOW_MS);
+        state.global_failures.push(now);
+        if state.global_failures.len() >= GLOBAL_MAX_FAILURES {
+            let retry_at = Timestamp(now.0.saturating_add(LOCKOUT_MS));
+            state.global_locked_until = Some(retry_at);
+            // Rotated keys must not accumulate either.
+            state.failures.clear();
+            return Err(AuthError::Locked { retry_at });
+        }
         let failure = state.failures.entry(client.to_string()).or_default();
         failure.attempts = failure.attempts.saturating_add(1);
         if failure.attempts >= MAX_LOGIN_ATTEMPTS {
