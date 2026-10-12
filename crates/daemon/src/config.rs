@@ -37,6 +37,8 @@ pub struct ControlConfig {
     pub public_url: String,
     /// Heartbeat interval sent to workers (shorter values are development-only).
     pub heartbeat_interval_ms: u64,
+    /// Name discovery shows to Tailnet peers; the Machine name when absent.
+    pub display_name: Option<String>,
 }
 
 /// Default worker heartbeat interval.
@@ -123,6 +125,7 @@ struct RawControlConfig {
     enabled: bool,
     public_url: Option<String>,
     heartbeat_interval_ms: Option<u64>,
+    display_name: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -193,6 +196,9 @@ pub enum ConfigError {
     /// The control section was enabled without a valid public URL.
     #[error("invalid [control] public_url: {0}")]
     InvalidControlUrl(String),
+    /// `[control] display_name` is empty, too long, or has control characters.
+    #[error("invalid [control] display_name: {0}")]
+    InvalidControlName(String),
     /// A control heartbeat interval outside the allowed range.
     #[error("invalid [control] heartbeat_interval_ms {0}; production requires 30000..=300000")]
     InvalidHeartbeat(u64),
@@ -322,9 +328,17 @@ fn parse_control_config(
     if !allowed.contains(&heartbeat_interval_ms) {
         return Err(ConfigError::InvalidHeartbeat(heartbeat_interval_ms));
     }
+    let display_name = raw
+        .display_name
+        .map(|name| {
+            protocol::link::validate_display_name(&name)
+                .map_err(|error| ConfigError::InvalidControlName(error.to_string()))
+        })
+        .transpose()?;
     Ok(Some(ControlConfig {
         public_url,
         heartbeat_interval_ms,
+        display_name,
     }))
 }
 

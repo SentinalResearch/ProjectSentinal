@@ -37,6 +37,7 @@ pub mod machine_details;
 pub mod message;
 pub mod metric;
 pub mod notification;
+pub mod pairing;
 pub mod process;
 pub mod projection;
 pub mod recipe;

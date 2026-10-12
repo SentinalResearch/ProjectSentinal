@@ -86,6 +86,7 @@ async fn harness() -> Harness {
             development: true,
             machine_id: MachineId(CONTROL.into()),
             display_name: "Control".into(),
+            discovery_name: None,
             os: Os::Macos,
             daemon_version: "0.0.1".into(),
             secrets_file: dir.join("machine-credentials.json"),

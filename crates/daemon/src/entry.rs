@@ -185,6 +185,7 @@ pub async fn run() -> Result<(), DaemonError> {
                 development: config.development,
                 machine_id: identity.machine_id.clone(),
                 display_name: machine.name.clone(),
+                discovery_name: control.display_name.clone(),
                 os: machine.os,
                 daemon_version: crate::DAEMON_VERSION.into(),
                 secrets_file: config.control_credentials_file.clone(),

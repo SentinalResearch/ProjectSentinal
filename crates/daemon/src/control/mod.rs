@@ -4,6 +4,7 @@
 //! HMACs. A successful exchange creates one link with two directional
 //! credentials; each side keeps only a hash of the one it verifies.
 
+mod discovery;
 mod proxy;
 mod refresh;
 mod release;
@@ -78,6 +79,9 @@ pub struct ControlSettings {
     pub machine_id: MachineId,
     /// Display name used when the control first registers itself.
     pub display_name: String,
+    /// Name discovery shows to Tailnet peers (`[control] display_name`);
+    /// `None` uses `display_name`.
+    pub discovery_name: Option<String>,
     /// This control's OS.
     pub os: Os,
     /// This daemon's version.
@@ -135,6 +139,7 @@ pub struct ControlService {
     audit: LinkAudit,
     projection_updates: tokio::sync::broadcast::Sender<ControlProjectionMessage>,
     refresh_fault: Arc<Mutex<Option<RefreshFault>>>,
+    discovery_limit: Arc<discovery::DiscoveryLimit>,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -185,6 +190,7 @@ impl ControlService {
             secrets: Arc::new(Mutex::new(secrets)),
             projection_updates,
             refresh_fault: Arc::new(Mutex::new(None)),
+            discovery_limit: Arc::new(discovery::DiscoveryLimit::default()),
         };
         // A refresh interrupted by a crash never reached the worker: undo it.
         service

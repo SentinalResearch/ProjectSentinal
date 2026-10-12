@@ -221,6 +221,9 @@ pub enum ProtocolError {
     /// A release version was not strict `MAJOR.MINOR.PATCH`.
     #[error("invalid release version '{0}'; expected MAJOR.MINOR.PATCH")]
     InvalidReleaseVersion(String),
+    /// A discovery response was not a compatible control for the probed origin.
+    #[error("invalid discovery response: {0}")]
+    InvalidDiscovery(&'static str),
 }
 
 impl From<serde_json::Error> for ProtocolError {

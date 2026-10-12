@@ -830,6 +830,44 @@ phone:
 - Not automated: real `tailscale serve`, `loginctl`, and the service manager.
   These are part of the VM acceptance.
 
+### Step 4 — discovery (2026-10-12)
+
+- **Contract:** `protocol::pairing::DiscoveryResponse` (`ProtocolRange`,
+  `PairingSupport`), with fixture `tests/fixtures/pairing.json` and generated
+  TS. `validate(probed_origin)` requires all of these:
+  - `sentinal = "control"` and schema 1;
+  - an origin equal to the probed origin;
+  - a protocol range containing 1;
+  - a ULID control ID, a strict release version, and a safe display name.
+
+  Unknown fields are tolerated.
+- **Daemon:** `control/discovery.rs` serves `GET /api/v1/discovery`.
+  - Control only (a worker gets 404). No authentication.
+  - `Cache-Control: no-store`; at most 1 KiB.
+  - 60 answers per minute control-wide, not keyed on the spoofable header.
+  - It names the control from `[control] display_name` (validated; falls back
+    to the Machine name) and reports `approval: false` until step 5.
+- **Client:** `crates/cli/src/discovery.rs`.
+  - Candidates: online peers with a `.ts.net` name and a 100.64/10 or
+    fd7a:115c:a1e0::/48 address. Capped at 64; 8 worker threads; 6 s run
+    deadline. A probe already in flight still has its own 2 s limit.
+  - The probe is `curl --resolve host:443:<peer ip>` (no rebinding),
+    `--proto =https`, `--max-redirs 0`, a 4 KiB cap.
+  - 404 is listed as "older Sentinal"; anything else unusable counts as
+    "did not answer".
+- **Setup:** `sentinal setup` option 2 lists the controls and never
+  auto-picks; it falls back to a typed URL when none are found.
+
+**Tests:**
+- `protocol/tests/pairing.rs` (3);
+- `daemon/tests/discovery_api.rs` (3: fields, fallback name, worker 404,
+  rate limit);
+- `tests/config.rs` (`display_name` validation);
+- `cli/tests/discovery.rs` (3: filtering, address pinning, origin mismatch,
+  404, bounds on count/concurrency/time, oversized/malformed). Mutation check:
+  accepting an answer without the origin check fails a test.
+- `cli/tests/setup.rs` (+3: list and pick, no auto-pick, none found).
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

@@ -6,6 +6,7 @@
 pub mod config;
 mod control;
 mod system;
+mod worker;
 
 use std::{
     fs,
@@ -135,6 +136,7 @@ pub fn run(
         .and_then(|value| value.get("control")?.get("enabled")?.as_bool())
         == Some(true);
 
+    let mut skip_discovery = options.control_url.is_some();
     let role = match options.role {
         Some(role) => role,
         None => {
@@ -154,7 +156,11 @@ pub fn run(
             );
             match io.ask("Choose 1-3 (q to quit): ").as_deref() {
                 Some("1") => SetupRole::Control,
-                Some("2" | "3") => SetupRole::Worker,
+                Some("2") => SetupRole::Worker,
+                Some("3") => {
+                    skip_discovery = true;
+                    SetupRole::Worker
+                }
                 _ => return io.cancelled(),
             }
         }
@@ -168,34 +174,6 @@ pub fn run(
                 config_path.display()
             ),
         ),
-        SetupRole::Worker => worker(&options, &mut io),
-    }
-}
-
-fn worker(options: &SetupOptions, io: &mut Io<'_>) -> Outcome {
-    let url = match &options.control_url {
-        Some(url) => url.clone(),
-        None => {
-            let _ = writeln!(
-                io.out,
-                "Finding controls on your Tailnet arrives in a later release; enter the control's address."
-            );
-            match io.ask("Control URL (https://….ts.net): ") {
-                Some(url) if !url.is_empty() => url,
-                _ => return io.cancelled(),
-            }
-        }
-    };
-    match protocol::link::validate_control_url(&url, protocol::link::ControlUrlPolicy::Production) {
-        Ok(_) => Outcome::Connect {
-            control_url: url.trim_end_matches('/').to_string(),
-            name: options.name.clone(),
-        },
-        Err(error) => io.fail(
-            exit::CANCELLED,
-            &format!(
-                "'{url}' is not a control URL ({error}); expected https://<name>.<tailnet>.ts.net"
-            ),
-        ),
+        SetupRole::Worker => worker::worker(&options, skip_discovery, system, &mut io),
     }
 }

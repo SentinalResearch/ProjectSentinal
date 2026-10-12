@@ -39,6 +39,7 @@ struct Fake {
     linger: Option<bool>,
     restart_fails: bool,
     unhealthy: bool,
+    discovered: cli::discovery::Discovered,
     calls: Vec<String>,
 }
 
@@ -82,6 +83,9 @@ impl System for Fake {
     fn publish(&mut self, version: &str, _config_dir: &Path) -> Result<(), String> {
         self.calls.push(format!("publish {version}"));
         Ok(())
+    }
+    fn discover(&mut self) -> Result<cli::discovery::Discovered, String> {
+        Ok(self.discovered.clone())
     }
 }
 
@@ -429,4 +433,92 @@ fn top_level_keys_go_above_existing_tables_and_those_tables_survive() {
         }
     )
     .is_err());
+}
+
+fn found(hosts: &[(&str, &str)]) -> cli::discovery::Discovered {
+    cli::discovery::Discovered {
+        controls: hosts
+            .iter()
+            .map(|(host, name)| cli::discovery::FoundControl {
+                discovery: protocol::pairing::DiscoveryResponse {
+                    sentinal: "control".into(),
+                    schema_version: 1,
+                    control_machine_id: protocol::MachineId("01K2C7RQ9M3X8V6T4N2P0SDB5A".into()),
+                    display_name: (*name).into(),
+                    origin: format!("https://{host}"),
+                    release: "0.1.18".into(),
+                    protocol: protocol::pairing::ProtocolRange { min: 1, max: 1 },
+                    pairing: protocol::pairing::PairingSupport {
+                        approval: false,
+                        code: true,
+                    },
+                },
+                address: "100.101.1.1".parse().unwrap(),
+            })
+            .collect(),
+        older: vec!["https://old.example-tailnet.ts.net".into()],
+        checked: hosts.len() + 2,
+        unanswered: 1,
+    }
+}
+
+#[test]
+fn discovered_controls_are_listed_and_the_owner_picks_one() {
+    let setup = Setup::new("discover");
+    let mut fake = Fake {
+        discovered: found(&[
+            ("lab.example-tailnet.ts.net", "Lab"),
+            (DNS, "Owner's Sentinal"),
+        ]),
+        ..linux()
+    };
+    let (outcome, stdout, _) = setup.run(setup.options(None, false), &mut fake, "2\n2\n");
+    assert_eq!(
+        outcome,
+        Outcome::Connect {
+            control_url: ORIGIN.into(),
+            name: None
+        },
+        "{stdout}"
+    );
+    for expected in [
+        "1) Lab   https://lab.example-tailnet.ts.net   0.1.18 · control 01K2C7RQ",
+        "2) Owner's Sentinal",
+        "3) Enter a URL",
+        "older Sentinal at https://old.example-tailnet.ts.net",
+        "(4 peers checked; 1 did not answer)",
+    ] {
+        assert!(stdout.contains(expected), "{expected}: {stdout}");
+    }
+}
+
+#[test]
+fn a_single_control_is_never_picked_without_asking() {
+    let setup = Setup::new("discover-one");
+    let mut fake = Fake {
+        discovered: found(&[(DNS, "Owner's Sentinal")]),
+        ..linux()
+    };
+    let (outcome, stdout, _) = setup.run(setup.options(None, false), &mut fake, "2\n");
+    assert_eq!(outcome, Outcome::Exit(2), "{stdout}");
+    assert!(stdout.contains("Choose 1-2"), "{stdout}");
+}
+
+#[test]
+fn with_no_control_found_the_owner_types_a_url() {
+    let setup = Setup::new("discover-none");
+    let mut fake = linux();
+    let (outcome, stdout, _) = setup.run(
+        setup.options(None, false),
+        &mut fake,
+        &format!("2\n{ORIGIN}\n"),
+    );
+    assert!(stdout.contains("No Sentinal control found"), "{stdout}");
+    assert_eq!(
+        outcome,
+        Outcome::Connect {
+            control_url: ORIGIN.into(),
+            name: None
+        }
+    );
 }

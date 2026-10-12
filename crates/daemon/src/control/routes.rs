@@ -131,6 +131,7 @@ impl ControlRoutes {
             )
             .route("/api/v1/push/provider", put(push_provider))
             .merge(super::release_routes::routes())
+            .merge(super::discovery::routes())
             .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES));
         let projection_routes = Router::new()
             .route("/api/v1/link/projection", post(projection_batch))
@@ -144,7 +145,7 @@ impl ControlRoutes {
             .merge(proxy)
     }
 
-    fn control(&self) -> Result<&ControlService, ControlFailure> {
+    pub(super) fn control(&self) -> Result<&ControlService, ControlFailure> {
         self.control.as_ref().ok_or_else(|| {
             ControlFailure::new(
                 404,

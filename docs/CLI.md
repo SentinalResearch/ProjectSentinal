@@ -103,9 +103,16 @@ and otherwise prints "Nothing to do".
   installed signed release for workers. It never binds `0.0.0.0`, never turns on
   Funnel, and never replaces a Serve route it did not create. If the restarted
   daemon is unhealthy, the previous config is restored.
-- **Worker:** asks for the control URL and continues with the one-time code
-  (`connect`). Finding controls on the Tailnet and click-to-approve pairing
-  replace this prompt in a later release.
+- **Worker:** option 2 lists the controls found on the Tailnet (name,
+  origin, release, and a short control ID) and never picks one by itself;
+  option 3, or `--control-url`, takes a typed URL. Either way it continues with
+  the one-time code (`connect`) until click-to-approve pairing lands.
+  Discovery reads only `tailscale status --json`: online peers with a `.ts.net`
+  name and a Tailscale address, at most 64 peers and 8 probes at a time, about
+  6 s in all. Each probe is `https://<peer>/api/v1/discovery`, pinned to that
+  peer's Tailscale address, with no redirects and a 4 KiB body cap. An answer
+  counts only if it names exactly the probed origin. A 404 is listed as an
+  older Sentinal.
 
 Exit codes: 0 done or nothing to do · 1 a step failed (files restored) ·
 2 cancelled or usage · 3–5 as `connect`, with 5 also meaning "already set up

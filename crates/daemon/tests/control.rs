@@ -80,6 +80,7 @@ fn open_with_read_model(
             development: false,
             machine_id: MachineId(CONTROL.into()),
             display_name: "Mac mini".into(),
+            discovery_name: None,
             os: Os::Macos,
             daemon_version: "0.0.1".into(),
             secrets_file: dir.join("machine-credentials.json"),

@@ -9,6 +9,7 @@ pub mod client;
 pub mod connect_command;
 pub mod daemon_url;
 pub mod detach;
+pub mod discovery;
 pub mod doctor;
 mod doctor_storage;
 pub mod frame;

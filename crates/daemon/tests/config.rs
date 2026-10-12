@@ -341,3 +341,30 @@ fn storage_limits_default_and_can_be_tightened_but_not_zeroed() {
         ));
     }
 }
+
+#[test]
+fn control_display_name_is_optional_and_must_be_a_safe_name() {
+    let base = "[control]\nenabled = true\npublic_url = \"https://c.example.ts.net\"\n";
+    let config = DaemonConfig::from_toml(base, Path::new("/home/me")).unwrap();
+    assert_eq!(config.control.unwrap().display_name, None);
+    let named = format!("{base}display_name = \"  Owner's Sentinal \"\n");
+    let config = DaemonConfig::from_toml(&named, Path::new("/home/me")).unwrap();
+    assert_eq!(
+        config.control.unwrap().display_name.as_deref(),
+        Some("Owner's Sentinal")
+    );
+    for bad in [
+        "\"\"",
+        "\"x\\u001b[31m\"",
+        &format!("\"{}\"", "n".repeat(65)),
+    ] {
+        let text = format!("{base}display_name = {bad}\n");
+        assert!(
+            matches!(
+                DaemonConfig::from_toml(&text, Path::new("/home/me")),
+                Err(ConfigError::InvalidControlName(_))
+            ),
+            "{bad}"
+        );
+    }
+}

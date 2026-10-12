@@ -1,0 +1,12 @@
+{
+  "discovery": {
+    "sentinal": "control",
+    "schema_version": 1,
+    "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A",
+    "display_name": "Owner's Sentinal",
+    "origin": "https://sentinal-pilot.example-tailnet.ts.net",
+    "release": "0.1.18",
+    "protocol": { "min": 1, "max": 1 },
+    "pairing": { "approval": false, "code": true }
+  }
+}

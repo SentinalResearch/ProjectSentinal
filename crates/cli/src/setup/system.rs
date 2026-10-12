@@ -65,6 +65,8 @@ pub trait System {
     fn healthy(&mut self, url: &str) -> bool;
     /// Publish the installed signed release to this control's package channel.
     fn publish(&mut self, version: &str, config_dir: &Path) -> Result<(), String>;
+    /// Find controls on the Tailnet (4.E §4).
+    fn discover(&mut self) -> Result<crate::discovery::Discovered, String>;
 }
 
 /// The real Machine.
@@ -239,5 +241,15 @@ impl System for RealSystem {
     fn publish(&mut self, version: &str, config_dir: &Path) -> Result<(), String> {
         crate::release::publish_installed(&self.prefix, config_dir, version)
             .map_err(|error| error.to_string())
+    }
+
+    fn discover(&mut self) -> Result<crate::discovery::Discovered, String> {
+        let tailscale = Self::tailscale_cli().ok_or_else(|| {
+            "Tailscale is not installed: install it from https://tailscale.com/download, sign in, then run sentinal setup".to_string()
+        })?;
+        crate::discovery::discover(
+            &crate::discovery::RealTransport { tailscale },
+            crate::discovery::DEADLINE,
+        )
     }
 }

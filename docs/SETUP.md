@@ -358,6 +358,12 @@ browser at all (the CLI and worker links still work). `*`, `null`, paths,
 and plain-HTTP origins are refused unless `development = true`, which only
 the `just` launchers write.
 
+`[control] display_name` (written by `sentinal setup`) is the name workers see
+when they look for controls. `GET /api/v1/discovery` answers, without
+authentication, only on the control: the name, control Machine ID, origin,
+release, protocol range, and pairing methods. It is limited to 60 answers a
+minute control-wide and is `Cache-Control: no-store`.
+
 Tailnet ACL (grants) for the intended devices only:
 
 ```json

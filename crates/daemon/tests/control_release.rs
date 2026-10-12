@@ -117,6 +117,7 @@ fn daemon(control: bool) -> Daemon {
                 development: false,
                 machine_id: MachineId("01J9Y0CTRL0000000000000000".into()),
                 display_name: "Control".into(),
+                discovery_name: None,
                 os: Os::Macos,
                 daemon_version: "0.1.17".into(),
                 secrets_file: dir.join("machine-credentials.json"),
