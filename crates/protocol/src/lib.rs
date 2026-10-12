@@ -40,6 +40,7 @@ pub mod notification;
 pub mod process;
 pub mod projection;
 pub mod recipe;
+pub mod release;
 pub mod session;
 pub mod session_log;
 pub mod time;

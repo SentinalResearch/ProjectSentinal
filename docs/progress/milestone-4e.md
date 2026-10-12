@@ -661,6 +661,32 @@ signature check fails the unsigned case), apply cases in
 Next, 2b: the daemon's daily watch, the dashboard Update control button and
 `GET/POST /api/v1/control/release`, Push on results, and automatic when idle.
 
+### Step 2b — control-release contract (protocol layer only, 2026-10-12)
+
+The wire contract for `/api/v1/control/release`, ahead of the daemon route
+handlers, the daily GitHub watch, the dashboard button, and automatic-when-idle
+(all still open — see "Next" above, unchanged):
+
+- `crates/protocol/src/release.rs`: `ReleaseChannel` (stable/beta),
+  `ReleasePolicy` (notify/automatic-when-idle/off), `AvailableRelease`,
+  `ControlUpdateState` (running/updated/rolled-back/failed/unknown),
+  `ControlUpdateStatus`, `ControlReleaseView` (the full dashboard payload —
+  current version, channel, policy, window, available release, any unsigned
+  release found, last-checked time, in-progress update, live-FULL-Session
+  count), `ControlUpdateRequest` (version + `allow_interrupt`, strict
+  `MAJOR.MINOR.PATCH` only), `ControlUpdateStarted`, `ReleasePolicyRequest`.
+- `ProtocolError::InvalidReleaseVersion` for a malformed version string.
+- Fixtures: `crates/protocol/tests/fixtures/release.json` (an available-update
+  view and a rolled-back-update view). Round-trip test plus a dedicated test
+  asserting `ControlUpdateRequest::validate()` rejects non-strict versions
+  (missing/extra segments, a `v` prefix, a leading zero, injected shell text).
+- Generated TS (`web/src/protocol/*.ts`) verified against this with
+  `just gen-ts --check`.
+
+Evidence: `cargo test -p protocol`, `cargo fmt -p protocol -- --check`,
+`cargo clippy -p protocol --all-targets --all-features -- -D warnings`, and
+`just gen-ts --check` all pass.
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

@@ -1,0 +1,39 @@
+{
+  "view_available": {
+    "current": "0.1.17",
+    "channel": "STABLE",
+    "policy": "NOTIFY",
+    "window": "03:00-05:00",
+    "available": {
+      "version": "0.1.18",
+      "published_at": "2026-10-12T10:00:00Z",
+      "notes_url": "https://github.com/SentinalResearch/ProjectSentinal/releases/tag/v0.1.18"
+    },
+    "unsigned_found": null,
+    "last_checked_at": 1792000000000,
+    "update": null,
+    "live_full_sessions": 2
+  },
+  "view_running": {
+    "current": "0.1.17",
+    "channel": "BETA",
+    "policy": "AUTOMATIC_WHEN_IDLE",
+    "window": "03:00-05:00",
+    "available": null,
+    "unsigned_found": "0.1.19",
+    "last_checked_at": null,
+    "update": {
+      "update_id": "cu_1792000000000",
+      "version": "0.1.18",
+      "previous": "0.1.17",
+      "state": "ROLLED_BACK",
+      "reason": "the restarted daemon did not pass its health check",
+      "started_at": 1792000000000,
+      "finished_at": 1792000060000
+    },
+    "live_full_sessions": 0
+  },
+  "update_request": {"version": "0.1.18", "allow_interrupt": true},
+  "update_started": {"update_id": "cu_1792000000000"},
+  "policy_request": {"policy": "OFF", "channel": "STABLE"}
+}

@@ -218,6 +218,9 @@ pub enum ProtocolError {
     /// The JSON could not be parsed into the expected type.
     #[error("invalid JSON: {0}")]
     Json(String),
+    /// A release version was not strict `MAJOR.MINOR.PATCH`.
+    #[error("invalid release version '{0}'; expected MAJOR.MINOR.PATCH")]
+    InvalidReleaseVersion(String),
 }
 
 impl From<serde_json::Error> for ProtocolError {
