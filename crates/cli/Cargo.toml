@@ -10,6 +10,8 @@ publish.workspace = true
 clap.workspace = true
 futures-util.workspace = true
 protocol = { path = "../protocol" }
+# Release watch/policy files (`sentinal release`); already a workspace dependency.
+serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

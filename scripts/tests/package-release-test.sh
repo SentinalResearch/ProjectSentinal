@@ -59,6 +59,11 @@ second_artifact="$second/$artifact_name"
 [[ "$(sha256 "$first_artifact")" == "$(sha256 "$second_artifact")" ]] || fail 'same inputs did not produce the same archive'
 
 entries="$(tar -tzf "$first_artifact")"
+# Release tools ship in every archive so a control needs no git checkout.
+for tool in tools/scripts/receive-release.sh tools/scripts/publish-worker-release.sh tools/scripts/apply-release.sh \
+  tools/scripts/lib/package-common.sh tools/scripts/lib/release-signature.sh tools/packaging/release-keys/allowed_signers; do
+  printf '%s\n' "$entries" | grep -qx "sentinal-worker/$tool" || fail "archive is missing $tool"
+done
 duplicates="$(printf '%s\n' "$entries" | LC_ALL=C sort | uniq -d)"
 [[ -z "$duplicates" ]] || fail "archive contains duplicate entries: $duplicates"
 while IFS= read -r listing; do
@@ -180,7 +185,12 @@ cp "$repo_root/LICENSE" "$source_copy/"
 cp -R "$repo_root/shell" "$source_copy/shell"
 cp -R "$repo_root/packaging/systemd" "$repo_root/packaging/launchd" "$source_copy/packaging/"
 cp "$repo_root/scripts/install-worker.sh" "$source_copy/scripts/"
-cp "$repo_root/scripts/lib/install-common.sh" "$repo_root/scripts/lib/launch-common.sh" "$source_copy/scripts/lib/"
+cp "$repo_root/scripts/lib/install-common.sh" "$repo_root/scripts/lib/launch-common.sh" \
+  "$repo_root/scripts/lib/package-common.sh" "$repo_root/scripts/lib/release-signature.sh" "$source_copy/scripts/lib/"
+cp "$repo_root/scripts/receive-release.sh" "$repo_root/scripts/publish-worker-release.sh" \
+  "$repo_root/scripts/apply-release.sh" "$source_copy/scripts/"
+mkdir -p "$source_copy/packaging/release-keys"
+cp "$repo_root/packaging/release-keys/allowed_signers" "$source_copy/packaging/release-keys/"
 for asset in index.html manifest.webmanifest sw.js; do
   printf 'asset %s\n' "$asset" >"$source_copy/web/dist/$asset"
 done

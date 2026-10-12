@@ -220,7 +220,31 @@ owner$ gh release upload v0.1.18 /tmp/v0.1.18/SHA256SUMS.sig --clobber
 
 ### Releases from GitHub (control)
 
-On the control, from a checkout of this repository:
+On the control (no git checkout needed; the release tools ship with every
+release under `~/.local/share/sentinal/tools`):
+
+```console
+control$ sentinal release check            # newest release signed by a pinned key
+control$ sentinal release update           # confirm, publish, install, health check
+control$ sentinal release rollback 0.1.17  # explicit, signed, audited
+control$ sentinal release policy           # notify (default) · auto · off, and channel
+```
+
+Behaviour:
+- `check` only offers a release whose `SHA256SUMS` verifies against the pinned
+  keys. An unsigned or wrongly signed release is reported as "found but not
+  signed" and never offered.
+- `update` asks for confirmation (`--yes` for automation). It runs the bundled
+  receive tool, then requires the restarted daemon to answer
+  `/api/v1/health` within 60 s (`--health-timeout`).
+- If the health check fails, the control moves the channel back and
+  reinstalls the previous signed release automatically, then reports
+  "Rolled back".
+- Results and the policy are stored owner-only in the data directory
+  (`release-watch.json`, `release-policy.json`).
+- `just receive-release` (below) remains for recovery from a checkout.
+
+From a checkout, the equivalent low-level command is:
 
 ```console
 control$ just receive-release 0.1.18

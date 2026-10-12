@@ -48,6 +48,10 @@ make_release() {
   printf '{}\n' >"$root/web/manifest.webmanifest"
   printf 'const release = "%s";\n' "$version" >"$root/web/sw.js"
   printf 'console.log("%s")\n' "$version" >"$root/web/assets/app-test.js"
+  mkdir -p "$root/tools/scripts/lib" "$root/tools/packaging/release-keys"
+  printf '#!/usr/bin/env bash\necho apply-%s\n' "$version" >"$root/tools/scripts/apply-release.sh"
+  chmod 755 "$root/tools/scripts/apply-release.sh"
+  printf '# keys %s\n' "$version" >"$root/tools/packaging/release-keys/allowed_signers"
   cat >"$root/BUILD.json" <<EOF
 {"schema_version":1,"version":"$release_version","git_commit":"test","source_date_epoch":1,"target":"aarch64-apple-darwin","protocol_version":1}
 EOF
@@ -104,6 +108,8 @@ assert_contains "$fresh_output" "Installed sentinal and sentinald in $prefix/bin
 assert_contains "$fresh_output" 'Worker bind: 100.90.80.70:17420'
 [[ -x "$prefix/bin/sentinal" ]] || fail 'sentinal was not installed executable'
 [[ -x "$prefix/bin/sentinald" ]] || fail 'sentinald was not installed executable'
+[[ -x "$prefix/share/sentinal/tools/scripts/apply-release.sh" ]] || fail 'release tools were not installed'
+grep -q 'apply-v1' "$prefix/share/sentinal/tools/scripts/apply-release.sh" || fail 'release tools are not from this release'
 assert_file_contains "$prefix/bin/sentinal" 'sentinal-v1'
 assert_file_contains "$prefix/share/sentinal/shell/external/sentinal.zsh" 'zsh hook v1'
 assert_file_contains "$prefix/share/sentinal/web/index.html" 'web v1'

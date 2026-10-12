@@ -68,6 +68,8 @@ sentinal_validate_source_binary "$bin_dir/sentinal"
 sentinal_validate_source_binary "$bin_dir/sentinald"
 
 for required in LICENSE scripts/install-worker.sh scripts/lib/install-common.sh scripts/lib/launch-common.sh \
+  scripts/receive-release.sh scripts/publish-worker-release.sh scripts/apply-release.sh \
+  scripts/lib/package-common.sh scripts/lib/release-signature.sh packaging/release-keys/allowed_signers \
   packaging/systemd/sentinald.service packaging/launchd/dev.sentinal.sentinald.plist \
   web/dist/index.html web/dist/manifest.webmanifest web/dist/sw.js; do
   [[ -f "$source_dir/$required" && ! -L "$source_dir/$required" ]] || sentinal_package_die "missing release asset '$source_dir/$required'"
@@ -92,6 +94,14 @@ cp "$bin_dir/sentinal" "$root/bin/sentinal"
 cp "$bin_dir/sentinald" "$root/bin/sentinald"
 chmod 755 "$root/bin/sentinal" "$root/bin/sentinald"
 cp -R "$source_dir/shell" "$root/shell"
+# Release tools, laid out like the repository so their default paths resolve.
+mkdir -p "$root/tools/scripts/lib" "$root/tools/packaging/release-keys"
+for tool in receive-release.sh publish-worker-release.sh apply-release.sh; do
+  cp "$source_dir/scripts/$tool" "$root/tools/scripts/$tool"
+  chmod 755 "$root/tools/scripts/$tool"
+done
+cp "$source_dir/scripts/lib/package-common.sh" "$source_dir/scripts/lib/release-signature.sh" "$root/tools/scripts/lib/"
+cp "$source_dir/packaging/release-keys/allowed_signers" "$root/tools/packaging/release-keys/allowed_signers"
 cp -R "$source_dir/web/dist" "$root/web"
 web_cache_id="$version-$target"
 sed "s/__SENTINAL_RELEASE_ID__/$web_cache_id/g" "$root/web/sw.js" >"$root/web/sw.js.tmp"

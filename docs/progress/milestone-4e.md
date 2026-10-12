@@ -627,6 +627,40 @@ commit their public lines to `packaging/release-keys/allowed_signers`
 - the release workflow's render step fails by design;
 - controls on ≤ 0.1.17 keep serving their old, unsigned install path.
 
+### Step 2a — `sentinal release` on the control (2026-10-12)
+
+Release tools:
+- Archives ship them under `tools/`, laid out like the repository:
+  `receive-release.sh`, `publish-worker-release.sh`, `apply-release.sh`,
+  their libraries, and `release-keys/allowed_signers`.
+- The installer installs them to `share/sentinal/tools`, with the same
+  transactional restore as the other assets.
+- New `scripts/apply-release.sh` reinstalls a published release from the local
+  package directory. It re-verifies the stored signature, the artifact digest,
+  and the archive entries. `receive-release` self-update and rollback both
+  use it.
+
+`sentinal release` (`crates/cli/src/release/`):
+- **check:** reads the GitHub releases API through `curl`, then filters by
+  channel (stable or beta), skips drafts, and keeps only versions newer than
+  the installed one. It offers the newest release whose `SHA256SUMS`
+  verifies against the pinned keys and lists all 4 targets. It reports, but
+  never offers, an unsigned one.
+- **update:** confirms, runs the receive tool, then polls `/api/v1/health`.
+  If health fails, it moves the channel back and reinstalls the previous
+  signed release, and records `ROLLED_BACK`.
+- **rollback:** explicit; the release must be published locally.
+- **policy:** notify, auto, or off, plus the channel.
+- State is kept 0600 in `release-watch.json` and `release-policy.json`.
+- A worker is refused.
+
+Tests: `crates/cli/tests/release.rs` (8 cases; mutation-checked: removing the
+signature check fails the unsigned case), apply cases in
+`receive-release-test.sh`, tools in package and installer tests.
+
+Next, 2b: the daemon's daily watch, the dashboard Update control button and
+`GET/POST /api/v1/control/release`, Push on results, and automatic when idle.
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

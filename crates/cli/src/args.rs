@@ -61,6 +61,15 @@ pub enum Command {
         #[arg(long)]
         config_dir: Option<PathBuf>,
     },
+    /// Check, install, or roll back signed releases on the control.
+    Release {
+        /// Release action.
+        #[command(subcommand)]
+        action: crate::release_args::ReleaseAction,
+        /// Shared release options.
+        #[command(flatten)]
+        options: crate::release_args::ReleaseOptions,
+    },
     /// Check for, install, or explicitly roll back a verified worker release.
     Update {
         /// Report whether the stable release differs without installing it.

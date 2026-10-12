@@ -132,26 +132,7 @@ fi
 if [[ "$self_update" == false ]]; then
   exit 0
 fi
-case "$(uname -s):$(uname -m)" in
-  Linux:x86_64|Linux:amd64) host_target=x86_64-unknown-linux-musl ;;
-  Linux:aarch64|Linux:arm64) host_target=aarch64-unknown-linux-musl ;;
-  Darwin:x86_64) host_target=x86_64-apple-darwin ;;
-  Darwin:arm64) host_target=aarch64-apple-darwin ;;
-  *) sentinal_package_die "published, but this control's platform is unsupported for self-update" ;;
-esac
-tailscale_cli="$(command -v tailscale 2>/dev/null || true)"
-if [[ -z "$tailscale_cli" && -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]]; then
-  tailscale_cli=/Applications/Tailscale.app/Contents/MacOS/Tailscale
-fi
-[[ -n "$tailscale_cli" ]] || sentinal_package_die "published, but the Tailscale CLI is missing for self-update"
-bind_ip="$("$tailscale_cli" ip -4 2>/dev/null | awk 'NR == 1 { print; exit }')"
-mkdir "$work/self"
-tar -xzf "$work/sentinal-worker-$version-$host_target.tar.gz" -C "$work/self"
-echo "Updating this control to $version ($host_target)"
-"$work/self/sentinal-worker/scripts/install-worker.sh" install --release-dir "$work/self/sentinal-worker" \
-  --bind "$bind_ip" --artifact-sha "$(sha256_of "$work/sentinal-worker-$version-$host_target.tar.gz")" \
-  ${installer_args[@]+"${installer_args[@]}"} >"$work/install.log" 2>&1 || {
-  cat "$work/install.log" >&2
+# Self-update from the copy just published, re-verified by apply-release.sh.
+"$SCRIPT_DIR/apply-release.sh" --version "$version" --package-dir "$package_dir" \
+  --allowed-signers "$allowed_signers" ${installer_args[@]+"${installer_args[@]}"} ||
   sentinal_package_die "published, but updating this control failed; its previous programs were restored"
-}
-echo "This control now runs $version"

@@ -144,12 +144,14 @@ if [[ -n "$release_dir" ]]; then
   source_bin_dir="$release_dir/bin"
   shell_source="$release_dir/shell"
   web_source="$release_dir/web"
+  tools_source="$release_dir/tools"
   build_command=""
 else
   sentinal_require_safe_path source "$source_dir"
   source_bin_dir="$source_dir/target/release"
   shell_source="$source_dir/shell"
   web_source="$source_dir/web/dist"
+  tools_source=""
   build_command="cargo build --locked --offline --release -p daemon --bin sentinald -p cli --bin sentinal; pnpm -C web build"
 fi
 
@@ -241,6 +243,7 @@ trap transaction_cleanup EXIT HUP INT TERM
 [[ ! -f "$bin_dir/sentinal" ]] || cp -p "$bin_dir/sentinal" "$transaction/sentinal"
 [[ ! -f "$bin_dir/sentinald" ]] || cp -p "$bin_dir/sentinald" "$transaction/sentinald"
 [[ ! -d "$share_dir/shell" ]] || cp -R "$share_dir/shell" "$transaction/shell"
+[[ ! -d "$share_dir/tools" ]] || cp -R "$share_dir/tools" "$transaction/tools"
 [[ ! -f "$release_state" ]] || cp -p "$release_state" "$transaction/release.json"
 [[ ! -f "$service_file" ]] || cp -p "$service_file" "$transaction/service"
 
@@ -254,6 +257,19 @@ mkdir -p "$shell_temporary"
 cp -R "$shell_source/." "$shell_temporary/"
 rm -rf -- "$shell_destination"
 mv "$shell_temporary" "$shell_destination"
+
+# Release tools (control updates/rollback) mirror the installed release; older
+# releases and source installs have none.
+tools_destination="$share_dir/tools"
+rm -rf -- "$share_dir/tools.tmp.$$"
+if [[ -n "$tools_source" && -d "$tools_source" ]]; then
+  mkdir -p "$share_dir/tools.tmp.$$"
+  cp -R "$tools_source/." "$share_dir/tools.tmp.$$/"
+  rm -rf -- "$tools_destination"
+  mv "$share_dir/tools.tmp.$$" "$tools_destination"
+else
+  rm -rf -- "$tools_destination"
+fi
 
 web_destination="$share_dir/web"
 web_temporary="$share_dir/web.tmp.$$"
@@ -310,6 +326,8 @@ if [[ "$install_service" == true ]]; then
     if [[ -f "$transaction/sentinald" ]]; then sentinal_atomic_install "$transaction/sentinald" "$bin_dir/sentinald"; else rm -f -- "$bin_dir/sentinald"; fi
     rm -rf -- "$shell_destination"
     [[ ! -d "$transaction/shell" ]] || mv "$transaction/shell" "$shell_destination"
+    rm -rf -- "$tools_destination"
+    [[ ! -d "$transaction/tools" ]] || mv "$transaction/tools" "$tools_destination"
     rm -rf -- "$web_destination"
     [[ ! -d "$transaction/web.previous" ]] || mv "$transaction/web.previous" "$web_destination"
     if [[ -f "$transaction/release.json" ]]; then mv "$transaction/release.json" "$release_state"; else rm -f -- "$release_state"; fi

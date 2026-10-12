@@ -214,6 +214,35 @@ grep -q '"version": "0.0.9"' "$test_root/home/.local/share/sentinal/release.json
   fail 'self-update did not record the release'
 [[ "$output" == *"This control now runs 0.0.9"* ]] || fail "no self-update confirmation: $output"
 
+# 8. apply-release.sh reinstalls from the local package directory, re-verifying
+#    the stored signature and digest; tampering installs nothing.
+applier="$repo_root/scripts/apply-release.sh"
+self_packages="$test_root/packages self"
+apply() {
+  PATH="$fake_bin:$base_path" HOME="$test_root/home" "$applier" --package-dir "$self_packages" \
+    --allowed-signers "$allowed" --no-service "$@"
+}
+output="$(apply --version 0.0.9 2>&1)" || fail "apply-release of a published release failed: $output"
+[[ "$output" == *"This control now runs 0.0.9"* ]] || fail "no apply confirmation: $output"
+host_artifact="$(ls "$self_packages/artifacts/" | grep "$(uname -s | tr 'A-Z' 'a-z' | sed 's/darwin/apple-darwin/;s/linux/linux-musl/')" | head -n 1)"
+cp "$self_packages/artifacts/$host_artifact" "$test_root/artifact.bak"
+chmod 600 "$self_packages/artifacts/$host_artifact"
+printf 'x' >>"$self_packages/artifacts/$host_artifact"
+if error="$(apply --version 0.0.9 2>&1)"; then
+  fail 'apply-release installed a tampered stored artifact'
+fi
+[[ "$error" == *"does not match the signed SHA256SUMS"* ]] || fail "unclear apply tamper error: $error"
+cp "$test_root/artifact.bak" "$self_packages/artifacts/$host_artifact"
+mv "$self_packages/releases/0.0.9.SHA256SUMS.sig" "$test_root/sig.bak"
+if error="$(apply --version 0.0.9 2>&1)"; then
+  fail 'apply-release installed a release without its stored signature'
+fi
+[[ "$error" == *"not signed by the owner"* ]] || fail "unclear apply missing-signature error: $error"
+mv "$test_root/sig.bak" "$self_packages/releases/0.0.9.SHA256SUMS.sig"
+if apply --version 0.0.8 >/dev/null 2>&1; then
+  fail 'apply-release installed an unpublished release'
+fi
+
 # Bad input is refused before any download.
 : >"$SENTINAL_TEST_CURL_LOG"
 for bad_version in 'v0.0.9;rm' '0.0.9.' '0.0.9..' '.0.0.9' '0.0' '0.0.9.1' '00.0.9' '0.0.9 '; do

@@ -220,7 +220,15 @@ sentinal disconnect
 sentinal identity reset [--yes]
 sentinal doctor [--prefix DIR] [--config-dir DIR]
 sentinal update [--check | --rollback VERSION] [--prefix DIR]
+sentinal release check [--channel stable|beta] [--json]
+sentinal release update [--version V] [--yes] [--skip-provenance] [--health-timeout S]
+sentinal release rollback VERSION [--yes]
+sentinal release policy [notify|auto|off] [--channel stable|beta]
 ```
+
+`sentinal release` runs on the control only (a worker is refused and pointed
+to `sentinal update`). It trusts only releases signed by the keys compiled into
+the binary, or by `--allowed-signers FILE` when given explicitly.
 
 Notifications have no synthetic `test` command. Configure `notify.toml` as
 described in `docs/SETUP.md`, then run an ordinary watched or hooked Command;

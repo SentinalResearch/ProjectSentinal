@@ -55,6 +55,9 @@ async fn dispatch(
         Command::Doctor { prefix, config_dir } => {
             return Ok(crate::doctor::run(prefix, config_dir, out));
         }
+        Command::Release { action, options } => {
+            return Ok(crate::release::run(action, options, out, err));
+        }
         Command::Update {
             check,
             rollback,
@@ -216,6 +219,7 @@ async fn dispatch(
         }
         Command::Watch { .. }
         | Command::Doctor { .. }
+        | Command::Release { .. }
         | Command::Update { .. }
         | Command::Hook { .. }
         | Command::Auto { .. }
