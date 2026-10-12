@@ -36,6 +36,7 @@ fn every_projection_body_round_trips() {
     round_trip::<ControlProjectionSnapshot>(&fixture["control_snapshot"]);
     round_trip::<ControlProjectionMessage>(&fixture["control_delta"]);
     round_trip::<ControlProjectionMessage>(&fixture["snapshot_required"]);
+    round_trip::<ControlProjectionMessage>(&fixture["snapshot_required_registry_changed"]);
 }
 
 #[test]

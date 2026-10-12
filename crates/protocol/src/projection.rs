@@ -751,6 +751,9 @@ pub enum ControlSnapshotReason {
     RevisionMismatch,
     /// Projection schema changed.
     SchemaChanged,
+    /// A Machine's registry state changed (disconnect, revoke, or rename) —
+    /// not itself a projection change, so it carries no delta of its own.
+    RegistryChanged,
 }
 
 /// One control-origin live projection message.

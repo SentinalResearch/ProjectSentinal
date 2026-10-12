@@ -808,7 +808,21 @@ impl ControlService {
             .unwrap_or_default();
         self.with_secrets(|secrets| secrets.remove(&links))?;
         self.audit.machine(now, "DISCONNECTED", machine_id, None);
+        self.notify_registry_changed();
         Ok(())
+    }
+
+    /// Tell every subscribed owner live stream to refetch a fresh snapshot:
+    /// registry state (disconnect/revoke/rename) isn't a projection change
+    /// with its own delta, so there is nothing to carry but the signal.
+    fn notify_registry_changed(&self) {
+        let current_revision = self.store.control_projection_revision().unwrap_or(0);
+        let _ = self
+            .projection_updates
+            .send(ControlProjectionMessage::SnapshotRequired {
+                current_revision,
+                reason: ControlSnapshotReason::RegistryChanged,
+            });
     }
 
     /// The owner-visible registry; never contains a secret.
@@ -843,6 +857,7 @@ impl ControlService {
             return Err(not_found());
         }
         self.audit.machine(now, "RENAMED", machine_id, None);
+        self.notify_registry_changed();
         let row = self
             .store
             .registry_machine(machine_id)
@@ -871,6 +886,7 @@ impl ControlService {
             .map_err(ControlFailure::internal)?;
         self.with_secrets(|secrets| secrets.remove(&links))?;
         self.audit.machine(now, "REVOKED", machine_id, None);
+        self.notify_registry_changed();
         Ok(())
     }
 

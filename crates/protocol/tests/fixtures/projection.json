@@ -118,5 +118,6 @@
     "truncated": false
   },
   "control_delta": { "type": "PROJECTION_DELTA", "machine_id": "01M40Q6XWORKER", "from_revision": 992, "to_revision": 995, "changes": [] },
-  "snapshot_required": { "type": "SNAPSHOT_REQUIRED", "current_revision": 1210, "reason": "DELTA_BOUND_EXCEEDED" }
+  "snapshot_required": { "type": "SNAPSHOT_REQUIRED", "current_revision": 1210, "reason": "DELTA_BOUND_EXCEEDED" },
+  "snapshot_required_registry_changed": { "type": "SNAPSHOT_REQUIRED", "current_revision": 1211, "reason": "REGISTRY_CHANGED" }
 }

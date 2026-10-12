@@ -6,4 +6,5 @@
 export type ControlSnapshotReason =
   | "DELTA_BOUND_EXCEEDED"
   | "REVISION_MISMATCH"
-  | "SCHEMA_CHANGED";
+  | "SCHEMA_CHANGED"
+  | "REGISTRY_CHANGED";
