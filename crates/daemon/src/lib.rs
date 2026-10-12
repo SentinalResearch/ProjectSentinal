@@ -38,4 +38,5 @@ pub mod recipes;
 pub mod scrollback;
 pub mod session_manager;
 pub mod shell;
+pub mod storage;
 pub mod tracker;

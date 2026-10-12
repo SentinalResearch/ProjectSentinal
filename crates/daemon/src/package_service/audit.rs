@@ -3,7 +3,6 @@
 use serde::Serialize;
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
@@ -76,11 +75,12 @@ impl PackageAudit {
         };
         let mut bytes = serde_json::to_vec(&record).map_err(|error| error.to_string())?;
         bytes.push(b'\n');
-        let mut file = crate::private_fs::private_file_options()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .map_err(|error| error.to_string())?;
-        file.write_all(&bytes).map_err(|error| error.to_string())
+        crate::private_fs::append_bounded(
+            &self.path,
+            &bytes,
+            crate::private_fs::AUDIT_ROTATE_BYTES,
+            crate::private_fs::AUDIT_KEEP_ROTATED,
+        )
+        .map_err(|error| error.to_string())
     }
 }

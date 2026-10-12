@@ -77,6 +77,8 @@ pub struct DaemonConfig {
     pub control: Option<ControlConfig>,
     /// Whether the control serves and accepts the disposable dashboard read model.
     pub control_read_model: bool,
+    /// Session-log retention limits (`[storage]`).
+    pub storage: crate::storage::StorageLimits,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -101,6 +103,14 @@ struct RawConfig {
     #[serde(default = "default_control_read_model")]
     control_read_model: bool,
     control: Option<RawControlConfig>,
+    storage: Option<RawStorageConfig>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawStorageConfig {
+    session_log_max_bytes: Option<u64>,
+    session_log_max_age_days: Option<u64>,
 }
 
 fn default_control_read_model() -> bool {
@@ -130,6 +140,9 @@ struct RawPackageConfig {
 /// Errors produced while loading daemon configuration.
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
+    /// A `[storage]` limit was zero.
+    #[error("invalid [storage] setting: {0} must be at least 1")]
+    InvalidStorage(&'static str),
     /// The configuration file could not be read.
     #[error("failed to read daemon config '{}': {source}", path.display())]
     Read {
@@ -276,6 +289,7 @@ impl DaemonConfig {
             behind_tailscale_serve: raw.behind_tailscale_serve,
             control,
             control_read_model: raw.control_read_model,
+            storage: parse_storage(raw.storage)?,
         })
     }
 }
@@ -390,4 +404,26 @@ fn is_tailscale_ipv4(address: Ipv4Addr) -> bool {
     const CGNAT_PREFIX: u32 = 0x6440_0000;
     const CGNAT_MASK: u32 = 0xffc0_0000;
     u32::from(address) & CGNAT_MASK == CGNAT_PREFIX
+}
+
+fn parse_storage(
+    raw: Option<RawStorageConfig>,
+) -> Result<crate::storage::StorageLimits, ConfigError> {
+    let defaults = crate::storage::StorageLimits::default();
+    let raw = raw.unwrap_or_default();
+    let limits = crate::storage::StorageLimits {
+        session_log_max_bytes: raw
+            .session_log_max_bytes
+            .unwrap_or(defaults.session_log_max_bytes),
+        session_log_max_age_days: raw
+            .session_log_max_age_days
+            .unwrap_or(defaults.session_log_max_age_days),
+    };
+    if limits.session_log_max_bytes == 0 {
+        return Err(ConfigError::InvalidStorage("session_log_max_bytes"));
+    }
+    if limits.session_log_max_age_days == 0 {
+        return Err(ConfigError::InvalidStorage("session_log_max_age_days"));
+    }
+    Ok(limits)
 }

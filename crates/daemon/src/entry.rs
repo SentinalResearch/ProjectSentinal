@@ -391,6 +391,12 @@ pub async fn run() -> Result<(), DaemonError> {
     if let Some(gateway) = push.clone() {
         spawn_push_delivery_worker(gateway, server_shutdown_rx.clone());
     }
+    crate::storage::spawn_storage_retention(
+        config.data_dir.clone(),
+        store.clone(),
+        config.storage,
+        server_shutdown_rx.clone(),
+    );
     let mut release = None;
     if config.control.is_some() {
         match sibling_sentinal_bin() {

@@ -608,6 +608,26 @@ For a worker installed from the Tailnet package service, prefer `sentinal
 update --check` and `sentinal update`; both reuse the stored verified control
 origin. Re-running the original curl command is also an update.
 
+## Storage limits
+
+Saved terminal output and audit files are bounded. Defaults need no config:
+
+```toml
+# daemon.toml (optional)
+[storage]
+session_log_max_bytes = 4294967296   # all saved Session logs together (4 GiB)
+session_log_max_age_days = 90        # finished Sessions' logs older than this go
+```
+
+- One Session's saved log stops at 1 GiB with a marker; the live terminal is
+  unaffected.
+- Finished Sessions' logs are deleted oldest first, when the daemon starts and
+  then daily. A running Session's log is never deleted.
+- Each audit file (`*.jsonl`) rotates at 16 MiB, keeping three older copies.
+- `sentinal doctor` prints current use on its `Storage:` line.
+
+To free space now, lower a limit and restart the daemon. Zero is rejected.
+
 ## Backup and inspection
 
 Stop or quiesce the daemon before a filesystem-level backup, then copy both

@@ -44,15 +44,15 @@ pub(super) fn spawn_reader(
                 return;
             }
         };
+        let mut budget =
+            super::log_budget::LogBudget::new(super::log_budget::SESSION_LOG_CAP_BYTES);
         let mut buffer = [0_u8; 8192];
         loop {
             let count = match reader.read(&mut buffer) {
                 Ok(0) => {
                     let trailing = osc.finish();
                     if !trailing.is_empty() {
-                        if let Err(error) =
-                            encoder.write_all(&trailing).and_then(|()| encoder.flush())
-                        {
+                        if let Err(error) = save(&mut encoder, &mut budget, &trailing) {
                             tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append trailing session log");
                         }
                         match handle.parser.lock() {
@@ -84,7 +84,7 @@ pub(super) fn spawn_reader(
             if bytes.is_empty() {
                 continue;
             }
-            if let Err(error) = encoder.write_all(bytes).and_then(|()| encoder.flush()) {
+            if let Err(error) = save(&mut encoder, &mut budget, bytes) {
                 tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append session log");
             }
             match handle.parser.lock() {
@@ -498,4 +498,22 @@ pub(super) fn spawn_exit_monitor(
             }
         }
     });
+}
+
+/// Save `bytes` within this Session's log budget (F9).
+fn save(
+    encoder: &mut impl std::io::Write,
+    budget: &mut super::log_budget::LogBudget,
+    bytes: &[u8],
+) -> std::io::Result<()> {
+    use super::log_budget::{Admit, CAP_MARKER};
+    match budget.admit(bytes.len()) {
+        Admit::Write => encoder.write_all(bytes)?,
+        Admit::Marker => {
+            tracing::warn!("a Session reached its saved-output limit; live output continues");
+            encoder.write_all(CAP_MARKER)?;
+        }
+        Admit::Skip => return Ok(()),
+    }
+    encoder.flush()
 }

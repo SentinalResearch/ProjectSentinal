@@ -47,6 +47,11 @@ pub fn run(prefix: Option<PathBuf>, config_dir: Option<PathBuf>, out: &mut dyn W
         "Updates: {}",
         describe_updates(settings.as_ref(), release.as_ref())
     );
+    let _ = writeln!(
+        out,
+        "Storage: {}",
+        crate::doctor_storage::describe(&config_dir.join("daemon.toml"), &home)
+    );
 
     if [&binaries, &config, &tailscale, &service, &pairing]
         .iter()

@@ -5,7 +5,6 @@ use protocol::Timestamp;
 use serde::Serialize;
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
@@ -59,21 +58,17 @@ impl SecurityAudit {
             reason,
         })?;
         line.push(b'\n');
-        let mut file = crate::private_fs::private_file_options()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .map_err(|source| LocalSocketError::Io {
-                operation: "open security audit log for",
-                path: self.path.clone(),
-                source,
-            })?;
-        file.write_all(&line)
-            .map_err(|source| LocalSocketError::Io {
-                operation: "append security audit log for",
-                path: self.path.clone(),
-                source,
-            })
+        crate::private_fs::append_bounded(
+            &self.path,
+            &line,
+            crate::private_fs::AUDIT_ROTATE_BYTES,
+            crate::private_fs::AUDIT_KEEP_ROTATED,
+        )
+        .map_err(|source| LocalSocketError::Io {
+            operation: "append security audit log for",
+            path: self.path.clone(),
+            source,
+        })
     }
 }
 

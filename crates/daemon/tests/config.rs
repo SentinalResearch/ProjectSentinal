@@ -309,3 +309,35 @@ fn allowed_origins_are_exact_and_refuse_wildcards() {
         vec!["http://100.64.0.1:5173".to_string()]
     );
 }
+
+#[test]
+fn storage_limits_default_and_can_be_tightened_but_not_zeroed() {
+    use daemon::storage::{DEFAULT_SESSION_LOG_MAX_AGE_DAYS, DEFAULT_SESSION_LOG_MAX_BYTES};
+    let defaults = DaemonConfig::from_toml("", Path::new("/home/tester")).unwrap();
+    assert_eq!(
+        defaults.storage.session_log_max_bytes,
+        DEFAULT_SESSION_LOG_MAX_BYTES
+    );
+    assert_eq!(
+        defaults.storage.session_log_max_age_days,
+        DEFAULT_SESSION_LOG_MAX_AGE_DAYS
+    );
+
+    let tight = DaemonConfig::from_toml(
+        "[storage]\nsession_log_max_bytes = 1073741824\nsession_log_max_age_days = 14\n",
+        Path::new("/home/tester"),
+    )
+    .unwrap();
+    assert_eq!(tight.storage.session_log_max_bytes, 1_073_741_824);
+    assert_eq!(tight.storage.session_log_max_age_days, 14);
+
+    for bad in [
+        "[storage]\nsession_log_max_bytes = 0\n",
+        "[storage]\nsession_log_max_age_days = 0\n",
+    ] {
+        assert!(matches!(
+            DaemonConfig::from_toml(bad, Path::new("/home/tester")),
+            Err(ConfigError::InvalidStorage(_))
+        ));
+    }
+}

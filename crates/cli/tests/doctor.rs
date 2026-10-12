@@ -298,3 +298,28 @@ fn write_executable(path: &Path, contents: &str) {
     fs::write(path, contents).unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
 }
+
+#[test]
+#[cfg(unix)]
+fn doctor_shows_storage_use_against_the_configured_limits() {
+    let root = TestDir::new();
+    let data = root.0.join("data");
+    fs::create_dir_all(data.join("sessions")).unwrap();
+    fs::write(data.join("sessions/1.log.zst"), vec![0_u8; 3 * 1024 * 1024]).unwrap();
+    fs::write(data.join("sessions/2.log.zst"), vec![0_u8; 1024 * 1024]).unwrap();
+    fs::write(data.join("audit.jsonl"), vec![b'x'; 1024 * 1024]).unwrap();
+    fs::write(data.join("audit.jsonl.1"), vec![b'x'; 1024 * 1024]).unwrap();
+    fs::write(data.join("terminal-agent.sqlite3"), vec![0_u8; 512 * 1024]).unwrap();
+    let fixture = Fixture::new(
+        &root,
+        &format!(
+            "bind = \"100.90.80.70:7420\"\ndata_dir = \"{}\"\n[storage]\nsession_log_max_bytes = 1073741824\nsession_log_max_age_days = 30\n",
+            data.display()
+        ),
+    );
+    let stdout = fixture.doctor();
+    assert!(
+        stdout.contains("Storage: Session logs 4.0 MiB (2) of 1024 MiB, kept 30 days · audits 2.0 MiB · database 0.5 MiB"),
+        "{stdout}"
+    );
+}

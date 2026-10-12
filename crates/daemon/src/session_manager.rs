@@ -9,6 +9,7 @@ mod external;
 mod external_lifecycle;
 mod lifecycle;
 mod local_dispatch;
+mod log_budget;
 mod operations;
 mod replay;
 mod structured;

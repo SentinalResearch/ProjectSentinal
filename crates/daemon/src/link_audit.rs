@@ -3,11 +3,10 @@
 //! Records never contain pairing codes, credentials, hashes, Authorization
 //! headers, or request bodies.
 
-use crate::private_fs::{ensure_private_dir, private_file_options};
+use crate::private_fs::ensure_private_dir;
 use protocol::{MachineId, Timestamp};
 use serde::Serialize;
 use std::{
-    io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -89,11 +88,12 @@ impl LinkAudit {
         }
         let mut line = serde_json::to_vec(record).map_err(|error| error.to_string())?;
         line.push(b'\n');
-        private_file_options()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .and_then(|mut file| file.write_all(&line))
-            .map_err(|error| error.to_string())
+        crate::private_fs::append_bounded(
+            &self.path,
+            &line,
+            crate::private_fs::AUDIT_ROTATE_BYTES,
+            crate::private_fs::AUDIT_KEEP_ROTATED,
+        )
+        .map_err(|error| error.to_string())
     }
 }

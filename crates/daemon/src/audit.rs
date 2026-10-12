@@ -4,7 +4,6 @@ use protocol::{SessionId, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -82,16 +81,13 @@ impl AuditLog {
             source,
         })?;
         line.push(b'\n');
-        let mut file = crate::private_fs::private_file_options()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .map_err(|source| AuditError::File {
-                operation: "open",
-                path: self.path.clone(),
-                source,
-            })?;
-        file.write_all(&line).map_err(|source| AuditError::File {
+        crate::private_fs::append_bounded(
+            &self.path,
+            &line,
+            crate::private_fs::AUDIT_ROTATE_BYTES,
+            crate::private_fs::AUDIT_KEEP_ROTATED,
+        )
+        .map_err(|source| AuditError::File {
             operation: "append to",
             path: self.path.clone(),
             source,

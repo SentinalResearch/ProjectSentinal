@@ -10,6 +10,7 @@ pub mod connect_command;
 pub mod daemon_url;
 pub mod detach;
 pub mod doctor;
+mod doctor_storage;
 pub mod frame;
 pub mod hook_command;
 pub mod hook_report;

@@ -148,6 +148,9 @@ changes nothing. Besides Binaries, Config, Tailscale, and Service it prints:
   read from the link file. It never prints a credential. A control prints
   "not needed on the control".
 - `Updates`: the worker's control origin and channel, or `just receive-release` on a control.
+- `Storage`: saved Session logs (size, count) against `[storage]`
+  `session_log_max_bytes` and the age limit, plus audit-file and database size.
+  It reads file sizes only.
 
 Tailscale is found on `PATH`, then inside the macOS app bundle
 (`/Applications/Tailscale.app/Contents/MacOS/Tailscale`).
