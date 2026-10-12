@@ -6,7 +6,7 @@
     "endpoint": { "address": "100.66.29.67", "port": 7420, "dns_name": "worker.tailnet.ts.net" },
     "daemon_version": "0.4.1",
     "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
-    "projection_sync": { "schema_version": 1, "source_epoch": "pe_01M4D1", "current_cursor": 44, "last_acked_cursor": 41 }
+    "projection_sync": { "schema_version": 1, "source_epoch": "pe_01M4D1", "current_cursor": 44, "last_acked_cursor": 41, "snapshot_required": false }
   },
   "heartbeat_response": {
     "status": "ACTIVE",
@@ -96,6 +96,7 @@
     "machines": [
       {
         "machine_id": "01M40Q6XWORKER",
+        "projection_available": true,
         "display_name": "MacBook",
         "os": "MACOS",
         "daemon_version": "0.4.1",

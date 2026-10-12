@@ -582,6 +582,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       if (next === null) return false;
       installProjection(next);
       startProjectionStream();
+      await refreshProjectedLegacy();
       return true;
     })().finally(() => { projectionReload = null; });
     return projectionReload;
@@ -796,6 +797,14 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     }
   };
 
+  const refreshProjectedLegacy = async (): Promise<void> => {
+    if (projection === null || projection.legacyMachineIds.size === 0) return;
+    const legacy = [...projection.legacyMachineIds]
+      .map((id) => connections.get(id))
+      .filter((connection): connection is MachineConnection => connection !== undefined && queryEligible(connection));
+    await mapConcurrent(legacy, QUERY_CONCURRENCY, (connection) => refreshConnection(connection, true));
+  };
+
   const refreshDue = async (): Promise<void> => {
     await ensureInitialized();
     if (projection !== null) return;
@@ -959,6 +968,27 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     resolveTerminal(sessionId) {
       const connection = liveOwner(sessionId, "terminal attach");
       return { websocketUrl: connection.transport.url, localSessionId: localId(sessionId), machineId: connection.id };
+    },
+    async refreshSessionDetail(sessionId) {
+      await ensureInitialized();
+      let connection: MachineConnection;
+      try {
+        connection = liveOwner(sessionId, "Session detail");
+      } catch {
+        return;
+      }
+      try {
+        const reply = await connection.transport.request(
+          { type: "LIST_SESSIONS" },
+          (message) => message.type === "SESSIONS",
+        );
+        if (reply.type !== "SESSIONS") return;
+        const local = localId(sessionId);
+        const match = reply.sessions.find((session) => session.id === local);
+        if (match) emit({ type: "SESSION_UPDATED", session: mapSession(match) });
+      } catch {
+        markFailure(connection);
+      }
     },
     async getRecipes() {
       await ensureInitialized();

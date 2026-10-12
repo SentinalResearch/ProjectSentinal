@@ -11,6 +11,7 @@ function snapshot(machineCount = 1, sessionsPerMachine = 1): ControlProjectionSn
     generated_at: 1_000,
     machines: Array.from({ length: machineCount }, (_, machineIndex) => ({
       machine_id: `machine-${machineIndex}`,
+      projection_available: true,
       display_name: `Machine ${machineIndex}`,
       os: machineIndex % 2 === 0 ? "MACOS" : "LINUX",
       daemon_version: "0.4.1",

@@ -67,7 +67,7 @@ fn event(cursor: u64, session_id: u64) -> ProjectionChange {
 #[test]
 fn migration_seven_adds_projection_tables_without_resetting_existing_data() {
     let store = Store::open_in_memory().unwrap();
-    assert_eq!(store.schema_version().unwrap(), 8);
+    assert_eq!(store.schema_version().unwrap(), 9);
     for table in [
         "projection_worker_state",
         "projection_outbox",
@@ -165,9 +165,23 @@ fn worker_outbox_rejects_gaps_and_stays_bounded() {
     store
         .record_projection_change(&machine, EPOCH, &upsert(1, 10), Timestamp(1), one_row)
         .unwrap();
-    assert!(store
+    store
         .record_projection_change(&machine, EPOCH, &upsert(2, 11), Timestamp(2), one_row)
-        .is_err());
+        .unwrap();
+    let report = store.projection_sync_report(&machine, EPOCH).unwrap();
+    assert_eq!(report.current_cursor, 2);
+    assert!(report.snapshot_required);
+    assert!(store
+        .projection_changes_after(&machine, EPOCH, 0, 10)
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        store
+            .worker_projection_snapshot(&machine, EPOCH)
+            .unwrap()
+            .len(),
+        2
+    );
 }
 
 #[test]

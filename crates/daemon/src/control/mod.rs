@@ -600,20 +600,26 @@ impl ControlService {
             .len()
             .saturating_sub(MAX_PROJECTED_MACHINES) as u32;
         let mut omitted_sessions = 0_u32;
+        let mut remaining_sessions = MAX_PROJECTED_SESSIONS;
+        let mut remaining_events = MAX_PROJECTED_EVENTS;
+        let mut remaining_metrics = MAX_PROJECTED_METRICS;
         let mut machines = Vec::new();
         for machine in registry.machines.into_iter().take(MAX_PROJECTED_MACHINES) {
             let state = self
                 .store
                 .control_projection_state(&machine.machine_id)
                 .map_err(ControlFailure::internal)?;
+            let session_count = self
+                .store
+                .projected_session_count(&machine.machine_id)
+                .map_err(ControlFailure::internal)?;
             let sessions = self
                 .store
-                .projected_sessions(&machine.machine_id, MAX_PROJECTED_SESSIONS + 1)
+                .projected_sessions(&machine.machine_id, remaining_sessions)
                 .map_err(ControlFailure::internal)?;
-            let machine_omitted = sessions
-                .len()
-                .saturating_sub(MAX_PROJECTED_SESSIONS as usize)
-                as u32;
+            let returned_sessions = sessions.len() as u32;
+            remaining_sessions = remaining_sessions.saturating_sub(returned_sessions);
+            let machine_omitted = session_count.saturating_sub(returned_sessions);
             omitted_sessions = omitted_sessions.saturating_add(machine_omitted);
             let credential_expired = machine
                 .credential
@@ -623,6 +629,7 @@ impl ControlService {
                 projection_freshness(machine.status, credential_expired, state.as_ref(), now);
             machines.push(ControlProjectedMachine {
                 machine_id: machine.machine_id.clone(),
+                projection_available: state.is_some(),
                 display_name: machine.display_name,
                 os: machine.os,
                 daemon_version: machine.daemon_version,
@@ -633,18 +640,23 @@ impl ControlService {
                 observed_at: state.as_ref().and_then(|value| value.observed_at),
                 synced_at: state.as_ref().map(|value| value.synced_at),
                 source_cursor: state.as_ref().map_or(0, |value| value.committed_cursor),
-                sessions: sessions
-                    .into_iter()
-                    .take(MAX_PROJECTED_SESSIONS as usize)
-                    .collect(),
-                events: self
-                    .store
-                    .projected_events(&machine.machine_id, MAX_PROJECTED_EVENTS)
-                    .map_err(ControlFailure::internal)?,
-                metrics: self
-                    .store
-                    .projected_metrics(&machine.machine_id, MAX_PROJECTED_METRICS)
-                    .map_err(ControlFailure::internal)?,
+                sessions,
+                events: {
+                    let values = self
+                        .store
+                        .projected_events(&machine.machine_id, remaining_events)
+                        .map_err(ControlFailure::internal)?;
+                    remaining_events = remaining_events.saturating_sub(values.len() as u32);
+                    values
+                },
+                metrics: {
+                    let values = self
+                        .store
+                        .projected_metrics(&machine.machine_id, remaining_metrics)
+                        .map_err(ControlFailure::internal)?;
+                    remaining_metrics = remaining_metrics.saturating_sub(values.len() as u32);
+                    values
+                },
                 omitted_sessions: machine_omitted,
             });
         }
@@ -676,7 +688,8 @@ impl ControlService {
             .as_ref()
             .filter(|state| state.source_epoch == report.source_epoch)
             .map_or(0, |state| state.committed_cursor);
-        let action = if report.schema_version != PROJECTION_SCHEMA_VERSION
+        let action = if report.snapshot_required
+            || report.schema_version != PROJECTION_SCHEMA_VERSION
             || stored
                 .as_ref()
                 .is_some_and(|state| state.source_epoch != report.source_epoch)

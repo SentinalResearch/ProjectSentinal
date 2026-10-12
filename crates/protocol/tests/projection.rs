@@ -81,6 +81,17 @@ fn legacy_control_snapshot_without_control_identity_still_decodes() {
 }
 
 #[test]
+fn legacy_projected_machine_defaults_to_projection_unavailable() {
+    let mut value = fixture()["control_snapshot"]["machines"][0].clone();
+    value
+        .as_object_mut()
+        .unwrap()
+        .remove("projection_available");
+    let decoded: protocol::ControlProjectedMachine = serde_json::from_value(value).unwrap();
+    assert!(!decoded.projection_available);
+}
+
+#[test]
 fn legacy_heartbeat_defaults_to_no_projection_capability() {
     let fixture =
         serde_json::from_str::<Value>(include_str!("fixtures/machine_link.json")).unwrap();

@@ -16,7 +16,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         ConnectInfo, DefaultBodyLimit, Path, Query, State,
     },
-    http::{HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post, put},
     Json, Router,
@@ -27,7 +27,7 @@ use protocol::{
         LinkHeartbeatRequest, LinkRefreshRequest, RenameMachineRequest,
     },
     ControlProjectionMessage, ControlSnapshotReason, MachineId, NotificationIntentBatch,
-    ProjectionBatch, PushProviderModeRequest, PushSubscriptionRequest,
+    ProjectionBatch, PushProviderModeRequest, PushSubscriptionRequest, MAX_PROJECTION_BATCH_BYTES,
 };
 use std::net::SocketAddr;
 
@@ -76,7 +76,7 @@ impl ControlRoutes {
     /// Build the router.
     pub fn router(self) -> Router {
         let proxy = proxy::routes(self.control.clone(), self.auth.clone(), self.development);
-        Router::new()
+        let link_routes = Router::new()
             .route("/api/v1/pairing/codes", post(create_code))
             .route(
                 "/api/v1/pairing/codes/{code_id}",
@@ -95,9 +95,6 @@ impl ControlRoutes {
                 "/api/v1/link/notification-intents",
                 post(notification_intents),
             )
-            .route("/api/v1/link/projection", post(projection_batch))
-            .route("/api/v1/control/snapshot", get(projection_snapshot))
-            .route("/api/v1/control/live", get(projection_live))
             .route("/api/v1/push/public-key", get(push_public_key))
             .route("/api/v1/push/deliveries", get(push_deliveries))
             .route(
@@ -110,7 +107,15 @@ impl ControlRoutes {
                 axum::routing::delete(push_unsubscribe),
             )
             .route("/api/v1/push/provider", put(push_provider))
-            .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES))
+            .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES));
+        let projection_routes = Router::new()
+            .route("/api/v1/link/projection", post(projection_batch))
+            .route("/api/v1/control/snapshot", get(projection_snapshot))
+            .route("/api/v1/control/live", get(projection_live))
+            .layer(DefaultBodyLimit::max(MAX_PROJECTION_BATCH_BYTES));
+        Router::new()
+            .merge(link_routes)
+            .merge(projection_routes)
             .with_state(self)
             .merge(proxy)
     }
@@ -285,7 +290,7 @@ async fn projection_batch(
 
 async fn projection_snapshot(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Response {
     match routes.owner(&headers) {
-        Ok(control) => reply(control.projection_snapshot()),
+        Ok(control) => no_store(reply(control.projection_snapshot())),
         Err(failure) => failure_response(failure),
     }
 }
@@ -301,9 +306,13 @@ async fn projection_live(
             let control = control.clone();
             let receiver = control.subscribe_projection_updates();
             match control.projection_updates_after(query.after) {
-                Ok(initial) => upgrade
-                    .on_upgrade(move |socket| projection_socket(socket, control, receiver, initial))
-                    .into_response(),
+                Ok(initial) => no_store(
+                    upgrade
+                        .on_upgrade(move |socket| {
+                            projection_socket(socket, control, receiver, initial)
+                        })
+                        .into_response(),
+                ),
                 Err(failure) => failure_response(failure),
             }
         }
@@ -463,6 +472,18 @@ fn no_content(result: Result<(), ControlFailure>) -> Response {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(failure) => failure_response(failure),
     }
+}
+
+fn no_store(mut response: Response) -> Response {
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, private"),
+    );
+    response.headers_mut().insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    response
 }
 
 fn failure_response(failure: ControlFailure) -> Response {

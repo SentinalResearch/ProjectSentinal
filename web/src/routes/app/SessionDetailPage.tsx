@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { CaptureBadge } from "../../components/CaptureBadge";
@@ -56,6 +56,14 @@ function DesktopSessionDetail() {
   const session = sessions.find((s) => s.id === id);
   const machine = session ? machines.find((m) => m.id === session.machine) : undefined;
   const machineName = machine?.name ?? session?.machine ?? "";
+
+  // Reduced-capture Sessions never attach, so they otherwise never get a fresh
+  // authoritative fetch from their owning worker — fields the control
+  // projection omits (e.g. cwd) would never arrive without this.
+  useEffect(() => {
+    if (!session || captureOf(session) === "FULL") return;
+    void dataAdapter.refreshSessionDetail(session.id);
+  }, [session?.id]);
 
   if (loading) return <div className={styles.page}>Loading…</div>;
 

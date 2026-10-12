@@ -43,6 +43,10 @@ const MIGRATIONS: &[(u32, &str)] = &[
     (6, include_str!("../migrations/006_native_push.sql")),
     (7, include_str!("../migrations/007_projection.sql")),
     (8, include_str!("../migrations/008_projection_resync.sql")),
+    (
+        9,
+        include_str!("../migrations/009_projection_snapshot_required.sql"),
+    ),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.

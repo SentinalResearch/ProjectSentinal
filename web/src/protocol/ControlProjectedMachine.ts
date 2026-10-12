@@ -18,6 +18,10 @@ export type ControlProjectedMachine = {
    */
   machine_id: MachineId;
   /**
+   * Whether this Machine has committed the current projection contract.
+   */
+  projection_available: boolean;
+  /**
    * Owner-visible Machine name.
    */
   display_name: string;

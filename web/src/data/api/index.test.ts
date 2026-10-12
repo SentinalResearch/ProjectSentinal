@@ -422,6 +422,7 @@ function controlProjection(): ControlProjectionSnapshot {
     generated_at: 1_700_000_002_000,
     machines: ["test-machine", "worker-machine"].map((machineId) => ({
       machine_id: machineId,
+      projection_available: true,
       display_name: machineId === "test-machine" ? "Control" : "Worker",
       os: machineId === "test-machine" ? "MACOS" : "LINUX",
       daemon_version: "0.4.1",
@@ -548,6 +549,24 @@ describe("apiAdapter authentication", () => {
     expect(new URL(sockets[0].url).pathname).toBe("/api/v1/control/live");
     expect(new URL(sockets[0].url).searchParams.get("after")).toBe("8");
     expect(sockets.flatMap((socket) => socket.requests)).toEqual([]);
+  });
+
+  it("uses one bounded direct refresh for an old worker without projection sync", async () => {
+    const { adapter, server, sockets } = setup();
+    const snapshot = controlProjection();
+    snapshot.machines[1].projection_available = false;
+    snapshot.machines[1].sessions = [];
+    snapshot.machines[1].events = [];
+    snapshot.machines[1].metrics = [];
+    server.projectionSnapshot = snapshot;
+    await adapter.auth.login("correct horse battery staple");
+
+    const sessions = await adapter.getSessions();
+
+    expect(sessions.map((entry) => entry.id)).toContain("worker-machine:1");
+    const worker = sockets.find((socket) => socket.machineId === "worker-machine");
+    expect(worker?.requests.map((request) => request.type)).toEqual(["GET_MACHINE", "LIST_SESSIONS"]);
+    expect(worker?.requests.some((request) => request.type === "GET_EVENTS")).toBe(false);
   });
 
   it("applies the control live delta without opening a worker socket", async () => {

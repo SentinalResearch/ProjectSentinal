@@ -94,6 +94,14 @@ export interface DataAdapter {
   /** Resolve a browser composite Session ID to its owning Machine route. */
   resolveTerminal(sessionId: string): TerminalRoute;
 
+  /**
+   * Fetch this Session fresh from its owning worker and merge the result in
+   * — for fields the control projection omits (e.g. cwd), so a reduced-capture
+   * Session's detail view still gets them without an attach. Best-effort: a
+   * no-op if the Machine isn't currently live/authoritative.
+   */
+  refreshSessionDetail(sessionId: string): Promise<void>;
+
   /** Subscribe to live updates (epoch ticks, event appends, state transitions). Returns an unsubscribe function. */
   subscribe(listener: (event: LiveEvent) => void): () => void;
 

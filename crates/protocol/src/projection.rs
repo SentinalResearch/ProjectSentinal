@@ -32,6 +32,9 @@ pub struct ProjectionSyncReport {
     pub current_cursor: u64,
     /// Latest cursor acknowledged durably by the control.
     pub last_acked_cursor: u64,
+    /// A bounded outbox overflow requires a complete replacement snapshot.
+    #[serde(default)]
+    pub snapshot_required: bool,
 }
 
 /// Next projection action selected by the control.
@@ -679,6 +682,9 @@ pub enum ProjectionFreshness {
 pub struct ControlProjectedMachine {
     /// Source Machine ID.
     pub machine_id: MachineId,
+    /// Whether this Machine has committed the current projection contract.
+    #[serde(default)]
+    pub projection_available: bool,
     /// Owner-visible Machine name.
     pub display_name: String,
     /// Reported operating system.

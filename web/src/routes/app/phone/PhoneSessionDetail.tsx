@@ -67,6 +67,14 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
   const waiting = session.state === "WAITING" && Boolean(session.prompt);
   const failed = session.state === "FAILED";
 
+  // Reduced-capture Sessions never attach, so they otherwise never get a
+  // fresh authoritative fetch from their owning worker — fields the control
+  // projection omits (e.g. cwd) would never arrive without this.
+  useEffect(() => {
+    if (capture === "FULL") return;
+    void dataAdapter.refreshSessionDetail(session.id);
+  }, [session.id, capture]);
+
   function stop() {
     if (needsInterruptConfirm(session)) setSheetOpen(true);
     else void dataAdapter.sendSignal(session.id, "SIGINT");

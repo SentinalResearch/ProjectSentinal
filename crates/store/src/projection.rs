@@ -78,7 +78,7 @@ impl Store {
         let transaction = connection.transaction()?;
         let state = worker_state(&transaction, machine_id)?;
         let current = match &state {
-            Some((epoch, current, _)) if epoch == source_epoch => *current,
+            Some((epoch, current, _, _)) if epoch == source_epoch => *current,
             Some(_) => 0,
             None => 0,
         };
@@ -111,17 +111,16 @@ impl Store {
                 .saturating_sub(previous_bytes)
                 .saturating_add(replacement_bytes);
             if compacted_bytes > limits.maximum_bytes {
-                return Err(StoreError::ProjectionOutboxFull {
-                    rows: transaction.query_row(
-                        "SELECT COUNT(*) FROM projection_outbox
-                         WHERE machine_id=?1 AND source_epoch=?2",
-                        params![machine_id.0, source_epoch],
-                        |row| row.get(0),
-                    )?,
-                    bytes: pending_bytes,
-                    maximum_rows: limits.maximum_rows,
-                    maximum_bytes: limits.maximum_bytes,
-                });
+                require_worker_projection_snapshot(
+                    &transaction,
+                    machine_id,
+                    source_epoch,
+                    cursor,
+                    change,
+                    at,
+                )?;
+                transaction.commit()?;
+                return Ok(());
             }
             transaction.execute(
                 "UPDATE projection_outbox SET change_json=?1,encoded_bytes=?2,created_at=?3
@@ -157,16 +156,20 @@ impl Store {
         )?;
         if rows >= limits.maximum_rows || pending_bytes.saturating_add(bytes) > limits.maximum_bytes
         {
-            return Err(StoreError::ProjectionOutboxFull {
-                rows,
-                bytes: pending_bytes,
-                maximum_rows: limits.maximum_rows,
-                maximum_bytes: limits.maximum_bytes,
-            });
+            require_worker_projection_snapshot(
+                &transaction,
+                machine_id,
+                source_epoch,
+                cursor,
+                change,
+                at,
+            )?;
+            transaction.commit()?;
+            return Ok(());
         }
         if state
             .as_ref()
-            .is_some_and(|(epoch, _, _)| epoch != source_epoch)
+            .is_some_and(|(epoch, _, _, _)| epoch != source_epoch)
         {
             transaction.execute(
                 "DELETE FROM projection_outbox WHERE machine_id=?1",
@@ -216,15 +219,18 @@ impl Store {
     ) -> Result<ProjectionSyncReport, StoreError> {
         let connection = self.lock()?;
         let state = worker_state(&connection, machine_id)?;
-        let (current_cursor, last_acked_cursor) = state
-            .filter(|(epoch, _, _)| epoch == source_epoch)
-            .map(|(_, current, acknowledged)| (current, acknowledged))
-            .unwrap_or((0, 0));
+        let (current_cursor, last_acked_cursor, snapshot_required) = state
+            .filter(|(epoch, _, _, _)| epoch == source_epoch)
+            .map(|(_, current, acknowledged, snapshot_required)| {
+                (current, acknowledged, snapshot_required)
+            })
+            .unwrap_or((0, 0, false));
         Ok(ProjectionSyncReport {
             schema_version: protocol::PROJECTION_SCHEMA_VERSION,
             source_epoch: source_epoch.into(),
             current_cursor,
             last_acked_cursor,
+            snapshot_required,
         })
     }
 
@@ -286,7 +292,7 @@ impl Store {
         let mut connection = self.lock()?;
         let transaction = connection.transaction()?;
         let state = worker_state(&transaction, machine_id)?;
-        let Some((epoch, current, acknowledged)) = state else {
+        let Some((epoch, current, acknowledged, _)) = state else {
             return Err(StoreError::MissingText {
                 kind: "projection worker state",
                 id: machine_id.0.clone(),
@@ -305,7 +311,8 @@ impl Store {
             params![machine_id.0, source_epoch, to_sql_id(cursor)?],
         )?;
         transaction.execute(
-            "UPDATE projection_worker_state SET acknowledged_cursor=?1
+            "UPDATE projection_worker_state SET acknowledged_cursor=?1,
+                snapshot_required=CASE WHEN current_cursor<=?1 THEN 0 ELSE snapshot_required END
              WHERE machine_id=?2 AND source_epoch=?3",
             params![to_sql_id(cursor)?, machine_id.0, source_epoch],
         )?;
@@ -578,6 +585,16 @@ impl Store {
             .collect()
     }
 
+    /// Count Session summaries for one Machine without loading their JSON.
+    pub fn projected_session_count(&self, machine_id: &MachineId) -> Result<u32, StoreError> {
+        let connection = self.lock()?;
+        Ok(connection.query_row(
+            "SELECT COUNT(*) FROM control_projection_sessions WHERE machine_id=?1",
+            [&machine_id.0],
+            |row| row.get(0),
+        )?)
+    }
+
     /// Return bounded newest safe Event summaries for one Machine.
     pub fn projected_events(
         &self,
@@ -846,15 +863,44 @@ fn change_with_cursor(change: &ProjectionChange, cursor: u64) -> ProjectionChang
 fn worker_state(
     connection: &rusqlite::Connection,
     machine_id: &MachineId,
-) -> Result<Option<(String, u64, u64)>, StoreError> {
+) -> Result<Option<(String, u64, u64, bool)>, StoreError> {
     Ok(connection
         .query_row(
-            "SELECT source_epoch,current_cursor,acknowledged_cursor
+            "SELECT source_epoch,current_cursor,acknowledged_cursor,snapshot_required
              FROM projection_worker_state WHERE machine_id=?1",
             [&machine_id.0],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .optional()?)
+}
+
+fn require_worker_projection_snapshot(
+    transaction: &Transaction<'_>,
+    machine_id: &MachineId,
+    source_epoch: &str,
+    cursor: u64,
+    change: &ProjectionChange,
+    at: Timestamp,
+) -> Result<(), StoreError> {
+    transaction.execute(
+        "DELETE FROM projection_outbox WHERE machine_id=?1",
+        [&machine_id.0],
+    )?;
+    transaction.execute(
+        "INSERT INTO projection_worker_state(
+            machine_id,source_epoch,current_cursor,acknowledged_cursor,updated_at,snapshot_required
+         ) VALUES (?1,?2,?3,0,?4,1)
+         ON CONFLICT(machine_id) DO UPDATE SET
+            source_epoch=excluded.source_epoch,
+            current_cursor=excluded.current_cursor,
+            acknowledged_cursor=CASE
+                WHEN projection_worker_state.source_epoch=excluded.source_epoch
+                THEN projection_worker_state.acknowledged_cursor ELSE 0 END,
+            updated_at=excluded.updated_at,
+            snapshot_required=1",
+        params![machine_id.0, source_epoch, to_sql_id(cursor)?, at.0],
+    )?;
+    update_worker_projection_record(transaction, machine_id, source_epoch, change, at)
 }
 
 fn control_state(

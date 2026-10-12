@@ -15,6 +15,7 @@ export interface ProjectionView {
   controlMachineId: string;
   revision: number;
   machines: Map<string, { machine: Machine; sessions: Session[] }>;
+  legacyMachineIds: Set<string>;
 }
 
 function duration(milliseconds: number): string {
@@ -143,6 +144,9 @@ export function projectionView(snapshot: ControlProjectionSnapshot, now: number)
     controlMachineId: snapshot.control_machine_id,
     revision: snapshot.view_revision,
     machines: new Map(snapshot.machines.map((machine) => [machine.machine_id, mapMachine(machine, now)])),
+    legacyMachineIds: new Set(snapshot.machines
+      .filter((machine) => !machine.projection_available)
+      .map((machine) => machine.machine_id)),
   };
 }
 

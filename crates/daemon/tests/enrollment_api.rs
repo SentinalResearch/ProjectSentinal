@@ -6,7 +6,7 @@
 use axum::{
     body::{to_bytes, Body},
     extract::connect_info::MockConnectInfo,
-    http::{Request, StatusCode},
+    http::{HeaderMap, Request, StatusCode},
     Router,
 };
 use daemon::{
@@ -116,6 +116,7 @@ fn daemon(control: bool, behind_serve: bool, peer: &str) -> Daemon {
 
 struct Reply {
     status: StatusCode,
+    headers: HeaderMap,
     body: Value,
 }
 
@@ -144,9 +145,11 @@ impl Daemon {
         .unwrap();
         let response = self.app.clone().oneshot(request).await.unwrap();
         let status = response.status();
+        let headers = response.headers().clone();
         let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         Reply {
             status,
+            headers,
             body: serde_json::from_slice(&bytes).unwrap_or(Value::Null),
         }
     }
@@ -229,6 +232,14 @@ async fn control_projection_snapshot_is_one_bounded_owner_resource() {
         .send("GET", "/api/v1/control/snapshot", Some(&session), &[], None)
         .await;
     assert_eq!(response.status, StatusCode::OK);
+    assert_eq!(
+        response.headers.get("cache-control").unwrap(),
+        "no-store, private"
+    );
+    assert_eq!(
+        response.headers.get("x-content-type-options").unwrap(),
+        "nosniff"
+    );
     let snapshot: protocol::ControlProjectionSnapshot =
         serde_json::from_value(response.body).unwrap();
     assert_eq!(snapshot.machines.len(), 1);
@@ -237,6 +248,7 @@ async fn control_projection_snapshot_is_one_bounded_owner_resource() {
         protocol::ProjectionFreshness::Stale
     );
     assert!(snapshot.machines[0].sessions.is_empty());
+    assert!(!snapshot.machines[0].projection_available);
 }
 
 #[tokio::test]

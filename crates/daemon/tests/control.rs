@@ -182,6 +182,35 @@ fn projection_batch(machine_id: &str) -> ProjectionBatch {
     }
 }
 
+fn projection_session_batch(machine_id: &str, base_cursor: u64, count: u64) -> ProjectionBatch {
+    let changes = (1..=count)
+        .map(|offset| {
+            let cursor = base_cursor + offset;
+            let mut session = Session::new(
+                SessionId(cursor),
+                MachineId(machine_id.into()),
+                "/bin/zsh",
+                "/private/cwd",
+                Timestamp(START),
+            );
+            session.title = Some("bounded dashboard session".into());
+            ProjectionChange::SessionUpsert {
+                cursor,
+                session: ProjectedSession::from_session(&session),
+            }
+        })
+        .collect();
+    ProjectionBatch::Delta {
+        schema_version: PROJECTION_SCHEMA_VERSION,
+        machine_id: MachineId(machine_id.into()),
+        source_epoch: "pe_scale".into(),
+        base_cursor,
+        through_cursor: base_cursor + count,
+        sent_at: Timestamp(START),
+        changes,
+    }
+}
+
 // ---- routing ---------------------------------------------------------------
 
 #[test]
@@ -200,6 +229,7 @@ fn heartbeat_negotiates_projection_upload_without_breaking_legacy_workers() {
             source_epoch: "pe_test".into(),
             current_cursor: 1,
             last_acked_cursor: 0,
+            snapshot_required: false,
         }),
     };
     let response = h
@@ -214,10 +244,28 @@ fn heartbeat_negotiates_projection_upload_without_breaking_legacy_workers() {
     request.projection_sync = None;
     assert_eq!(
         h.control
-            .heartbeat(credential.expose(), request)
+            .heartbeat(credential.expose(), request.clone())
             .unwrap()
             .projection_sync,
         None
+    );
+
+    request.sequence = 3;
+    request.projection_sync = Some(protocol::ProjectionSyncReport {
+        schema_version: PROJECTION_SCHEMA_VERSION,
+        source_epoch: "pe_test".into(),
+        current_cursor: 2,
+        last_acked_cursor: 0,
+        snapshot_required: true,
+    });
+    assert_eq!(
+        h.control
+            .heartbeat(credential.expose(), request)
+            .unwrap()
+            .projection_sync
+            .unwrap()
+            .action,
+        protocol::ProjectionSyncAction::Snapshot
     );
 }
 
@@ -258,6 +306,40 @@ fn projection_ingress_is_authenticated_machine_bound_and_idempotent() {
             .code,
         LinkFailureCode::Unauthorized
     );
+}
+
+#[test]
+fn owner_snapshot_has_one_global_session_budget_across_machines() {
+    let h = harness();
+    let first = h.pair(WORKER_A, "A");
+    let second = h.pair(WORKER_B, "B");
+    for (machine, credential, total) in [(WORKER_A, &first, 600_u64), (WORKER_B, &second, 500_u64)]
+    {
+        let mut cursor = 0;
+        while cursor < total {
+            let count = 128_u64.min(total - cursor);
+            h.control
+                .accept_projection(
+                    credential.expose(),
+                    projection_session_batch(machine, cursor, count),
+                )
+                .unwrap();
+            cursor += count;
+        }
+    }
+
+    let snapshot = h.control.projection_snapshot().unwrap();
+    assert_eq!(
+        snapshot
+            .machines
+            .iter()
+            .map(|machine| machine.sessions.len())
+            .sum::<usize>(),
+        1_000
+    );
+    assert_eq!(snapshot.omitted_sessions, 100);
+    assert!(snapshot.truncated);
+    assert!(serde_json::to_vec(&snapshot).unwrap().len() <= 2 * 1024 * 1024);
 }
 
 #[test]

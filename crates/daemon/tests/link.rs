@@ -12,8 +12,10 @@ use daemon::{
     link::{LinkManager, LinkSettings},
 };
 use protocol::{
-    link::{LinkEndpoint, LocalLinkState, RegistryStatus},
-    LocalErrorCode, LocalRequest, LocalResponse, MachineId, Os, Secret, Timestamp,
+    link::{LinkEndpoint, LinkExchangeRequest, LinkMachineInfo, LocalLinkState, RegistryStatus},
+    CaptureLevel, LocalErrorCode, LocalRequest, LocalResponse, MachineId, Os, ProjectedSession,
+    ProjectionBatch, ProjectionChange, Secret, Session, SessionId, Timestamp,
+    MAX_PROJECTION_BATCH_BYTES, PROJECTION_SCHEMA_VERSION,
 };
 use std::{
     fs,
@@ -258,6 +260,78 @@ async fn the_first_heartbeat_marks_the_worker_online() {
         Some("pop-os"),
         "hostname default"
     );
+}
+
+#[tokio::test]
+async fn projection_route_accepts_the_advertised_body_limit() {
+    let h = harness().await;
+    let code = h.control.create_code().unwrap();
+    let machine_id = MachineId("01J9Z3K8V6Q2T7M4X5C0RNB8DA".into());
+    let exchange = h
+        .control
+        .exchange(
+            LinkExchangeRequest {
+                pairing_code: code.code,
+                machine: LinkMachineInfo {
+                    machine_id: machine_id.clone(),
+                    display_name: "Large projection worker".into(),
+                    os: Os::Linux,
+                    daemon_version: "0.4.1".into(),
+                    capabilities: vec![],
+                },
+                endpoint: LinkEndpoint {
+                    address: "100.74.239.89".into(),
+                    port: 7420,
+                    dns_name: None,
+                },
+                control_credential: Secret::new("a".repeat(64)),
+            },
+            "tester",
+        )
+        .unwrap();
+    let changes = (1_u64..=128)
+        .map(|cursor| {
+            let mut session = Session::new(
+                SessionId(cursor),
+                machine_id.clone(),
+                "/bin/zsh",
+                "/tmp",
+                Timestamp(START),
+            );
+            session.capture = CaptureLevel::Full;
+            session.title = Some("🚀".repeat(48));
+            ProjectionChange::SessionUpsert {
+                cursor,
+                session: ProjectedSession::from_session(&session),
+            }
+        })
+        .collect();
+    let batch = ProjectionBatch::Delta {
+        schema_version: PROJECTION_SCHEMA_VERSION,
+        machine_id,
+        source_epoch: "pe_large_body".into(),
+        base_cursor: 0,
+        through_cursor: 128,
+        sent_at: Timestamp(START),
+        changes,
+    };
+    let encoded = serde_json::to_vec(&batch).unwrap();
+    assert!(
+        encoded.len() > 64 * 1024,
+        "fixture must exceed link default"
+    );
+    assert!(encoded.len() <= MAX_PROJECTION_BATCH_BYTES);
+
+    let response = reqwest::Client::new()
+        .post(format!("{}/api/v1/link/projection", h.url))
+        .bearer_auth(exchange.worker_credential.expose())
+        .body(encoded)
+        .header("content-type", "application/json")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
 }
 
 #[tokio::test]

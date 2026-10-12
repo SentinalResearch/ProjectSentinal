@@ -20,4 +20,8 @@ export type ProjectionSyncReport = {
    * Latest cursor acknowledged durably by the control.
    */
   last_acked_cursor: number;
+  /**
+   * A bounded outbox overflow requires a complete replacement snapshot.
+   */
+  snapshot_required: boolean;
 };

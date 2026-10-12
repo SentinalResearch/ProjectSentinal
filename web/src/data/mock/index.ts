@@ -82,6 +82,10 @@ export const mockAdapter: DataAdapter = {
     throw new Error("mock Sessions do not have daemon terminal routes");
   },
 
+  async refreshSessionDetail() {
+    // Mock Sessions already carry every field (including cwd) from fixtures.json.
+  },
+
   async getRecipes() {
     return delay(store.recipes.map((r) => ({ ...r })));
   },
