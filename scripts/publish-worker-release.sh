@@ -2,12 +2,15 @@
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/package-common.sh"
+source "$SCRIPT_DIR/lib/release-signature.sh"
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/publish-worker-release.sh publish --version VERSION --package-dir DIR --artifact FILE [--artifact FILE...] [--published-at MS]
+  scripts/publish-worker-release.sh publish --version VERSION --package-dir DIR --artifact FILE [--artifact FILE...]
+      --sums SHA256SUMS --signature SHA256SUMS.sig [--allowed-signers FILE] [--published-at MS]
   scripts/publish-worker-release.sh rollback --version VERSION --package-dir DIR
 EOF
 }
@@ -19,6 +22,9 @@ version=""
 package_dir=""
 published_at=""
 artifacts=()
+sums=""
+signature=""
+allowed_signers="$REPO_ROOT/packaging/release-keys/allowed_signers"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,6 +32,9 @@ while [[ $# -gt 0 ]]; do
     --package-dir) package_dir="${2:-}"; shift 2 ;;
     --published-at) published_at="${2:-}"; shift 2 ;;
     --artifact) artifacts+=("${2:-}"); shift 2 ;;
+    --sums) sums="${2:-}"; shift 2 ;;
+    --signature) signature="${2:-}"; shift 2 ;;
+    --allowed-signers) allowed_signers="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) sentinal_package_die "unknown publish argument '$1'" ;;
   esac
@@ -50,6 +59,10 @@ if [[ "$action" == rollback ]]; then
   exit 0
 fi
 [[ "$action" == publish ]] || sentinal_package_die "unknown action '$action'"
+# Every published release carries the owner's signature over SHA256SUMS; the
+# package service serves both so workers verify independently of this origin.
+[[ -n "$sums" && -n "$signature" ]] || sentinal_package_die "--sums and --signature are required: only owner-signed releases are published"
+sentinal_verify_release_sums "$sums" "$signature" "$allowed_signers"
 [[ ${#artifacts[@]} -ge 1 && ${#artifacts[@]} -le 16 ]] || sentinal_package_die "publish requires 1..16 --artifact values"
 if [[ -z "$published_at" ]]; then
   published_at="$(($(date +%s) * 1000))"
@@ -95,6 +108,8 @@ manifest="$stage/manifest.json"
     bytes="$(sentinal_package_length "$artifact")"
     ((bytes > 0 && bytes <= 268435456)) || sentinal_package_die "artifact '$name' length $bytes exceeds 1..=268435456"
     digest="$(sentinal_package_sha256 "$artifact")"
+    [[ "$(sentinal_sums_entry "$sums" "$name")" == "$digest" ]] ||
+      sentinal_package_die "artifact '$name' does not match the signed SHA256SUMS"
     ((index == 0)) || printf ',\n'
     cat <<EOF
     {
@@ -128,6 +143,18 @@ for staged in "$stage/artifacts"/*; do
     cmp -s "$staged" "$destination" || sentinal_package_die "artifact '$name' already exists with different content"
   else
     mv "$staged" "$destination"
+  fi
+done
+for suffix in SHA256SUMS SHA256SUMS.sig; do
+  source_file="$sums"
+  [[ "$suffix" == SHA256SUMS ]] || source_file="$signature"
+  destination="$package_dir/releases/$version.$suffix"
+  if [[ -e "$destination" ]]; then
+    cmp -s "$source_file" "$destination" || sentinal_package_die "release '$version' already has a different $suffix"
+  else
+    cp "$source_file" "$destination.tmp.$$"
+    chmod 600 "$destination.tmp.$$"
+    mv "$destination.tmp.$$" "$destination"
   fi
 done
 if [[ ! -e "$release" ]]; then

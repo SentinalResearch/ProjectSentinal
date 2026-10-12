@@ -183,23 +183,88 @@ refused. `<data_dir>/packages/package-audit.jsonl` contains only timestamp,
 route, release/target, status, and byte count—never headers, queries,
 credentials, or terminal data.
 
-### Releases from GitHub (control)
+### Release signing (owner, once per release)
 
-Tagged releases are built by `.github/workflows/release.yml` on GitHub-hosted
-Linux and macOS runners, attested with GitHub build provenance, and left as a
-draft Release for the owner to review and publish. On the control, from a
-checkout of this repository:
+Every release is signed by the owner, outside CI, with an SSH key whose public
+half is pinned in `packaging/release-keys/allowed_signers`. That file is
+compiled into `sentinald` and embedded in every `install.sh`. With no key
+pinned, every install, publish, and update fails closed.
+
+**One-time key setup:**
 
 ```console
-control$ just receive-release 0.1.16
+owner$ ssh-keygen -t ed25519-sk -C sentinal-release-primary -f ~/.ssh/sentinal-release   # hardware key
+owner$ ssh-keygen -t ed25519    -C sentinal-release-backup  -f /secure/offline/sentinal-release-backup
 ```
 
-This downloads every supported target, checks `SHA256SUMS`, each archive's
-`BUILD.json`, and `gh attestation verify` (GitHub CLI 2.49 or newer). Then it
-publishes to the Tailnet package channel, moving `stable` last, and updates
-the control's own programs. Workers keep updating from the control with
-`sentinal update`; they never contact GitHub. `--hash-only` publishes without
-provenance verification and prints a warning. `--no-self-update` only publishes.
+- If you have no hardware key, use `ssh-keygen -t ed25519` with a passphrase
+  for the primary key.
+- Add one line per key to `packaging/release-keys/allowed_signers`:
+  `sentinal-release namespaces="sentinal-release" <type> <base64 key> <comment>`.
+- Commit that file. Never commit, upload, or copy a private key to CI or the control.
+
+**For each tagged release:**
+1. `.github/workflows/release.yml` builds every target, attaches GitHub build
+   provenance, renders `install.sh` with the pinned keys, and leaves an
+   **unsigned draft**.
+2. On your own machine:
+
+```console
+owner$ gh release download v0.1.18 --dir /tmp/v0.1.18
+owner$ scripts/sign-release.sh --dir /tmp/v0.1.18 --key ~/.ssh/sentinal-release
+owner$ gh release upload v0.1.18 /tmp/v0.1.18/SHA256SUMS.sig --clobber
+```
+
+3. Publish the draft. `sign-release.sh` checks every listed file before
+   signing, and refuses a key that is not pinned.
+
+### Releases from GitHub (control)
+
+On the control, from a checkout of this repository:
+
+```console
+control$ just receive-release 0.1.18
+```
+
+This downloads every supported target and `SHA256SUMS.sig`, then checks:
+- the **owner signature** against the pinned keys;
+- each archive's SHA-256 and `BUILD.json`;
+- `gh attestation verify` (GitHub CLI 2.49 or newer).
+
+It then publishes the release, with its signed `SHA256SUMS` and signature, to
+the Tailnet package channel, moving `stable` last, and updates the control's
+own programs.
+
+Workers keep updating from the control with `sentinal update`. Its
+`install.sh` verifies the same owner signature with `ssh-keygen` (OpenSSH 8.2
+or newer), independently of the control's HTTPS origin, so workers never
+contact GitHub.
+
+| Option | Effect |
+|---|---|
+| `--skip-provenance` | Skips only GitHub provenance (with a warning) |
+| `--no-self-update` | Only publishes |
+
+`--hash-only` no longer exists; the owner signature is always required.
+
+For development or an emergency rotation, set `extra_release_keys =
+"/abs/path"` under `[packages]` in `daemon.toml`. The file must be owner-only,
+not group- or world-writable, contain only key lines, and be at most 8 KiB. Its
+keys are added to the compiled-in pin.
+
+**First control (no control exists yet).** Each release ships a signed
+`install.sh`:
+
+```console
+host$ curl -fsSLO https://github.com/SentinalResearch/ProjectSentinal/releases/latest/download/install.sh
+host$ sh install.sh
+```
+
+It verifies the owner signature before installing. For the review-first path,
+also download `SHA256SUMS` and `SHA256SUMS.sig`, check them with
+`ssh-keygen -Y verify -f packaging/release-keys/allowed_signers -I
+sentinal-release -n sentinal-release -s SHA256SUMS.sig < SHA256SUMS`, then
+compare `install.sh`'s SHA-256 before running it.
 
 ## Enroll a worker
 

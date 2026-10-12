@@ -273,12 +273,13 @@ to a live Session through its authoritative worker without a per-Session Event
 request storm.
 
 ## Milestone 4.E — V1 installation, discovery, and private pilot
-- [ ] Approve the release trust, installer formats, discovery, approval-pairing contract, and private-VM threat model
+- [x] Approve the release trust, installer formats, discovery, approval-pairing contract, and private-VM threat model
 - [ ] Ship normal installers for the approved macOS/Linux targets plus a verified curl/archive fallback
 - [ ] Add idempotent `sentinal setup` for CONTROL, WORKER, and manual recovery paths
 - [ ] Discover controls only from bounded Tailscale peer data and verified MagicDNS HTTPS origins
 - [ ] Add expiring click-to-approve pairing with matching verification words and code fallback
 - [ ] Publish and verify private stable/beta releases, Machine-scoped update status, rollback, and data preservation
+- [ ] Update the control like a worker: signed release watch, one-button update with health check and rollback, then workers in order; optional automatic-when-idle policy
 - [ ] Deploy one single-tenant control on a small Tailnet VM with no public Sentinal port
 - [ ] Complete clean-state Mac/Linux install → discover → approve → Watch → push → update acceptance
 

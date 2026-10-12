@@ -33,7 +33,7 @@ require_text $'permissions:\n  contents: read'
 [[ "$(grep -c 'contents: write' "$workflow")" == 1 ]] || fail 'exactly one job may write repository contents'
 [[ "$(grep -c 'id-token: write' "$workflow")" == 1 ]] || fail 'exactly one job may mint an OIDC token'
 require_text 'attestations: write'
-require_text 'persist-credentials: false'
+[[ "$(grep -c 'persist-credentials: false' "$workflow")" == "$(grep -c 'actions/checkout@' "$workflow")" ]] || fail 'every checkout must disable persisted credentials'
 if grep -Eq 'secrets\.' "$workflow"; then
   fail 'the release workflow must not use repository secrets'
 fi
@@ -49,6 +49,16 @@ require_text 'SHA256SUMS'
 require_text 'scripts/build-worker-release.sh'
 require_text '--frozen-lockfile'
 require_text 'cargo fetch --locked'
+
+# The bootstrap install.sh is rendered with the pinned keys and listed in the
+# signed SHA256SUMS. CI never signs: the owner signs the draft locally.
+require_text 'scripts/render-github-install.sh'
+require_text 'sha256sum -- *.tar.gz install.sh > SHA256SUMS'
+require_text 'dist/install.sh'
+require_text 'scripts/sign-release.sh'
+if grep -Eq 'ssh-keygen|-Y sign|gh release upload' "$workflow"; then
+  fail 'the workflow must never sign or upload a signature; the owner signs locally'
+fi
 
 # A human reviews the draft before anything is published.
 require_text '--draft'

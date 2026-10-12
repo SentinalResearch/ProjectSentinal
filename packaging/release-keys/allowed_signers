@@ -1,0 +1,11 @@
+# Sentinal release signing keys (OpenSSH allowed_signers format).
+#
+# Every release's SHA256SUMS is signed by the owner, outside CI, with
+#   ssh-keygen -Y sign -n sentinal-release -f <key> SHA256SUMS
+# and verified by installers, workers, and the control with
+#   ssh-keygen -Y verify -f allowed_signers -I sentinal-release -n sentinal-release
+#
+# This file is compiled into sentinald and embedded in install.sh. Add the
+# primary key and an offline backup key, one per line, e.g.:
+#   sentinal-release namespaces="sentinal-release" ssh-ed25519 AAAA... primary-2026
+# With no key lines, every signed-release check fails closed.

@@ -33,7 +33,21 @@ for target in $targets; do
   "$builder" --version 0.0.9 --target "$target" --bin-dir "$bins" --output "$good" \
     --source-date-epoch 1790712009 >/dev/null
 done
-(cd "$good" && for file in *.tar.gz; do printf '%s  %s\n' "$(sha256 "$file")" "$file"; done) >"$good/SHA256SUMS"
+printf '#!/bin/sh\necho bootstrap\n' >"$good/install.sh"
+
+# Throwaway release keys: one pinned, one not.
+ssh-keygen -q -t ed25519 -N "" -C pinned -f "$test_root/release-key"
+ssh-keygen -q -t ed25519 -N "" -C stranger -f "$test_root/stranger-key"
+allowed="$test_root/allowed_signers"
+printf 'sentinal-release namespaces="sentinal-release" %s\n' "$(cut -d' ' -f1,2 "$test_root/release-key.pub")" >"$allowed"
+
+# Sign DIR's existing SHA256SUMS with KEY (default: the pinned key).
+sign_sums() {
+  rm -f "$1/SHA256SUMS.sig"
+  ssh-keygen -q -Y sign -n sentinal-release -f "${2:-$test_root/release-key}" "$1/SHA256SUMS"
+}
+(cd "$good" && for file in install.sh *.tar.gz; do printf '%s  %s\n' "$(sha256 "$file")" "$file"; done) >"$good/SHA256SUMS"
+sign_sums "$good"
 
 fake_bin="$test_root/fake bin"
 mkdir -p "$fake_bin"
@@ -91,7 +105,7 @@ receive() {
   local release_dir="$1" path_dir="$2"
   shift 2
   SENTINAL_TEST_RELEASE_DIR="$release_dir" PATH="$path_dir:$base_path" HOME="$test_root/home" \
-    "$receiver" --repo example/sentinal "$@"
+    "$receiver" --repo example/sentinal --allowed-signers "$allowed" "$@"
 }
 
 # 1. Signed, complete release: verified, published with every target.
@@ -136,15 +150,35 @@ fi
 [[ "$error" == *"provenance"* ]] || fail "unclear attestation error: $error"
 [[ ! -e "$packages/channels/stable.json" ]] || fail 'an unverified release moved stable'
 
-# 4. Without gh the receiver refuses unless --hash-only is explicit.
+# 4. Without gh the receiver refuses unless --skip-provenance is explicit; the
+#    owner signature is still required. --hash-only no longer exists.
 packages="$test_root/packages no gh"
 if error="$(receive "$good" "$no_gh_bin" --version 0.0.9 --package-dir "$packages" --no-self-update 2>&1)"; then
-  fail 'published without provenance and without --hash-only'
+  fail 'published without provenance and without --skip-provenance'
 fi
-[[ "$error" == *"--hash-only"* ]] || fail "no guidance without gh: $error"
-output="$(receive "$good" "$no_gh_bin" --version 0.0.9 --package-dir "$packages" --no-self-update --hash-only 2>&1)" ||
-  fail '--hash-only was refused'
-[[ "$output" == *"WITHOUT build provenance"* ]] || fail "--hash-only did not warn: $output"
+[[ "$error" == *"--skip-provenance"* ]] || fail "no guidance without gh: $error"
+if error="$(receive "$good" "$no_gh_bin" --version 0.0.9 --package-dir "$packages" --no-self-update --hash-only 2>&1)"; then
+  fail '--hash-only still bypasses verification'
+fi
+[[ "$error" == *"signatures are always required"* ]] || fail "unclear --hash-only error: $error"
+output="$(receive "$good" "$no_gh_bin" --version 0.0.9 --package-dir "$packages" --no-self-update --skip-provenance 2>&1)" ||
+  fail "--skip-provenance was refused: $output"
+[[ "$output" == *"without GitHub build provenance"* ]] || fail "--skip-provenance did not warn: $output"
+
+# 4b. A missing signature or one from an unpinned key is refused.
+unsigned="$test_root/github unsigned"
+cp -R "$good" "$unsigned"
+rm -f "$unsigned/SHA256SUMS.sig"
+if error="$(receive "$unsigned" "$fake_bin" --version 0.0.9 --package-dir "$test_root/packages nosig" --no-self-update 2>&1)"; then
+  fail 'an unsigned release was received'
+fi
+[[ "$error" == *"SHA256SUMS.sig"* ]] || fail "unclear missing-signature error: $error"
+sign_sums "$unsigned" "$test_root/stranger-key"
+if error="$(receive "$unsigned" "$fake_bin" --version 0.0.9 --package-dir "$test_root/packages stranger" --no-self-update 2>&1)"; then
+  fail 'a release signed by an unpinned key was received'
+fi
+[[ "$error" == *"not signed by a trusted Sentinal release key"* ]] || fail "unclear unpinned-key error: $error"
+[[ ! -e "$test_root/packages stranger/channels/stable.json" ]] || fail 'an untrusted release moved stable' 
 
 # 5. An archive whose BUILD.json names another version is refused.
 mismatch="$test_root/github mismatch"
@@ -155,6 +189,7 @@ cp "$good"/*.tar.gz "$mismatch/"
 mv "$mismatch/sentinal-worker-0.0.8-x86_64-unknown-linux-musl.tar.gz" \
   "$mismatch/sentinal-worker-0.0.9-x86_64-unknown-linux-musl.tar.gz"
 (cd "$mismatch" && for file in *.tar.gz; do printf '%s  %s\n' "$(sha256 "$file")" "$file"; done) >"$mismatch/SHA256SUMS"
+sign_sums "$mismatch"
 if error="$(receive "$mismatch" "$fake_bin" --version 0.0.9 --package-dir "$test_root/packages mismatch" --no-self-update 2>&1)"; then
   fail 'an archive for another version was accepted'
 fi
@@ -164,6 +199,7 @@ fi
 partial="$test_root/github partial"
 cp -R "$good" "$partial"
 grep -v 'aarch64-unknown-linux-musl' "$good/SHA256SUMS" >"$partial/SHA256SUMS"
+sign_sums "$partial"
 if error="$(receive "$partial" "$fake_bin" --version 0.0.9 --package-dir "$test_root/packages partial" --no-self-update 2>&1)"; then
   fail 'an incomplete release was accepted'
 fi

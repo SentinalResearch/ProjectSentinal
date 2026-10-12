@@ -236,4 +236,4 @@ Apple signing and notarization stay out of scope (no Apple Developer account).
 | `sentinal 0.0.1` everywhere | Release builds stamp `SENTINAL_RELEASE_VERSION`/`SENTINAL_GIT_COMMIT`: `sentinal 0.1.16 (abc1234)`; the daemon reports the release to the registry |
 | VM `update --check`: "missing control_url" | Clear no-origin error that points the control to `just receive-release` |
 | `sentinal: command not found` after install | Installer and `install.sh` print a PATH hint |
-| Ubuntu `gh` 2.45 lacks `attestation` | `receive-release` refuses without gh 2.49+ unless `--hash-only` is explicit |
+| Ubuntu `gh` 2.45 lacks `attestation` | `receive-release` refuses without gh 2.49+ unless `--skip-provenance` is explicit; since 4.E step 1 the owner signature is always required |

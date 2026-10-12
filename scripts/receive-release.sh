@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Receive one GitHub release on the control: download every supported target,
-# verify SHA256SUMS, BUILD.json, and GitHub build provenance, publish to the
-# private Tailnet package channel, then update this control itself.
+# verify the owner's signature over SHA256SUMS, each archive's hash and
+# BUILD.json, and GitHub build provenance; publish to the private Tailnet
+# package channel, then update this control itself.
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/package-common.sh"
+source "$SCRIPT_DIR/lib/release-signature.sh"
 
 readonly TARGETS=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-apple-darwin aarch64-apple-darwin)
 readonly MAX_SUMS_BYTES=65536
@@ -18,7 +21,8 @@ Usage: scripts/receive-release.sh --version VERSION [OPTIONS]
 Options:
   --repo OWNER/NAME     GitHub repository (default: SentinalResearch/ProjectSentinal)
   --package-dir DIR     package directory (default: ~/.local/share/terminal-agent/packages)
-  --hash-only           publish without GitHub build-provenance verification (not recommended)
+  --allowed-signers FILE  pinned release keys (default: packaging/release-keys/allowed_signers)
+  --skip-provenance     skip GitHub build provenance (the owner signature is still required)
   --no-self-update      publish only; do not update this control's own programs
   --no-service          pass --no-service to the self-update installer
 EOF
@@ -27,7 +31,8 @@ EOF
 version=""
 repo="SentinalResearch/ProjectSentinal"
 package_dir="${HOME:-}/.local/share/terminal-agent/packages"
-hash_only=false
+skip_provenance=false
+allowed_signers="$REPO_ROOT/packaging/release-keys/allowed_signers"
 self_update=true
 installer_args=()
 while [[ $# -gt 0 ]]; do
@@ -35,7 +40,9 @@ while [[ $# -gt 0 ]]; do
     --version) version="${2:-}"; shift 2 ;;
     --repo) repo="${2:-}"; shift 2 ;;
     --package-dir) package_dir="${2:-}"; shift 2 ;;
-    --hash-only) hash_only=true; shift ;;
+    --skip-provenance) skip_provenance=true; shift ;;
+    --allowed-signers) allowed_signers="${2:-}"; shift 2 ;;
+    --hash-only) sentinal_package_die "--hash-only was removed: owner signatures are always required; use --skip-provenance to skip only GitHub build provenance" ;;
     --no-self-update) self_update=false; shift ;;
     --no-service) installer_args+=(--no-service); shift ;;
     -h|--help) usage; exit 0 ;;
@@ -49,10 +56,12 @@ sentinal_package_valid_version "$version" || sentinal_package_die "invalid relea
 sentinal_package_require_absolute package "$package_dir"
 command -v curl >/dev/null 2>&1 || sentinal_package_die "curl is required"
 
-if [[ "$hash_only" == false ]]; then
+sentinal_release_keys_present "$allowed_signers" ||
+  sentinal_package_die "no release signing keys are pinned in '$allowed_signers'; nothing can be trusted"
+if [[ "$skip_provenance" == false ]]; then
   if ! command -v gh >/dev/null 2>&1 || ! gh attestation verify --help >/dev/null 2>&1; then
     sentinal_package_die "GitHub CLI 2.49+ is required to verify build provenance (gh attestation verify).
-Install it from https://cli.github.com, or re-run with --hash-only to publish on checksums alone."
+Install it from https://cli.github.com, or re-run with --skip-provenance (the owner signature is still checked)."
   fi
 fi
 
@@ -79,7 +88,11 @@ download SHA256SUMS "$MAX_SUMS_BYTES"
 if [[ ! -s "$work/SHA256SUMS" ]] || grep -qvE '^[0-9a-f]{64}  [A-Za-z0-9._-]+$' "$work/SHA256SUMS"; then
   sentinal_package_die "SHA256SUMS is empty or malformed; nothing was published"
 fi
-expected_names=()
+download SHA256SUMS.sig "$SENTINAL_MAX_SIGNATURE_BYTES"
+sentinal_verify_release_sums "$work/SHA256SUMS" "$work/SHA256SUMS.sig" "$allowed_signers"
+echo "  owner signature verified"
+# The signed list may also name the GitHub bootstrap install.sh.
+expected_names=(install.sh)
 for target in "${TARGETS[@]}"; do
   expected_names+=("sentinal-worker-$version-$target.tar.gz")
 done
@@ -102,18 +115,19 @@ for target in "${TARGETS[@]}"; do
   built_target="$(printf '%s\n' "$build_json" | sed -n 's/.*"target"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
   [[ "$built_version" == "$version" && "$built_target" == "$target" ]] ||
     sentinal_package_die "$name BUILD.json names $built_version/$built_target, expected $version/$target"
-  if [[ "$hash_only" == false ]]; then
+  if [[ "$skip_provenance" == false ]]; then
     gh attestation verify "$work/$name" --repo "$repo" >/dev/null 2>&1 ||
       sentinal_package_die "build provenance verification failed for $name; nothing was published"
   fi
   artifacts+=(--artifact "$work/$name")
   echo "  verified $target"
 done
-if [[ "$hash_only" == true ]]; then
-  echo "WARNING: published WITHOUT build provenance verification (--hash-only); checksums came from the same release."
+if [[ "$skip_provenance" == true ]]; then
+  echo "WARNING: published without GitHub build provenance (--skip-provenance); the owner signature was verified."
 fi
 
-"$SCRIPT_DIR/publish-worker-release.sh" publish --version "$version" --package-dir "$package_dir" "${artifacts[@]}"
+"$SCRIPT_DIR/publish-worker-release.sh" publish --version "$version" --package-dir "$package_dir" "${artifacts[@]}" \
+  --sums "$work/SHA256SUMS" --signature "$work/SHA256SUMS.sig" --allowed-signers "$allowed_signers"
 
 if [[ "$self_update" == false ]]; then
   exit 0

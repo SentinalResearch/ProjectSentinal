@@ -75,6 +75,7 @@ fn service(root: &Path) -> PackageService {
             public_base_url: "https://sentinal-control.example.ts.net".into(),
             max_artifact_bytes: 1024 * 1024,
             web_root: None,
+            extra_release_keys: None,
         },
         owner_uid(root),
     )
@@ -365,6 +366,7 @@ async fn production_web_shell_has_safe_fallback_headers_and_api_precedence() {
                 public_base_url: "https://sentinal-control.example.ts.net".into(),
                 max_artifact_bytes: 1024 * 1024,
                 web_root: Some(web),
+                extra_release_keys: None,
             },
             owner_uid(&root.0),
         )
@@ -487,6 +489,7 @@ async fn package_root_symlink_is_refused() {
             public_base_url: "https://sentinal-control.example.ts.net".into(),
             max_artifact_bytes: 1024,
             web_root: None,
+            extra_release_keys: None,
         },
         owner_uid(&real),
     )
@@ -512,6 +515,7 @@ async fn package_child_symlink_is_refused() {
             public_base_url: "https://sentinal-control.example.ts.net".into(),
             max_artifact_bytes: 1024,
             web_root: None,
+            extra_release_keys: None,
         },
         owner_uid(&outside),
     )
@@ -576,24 +580,51 @@ fn generated_bootstrap_verifies_archive_before_running_installer() {
         }],
     };
     manifest.validate(1024 * 1024).unwrap();
+    // The owner-signed SHA256SUMS the control serves beside the release.
+    let sums = root.0.join("SHA256SUMS");
+    fs::write(
+        &sums,
+        format!(
+            "{}  sentinal-worker-0.0.1-{target}.tar.gz\n",
+            manifest.targets[0].sha256
+        ),
+    )
+    .unwrap();
+    let release_keys = sign_with_test_key(&root.0, &sums);
     let script = root.0.join("install.sh");
     write_executable(
         &script,
-        &render_install_script("https://sentinal-control.example.ts.net", &manifest),
+        &render_install_script(
+            "https://sentinal-control.example.ts.net",
+            &manifest,
+            &release_keys,
+        ),
     );
     let fake_bin = root.0.join("fake-bin");
     fs::create_dir_all(&fake_bin).unwrap();
     write_executable(
         &fake_bin.join("curl"),
-        r#"#!/bin/sh
+        &format!(
+            r#"#!/bin/sh
 set -eu
-[ "${SENTINAL_TEST_CURL_FAIL:-}" != 1 ] || exit 22
+[ "${{SENTINAL_TEST_CURL_FAIL:-}}" != 1 ] || exit 22
 output=''
+url=''
 while [ "$#" -gt 0 ]; do
-  if [ "$1" = '--output' ]; then output="$2"; shift 2; else shift; fi
+  case "$1" in
+    --output) output="$2"; shift 2 ;;
+    https://*) url="$1"; shift ;;
+    *) shift ;;
+  esac
 done
-cp "$SENTINAL_TEST_ARCHIVE" "$output"
+case "$url" in
+  *.SHA256SUMS.sig) cp '{sums}.sig' "$output" ;;
+  *.SHA256SUMS) cp '{sums}' "$output" ;;
+  *) cp "$SENTINAL_TEST_ARCHIVE" "$output" ;;
+esac
 "#,
+            sums = sums.display()
+        ),
     );
     write_executable(
         &fake_bin.join("tailscale"),
@@ -718,6 +749,32 @@ cp "$SENTINAL_TEST_ARCHIVE" "$output"
     assert!(!rejected.status.success());
     assert!(String::from_utf8_lossy(&rejected.stderr).contains("artifact length mismatch"));
     assert!(!root.0.join("must-not-run.log").exists());
+}
+
+/// Sign `sums` with a throwaway release key; returns its allowed_signers line.
+#[cfg(unix)]
+fn sign_with_test_key(dir: &Path, sums: &Path) -> String {
+    let key = dir.join("release-key");
+    assert!(Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", "", "-C", "test", "-f"])
+        .arg(&key)
+        .status()
+        .unwrap()
+        .success());
+    assert!(Command::new("ssh-keygen")
+        .args(["-q", "-Y", "sign", "-n", "sentinal-release", "-f"])
+        .arg(&key)
+        .arg(sums)
+        .status()
+        .unwrap()
+        .success());
+    let public = fs::read_to_string(key.with_extension("pub")).unwrap();
+    let mut fields = public.split_whitespace();
+    format!(
+        "sentinal-release namespaces=\"sentinal-release\" {} {}\n",
+        fields.next().unwrap(),
+        fields.next().unwrap()
+    )
 }
 
 #[cfg(unix)]

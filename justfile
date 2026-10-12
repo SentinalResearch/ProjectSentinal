@@ -61,6 +61,8 @@ check:
     bash scripts/tests/notification-examples-test.sh
     bash scripts/tests/release-workflow-test.sh
     bash scripts/tests/receive-release-test.sh
+    bash scripts/tests/release-signature-test.sh
+    bash scripts/tests/github-install-test.sh
 
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:

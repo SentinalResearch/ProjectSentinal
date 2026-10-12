@@ -25,6 +25,9 @@ pub struct PackageServiceConfig {
     pub max_artifact_bytes: u64,
     /// Optional production PWA build served from the same Tailnet HTTPS origin.
     pub web_root: Option<PathBuf>,
+    /// Optional owner-only file adding release keys to the compiled-in pin
+    /// (development keys, or an emergency rotation before a signed update).
+    pub extra_release_keys: Option<PathBuf>,
 }
 
 /// Configuration of the owner-selected control Machine role.
@@ -113,6 +116,7 @@ struct RawPackageConfig {
     public_base_url: Option<String>,
     max_artifact_bytes: Option<u64>,
     web_root: Option<PathBuf>,
+    extra_release_keys: Option<PathBuf>,
 }
 
 /// Errors produced while loading daemon configuration.
@@ -337,6 +341,7 @@ fn parse_package_config(
         public_base_url,
         max_artifact_bytes,
         web_root: raw.web_root,
+        extra_release_keys: raw.extra_release_keys,
     }))
 }
 

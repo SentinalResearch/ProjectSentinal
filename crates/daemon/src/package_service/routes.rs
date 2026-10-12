@@ -20,7 +20,7 @@ pub(super) async fn install_script(State(service): State<PackageService>) -> Res
     }
     let bytes = match read_manifest(&service, &service.root.join("channels/stable.json")).await {
         Ok((_, manifest)) => {
-            let script = render_install_script(&service.base_url, &manifest);
+            let script = render_install_script(&service.base_url, &manifest, &service.release_keys);
             if script.len() > super::manifest::MAX_MANIFEST_BYTES {
                 return audited_error(
                     &service,
@@ -69,6 +69,9 @@ pub(super) async fn release_manifest(
 ) -> Response {
     if let Some(response) = rate_limit(&service) {
         return response;
+    }
+    if let Some((version, kind)) = super::signed::parse(&file) {
+        return super::signed::serve(&service, &file, version, kind).await;
     }
     let Some(version) = file
         .strip_suffix(".json")

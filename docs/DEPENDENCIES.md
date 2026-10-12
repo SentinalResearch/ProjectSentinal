@@ -58,5 +58,9 @@ full commit SHA in `.github/workflows/release.yml`, and
 
 The runners also use `musl-tools` (Ubuntu apt) to link the Linux musl targets.
 
+**Release signatures** use OpenSSH's `ssh-keygen -Y sign/verify`, a system tool
+(OpenSSH 8.2 or newer, preinstalled on macOS and Ubuntu); no crate is added.
+The owner signs locally; CI never holds a signing key.
+
 ## Intelligence (V2)
 `llama.cpp` (server), `fastapi`, `transformers`, `trl`, `peft`, `datasets`

@@ -1,7 +1,8 @@
 # Build every supported worker release for one version tag and leave a draft
-# GitHub Release for the owner to review. The control VM downloads it, verifies
-# the build-provenance attestations and SHA256SUMS, and publishes it to its
-# private Tailnet package channel. Workers never download from GitHub.
+# GitHub Release for the owner to review and sign. CI never signs: the owner
+# runs scripts/sign-release.sh locally, uploads SHA256SUMS.sig, and publishes.
+# The control verifies the owner signature and build provenance, then
+# publishes to its private Tailnet package channel. Workers never use GitHub.
 name: release
 
 on:
@@ -89,16 +90,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: worker-*
           merge-multiple: true
           path: dist
 
+      - name: Render the bootstrap install.sh with the pinned release keys
+        run: scripts/render-github-install.sh --repo "$GITHUB_REPOSITORY" --output dist/install.sh
+
       - name: Write SHA256SUMS
         working-directory: dist
         run: |
-          sha256sum -- *.tar.gz > SHA256SUMS
+          sha256sum -- *.tar.gz install.sh > SHA256SUMS
           cat SHA256SUMS
 
       - name: Create the draft release
@@ -106,6 +114,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS \
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/install.sh dist/SHA256SUMS \
             --draft --verify-tag --title "Sentinal $GITHUB_REF_NAME" \
-            --notes "Worker releases for every supported target. Verify with: gh attestation verify <file> --repo $GH_REPO"
+            --notes "Unsigned draft. Owner: gh release download $GITHUB_REF_NAME --dir <dir>, then scripts/sign-release.sh --dir <dir> --key <key>, upload SHA256SUMS.sig, and publish. Provenance: gh attestation verify <file> --repo $GH_REPO"

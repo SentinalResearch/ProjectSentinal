@@ -3,7 +3,12 @@
 use super::manifest::{ReleaseManifest, TargetArch, TargetOs};
 
 /// Generate a bootstrap script from an already validated manifest.
-pub(super) fn generate(base_url: &str, manifest: &ReleaseManifest) -> String {
+pub(super) fn generate(base_url: &str, manifest: &ReleaseManifest, release_keys: &str) -> String {
+    // Only well-formed key lines reach the heredoc, so the terminator cannot appear.
+    let release_keys: String = super::release_keys::key_lines(release_keys)
+        .into_iter()
+        .map(|line| format!("{line}\n"))
+        .collect();
     let mut cases = String::new();
     for target in &manifest.targets {
         let system = match target.os {
@@ -89,6 +94,27 @@ temporary="$(mktemp -d "${{TMPDIR:-/tmp}}/sentinal-bootstrap.XXXXXX")" || fail "
 trap 'rm -rf -- "$temporary"' EXIT HUP INT TERM
 archive="$temporary/worker.tar.gz"
 
+# Trust only releases the owner signed with a pinned key, checked with OpenSSH
+# independently of this control's HTTPS origin.
+release_keys="$temporary/allowed_signers"
+cat >"$release_keys" <<'SENTINAL_RELEASE_KEYS'
+{release_keys}SENTINAL_RELEASE_KEYS
+grep -q '^sentinal-release namespaces="sentinal-release" ' "$release_keys" ||
+  fail "this control has no pinned release signing keys; nothing was installed"
+command -v ssh-keygen >/dev/null 2>&1 || fail "ssh-keygen (OpenSSH 8.2 or newer) is required to verify the release signature"
+sums="$temporary/SHA256SUMS"
+curl --proto '=https' --proto-redir '=https' --max-redirs 0 --fail --silent --show-error --max-filesize 65536 \
+  --output "$sums" "$control_url/packages/v1/releases/$release_version.SHA256SUMS" ||
+  fail "release $release_version is not signed on this control (SHA256SUMS missing); nothing was installed"
+curl --proto '=https' --proto-redir '=https' --max-redirs 0 --fail --silent --show-error --max-filesize 8192 \
+  --output "$sums.sig" "$control_url/packages/v1/releases/$release_version.SHA256SUMS.sig" ||
+  fail "release $release_version is not signed on this control (signature missing); nothing was installed"
+ssh-keygen -Y verify -f "$release_keys" -I sentinal-release -n sentinal-release -s "$sums.sig" <"$sums" >/dev/null 2>&1 ||
+  fail "release $release_version is not signed by a trusted Sentinal release key; nothing was installed"
+signed_sha="$(awk -v name="${{artifact_path##*/}}" '$2 == name {{ print $1 }}' "$sums")"
+[ -n "$signed_sha" ] && [ "$signed_sha" = "$expected_sha" ] ||
+  fail "the control's manifest does not match the signed SHA256SUMS; nothing was installed"
+
 size_mb="$(awk -v bytes="$expected_bytes" 'BEGIN {{ printf "%.1f", bytes / 1048576 }}')"
 printf '[1/4] Downloading %s MB\n' "$size_mb"
 if [ -t 2 ]; then
@@ -134,7 +160,7 @@ release="$temporary/extracted/sentinal-worker"
 [ -x "$release/bin/sentinal" ] || fail "artifact is missing bin/sentinal"
 [ -x "$release/bin/sentinald" ] || fail "artifact is missing bin/sentinald"
 [ -f "$release/scripts/install-worker.sh" ] || fail "artifact is missing the installer"
-printf '[2/4] Verifying   size, SHA-256, and archive entries ✓\n'
+printf '[2/4] Verifying   owner signature, size, SHA-256, and archive entries ✓\n'
 
 bind_ip="$(TAILSCALE_BE_CLI=1 "$tailscale_cli" ip -4 2>/dev/null | awk 'NR == 1 {{ print; exit }}')"
 case "$bind_ip" in
@@ -184,6 +210,7 @@ case ":${{PATH:-}}:" in
   *) printf 'Add %s to PATH to use the sentinal command, for example:\n  export PATH="%s:$PATH"\n' "$prefix/bin" "$prefix/bin" ;;
 esac
 "#,
-        manifest.release_version
+        manifest.release_version,
+        release_keys = release_keys,
     )
 }

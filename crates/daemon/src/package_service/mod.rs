@@ -3,10 +3,13 @@
 mod audit;
 mod bootstrap;
 mod manifest;
+mod release_keys;
 mod routes;
+mod signed;
 mod web;
 
 pub use manifest::{ManifestError, ReleaseManifest, ReleaseTarget, TargetArch, TargetOs};
+pub use release_keys::PINNED_RELEASE_KEYS;
 
 use crate::config::PackageServiceConfig;
 use audit::PackageAudit;
@@ -29,9 +32,14 @@ use tokio::sync::Semaphore;
 const MAX_DOWNLOADS: usize = 8;
 const MAX_REQUESTS_PER_MINUTE: u32 = 120;
 
-/// Render the verified worker bootstrap for one validated release manifest.
-pub fn render_install_script(base_url: &str, manifest: &ReleaseManifest) -> String {
-    bootstrap::generate(base_url, manifest)
+/// Render the verified worker bootstrap for one validated release manifest;
+/// it trusts only the given `allowed_signers` release keys.
+pub fn render_install_script(
+    base_url: &str,
+    manifest: &ReleaseManifest,
+    release_keys: &str,
+) -> String {
+    bootstrap::generate(base_url, manifest, release_keys)
 }
 
 /// Package-service startup and filesystem failures.
@@ -46,6 +54,14 @@ pub enum PackageServiceError {
         path: PathBuf,
         /// Filesystem error.
         source: std::io::Error,
+    },
+    /// The owner's extra release-keys file is unsafe or malformed.
+    #[error("invalid release keys file '{}': {reason}", path.display())]
+    ReleaseKeys {
+        /// Rejected file.
+        path: PathBuf,
+        /// Rejection reason.
+        reason: String,
     },
     /// A package root was not a safe directory.
     #[error("unsafe package directory '{}': {reason}", path.display())]
@@ -68,6 +84,7 @@ pub struct PackageService {
     rate: Arc<Mutex<RateWindow>>,
     owner_uid: u32,
     web_root: Option<PathBuf>,
+    release_keys: String,
 }
 
 #[derive(Debug)]
@@ -87,6 +104,7 @@ impl PackageService {
         if let Some(web_root) = config.web_root.as_deref() {
             validate_web_directory(web_root, owner_uid)?;
         }
+        let release_keys = release_keys::load(config.extra_release_keys.as_deref(), owner_uid)?;
         Ok(Self {
             audit: PackageAudit::new(&config.directory),
             root: config.directory,
@@ -99,7 +117,14 @@ impl PackageService {
             })),
             owner_uid,
             web_root: config.web_root,
+            release_keys,
         })
+    }
+
+    /// The release keys this control trusts: the compiled-in pin plus any
+    /// owner-configured extra keys, as `allowed_signers` key lines only.
+    pub fn release_keys(&self) -> &str {
+        &self.release_keys
     }
 
     fn allow_request(&self) -> bool {

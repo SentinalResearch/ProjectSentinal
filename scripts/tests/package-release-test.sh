@@ -20,6 +20,20 @@ sha256() {
   fi
 }
 
+# Throwaway release keys: one pinned, one not.
+ssh-keygen -q -t ed25519 -N "" -C pinned -f "$test_root/release-key"
+ssh-keygen -q -t ed25519 -N "" -C stranger -f "$test_root/stranger-key"
+allowed="$test_root/allowed_signers"
+printf 'sentinal-release namespaces="sentinal-release" %s\n' "$(cut -d' ' -f1,2 "$test_root/release-key.pub")" >"$allowed"
+
+# Write SHA256SUMS for DIR's archives and sign it with KEY (default: pinned).
+sign_dir() {
+  local dir="$1" key="${2:-$test_root/release-key}"
+  (cd "$dir" && for file in *.tar.gz; do printf '%s  %s\n' "$(sha256 "$file")" "$file"; done) >"$dir/SHA256SUMS"
+  rm -f "$dir/SHA256SUMS.sig"
+  ssh-keygen -q -Y sign -n sentinal-release -f "$key" "$dir/SHA256SUMS"
+}
+
 make_fake_bins() {
   local root="$1" marker="$2"
   mkdir -p "$root"
@@ -80,8 +94,29 @@ fi
 grep -Fq "unsupported target 'riscv64-unknown-linux-musl'" "$test_root/error" || fail 'unsupported target error was unclear'
 
 package_dir="$test_root/package service"
+first_dir="$(dirname "$first_artifact")"
+sign_dir "$first_dir"
+
+# Unsigned, unpinned, and mismatched publishes are refused before anything moves.
+if error="$("$publisher" publish --version 0.0.1 --package-dir "$package_dir" \
+  --published-at 1790712000000 --artifact "$first_artifact" 2>&1)"; then
+  fail 'an unsigned release was published'
+fi
+[[ "$error" == *"--sums and --signature are required"* ]] || fail "unclear unsigned error: $error"
+stranger_dir="$test_root/stranger"
+mkdir -p "$stranger_dir" && cp "$first_artifact" "$stranger_dir/"
+sign_dir "$stranger_dir" "$test_root/stranger-key"
+if error="$("$publisher" publish --version 0.0.1 --package-dir "$package_dir" \
+  --published-at 1790712000000 --artifact "$first_artifact" --sums "$stranger_dir/SHA256SUMS" --signature "$stranger_dir/SHA256SUMS.sig" --allowed-signers "$allowed" 2>&1)"; then
+  fail 'a release signed by an unpinned key was published'
+fi
+[[ "$error" == *"not signed by a trusted Sentinal release key"* ]] || fail "unclear unpinned error: $error"
+[[ ! -e "$package_dir/channels/stable.json" ]] || fail 'a refused publish moved stable'
+
 "$publisher" publish --version 0.0.1 --package-dir "$package_dir" \
-  --published-at 1790712000000 --artifact "$first_artifact" >/dev/null
+  --published-at 1790712000000 --artifact "$first_artifact" --sums "$first_dir/SHA256SUMS" --signature "$first_dir/SHA256SUMS.sig" --allowed-signers "$allowed" >/dev/null
+cmp -s "$first_dir/SHA256SUMS" "$package_dir/releases/0.0.1.SHA256SUMS" || fail 'signed SHA256SUMS was not stored with the release'
+cmp -s "$first_dir/SHA256SUMS.sig" "$package_dir/releases/0.0.1.SHA256SUMS.sig" || fail 'signature was not stored with the release'
 
 stable="$package_dir/channels/stable.json"
 release="$package_dir/releases/0.0.1.json"
@@ -94,14 +129,20 @@ grep -Fq "\"bytes\": $(wc -c <"$first_artifact" | tr -d '[:space:]')" "$release"
 
 # Publishing identical bytes is idempotent.
 "$publisher" publish --version 0.0.1 --package-dir "$package_dir" \
-  --published-at 1790712000000 --artifact "$first_artifact" >/dev/null
+  --published-at 1790712000000 --artifact "$first_artifact" --sums "$first_dir/SHA256SUMS" --signature "$first_dir/SHA256SUMS.sig" --allowed-signers "$allowed" >/dev/null
 
 make_fake_bins "$fake_bins" changed
 changed_dir="$test_root/changed"
 "$builder" --version 0.0.1 --target x86_64-apple-darwin \
   --bin-dir "$fake_bins" --output "$changed_dir" --source-date-epoch 1790712000 >/dev/null
+if error="$("$publisher" publish --version 0.0.1 --package-dir "$package_dir" \
+  --published-at 1790712000000 --artifact "$changed_dir/$artifact_name" --sums "$first_dir/SHA256SUMS" --signature "$first_dir/SHA256SUMS.sig" --allowed-signers "$allowed" 2>&1)"; then
+  fail 'an artifact that does not match the signed SHA256SUMS was accepted'
+fi
+[[ "$error" == *"does not match the signed SHA256SUMS"* ]] || fail "unclear signed-mismatch error: $error"
+sign_dir "$changed_dir"
 if "$publisher" publish --version 0.0.1 --package-dir "$package_dir" \
-  --published-at 1790712000000 --artifact "$changed_dir/$artifact_name" 2>"$test_root/conflict"; then
+  --published-at 1790712000000 --artifact "$changed_dir/$artifact_name" --sums "$changed_dir/SHA256SUMS" --signature "$changed_dir/SHA256SUMS.sig" --allowed-signers "$allowed" 2>"$test_root/conflict"; then
   fail 'same version with different content was accepted'
 fi
 grep -Fq "release '0.0.1' already exists with different content" "$test_root/conflict" || fail 'release conflict error was unclear'
@@ -110,16 +151,17 @@ grep -Fq "release '0.0.1' already exists with different content" "$test_root/con
 v2_dir="$test_root/v2"
 "$builder" --version 0.0.2 --target x86_64-apple-darwin \
   --bin-dir "$fake_bins" --output "$v2_dir" --source-date-epoch 1790712001 >/dev/null
+sign_dir "$v2_dir"
 stable_before="$(sha256 "$stable")"
 if SENTINAL_PUBLISH_FAIL_BEFORE_CHANNEL=1 "$publisher" publish --version 0.0.2 \
-  --package-dir "$package_dir" --published-at 1790712001000 \
+  --package-dir "$package_dir" --published-at 1790712001000 --sums "$v2_dir/SHA256SUMS" --signature "$v2_dir/SHA256SUMS.sig" --allowed-signers "$allowed" \
   --artifact "$v2_dir/sentinal-worker-0.0.2-x86_64-apple-darwin.tar.gz" 2>"$test_root/interrupted"; then
   fail 'injected publish interruption unexpectedly succeeded'
 fi
 [[ "$stable_before" == "$(sha256 "$stable")" ]] || fail 'interrupted publish changed stable channel'
 
 "$publisher" publish --version 0.0.2 --package-dir "$package_dir" \
-  --published-at 1790712001000 \
+  --published-at 1790712001000 --sums "$v2_dir/SHA256SUMS" --signature "$v2_dir/SHA256SUMS.sig" --allowed-signers "$allowed" \
   --artifact "$v2_dir/sentinal-worker-0.0.2-x86_64-apple-darwin.tar.gz" >/dev/null
 grep -Fq '"release_version": "0.0.2"' "$stable" || fail 'stable did not advance to v2'
 "$publisher" rollback --version 0.0.1 --package-dir "$package_dir" >/dev/null

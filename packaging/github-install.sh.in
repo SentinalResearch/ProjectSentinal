@@ -1,0 +1,149 @@
+#!/bin/sh
+# Sentinal installer from GitHub Releases (the first control, or a worker
+# without a control yet). It installs only a release whose SHA256SUMS is
+# signed by a pinned owner key, verified with OpenSSH, and never pairs.
+# Review-first: download this file, SHA256SUMS, and SHA256SUMS.sig from the
+# release, verify with `ssh-keygen -Y verify`, then run `sh install.sh`.
+set -eu
+umask 022
+
+repo='@SENTINAL_REPO@'
+
+fail() {
+  printf '%s\n' "sentinal install: $*" >&2
+  exit 1
+}
+
+version=''
+no_service='false'
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --version) [ "$#" -ge 2 ] || fail "--version requires X.Y.Z"; version="$2"; shift 2 ;;
+    --no-service) no_service='true'; shift ;;
+    *) fail "unknown argument '$1'" ;;
+  esac
+done
+
+platform="$(uname -s):$(uname -m)"
+case "$platform" in
+  Linux:x86_64|Linux:amd64) target='x86_64-unknown-linux-musl' ;;
+  Linux:aarch64|Linux:arm64) target='aarch64-unknown-linux-musl' ;;
+  Darwin:x86_64) target='x86_64-apple-darwin' ;;
+  Darwin:arm64) target='aarch64-apple-darwin' ;;
+  *) fail "unsupported target '$platform'; supported: macOS 13+ (arm64, x86_64), Linux with systemd (x86_64, aarch64)" ;;
+esac
+if [ -n "$version" ]; then
+  printf '%s' "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' ||
+    fail "invalid version '$version'; expected MAJOR.MINOR.PATCH"
+  base="https://github.com/$repo/releases/download/v$version"
+else
+  base="https://github.com/$repo/releases/latest/download"
+fi
+for tool in curl tar awk; do
+  command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
+done
+command -v ssh-keygen >/dev/null 2>&1 || fail "ssh-keygen (OpenSSH 8.2 or newer) is required to verify the release signature"
+
+temporary="$(mktemp -d "${TMPDIR:-/tmp}/sentinal-install.XXXXXX")" || fail "cannot create a temporary directory"
+trap 'rm -rf -- "$temporary"' EXIT HUP INT TERM
+
+release_keys="$temporary/allowed_signers"
+cat >"$release_keys" <<'SENTINAL_RELEASE_KEYS'
+@SENTINAL_RELEASE_KEYS@
+SENTINAL_RELEASE_KEYS
+grep -q '^sentinal-release namespaces="sentinal-release" ' "$release_keys" ||
+  fail "this installer has no pinned release signing keys; nothing was installed"
+
+# GitHub serves release assets through a redirect: follow it, HTTPS only.
+fetch() {
+  curl --location --proto '=https' --proto-redir '=https' --tlsv1.2 --max-redirs 3 --fail --silent --show-error \
+    --max-filesize "$2" --output "$temporary/$1" "$base/$1"
+}
+
+printf 'Installing Sentinal from %s (%s)\n' "$base" "$target"
+fetch SHA256SUMS 65536 || fail "could not download SHA256SUMS from $base"
+fetch SHA256SUMS.sig 8192 || fail "this release is not signed (SHA256SUMS.sig is missing); nothing was installed"
+sums="$temporary/SHA256SUMS"
+[ -s "$sums" ] || fail "SHA256SUMS is empty; nothing was installed"
+if grep -qvE '^[0-9a-f]{64}  [A-Za-z0-9._-]+$' "$sums"; then
+  fail "SHA256SUMS is malformed; nothing was installed"
+fi
+ssh-keygen -Y verify -f "$release_keys" -I sentinal-release -n sentinal-release -s "$sums.sig" <"$sums" >/dev/null 2>&1 ||
+  fail "this release is not signed by a trusted Sentinal release key; nothing was installed"
+printf '  owner signature verified\n'
+
+name="$(awk -v suffix="-$target.tar.gz" '
+  substr($2, 1, 16) == "sentinal-worker-" && substr($2, length($2) - length(suffix) + 1) == suffix { print $2 }' "$sums")"
+[ -n "$name" ] && [ "$(printf '%s\n' "$name" | wc -l | tr -d '[:space:]')" = 1 ] ||
+  fail "the signed release has no single artifact for $target"
+release_version="${name#sentinal-worker-}"
+release_version="${release_version%-"$target".tar.gz}"
+printf '%s' "$release_version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' ||
+  fail "the signed artifact name '$name' has no valid version"
+[ -z "$version" ] || [ "$version" = "$release_version" ] ||
+  fail "requested $version but the signed release is $release_version"
+expected="$(awk -v name="$name" '$2 == name { print $1 }' "$sums")"
+
+printf '  downloading %s\n' "$name"
+fetch "$name" 268435456 || fail "could not download $name"
+if command -v sha256sum >/dev/null 2>&1; then
+  actual="$(sha256sum "$temporary/$name" | awk '{print $1}')"
+else
+  actual="$(shasum -a 256 "$temporary/$name" | awk '{print $1}')"
+fi
+[ "$actual" = "$expected" ] || fail "SHA-256 mismatch for $name; nothing was installed"
+
+tar -tzf "$temporary/$name" >"$temporary/entries" || fail "$name is not a readable gzip archive"
+while IFS= read -r entry; do
+  case "$entry" in
+    sentinal-worker|sentinal-worker/*) ;;
+    *) fail "archive contains unsafe entry '$entry'" ;;
+  esac
+  case "/$entry/" in
+    */../*|*/./*) fail "archive contains unsafe entry '$entry'" ;;
+  esac
+done <"$temporary/entries"
+tar -tvzf "$temporary/$name" | while IFS= read -r entry; do
+  case "$entry" in
+    -*|d*) ;;
+    *) fail "archive contains a non-file entry" ;;
+  esac
+done
+mkdir "$temporary/extracted"
+tar -xzf "$temporary/$name" -C "$temporary/extracted" || fail "could not extract $name"
+release="$temporary/extracted/sentinal-worker"
+[ -x "$release/bin/sentinal" ] && [ -x "$release/bin/sentinald" ] && [ -f "$release/scripts/install-worker.sh" ] ||
+  fail "$name is missing programs or its installer"
+printf '  verified %s %s\n' "$release_version" "$target"
+
+tailscale_cli="${SENTINAL_TAILSCALE_CLI:-}"
+if [ -z "$tailscale_cli" ]; then
+  tailscale_cli="$(command -v tailscale 2>/dev/null || true)"
+fi
+if [ -z "$tailscale_cli" ] && [ -x '/Applications/Tailscale.app/Contents/MacOS/Tailscale' ]; then
+  tailscale_cli='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
+fi
+[ -n "$tailscale_cli" ] || fail "Tailscale is required: install it and sign in, then run this installer again"
+bind_ip="$(TAILSCALE_BE_CLI=1 "$tailscale_cli" ip -4 2>/dev/null | awk 'NR == 1 { print; exit }')"
+case "$bind_ip" in
+  100.*) ;;
+  *) fail "Tailscale is not connected; sign in with 'tailscale up' and run this installer again" ;;
+esac
+
+set --
+[ "$no_service" = 'false' ] || set -- --no-service
+if ! "$release/scripts/install-worker.sh" install --release-dir "$release" --bind "$bind_ip" \
+  --artifact-sha "$actual" "$@" >"$temporary/install.log" 2>&1; then
+  cat "$temporary/install.log" >&2
+  fail "installation failed; the previous programs and all data were kept"
+fi
+printf 'Sentinal %s is installed in %s\n' "$release_version" "$HOME/.local/bin"
+if "$HOME/.local/bin/sentinal" setup --help >/dev/null 2>&1; then
+  printf 'Next: run  sentinal setup\n'
+else
+  printf 'Next: follow https://github.com/%s/blob/main/docs/SETUP.md\n' "$repo"
+fi
+case ":${PATH:-}:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) printf 'Add %s to PATH, for example:\n  export PATH="%s:$PATH"\n' "$HOME/.local/bin" "$HOME/.local/bin" ;;
+esac
