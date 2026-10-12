@@ -24,6 +24,7 @@ use protocol::{
     },
     LocalErrorCode, LocalRequest, LocalResponse, MachineId, NotificationDeliveryState,
     NotificationIntentAcknowledgement, NotificationIntentBatch, NotificationResultClass, Os,
+    ProjectionAcknowledgement, ProjectionBatch, ProjectionSyncAction, ProjectionSyncDirective,
     Secret, Timestamp,
 };
 use std::{
@@ -167,6 +168,77 @@ pub fn spawn_notification_intent_uploader(
     });
 }
 
+/// Start the durable worker projection uploader negotiated by heartbeats.
+pub fn spawn_projection_uploader(
+    link: LinkManager,
+    store: Arc<Store>,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        loop {
+            tokio::select! {
+                _ = shutdown.changed() => break,
+                _ = interval.tick() => {
+                    if let Err(error) = upload_projection_once(&link, &store).await {
+                        tracing::warn!(message = %error.message, "projection upload failed");
+                    }
+                }
+            }
+        }
+    });
+}
+
+async fn upload_projection_once(link: &LinkManager, store: &Store) -> Result<(), LinkFailure> {
+    let Some(directive) = link.projection_directive()? else {
+        return Ok(());
+    };
+    if directive.action != ProjectionSyncAction::Upload {
+        return Ok(());
+    }
+    let machine_id = link.machine_id().map_err(identity_failure)?;
+    let epoch = projection_epoch(&machine_id);
+    let changes = store
+        .projection_changes_after(
+            &machine_id,
+            &epoch,
+            directive.committed_cursor,
+            u32::from(directive.max_changes),
+        )
+        .map_err(internal)?;
+    let Some(through_cursor) = changes.last().map(protocol::ProjectionChange::cursor) else {
+        return Ok(());
+    };
+    let batch = ProjectionBatch::Delta {
+        schema_version: protocol::PROJECTION_SCHEMA_VERSION,
+        machine_id: machine_id.clone(),
+        source_epoch: epoch.clone(),
+        base_cursor: directive.committed_cursor,
+        through_cursor,
+        sent_at: (link.inner.clock)(),
+        changes,
+    };
+    let acknowledgement = link.upload_projection(&batch).await?;
+    match acknowledgement.status {
+        protocol::ProjectionAcknowledgementStatus::Accepted
+        | protocol::ProjectionAcknowledgementStatus::Duplicate => {
+            store
+                .acknowledge_projection_cursor(
+                    &machine_id,
+                    &epoch,
+                    acknowledgement.committed_cursor,
+                )
+                .map_err(internal)?;
+        }
+        protocol::ProjectionAcknowledgementStatus::ResyncRequired => {}
+    }
+    Ok(())
+}
+
+pub(crate) fn projection_epoch(machine_id: &MachineId) -> String {
+    format!("projection-v1-{}", machine_id.0)
+}
+
 /// A link operation that failed, mapped to a local-socket error.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkFailure {
@@ -194,6 +266,8 @@ struct Inner {
     operation: tokio::sync::Mutex<()>,
     failures: AtomicU32,
     heartbeats_running: AtomicBool,
+    projection_store: Mutex<Option<Arc<Store>>>,
+    projection_directive: Mutex<Option<ProjectionSyncDirective>>,
 }
 
 /// This daemon's link to an owner-selected control Machine.
@@ -214,12 +288,24 @@ impl LinkManager {
                 operation: tokio::sync::Mutex::new(()),
                 failures: AtomicU32::new(0),
                 heartbeats_running: AtomicBool::new(false),
+                projection_store: Mutex::new(None),
+                projection_directive: Mutex::new(None),
             }),
         };
         if matches!(manager.read_link(), Ok(Some(link)) if link.state == StoredState::Active) {
             manager.spawn_heartbeats();
         }
         manager
+    }
+
+    /// Attach the local Store used for projection heartbeat negotiation.
+    pub fn with_projection_store(self, store: Arc<Store>) -> Self {
+        if let Ok(mut configured) = self.inner.projection_store.lock() {
+            *configured = Some(store);
+        } else {
+            tracing::error!("projection Store lock poisoned");
+        }
+        self
     }
 
     /// The immutable Machine ID, unless the identity is corrupt.
@@ -277,6 +363,47 @@ impl LinkManager {
                     "empty notification acknowledgement",
                 )
             })
+    }
+
+    /// Upload one bounded projection batch using the Machine link credential.
+    pub async fn upload_projection(
+        &self,
+        batch: &ProjectionBatch,
+    ) -> Result<ProjectionAcknowledgement, LinkFailure> {
+        let link = self
+            .read_link()?
+            .ok_or_else(|| LinkFailure::new(LocalErrorCode::NotConnected, "not connected"))?;
+        let credential = link
+            .worker_credential
+            .as_ref()
+            .filter(|_| link.state == StoredState::Active)
+            .ok_or_else(|| LinkFailure::new(LocalErrorCode::NotConnected, "not connected"))?;
+        self.inner
+            .client
+            .post(
+                &link.control_url,
+                "/api/v1/link/projection",
+                Some(credential.expose()),
+                batch,
+            )
+            .await
+            .map_err(|error| {
+                LinkFailure::new(LocalErrorCode::ControlUnreachable, error.to_string())
+            })?
+            .ok_or_else(|| {
+                LinkFailure::new(
+                    LocalErrorCode::ControlUnreachable,
+                    "empty projection acknowledgement",
+                )
+            })
+    }
+
+    fn projection_directive(&self) -> Result<Option<ProjectionSyncDirective>, LinkFailure> {
+        self.inner
+            .projection_directive
+            .lock()
+            .map(|value| value.clone())
+            .map_err(|_| internal("projection directive lock poisoned"))
     }
 
     /// Answer one local-socket link request.
@@ -492,6 +619,15 @@ impl LinkManager {
         // Persist the sequence before sending so a crash can never reuse it.
         link.sequence += 1;
         self.write_link(&link)?;
+        let projection_sync = self
+            .inner
+            .projection_store
+            .lock()
+            .map_err(|_| internal("projection Store lock poisoned"))?
+            .as_ref()
+            .map(|store| store.projection_sync_report(&machine_id, &projection_epoch(&machine_id)))
+            .transpose()
+            .map_err(internal)?;
         let request = LinkHeartbeatRequest {
             machine_id: machine_id.clone(),
             sequence: link.sequence,
@@ -499,7 +635,7 @@ impl LinkManager {
             endpoint: self.inner.settings.endpoint.clone(),
             daemon_version: self.inner.settings.daemon_version.clone(),
             capabilities: all_capabilities(),
-            projection_sync: None,
+            projection_sync,
         };
         let result: Result<Option<LinkHeartbeatResponse>, CallError> = self
             .inner
@@ -518,6 +654,12 @@ impl LinkManager {
                 link.last_heartbeat_at = Some(now);
                 link.heartbeat_interval_ms = response.next_heartbeat_ms;
                 link.notification_ingress = response.notification_ingress.unwrap_or(false);
+                *self
+                    .inner
+                    .projection_directive
+                    .lock()
+                    .map_err(|_| internal("projection directive lock poisoned"))? =
+                    response.projection_sync;
                 self.write_link(&link)?;
                 if response.refresh_due {
                     self.refresh(&mut link, &machine_id, &credential).await?;

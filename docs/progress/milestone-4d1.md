@@ -1,9 +1,9 @@
 # Milestone 4.D.1 progress — Incremental aggregation and control read model
 
-Status: **DESIGN REVIEW — AWAITING HUMAN APPROVAL.** No protocol fixture,
-migration, production code, or real Machine data has been changed. The
-proposal below is additive, needs no dependency, and keeps
-`PROTOCOL_VERSION = 1`.
+Status: **IMPLEMENTATION IN PROGRESS.** The additive design was approved on
+2026-10-12. Protocol and storage foundations are committed; daemon projection
+sync and the control snapshot/live resources are under implementation. The
+design needs no new dependency and keeps `PROTOCOL_VERSION = 1`.
 
 ## Plan and proving tests
 
@@ -11,14 +11,14 @@ proposal below is additive, needs no dependency, and keeps
    Machine sockets and request counters.
 2. [x] Review the authority, privacy, link, storage, browser, freshness,
    compatibility, rollback, and performance boundaries.
-3. [ ] Obtain explicit approval for this proposal, especially the bounded
+3. [x] Obtain explicit approval for this proposal, especially the bounded
    storage of owner-authored Session titles on the control.
 4. [ ] Add request-count regression tests, then repair the direct-query path
    (`web/src/data/api/index.test.ts`, `LiveDataContext.test.tsx`).
-5. [ ] Add additive projection HTTP/protocol contracts and generated
+5. [x] Add additive projection HTTP/protocol contracts and generated
    TypeScript (`crates/protocol/tests/contract.rs`, hand-written fixtures,
    `just gen-ts --check`).
-6. [ ] Add migration 007 and worker/control store behavior
+6. [x] Add migration 007 and worker/control store behavior
    (`crates/store/tests/projection.rs`).
 7. [ ] Add worker outbox, authenticated ingress, compaction, resync, and
    isolation (`crates/daemon/tests/projection_sync.rs`, control tests).

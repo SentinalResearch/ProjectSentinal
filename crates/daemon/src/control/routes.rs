@@ -12,7 +12,10 @@ use crate::{
     push::gateway::{PushGateway, PushGatewayError},
 };
 use axum::{
-    extract::{ConnectInfo, DefaultBodyLimit, Path, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        ConnectInfo, DefaultBodyLimit, Path, State,
+    },
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post, put},
@@ -23,7 +26,8 @@ use protocol::{
         LinkDisconnectRequest, LinkExchangeRequest, LinkFailure, LinkFailureCode,
         LinkHeartbeatRequest, LinkRefreshRequest, RenameMachineRequest,
     },
-    MachineId, NotificationIntentBatch, PushProviderModeRequest, PushSubscriptionRequest,
+    ControlProjectionMessage, ControlSnapshotReason, MachineId, NotificationIntentBatch,
+    ProjectionBatch, PushProviderModeRequest, PushSubscriptionRequest,
 };
 use std::net::SocketAddr;
 
@@ -85,6 +89,9 @@ impl ControlRoutes {
                 "/api/v1/link/notification-intents",
                 post(notification_intents),
             )
+            .route("/api/v1/link/projection", post(projection_batch))
+            .route("/api/v1/control/snapshot", get(projection_snapshot))
+            .route("/api/v1/control/live", get(projection_live))
             .route("/api/v1/push/public-key", get(push_public_key))
             .route("/api/v1/push/deliveries", get(push_deliveries))
             .route(
@@ -254,6 +261,71 @@ async fn notification_intents(
             request,
         )),
         Err(failure) => failure_response(failure),
+    }
+}
+
+async fn projection_batch(
+    State(routes): State<ControlRoutes>,
+    headers: HeaderMap,
+    Json(request): Json<ProjectionBatch>,
+) -> Response {
+    match routes.control() {
+        Ok(control) => reply(
+            control.accept_projection(bearer_from_headers(&headers).unwrap_or_default(), request),
+        ),
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn projection_snapshot(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Response {
+    match routes.owner(&headers) {
+        Ok(control) => reply(control.projection_snapshot()),
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn projection_live(
+    State(routes): State<ControlRoutes>,
+    headers: HeaderMap,
+    upgrade: WebSocketUpgrade,
+) -> Response {
+    match routes.owner(&headers) {
+        Ok(control) => {
+            let control = control.clone();
+            let receiver = control.subscribe_projection_updates();
+            upgrade
+                .on_upgrade(move |socket| projection_socket(socket, control, receiver))
+                .into_response()
+        }
+        Err(failure) => failure_response(failure),
+    }
+}
+
+async fn projection_socket(
+    mut socket: WebSocket,
+    control: ControlService,
+    mut receiver: tokio::sync::broadcast::Receiver<ControlProjectionMessage>,
+) {
+    loop {
+        let message = match receiver.recv().await {
+            Ok(message) => message,
+            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                let current_revision = control
+                    .projection_snapshot()
+                    .map_or(0, |snapshot| snapshot.view_revision);
+                ControlProjectionMessage::SnapshotRequired {
+                    current_revision,
+                    reason: ControlSnapshotReason::DeltaBoundExceeded,
+                }
+            }
+            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+        };
+        let Ok(encoded) = serde_json::to_string(&message) else {
+            break;
+        };
+        if socket.send(Message::Text(encoded.into())).await.is_err() {
+            break;
+        }
     }
 }
 

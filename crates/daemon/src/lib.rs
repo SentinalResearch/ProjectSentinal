@@ -31,6 +31,7 @@ pub mod osc;
 pub mod package_service;
 pub mod private_fs;
 pub mod process_probe;
+pub mod projection_runtime;
 pub mod pty;
 pub mod push;
 pub mod recipes;

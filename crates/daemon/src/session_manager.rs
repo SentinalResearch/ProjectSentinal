@@ -156,6 +156,8 @@ struct SessionManagerInner {
     /// Metrics and state of reduced-capture Sessions, for every connected
     /// client (they cannot attach, which is how FULL Sessions deliver them).
     observations: broadcast::Sender<DaemonMessage>,
+    /// Machine-wide Metrics stream consumed by the projection recorder.
+    projection_observations: broadcast::Sender<DaemonMessage>,
     /// Machine-wide structured Event stream.
     events: broadcast::Sender<Event>,
     /// Serializes external shell registration so concurrent reports create one Session.
@@ -230,6 +232,7 @@ impl SessionManager {
                 store,
                 probe: ProcessProbe::unavailable(),
                 observations: broadcast::channel(256).0,
+                projection_observations: broadcast::channel(256).0,
                 events: broadcast::channel(256).0,
                 registration: Mutex::new(()),
                 continuation: tokio::sync::Mutex::new(()),

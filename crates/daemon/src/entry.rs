@@ -9,7 +9,9 @@ use crate::{
     control::{ControlService, ControlSettings},
     identity,
     insights::{HostFacts, MachineInsights},
-    link::{spawn_notification_intent_uploader, LinkManager, LinkSettings},
+    link::{
+        spawn_notification_intent_uploader, spawn_projection_uploader, LinkManager, LinkSettings,
+    },
     local_socket::{current_uid, LocalHandler, LocalSocketError, SecurityAudit, UnixSocketServer},
     metrics::{process_tree, MetricsSampler, ResourceDebouncer},
     notifications::{
@@ -19,6 +21,7 @@ use crate::{
     package_service::{package_router, PackageService, PackageServiceError},
     private_fs::ensure_private_dir,
     process_probe::ProcessProbe,
+    projection_runtime::spawn_projection_recorder,
     pty::{FakePty, PtyBackend, RealPty},
     push::delivery::spawn_push_delivery_worker,
     push::gateway::{PushGateway, PushGatewaySettings},
@@ -208,7 +211,8 @@ pub async fn run() -> Result<(), DaemonError> {
             background: true,
         },
         Arc::new(now),
-    );
+    )
+    .with_projection_store(store.clone());
     let interrupted = store.interrupt_orphaned_sessions(now())?;
     if !interrupted.is_empty() {
         tracing::info!(
@@ -372,6 +376,14 @@ pub async fn run() -> Result<(), DaemonError> {
     let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
     spawn_notification_workers(notifications.clone(), server_shutdown_rx.clone());
     spawn_notification_intent_uploader(link.clone(), store.clone(), server_shutdown_rx.clone());
+    spawn_projection_recorder(
+        sessions.clone(),
+        store.clone(),
+        machine.id.clone(),
+        control.clone(),
+        server_shutdown_rx.clone(),
+    );
+    spawn_projection_uploader(link.clone(), store.clone(), server_shutdown_rx.clone());
     if let Some(gateway) = push.clone() {
         spawn_push_delivery_worker(gateway, server_shutdown_rx.clone());
     }

@@ -78,9 +78,10 @@ pub use notification::{
 };
 pub use process::{tree_totals, Process, ProcessState, ProcessTotals};
 pub use projection::{
-    ControlProjectionMessage, ControlProjectionSnapshot, ProjectedCaptureCapabilities,
-    ProjectedEventFacts, ProjectedEventSummary, ProjectedHealth, ProjectedMetricScope,
-    ProjectedMetrics, ProjectedProgressUnit, ProjectedSession, ProjectionAcknowledgement,
+    ControlProjectedMachine, ControlProjectionMessage, ControlProjectionSnapshot,
+    ControlSnapshotReason, ProjectedCaptureCapabilities, ProjectedEventFacts,
+    ProjectedEventSummary, ProjectedHealth, ProjectedMetricScope, ProjectedMetrics,
+    ProjectedProgressUnit, ProjectedSession, ProjectionAcknowledgement,
     ProjectionAcknowledgementStatus, ProjectionBatch, ProjectionChange, ProjectionFreshness,
     ProjectionResyncReason, ProjectionSyncAction, ProjectionSyncDirective, ProjectionSyncReport,
     MAX_PROJECTION_BATCH_BYTES, MAX_PROJECTION_CHANGES, PROJECTION_SCHEMA_VERSION,

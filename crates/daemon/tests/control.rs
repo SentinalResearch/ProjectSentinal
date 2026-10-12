@@ -8,7 +8,8 @@ use protocol::{
         LinkEndpoint, LinkExchangeRequest, LinkFailureCode, LinkHeartbeatRequest, LinkMachineInfo,
         LinkRefreshRequest, MachineCapability, PairingCodeState, RegistryStatus,
     },
-    MachineId, Os, Secret, Timestamp,
+    CaptureLevel, MachineId, Os, ProjectedSession, ProjectionBatch, ProjectionChange, Secret,
+    Session, SessionId, Timestamp, PROJECTION_SCHEMA_VERSION,
 };
 use std::{
     fs,
@@ -157,7 +158,107 @@ fn endpoint(address: &str) -> LinkEndpoint {
     }
 }
 
+fn projection_batch(machine_id: &str) -> ProjectionBatch {
+    let mut session = Session::new(
+        SessionId(7),
+        MachineId(machine_id.into()),
+        "/bin/zsh",
+        "/private/cwd",
+        Timestamp(START),
+    );
+    session.title = Some("Training".into());
+    session.capture = CaptureLevel::Full;
+    ProjectionBatch::Delta {
+        schema_version: PROJECTION_SCHEMA_VERSION,
+        machine_id: MachineId(machine_id.into()),
+        source_epoch: "pe_test".into(),
+        base_cursor: 0,
+        through_cursor: 1,
+        sent_at: Timestamp(START),
+        changes: vec![ProjectionChange::SessionUpsert {
+            cursor: 1,
+            session: ProjectedSession::from_session(&session),
+        }],
+    }
+}
+
 // ---- routing ---------------------------------------------------------------
+
+#[test]
+fn heartbeat_negotiates_projection_upload_without_breaking_legacy_workers() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    let mut request = LinkHeartbeatRequest {
+        machine_id: MachineId(WORKER_A.into()),
+        sequence: 1,
+        sent_at: h.now(),
+        endpoint: endpoint("100.74.239.89"),
+        daemon_version: "0.0.1".into(),
+        capabilities: vec![MachineCapability::Sessions],
+        projection_sync: Some(protocol::ProjectionSyncReport {
+            schema_version: PROJECTION_SCHEMA_VERSION,
+            source_epoch: "pe_test".into(),
+            current_cursor: 1,
+            last_acked_cursor: 0,
+        }),
+    };
+    let response = h
+        .control
+        .heartbeat(credential.expose(), request.clone())
+        .unwrap();
+    let directive = response.projection_sync.unwrap();
+    assert_eq!(directive.action, protocol::ProjectionSyncAction::Upload);
+    assert_eq!(directive.committed_cursor, 0);
+
+    request.sequence = 2;
+    request.projection_sync = None;
+    assert_eq!(
+        h.control
+            .heartbeat(credential.expose(), request)
+            .unwrap()
+            .projection_sync,
+        None
+    );
+}
+
+#[test]
+fn projection_ingress_is_authenticated_machine_bound_and_idempotent() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    let batch = projection_batch(WORKER_A);
+    let first = h
+        .control
+        .accept_projection(credential.expose(), batch.clone())
+        .unwrap();
+    assert_eq!(
+        first.status,
+        protocol::ProjectionAcknowledgementStatus::Accepted
+    );
+    let duplicate = h
+        .control
+        .accept_projection(credential.expose(), batch)
+        .unwrap();
+    assert_eq!(
+        duplicate.status,
+        protocol::ProjectionAcknowledgementStatus::Duplicate
+    );
+    let snapshot = h.control.projection_snapshot().unwrap();
+    let worker = snapshot
+        .machines
+        .iter()
+        .find(|machine| machine.machine_id == MachineId(WORKER_A.into()))
+        .unwrap();
+    assert_eq!(worker.sessions[0].title.as_deref(), Some("Training"));
+
+    assert_eq!(
+        h.control
+            .accept_projection(credential.expose(), projection_batch(WORKER_B))
+            .unwrap_err()
+            .failure
+            .code,
+        LinkFailureCode::Unauthorized
+    );
+}
 
 #[test]
 fn routing_targets_are_machine_scoped_and_revocation_removes_only_one() {

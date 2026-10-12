@@ -132,6 +132,7 @@ impl SessionManager {
             kind: watcher::ObservationKind::MetricsSample(resources),
         };
         let message = DaemonMessage::SessionMetrics { metrics };
+        let _ = self.inner.projection_observations.send(message.clone());
         if reduced {
             self.observe_reduced(message.clone());
         }
@@ -151,6 +152,11 @@ impl SessionManager {
     /// Metrics is observation, allowed for every capture level.
     pub fn observe(&self) -> broadcast::Receiver<DaemonMessage> {
         self.inner.observations.subscribe()
+    }
+
+    /// Subscribe to every local Metrics update for control projection.
+    pub fn observe_projection(&self) -> broadcast::Receiver<DaemonMessage> {
+        self.inner.projection_observations.subscribe()
     }
 
     pub(super) fn observe_reduced(&self, message: DaemonMessage) {
@@ -188,10 +194,9 @@ impl SessionManager {
                 }),
             })?;
         }
-        let _ = self
-            .inner
-            .observations
-            .send(DaemonMessage::MachineMetrics { metrics });
+        let message = DaemonMessage::MachineMetrics { metrics };
+        let _ = self.inner.projection_observations.send(message.clone());
+        let _ = self.inner.observations.send(message);
         Ok(())
     }
 

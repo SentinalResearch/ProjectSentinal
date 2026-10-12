@@ -29,7 +29,7 @@ pub use native_push::{
     StoredNotificationIntent, StoredPushSubscription,
 };
 pub use notification_deliveries::{NewNotificationDelivery, NotificationDelivery};
-pub use projection::ProjectionOutboxLimits;
+pub use projection::{ControlProjectionState, ProjectionOutboxLimits};
 
 const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("../migrations/001_initial.sql")),

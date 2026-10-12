@@ -210,6 +210,45 @@ async fn pairing_codes_need_an_owner_browser_session_not_the_machine_token() {
 }
 
 #[tokio::test]
+async fn control_projection_snapshot_is_one_bounded_owner_resource() {
+    let d = daemon(true, false, "100.64.0.2:5000");
+    assert_eq!(
+        d.send("GET", "/api/v1/control/snapshot", None, &[], None)
+            .await
+            .status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        d.send(
+            "GET",
+            "/api/v1/control/snapshot",
+            Some(TOKEN),
+            &[],
+            None,
+        )
+        .await
+        .status,
+        StatusCode::FORBIDDEN
+    );
+    let session = d.owner_session().await;
+    let response = d
+        .send(
+            "GET",
+            "/api/v1/control/snapshot",
+            Some(&session),
+            &[],
+            None,
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::OK);
+    let snapshot: protocol::ControlProjectionSnapshot =
+        serde_json::from_value(response.body).unwrap();
+    assert_eq!(snapshot.machines.len(), 1);
+    assert_eq!(snapshot.machines[0].freshness, protocol::ProjectionFreshness::Stale);
+    assert!(snapshot.machines[0].sessions.is_empty());
+}
+
+#[tokio::test]
 async fn a_daemon_without_the_control_role_answers_not_control() {
     let d = daemon(false, false, "100.64.0.2:5000");
     let session = d.owner_session().await;

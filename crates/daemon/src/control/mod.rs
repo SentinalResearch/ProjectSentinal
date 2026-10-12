@@ -20,8 +20,11 @@ use protocol::{
         LinkStatus, MachineCapability, MachineRole, PairingCode, PairingCodeState,
         PairingCodeStatus, RegistryMachine, RegistryMachines, RegistryStatus,
     },
-    MachineId, NotificationIntentAcknowledgement, NotificationIntentBatch, Os, PushProviderMode,
-    Secret, Timestamp,
+    ControlProjectedMachine, ControlProjectionMessage, ControlProjectionSnapshot,
+    ControlSnapshotReason, MachineId, NotificationIntentAcknowledgement, NotificationIntentBatch,
+    Os, ProjectionAcknowledgement, ProjectionBatch, ProjectionFreshness, ProjectionSyncAction,
+    ProjectionSyncDirective, PushProviderMode, Secret, Timestamp, MAX_PROJECTION_BATCH_BYTES,
+    MAX_PROJECTION_CHANGES, PROJECTION_SCHEMA_VERSION,
 };
 use secrets::{ControlSecrets, PresentedCredential};
 use std::{
@@ -44,6 +47,11 @@ const CREDENTIAL_LIFETIME_MS: i64 = 90 * 24 * 60 * 60 * 1_000;
 const REFRESH_WITHIN_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
 const REFRESH_GRACE_MS: i64 = 60_000;
 const NOTIFICATION_MAX_AGE_MS: i64 = 7 * 24 * 60 * 60 * 1_000;
+const PROJECTION_LIVE_MS: i64 = 10_000;
+const MAX_PROJECTED_MACHINES: usize = 100;
+const MAX_PROJECTED_SESSIONS: u32 = 1_000;
+const MAX_PROJECTED_EVENTS: u32 = 1_000;
+const MAX_PROJECTED_METRICS: u32 = 1_001;
 
 type Clock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
 
@@ -113,6 +121,7 @@ pub struct ControlService {
     clock: Clock,
     secrets: Arc<Mutex<ControlSecrets>>,
     audit: LinkAudit,
+    projection_updates: tokio::sync::broadcast::Sender<ControlProjectionMessage>,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -154,12 +163,14 @@ impl ControlService {
                 last_sequence: 0,
             })
             .map_err(|error| ControlError(error.to_string()))?;
+        let (projection_updates, _) = tokio::sync::broadcast::channel(256);
         Ok(ControlService {
             store,
             audit: LinkAudit::new(&settings.audit_dir, "pairing-audit.jsonl"),
             settings: Arc::new(settings),
             clock,
             secrets: Arc::new(Mutex::new(secrets)),
+            projection_updates,
         })
     }
 
@@ -425,6 +436,11 @@ impl ControlService {
             .map_err(ControlFailure::internal)?
             .map(|row| row.display_name)
             .unwrap_or_default();
+        let projection_sync = request
+            .projection_sync
+            .as_ref()
+            .map(|report| self.projection_directive(&request.machine_id, report))
+            .transpose()?;
         Ok(LinkHeartbeatResponse {
             status: LinkStatus::Active,
             display_name,
@@ -433,7 +449,201 @@ impl ControlService {
             notification_ingress: Some(
                 self.store.push_provider_mode().ok() == Some(PushProviderMode::WebPush),
             ),
-            projection_sync: None,
+            projection_sync,
+        })
+    }
+
+    /// Authenticate and durably apply one bounded projection upload.
+    pub fn accept_projection(
+        &self,
+        bearer: &str,
+        batch: ProjectionBatch,
+    ) -> Result<ProjectionAcknowledgement, ControlFailure> {
+        let now = (self.clock)();
+        let machine_id = match &batch {
+            ProjectionBatch::Delta { machine_id, .. }
+            | ProjectionBatch::Snapshot { machine_id, .. } => machine_id,
+        }
+        .clone();
+        self.authenticate(bearer, &machine_id, now)?;
+        self.commit_projection(&machine_id, batch, now, true)
+    }
+
+    /// Apply this control Machine's own local projection without loopback HTTP.
+    pub fn accept_local_projection(
+        &self,
+        batch: ProjectionBatch,
+    ) -> Result<ProjectionAcknowledgement, ControlFailure> {
+        let machine_id = match &batch {
+            ProjectionBatch::Delta { machine_id, .. }
+            | ProjectionBatch::Snapshot { machine_id, .. } => machine_id,
+        }
+        .clone();
+        if machine_id != self.settings.machine_id {
+            return Err(ControlFailure::new(
+                400,
+                LinkFailureCode::InvalidMachine,
+                "local projection must belong to the control Machine",
+            ));
+        }
+        self.commit_projection(&machine_id, batch, (self.clock)(), false)
+    }
+
+    fn commit_projection(
+        &self,
+        machine_id: &MachineId,
+        batch: ProjectionBatch,
+        now: Timestamp,
+        audit: bool,
+    ) -> Result<ProjectionAcknowledgement, ControlFailure> {
+        let before_revision = self
+            .store
+            .control_projection_revision()
+            .map_err(ControlFailure::internal)?;
+        let changes = match &batch {
+            ProjectionBatch::Delta { changes, .. } => Some(changes.clone()),
+            ProjectionBatch::Snapshot { .. } => None,
+        };
+        let acknowledgement = self
+            .store
+            .apply_projection_batch(machine_id, &batch, now)
+            .map_err(ControlFailure::internal)?;
+        if acknowledgement.status == protocol::ProjectionAcknowledgementStatus::Accepted {
+            let after_revision = self
+                .store
+                .control_projection_revision()
+                .map_err(ControlFailure::internal)?;
+            let update = changes.map_or(
+                ControlProjectionMessage::SnapshotRequired {
+                    current_revision: after_revision,
+                    reason: ControlSnapshotReason::RevisionMismatch,
+                },
+                |changes| ControlProjectionMessage::ProjectionDelta {
+                    from_revision: before_revision,
+                    to_revision: after_revision,
+                    changes,
+                },
+            );
+            let _ = self.projection_updates.send(update);
+        }
+        let metadata = format!(
+            "status={:?},cursor={},bytes={}",
+            acknowledgement.status,
+            acknowledgement.committed_cursor,
+            serde_json::to_vec(&batch).map_or(0, |bytes| bytes.len())
+        );
+        if audit {
+            self.audit
+                .machine(now, "PROJECTION_BATCH", machine_id, Some(&metadata));
+        }
+        Ok(acknowledgement)
+    }
+
+    /// Subscribe to committed projection changes for the owner live stream.
+    pub fn subscribe_projection_updates(
+        &self,
+    ) -> tokio::sync::broadcast::Receiver<ControlProjectionMessage> {
+        self.projection_updates.subscribe()
+    }
+
+    /// Build one bounded owner dashboard snapshot from local SQLite only.
+    pub fn projection_snapshot(&self) -> Result<ControlProjectionSnapshot, ControlFailure> {
+        let now = (self.clock)();
+        let registry = self.registry()?;
+        let omitted_machines = registry
+            .machines
+            .len()
+            .saturating_sub(MAX_PROJECTED_MACHINES) as u32;
+        let mut omitted_sessions = 0_u32;
+        let mut machines = Vec::new();
+        for machine in registry.machines.into_iter().take(MAX_PROJECTED_MACHINES) {
+            let state = self
+                .store
+                .control_projection_state(&machine.machine_id)
+                .map_err(ControlFailure::internal)?;
+            let sessions = self
+                .store
+                .projected_sessions(&machine.machine_id, MAX_PROJECTED_SESSIONS + 1)
+                .map_err(ControlFailure::internal)?;
+            let machine_omitted = sessions
+                .len()
+                .saturating_sub(MAX_PROJECTED_SESSIONS as usize)
+                as u32;
+            omitted_sessions = omitted_sessions.saturating_add(machine_omitted);
+            let freshness = projection_freshness(machine.status, state.as_ref(), now);
+            machines.push(ControlProjectedMachine {
+                machine_id: machine.machine_id.clone(),
+                display_name: machine.display_name,
+                os: machine.os,
+                daemon_version: machine.daemon_version,
+                capabilities: machine.capabilities,
+                registry_status: machine.status,
+                freshness,
+                last_seen: machine.last_seen,
+                observed_at: state.as_ref().and_then(|value| value.observed_at),
+                synced_at: state.as_ref().map(|value| value.synced_at),
+                source_cursor: state.as_ref().map_or(0, |value| value.committed_cursor),
+                sessions: sessions
+                    .into_iter()
+                    .take(MAX_PROJECTED_SESSIONS as usize)
+                    .collect(),
+                events: self
+                    .store
+                    .projected_events(&machine.machine_id, MAX_PROJECTED_EVENTS)
+                    .map_err(ControlFailure::internal)?,
+                metrics: self
+                    .store
+                    .projected_metrics(&machine.machine_id, MAX_PROJECTED_METRICS)
+                    .map_err(ControlFailure::internal)?,
+                omitted_sessions: machine_omitted,
+            });
+        }
+        Ok(ControlProjectionSnapshot {
+            schema_version: PROJECTION_SCHEMA_VERSION,
+            view_revision: self
+                .store
+                .control_projection_revision()
+                .map_err(ControlFailure::internal)?,
+            generated_at: now,
+            machines,
+            omitted_machines,
+            omitted_sessions,
+            truncated: omitted_machines > 0 || omitted_sessions > 0,
+        })
+    }
+
+    fn projection_directive(
+        &self,
+        machine_id: &MachineId,
+        report: &protocol::ProjectionSyncReport,
+    ) -> Result<ProjectionSyncDirective, ControlFailure> {
+        let stored = self
+            .store
+            .control_projection_state(machine_id)
+            .map_err(ControlFailure::internal)?;
+        let committed = stored
+            .as_ref()
+            .filter(|state| state.source_epoch == report.source_epoch)
+            .map_or(0, |state| state.committed_cursor);
+        let action = if report.schema_version != PROJECTION_SCHEMA_VERSION
+            || stored
+                .as_ref()
+                .is_some_and(|state| state.source_epoch != report.source_epoch)
+            || report.current_cursor < committed
+        {
+            ProjectionSyncAction::Snapshot
+        } else if report.current_cursor > committed {
+            ProjectionSyncAction::Upload
+        } else {
+            ProjectionSyncAction::Wait
+        };
+        Ok(ProjectionSyncDirective {
+            enabled: true,
+            schema_version: PROJECTION_SCHEMA_VERSION,
+            committed_cursor: committed,
+            max_batch_bytes: MAX_PROJECTION_BATCH_BYTES as u32,
+            max_changes: MAX_PROJECTION_CHANGES as u16,
+            action,
         })
     }
 
@@ -913,6 +1123,24 @@ impl ControlService {
             .lock()
             .map_err(|_| ControlFailure::internal("control secrets lock poisoned"))?;
         change(&mut secrets).map_err(ControlFailure::internal)
+    }
+}
+
+fn projection_freshness(
+    registry: RegistryStatus,
+    state: Option<&store::ControlProjectionState>,
+    now: Timestamp,
+) -> ProjectionFreshness {
+    match registry {
+        RegistryStatus::Revoked => ProjectionFreshness::Revoked,
+        RegistryStatus::Disconnected => ProjectionFreshness::Disconnected,
+        RegistryStatus::Offline => ProjectionFreshness::Offline,
+        RegistryStatus::Online => match state {
+            Some(state) if now.0.saturating_sub(state.synced_at.0) <= PROJECTION_LIVE_MS => {
+                ProjectionFreshness::Live
+            }
+            _ => ProjectionFreshness::Stale,
+        },
     }
 }
 

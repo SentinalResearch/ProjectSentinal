@@ -2,8 +2,9 @@
 
 use crate::{to_sql_id, Store, StoreError};
 use protocol::{
-    MachineId, ProjectedSession, ProjectionAcknowledgement, ProjectionAcknowledgementStatus,
-    ProjectionBatch, ProjectionChange, ProjectionResyncReason, ProjectionSyncReport, Timestamp,
+    MachineId, ProjectedEventSummary, ProjectedMetrics, ProjectedSession,
+    ProjectionAcknowledgement, ProjectionAcknowledgementStatus, ProjectionBatch, ProjectionChange,
+    ProjectionResyncReason, ProjectionSyncReport, Timestamp,
 };
 use rusqlite::{params, OptionalExtension, Transaction};
 
@@ -19,6 +20,21 @@ pub struct ProjectionOutboxLimits {
     pub maximum_rows: u32,
     /// Maximum encoded bytes.
     pub maximum_bytes: u64,
+}
+
+/// Cursor and timestamps for one control-side Machine projection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ControlProjectionState {
+    /// Worker source epoch.
+    pub source_epoch: String,
+    /// Latest committed source cursor.
+    pub committed_cursor: u64,
+    /// Newest worker observation represented.
+    pub observed_at: Option<Timestamp>,
+    /// Control commit time.
+    pub synced_at: Timestamp,
+    /// Latest control-view revision for this Machine.
+    pub view_revision: u64,
 }
 
 impl Default for ProjectionOutboxLimits {
@@ -298,6 +314,79 @@ impl Store {
             .iter()
             .map(|json| serde_json::from_str(json).map_err(StoreError::from))
             .collect()
+    }
+
+    /// Return bounded newest safe Event summaries for one Machine.
+    pub fn projected_events(
+        &self,
+        machine_id: &MachineId,
+        limit: u32,
+    ) -> Result<Vec<ProjectedEventSummary>, StoreError> {
+        let connection = self.lock()?;
+        let mut statement = connection.prepare(
+            "SELECT event_json FROM control_projection_events
+             WHERE machine_id=?1 ORDER BY at DESC,event_id DESC LIMIT ?2",
+        )?;
+        let values = statement
+            .query_map(params![machine_id.0, limit], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        values
+            .iter()
+            .map(|json| serde_json::from_str(json).map_err(StoreError::from))
+            .collect()
+    }
+
+    /// Return coalesced latest Metrics for one Machine.
+    pub fn projected_metrics(
+        &self,
+        machine_id: &MachineId,
+        limit: u32,
+    ) -> Result<Vec<ProjectedMetrics>, StoreError> {
+        let connection = self.lock()?;
+        let mut statement = connection.prepare(
+            "SELECT metrics_json FROM control_projection_metrics
+             WHERE machine_id=?1 ORDER BY at DESC,scope,session_key LIMIT ?2",
+        )?;
+        let values = statement
+            .query_map(params![machine_id.0, limit], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        values
+            .iter()
+            .map(|json| serde_json::from_str(json).map_err(StoreError::from))
+            .collect()
+    }
+
+    /// Return control cursor and freshness timestamps for one Machine.
+    pub fn control_projection_state(
+        &self,
+        machine_id: &MachineId,
+    ) -> Result<Option<ControlProjectionState>, StoreError> {
+        Ok(self
+            .lock()?
+            .query_row(
+                "SELECT source_epoch,committed_cursor,observed_at,synced_at,view_revision
+                 FROM control_projection_state WHERE machine_id=?1",
+                [&machine_id.0],
+                |row| {
+                    Ok(ControlProjectionState {
+                        source_epoch: row.get(0)?,
+                        committed_cursor: row.get(1)?,
+                        observed_at: row.get::<_, Option<i64>>(2)?.map(Timestamp),
+                        synced_at: Timestamp(row.get(3)?),
+                        view_revision: row.get(4)?,
+                    })
+                },
+            )
+            .optional()?)
+    }
+
+    /// Latest control-view revision across all Machines.
+    pub fn control_projection_revision(&self) -> Result<u64, StoreError> {
+        Ok(self.lock()?.query_row(
+            "SELECT COALESCE(MAX(revision),0) FROM control_projection_changes",
+            [],
+            |row| row.get(0),
+        )?)
     }
 }
 
