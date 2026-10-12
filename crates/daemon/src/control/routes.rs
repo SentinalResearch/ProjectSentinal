@@ -132,6 +132,7 @@ impl ControlRoutes {
             .route("/api/v1/push/provider", put(push_provider))
             .merge(super::release_routes::routes())
             .merge(super::discovery::routes())
+            .merge(super::approval_routes::routes())
             .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES));
         let projection_routes = Router::new()
             .route("/api/v1/link/projection", post(projection_batch))
@@ -156,7 +157,7 @@ impl ControlRoutes {
     }
 
     /// Require an owner browser Session (never the Machine token).
-    fn owner(&self, headers: &HeaderMap) -> Result<&ControlService, ControlFailure> {
+    pub(super) fn owner(&self, headers: &HeaderMap) -> Result<&ControlService, ControlFailure> {
         let control = self.control()?;
         let kind = credential_from_headers(headers, self.development)
             .and_then(|token| self.auth.authorize(&token).ok().flatten());

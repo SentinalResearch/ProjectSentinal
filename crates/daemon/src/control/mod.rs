@@ -4,6 +4,10 @@
 //! HMACs. A successful exchange creates one link with two directional
 //! credentials; each side keeps only a hash of the one it verifies.
 
+mod approval;
+mod approval_claim;
+mod approval_routes;
+mod approval_verify;
 mod discovery;
 mod proxy;
 mod refresh;
@@ -14,6 +18,7 @@ pub mod release_watch;
 pub mod routes;
 mod secrets;
 
+pub use approval_verify::{verification_words, PairingVerifier, TailnetVerifier, VerifyFuture};
 pub use refresh::RefreshFault;
 
 pub use release::{ControlRelease, ControlReleaseSettings, Detach};
@@ -140,6 +145,7 @@ pub struct ControlService {
     projection_updates: tokio::sync::broadcast::Sender<ControlProjectionMessage>,
     refresh_fault: Arc<Mutex<Option<RefreshFault>>>,
     discovery_limit: Arc<discovery::DiscoveryLimit>,
+    verifier: Arc<dyn PairingVerifier>,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -191,6 +197,7 @@ impl ControlService {
             projection_updates,
             refresh_fault: Arc::new(Mutex::new(None)),
             discovery_limit: Arc::new(discovery::DiscoveryLimit::default()),
+            verifier: Arc::new(TailnetVerifier::default()),
         };
         // A refresh interrupted by a crash never reached the worker: undo it.
         service

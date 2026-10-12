@@ -786,16 +786,24 @@ async fn unterminated_training_output_persists_watcher_events_and_session_health
     let events = tokio::time::timeout(Duration::from_millis(100), async {
         loop {
             let events = store.events(Some(session.id), None, 20).unwrap();
-            if events.iter().any(|event| {
-                matches!(
-                    event.kind,
-                    protocol::EventKind::ProgressUpdated {
-                        current: 7,
-                        total: Some(10),
-                        ..
-                    }
-                )
-            }) {
+            // Health is stored separately from the Event; wait for both.
+            let health_stored = store.session(session.id).unwrap().is_some_and(|stored| {
+                stored
+                    .health
+                    .is_some_and(|health| health.progress.is_some())
+            });
+            if health_stored
+                && events.iter().any(|event| {
+                    matches!(
+                        event.kind,
+                        protocol::EventKind::ProgressUpdated {
+                            current: 7,
+                            total: Some(10),
+                            ..
+                        }
+                    )
+                })
+            {
                 return events;
             }
             tokio::task::yield_now().await;

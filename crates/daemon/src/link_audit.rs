@@ -21,6 +21,9 @@ pub struct LinkAuditRecord<'a> {
     /// Pairing-code handle.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code_id: Option<&'a str>,
+    /// Approval-request handle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<&'a str>,
     /// Machine concerned.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub machine_id: Option<&'a str>,
