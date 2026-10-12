@@ -61,6 +61,32 @@ pub enum Command {
         #[arg(long)]
         config_dir: Option<PathBuf>,
     },
+    /// Make this Machine a control, or connect it to one, after a preview.
+    ///
+    /// Re-running finishes what is missing and changes nothing that is right.
+    Setup {
+        /// Role to set up; asked when absent.
+        #[arg(long, value_enum)]
+        role: Option<SetupRoleArg>,
+        /// Display name for this control (or, as a worker, this Machine).
+        #[arg(long)]
+        name: Option<String>,
+        /// Worker: the control's https origin (skips the question).
+        #[arg(long)]
+        control_url: Option<String>,
+        /// Apply the preview without asking (never approves pairing).
+        #[arg(long)]
+        yes: bool,
+        /// Worker: read the one-time code from one stdin line.
+        #[arg(long)]
+        code_stdin: bool,
+        /// Installed program prefix; defaults to the running binary's prefix.
+        #[arg(long)]
+        prefix: Option<PathBuf>,
+        /// Daemon configuration directory; defaults to ~/.config/terminal-agent.
+        #[arg(long)]
+        config_dir: Option<PathBuf>,
+    },
     /// Check, install, or roll back signed releases on the control.
     Release {
         /// Release action.
@@ -264,4 +290,13 @@ pub enum HookAction {
         #[arg(long, default_value = "")]
         at: String,
     },
+}
+
+/// `sentinal setup --role`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum SetupRoleArg {
+    /// Serve the dashboard and packages for workers.
+    Control,
+    /// Run Sessions for an existing control.
+    Worker,
 }

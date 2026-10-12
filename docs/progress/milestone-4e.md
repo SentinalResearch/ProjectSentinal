@@ -792,6 +792,44 @@ phone:
 
 **Not automated yet:** workers updating automatically after the control (step 7).
 
+### Step 3 — `sentinal setup` (2026-10-12)
+
+`crates/cli/src/setup/`:
+- `config.rs` edits `daemon.toml` as text, so comments and other keys
+  survive. `bind` moves to `127.0.0.1:7420`; `behind_tailscale_serve` and
+  `allowed_origins` go above the first table; `[control]` (with
+  `display_name`, which discovery will serve in step 4) and `[packages]` are
+  appended. A config that already sets any of these by hand, binds somewhere
+  other than loopback or Tailscale, or is a development config is refused
+  (exit 5), never merged.
+- `control.rs` plans and previews linger, the config, the restart, and the
+  missing Serve routes, then applies them in that order.
+  - A failed restart or health check restores the previous file and restarts
+    again.
+  - A Serve route that points elsewhere, raw TCP on 443, or Funnel on the
+    host is refused before anything changes.
+  - Last, it publishes the installed signed release (`receive-release.sh
+    --no-self-update`; provenance is checked when `gh` can).
+  - A finished control prints "Nothing to do".
+- `system.rs` puts Tailscale, `loginctl`, `systemctl`/`launchctl`, `curl`, and
+  publishing behind the `System` trait.
+- The WORKER role validates the control URL and continues with the existing
+  code flow (`connect`), until discovery and approval land in steps 4–5.
+
+**Deviations from §3:**
+- **No port-8443 fallback.** `public_url` and `public_base_url` are validated
+  as port-less `.ts.net` origins, so a foreign `/` route is refused with the
+  command to remove it.
+- **`--json` waits for step 5,** where it carries the verification words.
+
+**Tests:** `crates/cli/tests/setup.rs` (11), with a recording fake `System`.
+- The generated config is parsed by the daemon's own loader (a `daemon`
+  dev-dependency).
+- Mutation-checked: removing the Funnel refusal, or the restore on a failed
+  restart, fails a test.
+- Not automated: real `tailscale serve`, `loginctl`, and the service manager.
+  These are part of the VM acceptance.
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

@@ -55,6 +55,32 @@ async fn dispatch(
         Command::Doctor { prefix, config_dir } => {
             return Ok(crate::doctor::run(prefix, config_dir, out));
         }
+        Command::Setup {
+            role,
+            name,
+            control_url,
+            yes,
+            code_stdin,
+            prefix,
+            config_dir,
+        } => {
+            return Ok(exit_code(
+                setup(
+                    SetupArgs {
+                        role,
+                        name,
+                        control_url,
+                        yes,
+                        code_stdin,
+                        prefix,
+                        config_dir,
+                    },
+                    out,
+                    err,
+                )
+                .await,
+            ))
+        }
         Command::Release { action, options } => {
             return Ok(crate::release::run(action, options, out, err));
         }
@@ -219,6 +245,7 @@ async fn dispatch(
         }
         Command::Watch { .. }
         | Command::Doctor { .. }
+        | Command::Setup { .. }
         | Command::Release { .. }
         | Command::Update { .. }
         | Command::Hook { .. }
@@ -364,6 +391,63 @@ async fn connect(
         err,
     )
     .await
+}
+
+struct SetupArgs {
+    role: Option<crate::args::SetupRoleArg>,
+    name: Option<String>,
+    control_url: Option<String>,
+    yes: bool,
+    code_stdin: bool,
+    prefix: Option<PathBuf>,
+    config_dir: Option<PathBuf>,
+}
+
+async fn setup(args: SetupArgs, out: &mut dyn Write, err: &mut dyn Write) -> i32 {
+    use crate::setup::{self, Outcome, RealSystem, SetupOptions, SetupRole};
+    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+        let _ = writeln!(err, "sentinal setup: HOME is not set");
+        return setup::exit::CANCELLED;
+    };
+    let prefix = args.prefix.unwrap_or_else(|| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent()?.parent().map(PathBuf::from))
+            .unwrap_or_else(|| home.join(".local"))
+    });
+    let version = std::fs::read_to_string(prefix.join("share/sentinal/release.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|value| value.get("version")?.as_str().map(str::to_string))
+        .unwrap_or_else(|| crate::version::VERSION.as_str().to_string());
+    let options = SetupOptions {
+        role: args.role.map(|role| match role {
+            crate::args::SetupRoleArg::Control => SetupRole::Control,
+            crate::args::SetupRoleArg::Worker => SetupRole::Worker,
+        }),
+        name: args.name,
+        control_url: args.control_url,
+        yes: args.yes,
+        interactive: std::io::stdin().is_terminal(),
+        config_dir: args
+            .config_dir
+            .unwrap_or_else(|| home.join(".config/terminal-agent")),
+        home,
+        user: std::env::var("USER").unwrap_or_default(),
+        version,
+        prefix: prefix.clone(),
+    };
+    let mut system = RealSystem { prefix };
+    let outcome = {
+        let mut stdin = std::io::stdin().lock();
+        setup::run(options, &mut system, &mut stdin, out, err)
+    };
+    match outcome {
+        Outcome::Exit(code) => code,
+        Outcome::Connect { control_url, name } => {
+            connect(&control_url, name.as_deref(), args.code_stdin, out, err).await
+        }
+    }
 }
 
 /// `--code-stdin` never touches a terminal.

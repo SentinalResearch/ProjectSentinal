@@ -266,3 +266,49 @@ impl<T: BufRead> TakeLine for T {
         self.take(64).read_line(buffer)
     }
 }
+
+/// Publish the release this control already runs to its own package channel
+/// (`sentinal setup`), so workers can install from it. The owner signature is
+/// required; GitHub build provenance is checked when `gh` can.
+pub(crate) fn publish_installed(
+    prefix: &std::path::Path,
+    config_dir: &std::path::Path,
+    version: &str,
+) -> Result<(), ReleaseError> {
+    let context = Context::load(&crate::release_args::ReleaseOptions {
+        repo: crate::release_args::DEFAULT_RELEASE_REPO.to_string(),
+        allowed_signers: None,
+        prefix: Some(prefix.to_path_buf()),
+        config_dir: Some(config_dir.to_path_buf()),
+    })?;
+    let version =
+        Version::parse(version).ok_or_else(|| ReleaseError::InvalidVersion(version.into()))?;
+    let provenance = Command::new("gh")
+        .args(["attestation", "verify", "--help"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success());
+    let mut receive = Command::new(context.tool("receive-release.sh")?);
+    receive
+        .args([
+            "--version",
+            &version.to_string(),
+            "--no-self-update",
+            "--package-dir",
+        ])
+        .arg(&context.package_dir)
+        .arg("--allowed-signers")
+        .arg(&context.allowed_signers)
+        .args(["--repo", &context.repo]);
+    if !provenance {
+        receive.arg("--skip-provenance");
+    }
+    if run_tool(receive) {
+        Ok(())
+    } else {
+        Err(ReleaseError::Refused(format!(
+            "publishing {version} for workers failed; run sentinal setup again"
+        )))
+    }
+}

@@ -311,7 +311,15 @@ compare `install.sh`'s SHA-256 before running it.
 
 ### Make one Machine the control
 
-On the Machine you choose as control, add to its `daemon.toml`:
+On the Machine you choose as control, after installing:
+
+```console
+control$ sentinal setup        # choose 1) Create my Sentinal control
+```
+
+It previews and then writes the configuration below, enables linger, adds the
+Tailscale Serve routes, and publishes worker packages. The manual equivalent,
+for reference or recovery, is to add to its `daemon.toml`:
 
 ```toml
 bind = "127.0.0.1:7420"                 # published only through Tailscale Serve

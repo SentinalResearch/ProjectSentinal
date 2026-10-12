@@ -516,6 +516,7 @@ name = "cli"
 version = "0.0.1"
 dependencies = [
  "clap",
+ "daemon",
  "futures-util",
  "portable-pty",
  "protocol",

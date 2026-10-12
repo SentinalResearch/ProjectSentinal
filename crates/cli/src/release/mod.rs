@@ -6,6 +6,8 @@ mod apply;
 mod github;
 mod state;
 
+pub(crate) use apply::publish_installed;
+
 use crate::release_args::{ReleaseAction, ReleaseChannel, ReleaseOptions};
 use std::{
     fmt, fs,

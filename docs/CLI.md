@@ -88,6 +88,31 @@ unless exact-path data deletion is separately requested. Full prerequisites,
 service commands, paths, backup, and acceptance steps are in
 `docs/SETUP.md`.
 
+### `setup`
+
+`sentinal setup` asks what this Machine is, previews every change, and
+applies it only after `y` (or `--yes`). Re-running it finishes what is missing
+and otherwise prints "Nothing to do".
+
+- **Control:** rewrites `daemon.toml` to bind `127.0.0.1:7420` with
+  `[control]` and `[packages]` (the previous file is kept as
+  `daemon.toml.before-setup`; comments and other keys are kept). It then
+  enables linger on Linux (`sudo loginctl enable-linger`, shown first), restarts
+  the service, checks health, adds the Tailscale Serve routes `/` → `:7422` and
+  `/api` → `:7420/api`, checks health through HTTPS, and publishes the
+  installed signed release for workers. It never binds `0.0.0.0`, never turns on
+  Funnel, and never replaces a Serve route it did not create. If the restarted
+  daemon is unhealthy, the previous config is restored.
+- **Worker:** asks for the control URL and continues with the one-time code
+  (`connect`). Finding controls on the Tailnet and click-to-approve pairing
+  replace this prompt in a later release.
+
+Exit codes: 0 done or nothing to do · 1 a step failed (files restored) ·
+2 cancelled or usage · 3–5 as `connect`, with 5 also meaning "already set up
+differently" (the file and reason are named) · 6 Tailscale missing or signed
+out. Without a terminal, pass `--role control --yes`, or
+`--role worker --control-url URL --code-stdin`.
+
 ### Private install and `connect` flow
 
 An owner-controlled Tailnet control Machine can serve a
@@ -217,6 +242,7 @@ sentinal hook uninstall [zsh|bash|fish] [--rc PATH]
 sentinal auto on|off|status [zsh|bash|fish] [--rc PATH]
 sentinal adopt PID [--log PATH] [-t TITLE]
 sentinal adopt --pick
+sentinal setup [--role control|worker] [--name NAME] [--control-url URL] [--yes] [--code-stdin]
 sentinal connect CONTROL_URL [--name NAME] [--code-stdin]
 sentinal connection status [--json]
 sentinal disconnect

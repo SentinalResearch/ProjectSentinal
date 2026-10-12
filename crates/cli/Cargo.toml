@@ -19,6 +19,8 @@ tokio-tungstenite.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
+# setup tests validate generated daemon.toml with the daemon's own loader.
+daemon = { path = "../daemon" }
 # Drives the CLI inside a real pseudo-terminal in the ignored watch_integration.
 portable-pty.workspace = true
 # Paused clock for deterministic 50 ms deadline tests (no real sleeps).
