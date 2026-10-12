@@ -690,7 +690,9 @@ comparison, web tests (49 files / 224 tests), production web build, 20 eval
 tests, and every shell/release/installer documentation check; its final line
 is `github install test: passed`. A real, full `pnpm exec playwright test` —
 all 7 projects, 13 tests, including `projection-acceptance` — also passes end
-to end in about a minute.
+to end. It was rerun from a clean archive of candidate `995c173` and reported
+`13 passed (1.4m)`; the working tree's concurrent frontend and notification
+edits were not included.
 
 ## Real-Machine acceptance fields
 
