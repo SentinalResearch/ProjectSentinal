@@ -716,6 +716,9 @@ pub struct ControlProjectedMachine {
 pub struct ControlProjectionSnapshot {
     /// Projection schema.
     pub schema_version: u16,
+    /// Control Machine that owns browser routing, when reported by this version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_machine_id: Option<MachineId>,
     /// Monotonic control-view revision.
     pub view_revision: u64,
     /// Control generation time.

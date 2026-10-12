@@ -90,6 +90,7 @@
   "resync": { "status": "RESYNC_REQUIRED", "source_epoch": "pe_01M4D1", "committed_cursor": 38, "reason": "CURSOR_MISMATCH" },
   "control_snapshot": {
     "schema_version": 1,
+    "control_machine_id": "01M40Q6XCONTROL",
     "view_revision": 992,
     "generated_at": 1791792001000,
     "machines": [

@@ -2,6 +2,7 @@ import type { CaptureLevel } from "../protocol/CaptureLevel";
 import type { SessionLog } from "../protocol/SessionLog";
 import type { SessionOrigin } from "../protocol/SessionOrigin";
 import type { SessionState } from "../protocol/SessionState";
+import type { ProjectionFreshness } from "../protocol/ProjectionFreshness";
 
 export type MachineStatus = "ONLINE" | "OFFLINE" | "AUTH_EXPIRED" | "DISCONNECTED" | "REVOKED";
 
@@ -11,6 +12,8 @@ export interface Machine {
   os: "Linux" | "macOS" | "Windows";
   hardware: string;
   status: MachineStatus;
+  freshness?: ProjectionFreshness;
+  syncedAt?: number;
   lastSeen?: string;
   endpoint?: string;
   capabilities?: string[];

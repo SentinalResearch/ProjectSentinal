@@ -12,6 +12,8 @@ import type { MachineMetricPoint } from "../../protocol/MachineMetricPoint";
 import type { Recipe as WireRecipe } from "../../protocol/Recipe";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import type { Session as WireSession } from "../../protocol/Session";
+import type { ControlProjectionMessage } from "../../protocol/ControlProjectionMessage";
+import type { ControlProjectionSnapshot } from "../../protocol/ControlProjectionSnapshot";
 import { RegistryError, type DataAdapter, type HistoryFilters, type LiveEvent } from "../adapter";
 import type {
   MachineInsight,
@@ -34,12 +36,13 @@ import {
   mapConcurrent,
 } from "./machine-connections";
 import { createRegistryApi } from "./registry";
+import { applyProjectionMessage, projectionView, type ProjectionView } from "./projection-view";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
 
 const PROTOCOL_VERSION = 1;
 const SOCKET_OPEN = 1;
-const POLL_INTERVAL_MS = 2_000;
+const INTEGRITY_INTERVAL_MS = 60_000;
 const QUERY_CONCURRENCY = 3;
 const encoder = new TextEncoder();
 
@@ -270,12 +273,6 @@ export function watcherEventPatch(observed: WireEvent): Partial<Session> | undef
   return undefined;
 }
 
-function applyWatcherEvents(session: Session, events: WireEvent[]): Session {
-  let result = { ...session, events: events.map(mapWatcherEvent) };
-  for (const event of events) result = { ...result, ...watcherEventPatch(event) };
-  return result;
-}
-
 function relativeDate(startedAt: number): { date: string; daysAgo: number } {
   const daysAgo = Math.max(0, Math.floor((Date.now() - startedAt) / 86_400_000));
   if (daysAgo === 0) return { date: "Today", daysAgo };
@@ -324,10 +321,6 @@ class DaemonTransport {
 
   setMachine(machine: string): void {
     this.machine = machine;
-  }
-
-  rememberEventBaseline(events: WireEvent[]): void {
-    for (const event of events) this.eventDeduper.accept(this.machine, event.id);
   }
 
   async request(request: ClientRequest, accepts: (message: DaemonMessage) => boolean): Promise<DaemonMessage> {
@@ -494,12 +487,150 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   let controlMachineId: string | null = null;
   let initialization: Promise<void> | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let projection: ProjectionView | null = null;
+  let projectionSocket: ApiSocket | null = null;
+  let projectionReconnect: ReturnType<typeof setTimeout> | null = null;
+  let projectionReload: Promise<boolean> | null = null;
+  let legacyRefresh: Promise<void> | null = null;
   const recipeRoutes = new Map<string, { machineId: string; sourceId: string }>();
 
   const emit = (event: LiveEvent) => {
     for (const listener of listeners) listener(event);
   };
   controlTransport.subscribe(emit);
+
+  const newConnection = (id: string, machine: Machine, sessions: Session[]): MachineConnection => {
+    const transport = id === controlMachineId
+      ? controlTransport
+      : new DaemonTransport(workerSocketUrl(controlSocketUrl, id), id, socketFactory, false);
+    if (transport !== controlTransport) transport.subscribe(emit);
+    return {
+      id,
+      transport,
+      machine,
+      sessions,
+      retry: new RetryState({ baseMs: 2_000, maximumMs: 60_000, wakeAfterMs: 30_000 }),
+      retryAt: 0,
+    };
+  };
+
+  const projectionUrl = (revision: number): string => {
+    const endpoint = new URL(controlSocketUrl);
+    endpoint.pathname = "/api/v1/control/live";
+    endpoint.search = `?after=${revision}`;
+    endpoint.hash = "";
+    return endpoint.toString();
+  };
+
+  const installProjection = (next: ProjectionView): void => {
+    projection = next;
+    controlMachineId = next.controlMachineId;
+    controlTransport.setMachine(next.controlMachineId);
+    const present = new Set(next.machines.keys());
+    for (const [id, connection] of connections) {
+      if (!present.has(id)) {
+        connection.transport.reset();
+        connections.delete(id);
+      }
+    }
+    for (const [id, projected] of next.machines) {
+      const existing = connections.get(id);
+      if (existing) {
+        existing.machine = projected.machine;
+        existing.sessions = projected.sessions;
+      } else {
+        connections.set(id, newConnection(id, projected.machine, projected.sessions));
+      }
+    }
+    if (pollTimer !== null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    emit({
+      type: "DATA_RESET",
+      machines: [...connections.values()].map((connection) => connection.machine),
+      sessions: [...connections.values()].flatMap((connection) => connection.sessions),
+    });
+  };
+
+  const closeProjectionStream = (): void => {
+    if (projectionReconnect !== null) clearTimeout(projectionReconnect);
+    projectionReconnect = null;
+    projectionSocket?.close();
+    projectionSocket = null;
+  };
+
+  const loadProjection = async (): Promise<boolean> => {
+    if (projectionReload !== null) return projectionReload;
+    projectionReload = (async () => {
+      let response: Response;
+      try {
+        response = await fetcher(`${authBaseUrl}/control/snapshot`, {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+      } catch {
+        return false;
+      }
+      if (response.status === 404 || response.status === 501) return false;
+      if (!response.ok) {
+        if (response.status === 401) window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+        throw daemonError(`control projection request failed with status ${response.status}`);
+      }
+      const next = projectionView(await response.json() as ControlProjectionSnapshot, now());
+      if (next === null) return false;
+      installProjection(next);
+      startProjectionStream();
+      return true;
+    })().finally(() => { projectionReload = null; });
+    return projectionReload;
+  };
+
+  const startProjectionStream = (): void => {
+    if (projection === null || projectionSocket !== null) return;
+    const socket = socketFactory(projectionUrl(projection.revision));
+    projectionSocket = socket;
+    socket.onmessage = (event: MessageEvent<string | ArrayBuffer | Blob>) => {
+      if (typeof event.data !== "string" || projection === null) return;
+      let message: ControlProjectionMessage;
+      try {
+        message = JSON.parse(event.data) as ControlProjectionMessage;
+      } catch {
+        void loadProjection();
+        return;
+      }
+      const events = applyProjectionMessage(projection, message, now());
+      if (events === null) {
+        closeProjectionStream();
+        void loadProjection();
+        return;
+      }
+      if (message.type === "PROJECTION_DELTA" && message.machine_id) {
+        const projected = projection.machines.get(message.machine_id);
+        const connection = connections.get(message.machine_id);
+        if (projected && connection) {
+          connection.machine = projected.machine;
+          connection.sessions = projected.sessions;
+        }
+      }
+      for (const event of events) emit(event);
+    };
+    socket.onclose = (event) => {
+      if (projectionSocket !== socket) return;
+      projectionSocket = null;
+      if (event.code === 4_001) {
+        window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+        return;
+      }
+      if (projection !== null && projectionReconnect === null) {
+        projectionReconnect = setTimeout(() => {
+          projectionReconnect = null;
+          startProjectionStream();
+        }, 2_000);
+      }
+    };
+    socket.onerror = () => undefined;
+  };
 
   const upsertWorker = (row: RegistryMachine): MachineConnection | null => {
     if (row.role !== "WORKER") return null;
@@ -574,6 +705,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   };
 
   const initialize = async (): Promise<void> => {
+    if (await loadProjection()) return;
     const reply = await controlTransport.request({ type: "GET_MACHINE" }, (message) => message.type === "MACHINE");
     if (reply.type !== "MACHINE") throw daemonError("missing control Machine");
     controlMachineId = reply.machine.id;
@@ -631,18 +763,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     // A row stamped with another Machine ID is never shown or routed. Dropping
     // it (not the whole Machine) keeps the valid Sessions and a steady status.
     const owned = reply.sessions.filter((session) => session.machine_id === connection.id);
-    const mapped: Session[] = [];
-    const baseline: WireEvent[] = [];
-    for (const wire of owned) {
-      const events = await connection.transport.request(
-        { type: "GET_EVENTS", session_id: wire.id, after: null, limit: 500 },
-        (message) => message.type === "EVENTS",
-      );
-      const observed = events.type === "EVENTS" ? events.events : [];
-      baseline.push(...observed);
-      mapped.push(applyWatcherEvents(mapSession(wire), observed));
-    }
-    connection.transport.rememberEventBaseline(baseline);
+    const mapped = owned.map(mapSession);
     connection.sessions = mapped;
     return mapped;
   };
@@ -672,24 +793,32 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
 
   const refreshDue = async (): Promise<void> => {
     await ensureInitialized();
-    await loadRegistry();
-    const at = now();
-    const due = [...connections.values()].filter((connection) => queryEligible(connection) && connection.retryAt <= at);
-    await mapConcurrent(due, QUERY_CONCURRENCY, (connection) => refreshConnection(connection, true));
+    if (projection !== null) return;
+    await refreshLegacy();
+  };
+
+  const refreshLegacy = async (): Promise<void> => {
+    legacyRefresh ??= (async () => {
+      await loadRegistry();
+      const at = now();
+      const due = [...connections.values()].filter((connection) =>
+        queryEligible(connection) && connection.retryAt <= at);
+      await mapConcurrent(due, QUERY_CONCURRENCY, (connection) => refreshConnection(connection, true));
+    })().finally(() => { legacyRefresh = null; });
+    await legacyRefresh;
   };
 
   const getMachines = async (): Promise<Machine[]> => {
     await ensureInitialized();
-    await loadRegistry();
-    await mapConcurrent([...connections.values()].filter(queryEligible), QUERY_CONCURRENCY,
-      (connection) => refreshConnection(connection, false));
+    if (projection !== null) return [...connections.values()].map((connection) => connection.machine);
+    await refreshLegacy();
     return [...connections.values()].map((connection) => connection.machine);
   };
 
   const getSessions = async (): Promise<Session[]> => {
     await ensureInitialized();
-    await mapConcurrent([...connections.values()].filter(queryEligible), QUERY_CONCURRENCY,
-      (connection) => refreshConnection(connection, true));
+    if (projection !== null) return [...connections.values()].flatMap((connection) => connection.sessions);
+    await refreshLegacy();
     return [...connections.values()].flatMap((connection) => connection.sessions);
   };
 
@@ -712,6 +841,8 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     fetcher,
     storage,
     resetTransport: () => {
+      closeProjectionStream();
+      projection = null;
       for (const connection of connections.values()) connection.transport.reset();
       connections.clear();
       controlMachineId = null;
@@ -885,9 +1016,17 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     },
     subscribe(listener) {
       listeners.add(listener);
-      if (pollTimer === null) pollTimer = setInterval(() => void refreshDue(), POLL_INTERVAL_MS);
+      void ensureInitialized().then(() => {
+        if (projection === null && listeners.has(listener) && pollTimer === null) {
+          pollTimer = setInterval(() => void refreshDue(), INTEGRITY_INTERVAL_MS);
+        }
+      }).catch(() => undefined);
       const onVisibility = () => {
         if (document.visibilityState !== "visible") return;
+        if (projection !== null) {
+          if (projectionSocket === null) startProjectionStream();
+          return;
+        }
         const at = now();
         for (const connection of connections.values()) connection.retryAt = connection.retry.resumeAt(at);
         void refreshDue();

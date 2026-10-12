@@ -73,6 +73,14 @@ fn an_empty_final_snapshot_can_clear_a_control_projection() {
 }
 
 #[test]
+fn legacy_control_snapshot_without_control_identity_still_decodes() {
+    let mut value = fixture()["control_snapshot"].clone();
+    value.as_object_mut().unwrap().remove("control_machine_id");
+    let decoded: ControlProjectionSnapshot = serde_json::from_value(value).unwrap();
+    assert_eq!(decoded.control_machine_id, None);
+}
+
+#[test]
 fn legacy_heartbeat_defaults_to_no_projection_capability() {
     let fixture =
         serde_json::from_str::<Value>(include_str!("fixtures/machine_link.json")).unwrap();

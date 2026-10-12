@@ -650,6 +650,7 @@ impl ControlService {
         }
         Ok(ControlProjectionSnapshot {
             schema_version: PROJECTION_SCHEMA_VERSION,
+            control_machine_id: Some(self.settings.machine_id.clone()),
             view_revision: self
                 .store
                 .control_projection_revision()

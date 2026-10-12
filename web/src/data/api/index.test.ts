@@ -8,6 +8,8 @@ import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { Session as WireSession } from "../../protocol/Session";
 import type { Command } from "../../protocol/Command";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
+import type { ControlProjectionMessage } from "../../protocol/ControlProjectionMessage";
+import type { ControlProjectionSnapshot } from "../../protocol/ControlProjectionSnapshot";
 import { createApiAdapter, mapSession, type ApiSocket } from ".";
 
 const machine: WireMachine = {
@@ -94,7 +96,9 @@ class FakeAuthServer {
   /** Machines whose Session list also carries a row stamped with another Machine ID. */
   readonly foreignSessionMachines = new Set<string>();
   readonly revokedMachines: string[] = [];
+  readonly paths: string[] = [];
   registryMachines: RegistryMachine[] = [];
+  projectionSnapshot: ControlProjectionSnapshot | null = null;
 
   constructor(password: string | null) {
     this.password = password;
@@ -102,6 +106,7 @@ class FakeAuthServer {
 
   fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input), "http://daemon.test");
+    this.paths.push(url.pathname);
     const request = init ?? {};
     if (url.pathname === "/api/v1/auth/status") {
       return json({ setup_required: this.password === null });
@@ -123,6 +128,9 @@ class FakeAuthServer {
     }
     if (!this.browserAuthenticated) {
       return failure("INVALID_SESSION", "invalid or expired browser session", 401);
+    }
+    if (url.pathname === "/api/v1/control/snapshot") {
+      return this.projectionSnapshot === null ? new Response(null, { status: 404 }) : json(this.projectionSnapshot);
     }
     if (url.pathname === "/api/v1/auth/browser/session") {
       return json({ expires_at: 1_790_086_400_000 });
@@ -347,6 +355,10 @@ class FakeSocket implements ApiSocket {
       }),
     );
   }
+
+  project(message: ControlProjectionMessage) {
+    this.onmessage?.(new MessageEvent("message", { data: JSON.stringify(message) }));
+  }
 }
 
 function body(request: RequestInit): Record<string, unknown> {
@@ -402,6 +414,57 @@ function workerRegistry(machineId = "worker-machine"): RegistryMachine {
   };
 }
 
+function controlProjection(): ControlProjectionSnapshot {
+  return {
+    schema_version: 1,
+    control_machine_id: "test-machine",
+    view_revision: 8,
+    generated_at: 1_700_000_002_000,
+    machines: ["test-machine", "worker-machine"].map((machineId) => ({
+      machine_id: machineId,
+      display_name: machineId === "test-machine" ? "Control" : "Worker",
+      os: machineId === "test-machine" ? "MACOS" : "LINUX",
+      daemon_version: "0.4.1",
+      capabilities: ["SESSIONS", "EVENTS", "METRICS"],
+      registry_status: "ONLINE",
+      freshness: "LIVE",
+      last_seen: 1_700_000_001_000,
+      observed_at: 1_700_000_001_000,
+      synced_at: 1_700_000_001_000,
+      source_cursor: 20,
+      sessions: [{
+        id: 1,
+        continued_from: null,
+        title: `${machineId} Session`,
+        state: "RUNNING",
+        origin: "WATCH",
+        capture: "FULL",
+        capabilities: {
+          can_attach: true,
+          can_send_input: true,
+          can_resize: true,
+          can_kill_daemon_pty: true,
+          exposes_commands: true,
+          exposes_terminal_output: true,
+          exposes_log_output: false,
+          exposes_metrics: true,
+        },
+        health: null,
+        created_at: 1_700_000_000_000,
+        updated_at: 1_700_000_001_000,
+        finished_at: null,
+        exit_code: null,
+      }],
+      events: [],
+      metrics: [],
+      omitted_sessions: 0,
+    })),
+    omitted_machines: 0,
+    omitted_sessions: 0,
+    truncated: false,
+  };
+}
+
 describe("apiAdapter authentication", () => {
   it("bootstraps the single owner without exposing a browser credential to storage", async () => {
     const { adapter, storage } = setup(null);
@@ -439,6 +502,62 @@ describe("apiAdapter authentication", () => {
     expect(sockets).toHaveLength(1);
   });
 
+  it("hydrates from one control snapshot and one live stream with no worker or Event query", async () => {
+    const { adapter, server, sockets } = setup();
+    server.projectionSnapshot = controlProjection();
+    await adapter.auth.login("correct horse battery staple");
+
+    const [machines, sessions] = await Promise.all([adapter.getMachines(), adapter.getSessions()]);
+
+    expect(machines.map((entry) => entry.id)).toEqual(["test-machine", "worker-machine"]);
+    expect(sessions.map((entry) => entry.id)).toEqual(["test-machine:1", "worker-machine:1"]);
+    expect(server.paths.filter((path) => path === "/api/v1/control/snapshot")).toHaveLength(1);
+    expect(sockets).toHaveLength(1);
+    expect(new URL(sockets[0].url).pathname).toBe("/api/v1/control/live");
+    expect(new URL(sockets[0].url).searchParams.get("after")).toBe("8");
+    expect(sockets.flatMap((socket) => socket.requests)).toEqual([]);
+  });
+
+  it("applies the control live delta without opening a worker socket", async () => {
+    const { adapter, server, sockets } = setup();
+    server.projectionSnapshot = controlProjection();
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getSessions();
+    const live: import("../adapter").LiveEvent[] = [];
+    const unsubscribe = adapter.subscribe((event) => live.push(event));
+    await Promise.resolve();
+
+    sockets[0].project({
+      type: "PROJECTION_DELTA",
+      machine_id: "worker-machine",
+      from_revision: 8,
+      to_revision: 9,
+      changes: [{
+        type: "METRICS_REPLACE",
+        cursor: 21,
+        metrics: {
+          scope: "SESSION",
+          session_id: 1,
+          at: 1_700_000_003_000,
+          cpu_percent: 72,
+          ram_used_bytes: 2_147_483_648,
+          ram_total_bytes: null,
+          gpu_percent: null,
+          vram_used_bytes: null,
+          vram_total_bytes: null,
+        },
+      }],
+    });
+
+    expect(live).toContainEqual(expect.objectContaining({
+      type: "SESSION_METRICS",
+      sessionId: "worker-machine:1",
+      metrics: expect.objectContaining({ cpuPct: 72, ramGB: 2 }),
+    }));
+    expect(sockets).toHaveLength(1);
+    unsubscribe();
+  });
+
   it("maps the watcher's training summary onto the Session", () => {
     const mapped = mapSession({
       ...session,
@@ -454,28 +573,22 @@ describe("apiAdapter authentication", () => {
     expect(mapped.metrics).toBeUndefined();
   });
 
-  it("loads persisted watcher Events and deterministic Health without parsing terminal text", async () => {
+  it("loads deterministic Health without replaying every Session Event", async () => {
     const { adapter, sockets } = setup();
     await adapter.auth.login("correct horse battery staple");
 
     await expect(adapter.getSessions()).resolves.toEqual([
       expect.objectContaining({
-        progress: { current: 7, total: 10, unit: "epoch" },
         health: expect.objectContaining({
           progress: "70%",
           activity: "GOOD",
           overall: "HEALTHY",
           evidence: ["progress reached 70.0%"],
         }),
-        events: [expect.arrayContaining(["PROGRESS_UPDATED", "epoch 7/10"])],
+        events: [],
       }),
     ]);
-    expect(sockets[0].requests).toContainEqual({
-      type: "GET_EVENTS",
-      session_id: 1,
-      after: null,
-      limit: 500,
-    });
+    expect(sockets[0].requests.some((request) => request.type === "GET_EVENTS")).toBe(false);
   });
 
   it("returns remaining attempts for an invalid password", async () => {
