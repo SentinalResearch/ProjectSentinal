@@ -8,10 +8,10 @@ mod runtime;
 use config::ConfigSnapshot;
 use presentation::Presentation;
 use protocol::{
-    CaptureLevel, Event, EventKind, MachineId, NotificationConfigurationState,
-    NotificationDeliveryState, NotificationFacts, NotificationIntent, NotificationJournalEntry,
-    NotificationRuleSet, NotificationRules, NotificationStatus, SessionId, SessionNotificationRule,
-    Timestamp,
+    CaptureLevel, Event, EventKind, MachineId, NotificationCategory,
+    NotificationConfigurationState, NotificationDeliveryState, NotificationFacts,
+    NotificationIntent, NotificationJournalEntry, NotificationRuleSet, NotificationRules,
+    NotificationStatus, SessionId, SessionNotificationRule, SessionOrigin, Timestamp,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -273,6 +273,18 @@ impl NotificationService {
         let Some(category) = presentation::category(&event.kind) else {
             return Ok(false);
         };
+        let session_row = self
+            .store
+            .session(event.session_id)
+            .map_err(|error| error.to_string())?;
+        if let EventKind::CommandFinished { duration_ms, .. } = &event.kind {
+            if !finish_notifies(
+                session_row.as_ref().map(|session| session.origin),
+                duration_ms.0,
+            ) {
+                return Ok(false);
+            }
+        }
         let enabled = self
             .rules
             .read()
@@ -290,10 +302,7 @@ impl NotificationService {
             .read()
             .map(|value| value.state == NotificationConfigurationState::Configured)
             .unwrap_or(false);
-        let session_label = self
-            .store
-            .session(event.session_id)
-            .map_err(|error| error.to_string())?
+        let session_label = session_row
             .and_then(|session| session.title)
             .and_then(safe_session_label);
         let intent = notification_intent(&self.machine_id, event, session_label)?;
@@ -488,6 +497,21 @@ fn category_enabled(rules: NotificationRuleSet, kind: &EventKind) -> bool {
 }
 
 pub use runtime::{spawn_notification_workers, spawn_notifier};
+
+/// A finished Command is notification-worthy for a `sentinal watch` Session
+/// (its one defining Command is the job) or, in any other Session (a shell,
+/// hooked terminal, or auto-wrapped shell running many Commands), only when it
+/// ran at least `LONG_COMMAND_MS`, so typing `ls` never notifies but a long
+/// build still does. An unknown Session keeps notifying.
+pub(crate) fn finish_notifies(origin: Option<SessionOrigin>, duration_ms: u64) -> bool {
+    match origin {
+        Some(SessionOrigin::Watch) | None => true,
+        Some(_) => duration_ms >= LONG_COMMAND_MS,
+    }
+}
+
+/// Minimum run time for a non-Watch Command to notify when it finishes.
+pub(crate) const LONG_COMMAND_MS: u64 = 60_000;
 
 #[cfg(test)]
 mod tests;

@@ -134,7 +134,26 @@ fn missing_config_is_unavailable_and_symlink_is_invalid() {
 async fn exact_safe_request_uses_structured_event_and_click() {
     let root = private_root("request");
     write_config(&root, "http://127.0.0.1:2586", Some("private-token"));
-    let store = store_with_session();
+    // CommandFinished only maps to Completed/Failed for a `sentinal watch`
+    // Session (one defining Command) — see notifications.rs::enqueue. An
+    // ordinary (default-origin) Session runs many Commands, so this exact
+    // request-shape test needs a Watch-origin Session to legitimately notify;
+    // built inline (not store_with_session(), shared by tests that don't care
+    // about origin) so only this test's precondition changes.
+    let store = Arc::new(Store::open_in_memory().unwrap());
+    let mut session = Session::new(
+        SessionId(7),
+        MachineId("machine-a".into()),
+        "/bin/sh",
+        "/work",
+        Timestamp(1),
+    );
+    session.title = Some("Training".into());
+    session.origin = SessionOrigin::Watch;
+    session
+        .transition(SessionState::Idle, Timestamp(2))
+        .unwrap();
+    store.insert_session(&session).unwrap();
     let finished = event(
         1,
         EventKind::CommandFinished {
@@ -385,4 +404,26 @@ fn config_parent_and_file_are_owned_by_the_test_user() {
         fs::metadata(&path).unwrap().uid()
     );
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn only_watch_jobs_and_long_commands_notify_when_they_finish() {
+    use super::{finish_notifies, LONG_COMMAND_MS};
+    assert!(finish_notifies(Some(SessionOrigin::Watch), 5));
+    assert!(finish_notifies(None, 5));
+    for origin in [
+        SessionOrigin::Ui,
+        SessionOrigin::ShellHook,
+        SessionOrigin::AutoWrap,
+    ] {
+        assert!(
+            !finish_notifies(Some(origin), 2_000),
+            "{origin:?}: `ls` must not notify"
+        );
+        assert!(!finish_notifies(Some(origin), LONG_COMMAND_MS - 1));
+        assert!(
+            finish_notifies(Some(origin), LONG_COMMAND_MS),
+            "{origin:?}: a long build notifies"
+        );
+    }
 }

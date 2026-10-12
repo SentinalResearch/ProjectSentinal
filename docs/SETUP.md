@@ -463,7 +463,10 @@ demo executable and training checkpoint use the private runtime directory.
 Checkpoint and progress rules are off by default and must be enabled for that
 Session when those categories are under test.
 
-Detach with `Ctrl+J` after starting the waiting test. The stored structured
+Detach with `Ctrl+J` after starting the waiting test. A finished Command notifies
+for a `sentinal watch` job, and in any other Session (a dashboard shell, a
+hooked terminal, or an auto-wrapped shell) only when it ran at least 60 s,
+so short commands such as `ls` never notify. The stored structured
 Event drives delivery; notification text never copies the terminal line or
 Command. Retriable timeout/connection/`429`/`5xx` results use four total
 attempts with bounded backoff and survive daemon restart in SQLite. Permanent

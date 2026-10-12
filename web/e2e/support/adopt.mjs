@@ -109,11 +109,15 @@ export function reportCommand(socket, title, exitCode = 0) {
     SENTINAL_HOOK_TEXT: "printf structured-notification-test",
     SENTINAL_TITLE: title,
   };
-  execFileSync(binary, [...common, "start", "--pid", String(pid), "--shell", "/bin/sh", "--seq", sequence], {
+  // A finished Command in a hooked shell notifies only after a long run
+  // (60 s, notifications.rs::finish_notifies); report one that ran 2 minutes.
+  const finishedAt = Date.now() / 1000;
+  const startedAt = (finishedAt - 120).toFixed(6);
+  execFileSync(binary, [...common, "start", "--pid", String(pid), "--shell", "/bin/sh", "--seq", sequence, "--at", startedAt], {
     env: environment,
     stdio: "ignore",
   });
-  execFileSync(binary, [...common, "finish", "--pid", String(pid), "--shell", "/bin/sh", "--seq", sequence, "--exit", String(exitCode)], {
+  execFileSync(binary, [...common, "finish", "--pid", String(pid), "--shell", "/bin/sh", "--seq", sequence, "--exit", String(exitCode), "--at", finishedAt.toFixed(6)], {
     env: environment,
     stdio: "ignore",
   });
