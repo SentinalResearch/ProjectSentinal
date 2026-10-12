@@ -5,6 +5,7 @@ import { RegistryError } from "../../data/adapter";
 import { useLiveData } from "../../data/LiveDataContext";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import { AddMachineDialog } from "./AddMachineDialog";
+import { ControlReleaseCard } from "./ControlReleaseCard";
 import { useIsPhone } from "../../hooks/useViewport";
 import { PhoneMachineCards } from "./phone/PhoneMachineCards";
 import styles from "./SettingsPage.module.css";
@@ -62,6 +63,8 @@ export function MachinesTab({ pollMs }: MachinesTabProps) {
           Add Machine
         </button>
       </header>
+
+      <ControlReleaseCard />
 
       {load.kind === "error" ? (
         <p className={styles.tabLoading} role="alert">

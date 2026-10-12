@@ -1,0 +1,154 @@
+/* The control's own release (4.E §11b). Square, Swiss: no radius. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--bg-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.overline {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.version {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.offerText {
+  flex: 1 1 220px;
+  font-size: 14px;
+}
+
+.link {
+  color: var(--accent-fg);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.primary,
+.secondary,
+.primaryWide,
+.secondaryWide {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.primary,
+.primaryWide {
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.secondary,
+.secondaryWide {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+}
+
+.primaryWide,
+.secondaryWide {
+  width: 100%;
+  min-height: 52px;
+  font-size: 16px;
+}
+
+.primary:disabled,
+.secondary:disabled,
+.segment:disabled {
+  opacity: 0.55;
+}
+
+.status,
+.muted,
+.warning,
+.problem,
+.sheetText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.status {
+  color: var(--text-1);
+}
+
+.muted {
+  color: var(--text-3);
+}
+
+.warning {
+  color: var(--s-waiting-fg);
+}
+
+.problem {
+  color: var(--s-failed-fg);
+}
+
+.sheetText {
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.segmented {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  border: 1px solid var(--line-strong);
+}
+
+.segment {
+  min-height: 40px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.segment[aria-checked="true"] {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
