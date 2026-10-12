@@ -57,4 +57,15 @@ describe("B2 · phone Overview", () => {
     const card = await screen.findByRole("article", { name: /Tailed fine-tune/ }, { timeout: 5000 });
     expect(within(card).queryByRole("button", { name: "y" })).not.toBeInTheDocument();
   });
+
+  it("filters to the Sessions that need you from the top bar's count, with a way back to all", async () => {
+    renderAt("/app/overview?needs=1", routes);
+    const needs = await screen.findByRole("region", { name: "Needs you" }, { timeout: 5000 });
+    const count = within(needs).getAllByRole("article").length;
+    expect(screen.queryByRole("region", { name: "RTX-PC" })).not.toBeInTheDocument();
+    const chips = screen.getByRole("group", { name: "Machines" });
+    expect(within(chips).getByRole("button", { name: `Needs you ${count}` })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.setup().click(within(chips).getByRole("button", { name: "All" }));
+    expect(await screen.findByRole("region", { name: "RTX-PC" })).toBeInTheDocument();
+  });
 });

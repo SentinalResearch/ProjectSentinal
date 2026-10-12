@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -37,6 +37,49 @@ describe("SessionDetailPage", () => {
     expect(screen.getByText("LOSS")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Live resources" })).toBeInTheDocument();
     expect(screen.getByTestId("terminal-host")).toBeInTheDocument();
+  });
+
+  it("puts the terminal in the left half and every detail in the right half, in order", async () => {
+    renderSession("/app/sessions/qwen");
+    await screen.findByRole("heading", { name: "Qwen Training" });
+
+    const terminal = screen.getByRole("region", { name: "Terminal" });
+    const details = screen.getByRole("region", { name: "Session details" });
+    expect(terminal.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Left: header (label, machine · cwd, attach status), xterm, then the key bar.
+    expect(within(terminal).getByText("TERMINAL")).toBeInTheDocument();
+    expect(within(terminal).getByText(/^RTX-PC · /)).toBeInTheDocument();
+    expect(within(terminal).getByText(/attached|connecting…/)).toBeInTheDocument();
+    expect(within(terminal).getByTestId("terminal-host")).toBeInTheDocument();
+    expect(within(within(terminal).getByLabelText("Terminal keys")).getAllByRole("button").map((b) => b.textContent))
+      .toEqual(["Ctrl‑C", "Esc", "Tab", "↑", "↓"]);
+    expect(within(terminal).queryByRole("heading")).not.toBeInTheDocument();
+
+    // Right: breadcrumb, header, state block, health card, events — in that order.
+    const ordered = [
+      within(details).getByRole("navigation", { name: "Breadcrumb" }),
+      within(details).getByRole("heading", { name: "Qwen Training" }),
+      within(details).getByText("LOSS"),
+      within(details).getByText("HEALTH"),
+      within(details).getByText("Events"),
+    ];
+    for (let i = 1; i < ordered.length; i += 1) {
+      expect(ordered[i - 1].compareDocumentPosition(ordered[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(within(details).queryByTestId("terminal-host")).not.toBeInTheDocument();
+  });
+
+  it("asks before the key bar's Ctrl-C sends anything", async () => {
+    renderSession("/app/sessions/qwen");
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "Qwen Training" });
+
+    const keys = within(screen.getByRole("region", { name: "Terminal" })).getByLabelText("Terminal keys");
+    await user.click(within(keys).getByRole("button", { name: "Ctrl‑C" }));
+    expect(await screen.findByText("Send Ctrl‑C to Qwen Training?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getAllByText("RUNNING").length).toBeGreaterThan(0);
   });
 
   it("opens and cancels the Ctrl-C confirm dialog without sending anything", async () => {

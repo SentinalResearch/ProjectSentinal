@@ -289,10 +289,10 @@ apply or roll it back from the exact Machine without exposing credentials.
 
 ## Milestone 4.F — Mobile web experience
 - [x] Approve the screen inventory, breakpoint, navigation, data-gap, sheet, and phone-terminal plan
-- [x] Phone shell below 768 px: bottom tab bar, back bars, safe areas; desktop unchanged
+- [x] Phone shell below 768 px: top bar, title switcher Menu (N1) and Search (N2), back bars with edge swipe, safe areas; desktop unchanged
 - [x] Notification path: Overview, Session detail, Waiting, Opened-from-failure, Terminal + key bar, Ctrl-C sheet
 - [x] Lists: Terminals stack, History + filters sheet, Recipes, Run Recipe
-- [x] More: Machines, Notifications chips, Account, Theme; public Landing, Features, Sign in
+- [x] Settings (formerly More): Machines, Projects, Notifications chips, Account, Theme; public Landing, Features, Sign in
 - [x] Production Playwright at 390×844, 320×568, and landscape with per-screen screenshots
 - [ ] Record real-iPhone acceptance of every screen and the push → exact Session path
 

@@ -1,0 +1,226 @@
+/* N1 Menu / N2 Search (MOBILE_SPEC.md → Navigation). Square, no radius. */
+
+.menu {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+  background: var(--bg-0);
+  color: var(--text-1);
+}
+
+.head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 8px 0 20px;
+}
+
+.wordmark {
+  flex: 1;
+  padding-left: 10px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.close {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 20px;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 8px 20px calc(24px + var(--safe-bottom));
+}
+
+.search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 14px;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.searchGlyph {
+  display: flex;
+  color: var(--text-3);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 16px;
+  -webkit-appearance: none;
+}
+
+.search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.search input::placeholder {
+  color: var(--text-3);
+}
+
+.pages {
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-1);
+  text-decoration: none;
+}
+
+.pageMark {
+  flex: none;
+  width: 4px;
+  height: 28px;
+}
+
+.page[aria-current="page"] .pageMark {
+  background: var(--accent);
+}
+
+.pageLabel {
+  flex: 1;
+  font-size: 26px;
+  line-height: 28px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.pageMeta {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--text-1);
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  margin-right: -20px;
+  padding: 10px 20px 2px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-1);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  box-shadow: inset 0 0 0 1.5px var(--s-disconnected-fg);
+}
+
+.dot[data-online="true"] {
+  background: var(--s-running);
+  box-shadow: none;
+}
+
+.results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-1);
+  text-decoration: none;
+}
+
+.resultText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.resultTitle {
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultDetail {
+  overflow: hidden;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  font-size: 20px;
+  color: var(--text-3);
+}
+
+.empty {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.page:active,
+.result:active,
+.chip:active {
+  background: var(--bg-2);
+}

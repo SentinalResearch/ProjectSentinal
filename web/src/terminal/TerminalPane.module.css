@@ -12,7 +12,12 @@
 
 .host :global(.xterm) {
   height: 100%;
-  padding: 10px 12px;
+  padding: var(--term-padding, 10px 12px);
+}
+
+/* xterm.css paints its viewport #000 under the padding; keep one terminal colour. */
+.host :global(.xterm .xterm-viewport) {
+  background-color: var(--term-bg);
 }
 
 .keyBar {
@@ -24,7 +29,7 @@
 
 .key {
   flex: 1;
-  height: 36px;
+  height: var(--term-key-height, 36px);
   border: 0;
   background: var(--bg-1);
   color: var(--text-1);
@@ -33,18 +38,18 @@
 }
 
 .key:hover {
-  background: var(--bg-2);
+  background: var(--term-key-hover, var(--bg-2));
 }
 
 .ctrlC {
   flex: 1.3;
-  background: var(--s-failed);
-  color: var(--ink);
+  background: var(--term-interrupt-bg, var(--s-failed));
+  color: var(--term-interrupt-fg, var(--ink));
   font-weight: 700;
 }
 
 .ctrlC:hover {
-  background: var(--s-failed);
+  background: var(--term-interrupt-bg, var(--s-failed));
 }
 
 .replayWarning {

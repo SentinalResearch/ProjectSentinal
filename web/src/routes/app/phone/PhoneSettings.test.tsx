@@ -6,11 +6,11 @@ import { dataAdapter } from "../../../data";
 import { resetSimulation } from "../../../data/mock/simulation";
 import { resetViewport, setViewport } from "../../../test-viewport";
 import { SettingsPage } from "../SettingsPage";
-import { MoreRoute } from "./MorePage";
+import { MoreRedirect } from "./SettingsHome";
 import { renderAt } from "./harness";
 
 const routes = [
-  { path: "more", element: <MoreRoute /> },
+  { path: "more", element: <MoreRedirect /> },
   { path: "settings", element: <SettingsPage /> },
   { path: "settings/:tab", element: <SettingsPage /> },
 ];
@@ -25,16 +25,16 @@ describe("E2–E4 · phone settings", () => {
     vi.restoreAllMocks();
   });
 
-  it("sends bare Settings to More and gives every Settings screen a back bar to More", async () => {
+  it("shows Settings at /app/settings and gives every Settings screen a back bar to Settings", async () => {
     renderAt("/app/settings", routes);
-    expect(await screen.findByRole("heading", { name: "More" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Settings" }, { timeout: 5000 })).toBeInTheDocument();
   });
 
   it("E3: toggles per-Session rules with wrapping chips and rolls back a refusal", async () => {
     const setRule = vi.spyOn(dataAdapter.notifications, "setRule").mockRejectedValueOnce(new Error("Machine offline"));
     renderAt("/app/settings/notifications", routes);
     const user = userEvent.setup();
-    expect(await screen.findByRole("button", { name: "‹ More" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "‹ Settings" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Enable notifications on this device" })).toBeInTheDocument();
     const row = await screen.findByRole("group", { name: "Qwen Training on RTX-PC" }, { timeout: 5000 });
     expect(within(row).getAllByRole("button").map((chip) => chip.textContent)).toEqual([
@@ -66,7 +66,7 @@ describe("E2–E4 · phone settings", () => {
 
   it("E4: password change and sign-out on this browser", async () => {
     renderAt("/app/settings/account", routes);
-    expect(await screen.findByRole("button", { name: "‹ More" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "‹ Settings" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Account" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Current password/i)).toBeInTheDocument();
   });

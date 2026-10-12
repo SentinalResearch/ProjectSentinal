@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   height: 100dvh;
+  padding-top: var(--safe-top);
   background: var(--bg-0);
   color: var(--text-1);
   font-variant-numeric: tabular-nums;
@@ -14,41 +15,61 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-top: var(--safe-top);
   -webkit-overflow-scrolling: touch;
 }
 
-.tabBar {
+/* Top bar on top-level screens: logo · needs-you count · search. No tab bar. */
+.topBar {
   flex: none;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  height: calc(49px + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
-  border-top: 1px solid var(--line);
-  background: var(--bg-0);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 48px;
+  padding: 0 8px 0 20px;
 }
 
-.tab {
+.topLogo {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
   min-height: 44px;
-  color: var(--text-3);
-  font-size: 11px;
-  font-weight: 600;
+  color: var(--text-1);
+}
+
+.topSpacer {
+  flex: 1;
+}
+
+.needsBadge {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 10px;
   text-decoration: none;
 }
 
-.tab[aria-current="page"] {
-  color: var(--accent-fg);
+.needsCount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 5px;
+  background: #ffd000;
+  color: #0a0a0a;
+  font-size: 11px;
   font-weight: 800;
 }
 
-.tabGlyph {
-  font-size: 18px;
-  line-height: 20px;
+.topIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 20px;
 }
 
 .backBar {
@@ -73,7 +94,7 @@
   display: flex;
   flex-direction: column;
   gap: 28px;
-  padding: 12px 20px 32px;
+  padding: 12px 20px calc(32px + var(--safe-bottom));
 }
 
 .pageTitle {
@@ -82,6 +103,26 @@
   line-height: 36px;
   font-weight: 800;
   letter-spacing: -0.04em;
+}
+
+/* The page title is the switcher: "Overview ▾" opens the Menu. */
+.titleSwitcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+}
+
+.titleCaret {
+  font-size: 20px;
+  color: var(--text-3);
 }
 
 .sectionHead {

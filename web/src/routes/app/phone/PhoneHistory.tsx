@@ -9,6 +9,7 @@ import type { HistoryEntry } from "../../../data/types";
 import { DATE_BUCKETS, historyRowState, RESULT_LABEL, RESULTS, useHistoryQuery } from "../useHistoryQuery";
 import shell from "./phone.module.css";
 import styles from "./phoneLists.module.css";
+import { PageTitle } from "./PageTitle";
 
 /** D1 · History on phones, with the D2 filters sheet. */
 export function PhoneHistory() {
@@ -37,7 +38,7 @@ export function PhoneHistory() {
 
   return (
     <div className={shell.page}>
-      <h1 className={shell.pageTitle}>History</h1>
+      <PageTitle>History</PageTitle>
       <input
         type="search"
         aria-label="Search commands"

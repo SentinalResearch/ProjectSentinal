@@ -1,9 +1,55 @@
 .page {
-  max-width: 1320px;
   padding: 28px 48px 64px;
+}
+
+/* Desktop Session page: the terminal is the left half and stays put while the
+   details on the right scroll inside the app's main area (the scroll
+   container). A grid, never flex-wrap: a wrapped sticky full-height terminal
+   would cover the content below it. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  min-height: 100vh;
+}
+
+.terminalColumn {
+  /* Terminal chrome is identical in both themes so program colours read
+     correctly; descendants (key bar, history notes) use these values. */
+  --bg-1: #161616;
+  --bg-2: #161616;
+  --bg-3: #1c1c1c;
+  --text-1: #f2f2f0;
+  --text-2: #b8b8b4;
+  --text-3: #8a8a86;
+  --line: #262626;
+  --term-padding: 16px 20px;
+  --term-key-height: 44px;
+  --term-key-hover: #262626;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--term-bg);
+  color: var(--term-fg);
+  border-right: 1px solid var(--line);
+}
+
+.details {
+  min-width: 0;
+  padding: 28px clamp(20px, 3vw, 40px) 64px;
   display: flex;
   flex-direction: column;
   gap: 28px;
+}
+
+.reducedBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
 }
 
 .breadcrumb {
@@ -41,8 +87,8 @@
 }
 
 .headerText {
-  flex: 1;
-  min-width: 320px;
+  flex: 1 1 280px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -56,8 +102,8 @@
 }
 
 .title {
-  font-size: 40px;
-  line-height: 42px;
+  font-size: 34px;
+  line-height: 38px;
   font-weight: 800;
   letter-spacing: -0.035em;
 }
@@ -155,39 +201,29 @@
   font-size: 13px;
 }
 
-.body {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
-  align-items: flex-start;
-}
-
-.terminalSection {
-  flex: 2 1 520px;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .terminalHeader {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 40px;
-  padding: 0 12px;
-  background: var(--bg-2);
+  height: 48px;
+  padding: 0 16px;
+  background: #111111;
+  border-bottom: 1px solid #262626;
 }
 
 .terminalLabel {
+  flex: none;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
+  color: var(--text-1);
 }
 
 .terminalPath {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--text-3);
+  color: #8a8a86;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -200,7 +236,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--text-3);
+  color: #8a8a86;
   flex: none;
 }
 
@@ -210,60 +246,11 @@
   flex: none;
 }
 
-.side {
-  flex: 1 1 320px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-
 .notFound {
   padding: 48px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-@media (max-width: 640px) {
-  .page {
-    padding: 16px 16px 40px;
-    gap: 20px;
-  }
-
-  .title {
-    font-size: 32px;
-    line-height: 34px;
-    letter-spacing: -0.03em;
-  }
-
-  .header {
-    padding-bottom: 16px;
-  }
-
-  .actions {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .splitButton,
-  .ctrlCButton,
-  .continueButton {
-    height: 44px;
-    flex: 1 1 auto;
-  }
-
-  .body {
-    gap: 24px;
-  }
-
-  .terminalSection {
-    flex-basis: 100%;
-  }
-
-  .side {
-    flex-basis: 100%;
-  }
 }
 
 .logHint {
@@ -289,9 +276,28 @@
 }
 
 .history {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+}
+
+.historyStack {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.fillPane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .generationNav {
@@ -323,6 +329,21 @@
   gap: 8px;
 }
 
+.generationPrimary {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+.generationPrimary .generationBoundary,
+.generationPrimary .generationHeader {
+  margin: 8px 20px 0;
+}
+
+.generationPrimary .generationHeader {
+  margin-bottom: 8px;
+}
+
 .generationBoundary,
 .historyOmitted {
   margin: 0;
@@ -349,6 +370,8 @@
 }
 
 .generationHeader strong {
+  flex: none;
+  white-space: nowrap;
   color: var(--text-1);
 }
 

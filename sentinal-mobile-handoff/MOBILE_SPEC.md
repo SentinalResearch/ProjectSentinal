@@ -4,7 +4,7 @@ Reference design: `Sentinal Mobile.dc.html` (open via a local server, e.g. `npx 
 
 ## Breakpoint
 - `< 768px` → mobile layout below. `≥ 768px` → the existing desktop layout (sidebar).
-- Never shrink the desktop sidebar into an icon rail on phones. Replace it with the bottom tab bar.
+- Never shrink the desktop sidebar into an icon rail on phones. Replace it with the top bar + menu described below.
 
 ## Tokens (CSS variables)
 | token | light | dark |
@@ -43,8 +43,12 @@ Terminal surface is always #0C0C0C with text #D4D4D0, in both themes.
 - Horizontal chip rows (machines, history filters) scroll sideways; they don't wrap.
 
 ## Navigation
-Bottom tab bar, 83px (49 + safe area), top 1px --line border, 5 equal columns: Overview ▦ · Terminals ❐ · History ↺ · Recipes ≡ · More ⋯. Active tab: --accent-fg, weight 800. Others --text-3.
-Detail screens get a 44px nav bar with a "‹ Parent" back link in --accent-fg and an optional ⋯ menu.
+No bottom tab bar.
+- **Top bar (48px)** on top-level screens: logo (left), needs-you count (yellow, opens Overview filtered), search ⌕ (right).
+- **The page title is the switcher:** "Overview ▾". Tapping it or ⌕ opens the **Menu** (N1): full-screen, search field focused, large page list (Overview, Terminals, History, Recipes, Settings) with the current page marked by a 4px accent bar, then machine and project chips. ✕ closes.
+- **Search (N2):** typing filters across sessions, recipes and history, grouped by type.
+- **Detail screens:** 44px nav bar with "‹ Parent" back link in --accent-fg; swipe from the left edge also goes back.
+- The former "More" screen is now **Settings** (reached from the menu).
 
 ## Screens
 - **A1 Landing (public):** 56px header (logo, theme icon, "Sign in" text button); left-aligned hero 46/44 headline; buttons stacked full width (Sign in = accent, Set up this server = outline); small native "needs you" preview list, not a scaled desktop mock.
@@ -61,7 +65,8 @@ Detail screens get a 44px nav bar with a "‹ Parent" back link in --accent-fg a
 - **D2 Filters sheet:** Machine / Project / Result / Date chip groups that wrap; Reset; "Show N results".
 - **D3 Recipes:** grouped by category; rows = name, mono template (ellipsis), machine · parameter count, chevron.
 - **D4 Run recipe:** parameter fields (mono, "default" hint), 3-way target machine segmented control (offline machines disabled), command preview, sticky "Run on <machine>".
-- **E1 More:** Machines (status), Projects, Settings rows, Theme segmented (Light / Dark / Auto), user + Sign out (destructive text).
+- **N1 Menu / N2 Search:** see Navigation.
+- **E1 Settings:** Machines (status), Projects, Settings rows, Theme segmented (Light / Dark / Auto), user + Sign out (destructive text).
 - **E2 Machines & tokens:** Pair a machine button; machine cards with name, role tag (CONTROL / WORKER), hardware, status, "Revoke token" (destructive, confirm).
 - **E3 Notifications:** device push toggle card; per-session rows with wrap-around toggle chips (Finished, Error, Stalled, Checkpoint, Progress). Replaces the desktop checkbox table on phones.
 - **E4 Account:** change password, signed-in browsers with Sign out.

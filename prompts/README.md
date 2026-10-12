@@ -35,7 +35,7 @@ model) to build the whole system, one milestone at a time.
 | 4.D | `05d-milestone-4d-native-push-gateway.md` | Control-owned Web Push now, provider boundary for future native apps |
 | 4.D.1 | `05d1-milestone-4d1-incremental-control-read-model.md` | Incremental aggregation and bounded durable control read model |
 | 4.E | `05e-milestone-4e-v1-install-discovery-private-pilot.md` | Normal-person install, Tailnet discovery, approval pairing, private cloud pilot |
-| 4.F | `05f-milestone-4f-mobile-web.md` | Mobile web experience from `sentinal-mobile-handoff/`: tab bar, phone screens, terminal, sheets |
+| 4.F | `05f-milestone-4f-mobile-web.md` | Mobile web experience from `sentinal-mobile-handoff/`: top bar, title switcher menu and search, phone screens, terminal, sheets |
 | 5 | `06-milestone-5-projects-autocomplete.md` | Projects, command library, autocomplete |
 | 6 | `07-milestone-6-intelligence-foundation.md` | Agent tool API, datasets, evals, baselines |
 | 7 | `08-milestone-7-finetune-agent.md` | Fine-tuned small model, heartbeat, journal (**V2**) |

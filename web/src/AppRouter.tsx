@@ -11,7 +11,7 @@ import { HistoryPage } from "./routes/app/HistoryPage";
 import { RecipesPage } from "./routes/app/RecipesPage";
 import { SettingsPage } from "./routes/app/SettingsPage";
 import { LandingPage } from "./routes/landing/LandingPage";
-import { MoreRoute } from "./routes/app/phone/MorePage";
+import { MoreRedirect } from "./routes/app/phone/SettingsHome";
 import { SessionTerminalRoute } from "./routes/app/phone/PhoneTerminal";
 import { PublicAuthGuard, RequireAuth } from "./routes/guards";
 
@@ -37,7 +37,7 @@ export function AppRouter() {
             <Route path="history" element={<HistoryPage />} />
             <Route path="recipes" element={<RecipesPage />} />
             <Route path="recipes/:id" element={<RecipesPage />} />
-            <Route path="more" element={<MoreRoute />} />
+            <Route path="more" element={<MoreRedirect />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/:tab" element={<SettingsPage />} />
           </Route>

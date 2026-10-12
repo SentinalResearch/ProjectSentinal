@@ -9,6 +9,7 @@ import { usePeekLines } from "../../../terminal/peek";
 import { isReadOnlyTerminalState } from "../../../terminal/lifecycle";
 import shell from "./phone.module.css";
 import styles from "./phoneLists.module.css";
+import { PageTitle } from "./PageTitle";
 
 /** True while the element is on screen (always true where IntersectionObserver is missing). */
 function useOnScreen<T extends Element>(): [React.RefObject<T | null>, boolean] {
@@ -63,7 +64,7 @@ export function PhoneTerminals() {
     <div className={shell.page}>
       <header className={styles.headerRow}>
         <div>
-          <h1 className={shell.pageTitle}>Terminals</h1>
+          <PageTitle>Terminals</PageTitle>
           <span className={styles.subtitle}>{live.length} open · tap one to go full screen</span>
         </div>
         <button type="button" className={styles.plus} aria-label="New session" onClick={() => void newSession()}>

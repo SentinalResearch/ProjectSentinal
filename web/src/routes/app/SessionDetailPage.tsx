@@ -149,149 +149,153 @@ function DesktopSessionDetail() {
     }
   }
 
-  return (
-    <div className={styles.page}>
-      <nav className={styles.breadcrumb}>
-        <button
-          type="button"
-          className={styles.breadcrumbMachine}
-          onClick={() => navigate(`/app/overview?machine=${session.machine}`)}
-        >
-          {machineName}
-        </button>
-        <span>/</span>
-        <span className={styles.breadcrumbName}>{root.name}</span>
-      </nav>
+  const sectionLabel = SECTION_LABELS[capture];
 
-      <header className={styles.header}>
-        <div className={styles.headerText}>
-          <div className={styles.titleRow}>
-            <h1 className={styles.title}>{root.name}</h1>
-            <span className={styles.generationMarker}>
-              Generation {lineage.selectedIndex + 1} of {lineage.ordered.length}
-            </span>
-            <StateTag state={session.state} exitUnknown={unknownExit} />
-            <CaptureBadge capture={capture} origin={session.origin} />
-            {hasHealth && (
+  return (
+    <div className={styles.split}>
+      <section
+        className={styles.terminalColumn}
+        aria-label={sectionLabel.charAt(0) + sectionLabel.slice(1).toLowerCase()}
+      >
+        <div className={styles.terminalHeader}>
+          <span className={styles.terminalLabel}>{sectionLabel}</span>
+          <span className={`${styles.terminalPath} mono`}>
+            {machineName} · {session.cwd ?? "~"}
+          </span>
+          {capabilities.canAttach && !readOnly && (
+            <span className={styles.attachedIndicator}>
               <span
-                className={styles.healthOutline}
-                style={{ boxShadow: `inset 0 0 0 1.5px var(--s-${healthSlug}-fg)`, color: `var(--s-${healthSlug}-fg)` }}
-              >
-                {healthLabel}
-              </span>
-            )}
-            <MockBadge />
-          </div>
-          {session.command && <span className={styles.command}>{session.command}</span>}
-          <span className={styles.meta}>{meta}</span>
-          {capture !== "FULL" && (
-            <span className={styles.captureLine} role="note">
-              {captureExplanation(capture)}
+                className={styles.attachedDot}
+                style={{ background: attached ? "var(--s-running)" : "var(--s-disconnected-fg)" }}
+              />
+              {attached ? "attached" : "connecting…"}
             </span>
           )}
-          {hint && <span className={styles.logHint}>{hint}</span>}
         </div>
-        <div className={styles.actions}>
+        {capabilities.canAttach ? (
+          <SessionHistoryTerminals
+            lineage={lineage}
+            selectedId={session.id}
+            machineName={machineName}
+            onSelect={(sessionId) => navigate(`/app/sessions/${sessionId}`)}
+            onAttachedChange={setAttached}
+            onRequestInterrupt={askCtrlC}
+          />
+        ) : (
+          <div className={styles.reducedBody}>
+            <ReducedCapturePanel session={session} showSummary={false} />
+          </div>
+        )}
+      </section>
+
+      <section className={styles.details} aria-label="Session details">
+        <nav className={styles.breadcrumb} aria-label="Breadcrumb">
           <button
             type="button"
-            className={styles.splitButton}
-            onClick={() => navigate(`/app/split?focus=${session.id}`)}
+            className={styles.breadcrumbMachine}
+            onClick={() => navigate(`/app/overview?machine=${session.machine}`)}
           >
-            Open in split view
+            {machineName}
           </button>
-          {canInterrupt && (
-            <button type="button" className={styles.ctrlCButton} onClick={askCtrlC}>
-              Ctrl‑C…
-            </button>
-          )}
-          {canContinue && (
-            <button
-              type="button"
-              className={styles.continueButton}
-              disabled={continuing}
-              onClick={() => void continueInNewSession(latest)}
-            >
-              {continuing ? "Creating Session…" : "Continue in new Session"}
-            </button>
-          )}
-          {session.id !== latest.id && (
-            <button
-              type="button"
-              className={styles.continueButton}
-              onClick={() => navigate(`/app/sessions/${latest.id}`)}
-            >
-              View latest Session
-            </button>
-          )}
-        </div>
-      </header>
+          <span>/</span>
+          <span className={styles.breadcrumbName}>{root.name}</span>
+        </nav>
 
-      {canContinue && (
-        <div className={styles.endedBanner} role="status">
-          <strong>
-            Session ended — output saved · {" "}
-            {session.state}
-            {session.exitCode !== null && session.exitCode !== undefined
-              ? ` · exit code ${session.exitCode}`
-              : ""}
-            {" · saved with this Session; no server path is exposed"}
-          </strong>
-        </div>
-      )}
-      {lineageError && <p className={styles.continueError} role="alert">{lineageError}</p>}
-      {continueError && <p className={styles.continueError} role="alert">{continueError}</p>}
-
-      <SessionTopBlock
-        session={session}
-        kind={kind}
-        interrupted={interrupted}
-        lastCheckpoint={lastCheckpointPath(session)}
-        canSendInput={capabilities.canSendInput}
-        onAnswer={answerPrompt}
-        onRerun={rerun}
-        onShowOutput={() => {
-          /* the terminal is always visible below; nothing to scroll to on this layout */
-        }}
-      />
-      {capture !== "COMMANDS" && <SessionCommands sessionId={session.id} />}
-      {capture !== "PROCESS" && <ResourceBars metrics={session.metrics} />}
-
-      <div className={styles.body}>
-        <section className={styles.terminalSection}>
-          <div className={styles.terminalHeader}>
-            <span className={styles.terminalLabel}>{SECTION_LABELS[capture]}</span>
-            <span className={`${styles.terminalPath} mono`}>
-              {machineName} · {session.cwd ?? "~"}
-            </span>
-            {capabilities.canAttach && !readOnly && (
-              <span className={styles.attachedIndicator}>
+        <header className={styles.header}>
+          <div className={styles.headerText}>
+            <div className={styles.titleRow}>
+              <h1 className={styles.title}>{root.name}</h1>
+              <span className={styles.generationMarker}>
+                Generation {lineage.selectedIndex + 1} of {lineage.ordered.length}
+              </span>
+              <StateTag state={session.state} exitUnknown={unknownExit} />
+              <CaptureBadge capture={capture} origin={session.origin} />
+              {hasHealth && (
                 <span
-                  className={styles.attachedDot}
-                  style={{ background: attached ? "var(--s-running)" : "var(--s-disconnected-fg)" }}
-                />
-                {attached ? "attached" : "connecting…"}
+                  className={styles.healthOutline}
+                  style={{ boxShadow: `inset 0 0 0 1.5px var(--s-${healthSlug}-fg)`, color: `var(--s-${healthSlug}-fg)` }}
+                >
+                  {healthLabel}
+                </span>
+              )}
+              <MockBadge />
+            </div>
+            {session.command && <span className={styles.command}>{session.command}</span>}
+            <span className={styles.meta}>{meta}</span>
+            {capture !== "FULL" && (
+              <span className={styles.captureLine} role="note">
+                {captureExplanation(capture)}
               </span>
             )}
+            {hint && <span className={styles.logHint}>{hint}</span>}
           </div>
-          {capabilities.canAttach ? (
-            <SessionHistoryTerminals
-              lineage={lineage}
-              selectedId={session.id}
-              machineName={machineName}
-              onSelect={(sessionId) => navigate(`/app/sessions/${sessionId}`)}
-              onAttachedChange={setAttached}
-              onRequestInterrupt={askCtrlC}
-            />
-          ) : (
-            <ReducedCapturePanel session={session} showSummary={false} />
-          )}
-        </section>
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.splitButton}
+              onClick={() => navigate(`/app/split?focus=${session.id}`)}
+            >
+              Open in split view
+            </button>
+            {canInterrupt && (
+              <button type="button" className={styles.ctrlCButton} onClick={askCtrlC}>
+                Ctrl‑C…
+              </button>
+            )}
+            {canContinue && (
+              <button
+                type="button"
+                className={styles.continueButton}
+                disabled={continuing}
+                onClick={() => void continueInNewSession(latest)}
+              >
+                {continuing ? "Creating Session…" : "Continue in new Session"}
+              </button>
+            )}
+            {session.id !== latest.id && (
+              <button
+                type="button"
+                className={styles.continueButton}
+                onClick={() => navigate(`/app/sessions/${latest.id}`)}
+              >
+                View latest Session
+              </button>
+            )}
+          </div>
+        </header>
 
-        <aside className={styles.side}>
-          {session.health && <HealthCard health={session.health} interrupted={interrupted} />}
-          <EventsList events={session.events ?? []} />
-        </aside>
-      </div>
+        {canContinue && (
+          <div className={styles.endedBanner} role="status">
+            <strong>
+              Session ended — output saved · {" "}
+              {session.state}
+              {session.exitCode !== null && session.exitCode !== undefined
+                ? ` · exit code ${session.exitCode}`
+                : ""}
+              {" · saved with this Session; no server path is exposed"}
+            </strong>
+          </div>
+        )}
+        {lineageError && <p className={styles.continueError} role="alert">{lineageError}</p>}
+        {continueError && <p className={styles.continueError} role="alert">{continueError}</p>}
+
+        <SessionTopBlock
+          session={session}
+          kind={kind}
+          interrupted={interrupted}
+          lastCheckpoint={lastCheckpointPath(session)}
+          canSendInput={capabilities.canSendInput}
+          onAnswer={answerPrompt}
+          onRerun={rerun}
+          onShowOutput={() => {
+            /* the terminal is always visible in the left half; nothing to scroll to */
+          }}
+        />
+        {capture !== "COMMANDS" && <SessionCommands sessionId={session.id} />}
+        {capture !== "PROCESS" && <ResourceBars metrics={session.metrics} />}
+        {session.health && <HealthCard health={session.health} interrupted={interrupted} />}
+        <EventsList events={session.events ?? []} />
+      </section>
 
       <ConfirmDialog
         open={confirmOpen}

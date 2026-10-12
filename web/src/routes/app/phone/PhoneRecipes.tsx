@@ -9,6 +9,7 @@ import { portWarnings, validateParam } from "../recipeRules";
 import { BackBar } from "./BackBar";
 import shell from "./phone.module.css";
 import styles from "./phoneLists.module.css";
+import { PageTitle } from "./PageTitle";
 
 function useRecipes(): Recipe[] | null {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
@@ -35,7 +36,7 @@ export function PhoneRecipes() {
 
   return (
     <div className={shell.page}>
-      <h1 className={shell.pageTitle}>Recipes</h1>
+      <PageTitle>Recipes</PageTitle>
       {[...categories].map(([category, items]) => (
         <section key={category} aria-label={category}>
           <h2 className={styles.groupHead}>{category.toUpperCase()}</h2>

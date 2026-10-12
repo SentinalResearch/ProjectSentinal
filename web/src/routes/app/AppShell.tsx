@@ -3,8 +3,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 
 import { LiveDataProvider } from "../../data/LiveDataContext";
 import { useIsPhone } from "../../hooks/useViewport";
-import { TabBar } from "./phone/TabBar";
-import phone from "./phone/phone.module.css";
+import { PhoneShell } from "./phone/PhoneShell";
 import { Sidebar } from "./Sidebar";
 import styles from "./AppShell.module.css";
 
@@ -47,17 +46,12 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [navigate]);
 
-  // Phones get the bottom tab bar and never the sidebar or its icon rail.
+  // Phones get the top bar and menu, never the sidebar or its icon rail.
   // LiveDataProvider stays above the switch so rotation keeps live data.
   if (isPhone) {
     return (
       <LiveDataProvider>
-        <div className={phone.shell}>
-          <main className={phone.main}>
-            <Outlet />
-          </main>
-          <TabBar />
-        </div>
+        <PhoneShell />
       </LiveDataProvider>
     );
   }

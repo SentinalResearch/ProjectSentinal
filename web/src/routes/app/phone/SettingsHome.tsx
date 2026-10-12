@@ -3,7 +3,8 @@ import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { useTheme, type ThemePreference } from "../../../context/ThemeContext";
 import { useLiveData } from "../../../data/LiveDataContext";
-import { useIsPhone } from "../../../hooks/useViewport";
+import { projectsOf } from "./menuSearch";
+import { PageTitle } from "./PageTitle";
 import styles from "./phone.module.css";
 
 const THEMES: { value: ThemePreference; label: string }[] = [
@@ -12,26 +13,50 @@ const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "Auto" },
 ];
 
-/** `/app/more` on phones (E1); desktop keeps its Settings page. */
-export function MoreRoute() {
-  return useIsPhone() ? <MorePage /> : <Navigate to="/app/settings" replace />;
+/** The former `/app/more` (bookmarks, notifications) now lands on Settings. */
+export function MoreRedirect() {
+  return <Navigate to="/app/settings" replace />;
 }
 
-/** E1 · More: settings entry points, theme, and sign out. */
-export function MorePage() {
-  const { machines } = useLiveData();
+/** E1 · Settings (formerly More), opened from the Menu: Machines, Projects, settings, theme, sign out. */
+export function PhoneSettingsHome() {
+  const { machines, sessions } = useLiveData();
   const { preference, setPreference } = useTheme();
   const { logout } = useAuth();
   const online = machines.filter((machine) => machine.status === "ONLINE").length;
+  const projects = projectsOf(sessions);
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.pageTitle}>More</h1>
+      <PageTitle>Settings</PageTitle>
+
+      <section aria-label="Machines">
+        <div className={styles.sectionHead}>Machines</div>
+        {machines.map((machine) => (
+          <Link key={machine.id} className={styles.linkRow} to={`/app/overview?machine=${encodeURIComponent(machine.id)}`}>
+            <span className={styles.rowTitle}>{machine.name}</span>
+            <span className={styles.rowMeta}>{machine.status === "ONLINE" ? "online" : machine.status.toLowerCase()}</span>
+            <span className={styles.chevron} aria-hidden="true">›</span>
+          </Link>
+        ))}
+      </section>
+
+      {projects.length > 0 && (
+        <section aria-label="Projects">
+          <div className={styles.sectionHead}>Projects</div>
+          {projects.map((project) => (
+            <Link key={project.slug} className={styles.linkRow} to={`/app/projects/${project.slug}`}>
+              <span className={styles.rowTitle}>{project.name}</span>
+              <span className={styles.chevron} aria-hidden="true">›</span>
+            </Link>
+          ))}
+        </section>
+      )}
 
       <section aria-label="Settings">
         <div className={styles.sectionHead}>Settings</div>
         <Link className={styles.linkRow} to="/app/settings/machines">
-          <span className={styles.rowTitle}>Machines</span>
+          <span className={styles.rowTitle}>Machines &amp; tokens</span>
           <span className={styles.rowMeta}>
             {online} of {machines.length} online
           </span>

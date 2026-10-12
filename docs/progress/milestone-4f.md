@@ -4,7 +4,9 @@ Status: **APPROVED as proposed by the owner on 2026-10-08** — Ctrl-C confirms
 after 60 s of running (Kill and Revoke always), C3 uses read-only peek attach,
 Overview "+" creates a FULL Session on the control, and B3 shows "LAST ACTIVITY".
 Implementation complete and automated evidence recorded below; real-iPhone
-acceptance is pending (owner's device).
+acceptance is pending (owner's device). **Revised 2026-10-12** for handoff v2:
+the tab bar is replaced by a top bar, a title switcher, and one Menu with
+search (see "Revision 2" below, which supersedes the tab-bar parts of Design).
 
 Reference: `sentinal-mobile-handoff/` (`MOBILE_SPEC.md` and `Sentinal Mobile.dc.html`,
 17 screens at 390×844). Prompt: `prompts/05f-milestone-4f-mobile-web.md`.
@@ -41,7 +43,7 @@ Reference: `sentinal-mobile-handoff/` (`MOBILE_SPEC.md` and `Sentinal Mobile.dc.
 | D2 Filters | sheet over D1 | `HistoryFilters` | `BottomSheet` with chip groups |
 | D3 Recipes | `/app/recipes` | `getRecipes`, categories | `PhoneRecipeRow` |
 | D4 Run Recipe | `/app/recipes/:id` | `RecipesPage` validation, port warnings, `runRecipe` | `SegmentedControl`, sticky Run bar |
-| E1 More | `/app/more` (new) | theme context, auth logout | `MorePage` |
+| E1 More → Settings (rev. 2) | `/app/more` → `/app/settings` | theme context, auth logout | `MorePage` → `PhoneSettingsHome` |
 | E2 Machines | `/app/settings/machines` | `MachinesTab` actions, `AddMachineDialog`, `MachinePanel` | `PhoneMachineCard` |
 | E3 Notifications | `/app/settings/notifications` | `NotificationsTab` rules, rollback, 4.D device card | `RuleChips` |
 | E4 Account | `/app/settings/account` | `AccountTab` (password change, sign out) | phone layout only |
@@ -231,6 +233,46 @@ sheet.
 - Not covered by automation: A2 is part of A1 on phones (four stacked feature
   sections). B1 reuses the existing sign-in screen, whose own 640 px rules
   already fit a phone.
+
+## Revision 2 (2026-10-12) — handoff v2 navigation and desktop Session page
+
+Source: the owner's `sentinal-mobile-handoff 2/`. It was copied over the tracked
+`sentinal-mobile-handoff/` (spec, design, new `reference/SentinalSession.dc.html`;
+`support.js` unchanged).
+
+**Phone navigation (MOBILE_SPEC.md → Navigation)**
+
+| Before | After |
+|---|---|
+| Bottom tab bar (Overview, Terminals, History, Recipes, More) | No tab bar. `PhoneShell` shows a 48 px `TopBar` on top-level screens: logo, the needs-you count (→ `/app/overview?needs=1`), and ⌕ |
+| Plain page titles | `PageTitle`: "Overview ▾" is a button that opens the Menu |
+| — | **N1 `PhoneMenu`**: full-screen dialog; search focused; pages with meta and a 4 px accent current-page bar; Machine and project chips; ✕/Escape close; focus returns to the opener; focus is trapped |
+| — | **N2** search (`menuSearch.ts`): Pages, Sessions, Machines, Recipes, and History (debounced `getHistory({ query })`), 5 per group, with an empty state |
+| E1 More at `/app/more` | E1 Settings at `/app/settings` (`PhoneSettingsHome`): Machines with status, Projects, "Machines & tokens"/Notifications/Account, Theme, Sign out. `/app/more` redirects. Sub-screens back out with "‹ Settings" |
+| Back bar only | `BackBar` also goes back on a left-edge swipe (start ≤ 24 px, ≥ 72 px right, < 48 px vertical drift) |
+
+The needs-you filter shows only those Sessions, with a pressed "Needs you N"
+chip; "All" clears it. Sticky action bars and pages now carry the bottom safe
+area themselves, which the tab bar used to provide.
+
+**Desktop Session page:**
+- The page is a two-column grid. The terminal is the left half: sticky, full
+  height, and `#0C0C0C` in both themes. The details scroll on the right.
+- With several generations, earlier ones scroll in a strip above the newest,
+  which fills the column and keeps the key bar.
+- The xterm viewport no longer shows a black frame under its padding.
+
+**Evidence:**
+- Vitest: phone tests cover the top bar, Menu (focus, Escape, current page),
+  grouped search, the needs filter, edge swipe, and the Settings redirect.
+- `e2e/mobile.spec.ts`:
+  - navigates only through the Menu;
+  - checks the swipe back;
+  - adds screenshots `n1-menu`, `n2-search`, `b2-needs-you` (when present),
+    and `e1-settings`.
+- `e2e/desktop-session.spec.ts` measures the halves at 1280, 1440, and 1920
+  (sidebar open and collapsed) and at 768 and 1024. It also checks scroll
+  stickiness, reflow, and the light theme.
 
 ## Real-device matrix (to fill during acceptance)
 

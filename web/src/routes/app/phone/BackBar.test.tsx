@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -37,5 +37,19 @@ describe("BackBar", () => {
     await user.click(screen.getByRole("button", { name: "open" }));
     await user.click(screen.getByRole("button", { name: "‹ Overview" }));
     expect(screen.getByTestId("where")).toHaveTextContent("/app/history");
+  });
+
+  it("a swipe from the left edge goes back; a swipe that starts mid-screen or drifts vertically does not", async () => {
+    render(<MemoryRouter initialEntries={["/app/sessions/rtx:1"]}>{routes()}</MemoryRouter>);
+    const swipe = (fromX: number, toX: number, toY = 300) => {
+      fireEvent.touchStart(window, { touches: [{ clientX: fromX, clientY: 300 }] });
+      fireEvent.touchEnd(window, { changedTouches: [{ clientX: toX, clientY: toY }] });
+    };
+    swipe(160, 320);
+    swipe(8, 200, 420);
+    swipe(8, 40);
+    expect(screen.getByTestId("where")).toHaveTextContent("/app/sessions/rtx:1");
+    swipe(8, 160);
+    expect(screen.getByTestId("where")).toHaveTextContent("/app/overview");
   });
 });

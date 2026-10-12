@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { MockBadge } from "../../components/MockBadge";
 import { isMockData } from "../../data";
@@ -11,6 +11,7 @@ import { settingsTabs, type SettingsTabKey } from "./settings-tabs";
 import styles from "./SettingsPage.module.css";
 import { useIsPhone } from "../../hooks/useViewport";
 import { BackBar } from "./phone/BackBar";
+import { PhoneSettingsHome } from "./phone/SettingsHome";
 import phone from "./phone/phone.module.css";
 
 const TABS = settingsTabs(isMockData);
@@ -26,12 +27,13 @@ export function SettingsPage() {
   const active = normalizeTab(tab);
   const isPhone = useIsPhone();
 
-  // Phones reach each Settings screen from More; bare /app/settings is More.
+  // On phones bare /app/settings is the Settings home (E1, reached from the
+  // Menu); each Settings screen backs out to it.
   if (isPhone) {
-    if (!tab) return <Navigate to="/app/more" replace />;
+    if (!tab) return <PhoneSettingsHome />;
     return (
       <>
-        <BackBar parentLabel="More" parentPath="/app/more" />
+        <BackBar parentLabel="Settings" parentPath="/app/settings" />
         <div className={phone.page}>
           {active === "machines" && <MachinesTab />}
           {active === "notifications" && <NotificationsTab />}

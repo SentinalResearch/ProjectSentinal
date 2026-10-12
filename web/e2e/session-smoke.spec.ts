@@ -116,6 +116,7 @@ test("three Session generations survive reload with input only on the latest", a
   await expect(terminalHosts.nth(0)).toHaveAttribute("aria-readonly", "true");
   await expect(terminalHosts.nth(1)).toHaveAttribute("aria-readonly", "true");
   await expect(terminalHosts.nth(2)).toHaveAttribute("aria-readonly", "false");
+  await page.screenshot({ path: test.info().outputPath("session-three-generations.png"), animations: "disabled" });
 
   const binaryBeforeHistoricalInput = sentFrames.filter((frame) => typeof frame !== "string").length;
   await terminalHosts.nth(0).click();

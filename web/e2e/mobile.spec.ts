@@ -26,6 +26,24 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBe(false);
 }
 
+/** Switch top-level pages the phone way: the title (or ⌕) opens the Menu. */
+async function goTo(page: Page, label: "Overview" | "Terminals" | "History" | "Recipes" | "Settings") {
+  await page.getByRole("button", { name: "Search" }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  await menu.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: new RegExp(`^${label}`) }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: label })).toBeVisible();
+}
+
+/** A synthetic left-edge swipe (Chromium with touch). */
+async function swipeFromLeftEdge(page: Page) {
+  await page.evaluate(() => {
+    const touch = (x: number) => new Touch({ identifier: 1, target: document.body, clientX: x, clientY: 400 });
+    window.dispatchEvent(new TouchEvent("touchstart", { touches: [touch(6)], changedTouches: [touch(6)] }));
+    window.dispatchEvent(new TouchEvent("touchend", { touches: [], changedTouches: [touch(180)] }));
+  });
+}
+
 async function expectNoBrowserCredential(page: Page) {
   const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
   expect(Object.keys(JSON.parse(stored)).filter((key) => key !== "sentinal.theme")).toEqual([]);
@@ -36,17 +54,38 @@ async function expectNoBrowserCredential(page: Page) {
 test.describe("phone 390×844", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("tab bar, Session, terminal, and Ctrl-C sheet on the production build", async ({ page }) => {
+  test("top bar, menu, search, Session, terminal, and Ctrl-C sheet on the production build", async ({ page }) => {
     test.setTimeout(120_000);
     // Time keeps flowing; installing the clock only lets the test jump ahead.
     await page.clock.install();
     await signIn(page);
 
-    const tabs = page.getByRole("navigation", { name: "Tabs" });
-    await expect(tabs.getByRole("link")).toHaveText([/Overview/, /Terminals/, /History/, /Recipes/, /More/]);
+    // No tab bar: a top bar (logo · needs-you · ⌕) and a title that switches pages.
+    await expect(page.getByRole("navigation", { name: "Tabs" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Search history/ })).toHaveCount(0);
+    await expect(page.getByRole("banner").getByRole("button", { name: "Search" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await shot(page, "b2-overview");
+
+    await page.getByRole("button", { name: "Overview" }).click();
+    const menu = page.getByRole("dialog", { name: "Menu" });
+    await expect(menu.getByRole("searchbox", { name: "Search" })).toBeFocused();
+    await expect(menu.getByRole("navigation", { name: "Pages" }).getByRole("link")).toHaveCount(5);
+    await expect(menu.getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
+    await shot(page, "n1-menu");
+    await menu.getByRole("searchbox", { name: "Search" }).fill("Watched");
+    await expect(menu.getByRole("list", { name: "Sessions" })).toBeVisible();
+    await shot(page, "n2-search");
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+
+    const needs = page.getByRole("banner").getByRole("link", { name: /need you$/ });
+    if (await needs.count()) {
+      await needs.click();
+      await expect(page).toHaveURL(/\/app\/overview\?needs=1$/);
+      await shot(page, "b2-needs-you");
+      await page.getByRole("group", { name: "Machines" }).getByRole("button", { name: "All" }).click();
+    }
 
     // A Session row: badge and duration on their own line, then the title.
     const row = page.locator("main a[href^='/app/sessions/']").first();
@@ -55,6 +94,13 @@ test.describe("phone 390×844", () => {
     await expect(page.getByRole("button", { name: "‹ Overview" })).toBeVisible();
     await expect(page.getByRole("list", { name: "Metrics" })).toBeVisible();
     await shot(page, "b3-session");
+
+    // A swipe from the left edge goes back, like ‹ Overview.
+    const sessionUrl = page.url();
+    await swipeFromLeftEdge(page);
+    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await page.goto(sessionUrl);
+    await expect(page.getByRole("list", { name: "Metrics" })).toBeVisible();
 
     await page.getByRole("link", { name: "Open terminal" }).click();
     await expect(page.getByRole("button", { name: "‹ Detach" })).toBeVisible();
@@ -94,16 +140,15 @@ test.describe("phone 390×844", () => {
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   });
 
-  test("Terminals, History filters, Recipes, More, and theme", async ({ page }) => {
+  test("Terminals, History filters, Recipes, Settings, and theme", async ({ page }) => {
     test.setTimeout(120_000);
     await signIn(page);
 
-    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /Terminals/ }).click();
-    await expect(page.getByRole("heading", { name: "Terminals" })).toBeVisible();
+    await goTo(page, "Terminals");
     await expect(page.getByText(/open · tap one to go full screen/)).toBeVisible();
     await shot(page, "c3-terminals");
 
-    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /History/ }).click();
+    await goTo(page, "History");
     await expect(page.getByRole("searchbox", { name: "Search commands" })).toBeVisible();
     await shot(page, "d1-history");
     await page.getByRole("button", { name: /^Filters/ }).click();
@@ -113,7 +158,7 @@ test.describe("phone 390×844", () => {
     await filters.getByRole("button", { name: /^Show \d+ results?$/ }).click();
     await expect(filters).toHaveCount(0);
 
-    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /Recipes/ }).click();
+    await goTo(page, "Recipes");
     const recipe = page.locator("main a[href^='/app/recipes/']").first();
     await expect(recipe).toBeVisible();
     await shot(page, "d3-recipes");
@@ -130,29 +175,31 @@ test.describe("phone 390×844", () => {
     expect(decodeURIComponent(new URL(page.url()).pathname)).toMatch(new RegExp(`^/app/sessions/${owner}:\\d+$`));
     await shot(page, "d4-recipe-session");
 
-    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /More/ }).click();
-    await expect(page.getByRole("heading", { name: "More" })).toBeVisible();
-    await shot(page, "e1-more");
+    // Back returns along in-app history: Session → Run Recipe → Recipes.
+    await page.getByRole("button", { name: "‹ Overview" }).click();
+    await page.getByRole("button", { name: "‹ Recipes" }).click();
+    await goTo(page, "Settings");
+    await expect(page.getByRole("region", { name: "Machines" })).toBeVisible();
+    await shot(page, "e1-settings");
     await page.getByRole("link", { name: /Notifications/ }).click();
-    await expect(page.getByRole("button", { name: "‹ More" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "‹ Settings" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Enable notifications on this device" })).toBeVisible();
     await shot(page, "e3-notifications");
-    await page.getByRole("button", { name: "‹ More" }).click();
-    await page.getByRole("link", { name: /Machines/ }).click();
+    await page.getByRole("button", { name: "‹ Settings" }).click();
+    await page.getByRole("link", { name: /Machines & tokens/ }).click();
     await expect(page.locator("main article").first()).toBeVisible();
     await shot(page, "e2-machines");
-    await page.getByRole("button", { name: "‹ More" }).click();
+    await page.getByRole("button", { name: "‹ Settings" }).click();
     await page.getByRole("link", { name: /Account/ }).click();
     await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
     await shot(page, "e4-account");
 
-    await page.getByRole("button", { name: "‹ More" }).click();
+    await page.getByRole("button", { name: "‹ Settings" }).click();
     await page.getByRole("radio", { name: "Light" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /Overview/ }).click();
-    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await goTo(page, "Overview");
     await shot(page, "b2-overview-light");
-    await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /More/ }).click();
+    await goTo(page, "Settings");
     await page.getByRole("radio", { name: "Dark" }).click();
     await expectNoBrowserCredential(page);
   });

@@ -1,15 +1,18 @@
 # MILESTONE 4.F — Mobile web experience
 
 Goal: on a phone, the installed Sentinal PWA is a first-class mobile app. It
-has a bottom tab bar, native-feeling screens, readable Session rows, a usable
+has no tab bar: a top bar and a page title that switches pages through one
+menu with search, native-feeling screens, readable Session rows, a usable
 full-screen terminal, and confirmation sheets. It is built from the mobile
 design handoff, so a push notification opens a screen designed for a phone
 rather than a squeezed desktop page.
 
 The reference is `sentinal-mobile-handoff/`:
 - `MOBILE_SPEC.md` holds the rules;
-- `Sentinal Mobile.dc.html` holds 17 screens at 390×844 (open it with
-  `npx serve sentinal-mobile-handoff`).
+- `Sentinal Mobile.dc.html` holds the phone screens at 390×844, including N1
+  Menu and N2 Search (open it with `npx serve sentinal-mobile-handoff`);
+- `reference/SentinalSession.dc.html` is the desktop Session page reference
+  (terminal in the left half, details on the right).
 
 Rebuild those screens as responsive layouts in the existing React + xterm.js
 PWA. Desktop (≥ 768 px) keeps its current layout and behaviour.
@@ -40,8 +43,9 @@ Present one concrete plan covering:
    component, or a new one. The screens are: A1 Landing, A2 Features,
    B1 Sign in, B2 Overview, B3 Session detail, B4 Waiting, B5 From a
    notification (failed), C1 Terminal, C2 Ctrl-C confirm, C3 Terminals,
-   D1 History, D2 Filters sheet, D3 Recipes, D4 Run recipe, E1 More,
-   E2 Machines, E3 Notifications, E4 Account. Show which desktop components
+   D1 History, D2 Filters sheet, D3 Recipes, D4 Run recipe, N1 Menu,
+   N2 Search, E1 Settings (formerly More), E2 Machines, E3 Notifications,
+   E4 Account. Show which desktop components
    are shared and which phone components are new.
 2. **Breakpoint mechanism.** The mobile layout applies below 768 px. Decide CSS
    media queries versus one shared `useViewport` hook, and how a rotation or
@@ -49,11 +53,16 @@ Present one concrete plan covering:
    unsent input. The current sidebar collapses to an icon rail below 1,200 px;
    phones must never see that rail (`MOBILE_SPEC.md` → Breakpoint).
 3. **Navigation.**
-   - The bottom tab bar has five tabs: Overview, Terminals, History, Recipes,
-     More.
-   - Detail screens get a 44 px back bar.
+   - There is no tab bar. Top-level pages are Overview, Terminals, History,
+     Recipes, and Settings.
+   - Top-level screens get a 48 px top bar: logo, the needs-you count (opens
+     Overview filtered to Sessions that need you), and search ⌕.
+   - The page title is the switcher ("Overview ▾"). It and ⌕ open the Menu
+     (N1); typing in it searches Sessions, Recipes, and History (N2).
+   - Detail screens get a 44 px back bar; a swipe from the left edge also goes
+     back.
    - Map every existing desktop route (Overview, Session, Split, Project,
-     History, Recipes, Settings tabs) to a tab or a detail screen.
+     History, Recipes, Settings tabs) to a top-level page or a detail screen.
    - Map every deep link (notification URLs, login return paths) to a phone
      screen.
    - Define how the browser back button and swipe-back behave.
@@ -91,9 +100,23 @@ Then stop for explicit human approval.
 
 ## 1. Shell and navigation
 
-- Below 768 px, render the bottom tab bar instead of the sidebar. It is 83 px
-  tall (49 + safe area), has a 1 px top border and five equal columns, and the
-  active tab uses `--accent-fg` at weight 800.
+- Below 768 px, never render the sidebar or its icon rail, and render no tab
+  bar. Top-level screens get the 48 px top bar: the logo on the left, then the
+  needs-you count (a yellow #FFD000 square, hidden at zero) and search ⌕ on the
+  right.
+- Each top-level page title is a button ("Overview ▾", 34/36 800) that opens
+  the Menu.
+- **N1 Menu:** a full-screen modal dialog.
+  - The search field is focused on open: 52 px tall, with a 2 px accent inset.
+  - Then the five pages as 26 px rows, with meta such as "3 need you" or
+    "8 open"; the current page is marked by a 4 px accent bar.
+  - Then MACHINES and PROJECTS chips.
+  - ✕, Escape, or picking an item closes it, and focus returns to the opener.
+- **N2 Search:** typing replaces the page list with results grouped by type
+  (Pages, Sessions, Machines, Recipes, History). Rows show a title, a mono
+  detail line, and ›. Show an explicit empty state for no matches.
+- The former More screen is **Settings** at `/app/settings`, and `/app/more`
+  redirects there. Settings sub-screens back out with "‹ Settings".
 - Every page uses 20 px side padding and honours
   `env(safe-area-inset-top/bottom)` in the installed standalone PWA.
 - Back bars show "‹ Parent" in `--accent-fg`, with an optional ⋯ menu.
@@ -168,9 +191,9 @@ This is what a push notification opens, so it is accepted first.
   - command preview;
   - sticky "Run on <Machine>".
 
-## 4. More and settings
+## 4. Settings
 
-- **E1 More:**
+- **E1 Settings** (formerly More, reached from the Menu):
   - Machines with status, Projects, Settings rows;
   - Theme segmented control (Light / Dark / Auto);
   - the signed-in user, and Sign out as destructive text.
@@ -225,7 +248,9 @@ This is what a push notification opens, so it is accepted first.
 ## Tests first
 
 - **Component tests at phone width** for:
-  - the tab bar;
+  - the top bar, title switcher, Menu (focus, Escape, current page), and
+    grouped search;
+  - the left-edge swipe back;
   - the Session row structure (badge never on the title line; long names
     truncate);
   - needs-you cards and the waiting y/n;
@@ -243,7 +268,9 @@ This is what a push notification opens, so it is accepted first.
     sheet → cancel and confirm;
   - History search and filters → Save as Recipe;
   - Recipes → Run on Machine;
-  - More → Notifications chips → Machines;
+  - title or ⌕ → Menu → search → a result, and every page through the Menu;
+  - a left-edge swipe back from a detail screen;
+  - Menu → Settings → Notifications chips → Machines;
   - theme switch;
   - rotation without losing terminal state.
 
