@@ -62,6 +62,15 @@ fn harness() -> Harness {
 }
 
 fn open(store: &Arc<Store>, clock: &Arc<AtomicI64>, dir: &Path) -> ControlService {
+    open_with_read_model(store, clock, dir, true)
+}
+
+fn open_with_read_model(
+    store: &Arc<Store>,
+    clock: &Arc<AtomicI64>,
+    dir: &Path,
+    read_model_enabled: bool,
+) -> ControlService {
     let clock = clock.clone();
     ControlService::open(
         store.clone(),
@@ -75,6 +84,7 @@ fn open(store: &Arc<Store>, clock: &Arc<AtomicI64>, dir: &Path) -> ControlServic
             daemon_version: "0.0.1".into(),
             secrets_file: dir.join("machine-credentials.json"),
             audit_dir: dir.to_path_buf(),
+            read_model_enabled,
         },
         Arc::new(move || Timestamp(clock.load(Ordering::SeqCst))),
     )
@@ -266,6 +276,69 @@ fn heartbeat_negotiates_projection_upload_without_breaking_legacy_workers() {
             .unwrap()
             .action,
         protocol::ProjectionSyncAction::Snapshot
+    );
+}
+
+#[test]
+fn disabled_read_model_refuses_projection_without_deleting_existing_data() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    h.control
+        .accept_projection(credential.expose(), projection_batch(WORKER_A))
+        .unwrap();
+
+    let disabled = open_with_read_model(&h.store, &h.clock, &h.dir, false);
+    let response = disabled
+        .heartbeat(
+            credential.expose(),
+            LinkHeartbeatRequest {
+                machine_id: MachineId(WORKER_A.into()),
+                sequence: 1,
+                sent_at: h.now(),
+                endpoint: endpoint("100.74.239.89"),
+                daemon_version: "0.0.1".into(),
+                capabilities: vec![MachineCapability::Sessions],
+                projection_sync: Some(protocol::ProjectionSyncReport {
+                    schema_version: PROJECTION_SCHEMA_VERSION,
+                    source_epoch: "pe_test".into(),
+                    current_cursor: 1,
+                    last_acked_cursor: 0,
+                    snapshot_required: false,
+                }),
+            },
+        )
+        .unwrap();
+    let directive = response.projection_sync.unwrap();
+    assert!(!directive.enabled);
+    assert_eq!(directive.action, protocol::ProjectionSyncAction::Disabled);
+
+    for failure in [
+        disabled.projection_snapshot().unwrap_err(),
+        disabled
+            .accept_projection(credential.expose(), projection_batch(WORKER_A))
+            .unwrap_err(),
+    ] {
+        assert_eq!(failure.status, 404);
+        assert_eq!(failure.failure.code, LinkFailureCode::NotFound);
+    }
+    disabled
+        .accept_local_projection(projection_batch(CONTROL))
+        .unwrap();
+    assert_eq!(
+        h.store
+            .projected_sessions(&MachineId(WORKER_A.into()), 10)
+            .unwrap()
+            .len(),
+        1,
+        "disabling the read model must preserve disposable projection rows"
+    );
+    assert_eq!(
+        h.store
+            .projected_sessions(&MachineId(CONTROL.into()), 10)
+            .unwrap()
+            .len(),
+        1,
+        "the hidden local projection must stay current for a safe re-enable"
     );
 }
 

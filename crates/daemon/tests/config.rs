@@ -28,6 +28,16 @@ fn defaults_bind_only_to_loopback() {
         Path::new("/home/tester/.local/share/terminal-agent/run/sentinald.sock")
     );
     assert!(config.packages.is_none());
+    assert!(config.control_read_model);
+}
+
+#[test]
+fn control_read_model_can_be_disabled_without_changing_other_defaults() {
+    let config =
+        DaemonConfig::from_toml("control_read_model = false\n", Path::new("/home/tester")).unwrap();
+
+    assert!(!config.control_read_model);
+    assert_eq!(config.bind.to_string(), "127.0.0.1:7420");
 }
 
 #[test]

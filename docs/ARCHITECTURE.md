@@ -146,6 +146,23 @@ state cannot affect another generation. Only the latest live generation can
 receive input or resize requests. Ancestor output remains in its original
 per-Session log and is never copied into a descendant PTY or log.
 
+## Control dashboard read model
+
+Workers remain authoritative for Sessions, Commands, Events, Metrics, output
+logs, PTYs, and every mutation. Each worker also emits a bounded,
+privacy-minimized projection through its authenticated Machine link. The
+control materializes those summaries in SQLite so the dashboard can load with
+one snapshot and one live stream even when a worker is temporarily offline.
+Raw terminal bytes, full Command text, cwd, input, credentials, environment,
+and log contents are never projected.
+
+The read model cannot authorize attach, input, resize, signal, kill,
+continuation, or Recipe execution; those operations are always routed to the
+owning live worker. Setting the top-level daemon option
+`control_read_model = false` disables projection negotiation, upload ingress,
+and owner snapshot/live resources without deleting the disposable projection
+tables. The PWA then uses the bounded direct-query compatibility path.
+
 ## Native notification flow
 
 Eligible stored Events become closed, privacy-safe notification intents. An

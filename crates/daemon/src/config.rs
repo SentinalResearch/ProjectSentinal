@@ -75,6 +75,8 @@ pub struct DaemonConfig {
     pub behind_tailscale_serve: bool,
     /// Present when this daemon is the owner-selected control Machine.
     pub control: Option<ControlConfig>,
+    /// Whether the control serves and accepts the disposable dashboard read model.
+    pub control_read_model: bool,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -96,7 +98,13 @@ struct RawConfig {
     development: bool,
     #[serde(default)]
     behind_tailscale_serve: bool,
+    #[serde(default = "default_control_read_model")]
+    control_read_model: bool,
     control: Option<RawControlConfig>,
+}
+
+fn default_control_read_model() -> bool {
+    true
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -267,6 +275,7 @@ impl DaemonConfig {
             development: raw.development,
             behind_tailscale_serve: raw.behind_tailscale_serve,
             control,
+            control_read_model: raw.control_read_model,
         })
     }
 }

@@ -36,6 +36,10 @@ all `pending`. The design needs no new dependency and keeps
    and the scale fixture; update Roadmap and this report. **Not done:** the
    real-Machine acceptance matrix below, which needs the owner's own
    hardware — not run as part of `just check` either.
+10. [x] Implement and test the documented `control_read_model = false`
+    rollback switch. It returns the explicit disabled heartbeat directive,
+    refuses projection ingress/snapshot/live resources with the browser's
+    fallback `404`, and preserves existing projection rows.
 
 ## Baseline measurement
 
@@ -612,7 +616,7 @@ fixtures remain readable, generated TypeScript is regenerated, and
 the new tables.
 
 Mixed versions negotiate through optional heartbeat fields. A runtime
-`control_read_model = false` setting disables sync/snapshot use and selects the
+top-level `control_read_model = false` setting disables sync/snapshot use and selects the
 repaired 60-second direct path; it does not drop tables. Rolling back binaries
 therefore leaves worker Sessions/Commands/Events/Metrics/logs and control
 projection rows untouched. Direct terminal routing remains available whenever
@@ -680,15 +684,13 @@ could legitimately sort first; and the new acceptance spec's own secret-leak
 sweep read a disconnected worker's `link.json` after `sentinal disconnect`
 had already deleted it.
 
-Evidence: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets
---all-features -D warnings`, `cargo test --workspace` (clean), `just gen-ts
---check`, `pnpm -C web check` (48 files / 217 tests) and `pnpm -C web build`
-all pass. A real, full `pnpm exec playwright test` — all 7 projects, 13
-tests, including `projection-acceptance` — passes end to end in about a
-minute. The full `just check` recipe itself was not re-run verbatim (it also
-covers the unrelated shell/release/installer/eval test scripts bundled with
-Milestone 4.E); everything it would run that's relevant to 4.D.1 was run
-directly and is clean.
+Evidence: `just check` passes verbatim on 2026-10-12, including formatting,
+Clippy with warnings denied, the complete Rust workspace, generated TypeScript
+comparison, web tests (49 files / 224 tests), production web build, 20 eval
+tests, and every shell/release/installer documentation check; its final line
+is `github install test: passed`. A real, full `pnpm exec playwright test` —
+all 7 projects, 13 tests, including `projection-acceptance` — also passes end
+to end in about a minute.
 
 ## Real-Machine acceptance fields
 
@@ -711,7 +713,6 @@ Request/byte evidence to record:
 
 ## Open questions
 
-- Human approval of the six explicit approval points above.
 - Linux real-Machine availability for final two-worker evidence.
 - Whether the owner wants Session titles omitted despite the usability cost;
   omission requires no wire redesign and is the privacy-stricter fallback.

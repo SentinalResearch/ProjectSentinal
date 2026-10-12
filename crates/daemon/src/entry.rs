@@ -189,6 +189,7 @@ pub async fn run() -> Result<(), DaemonError> {
                 daemon_version: crate::DAEMON_VERSION.into(),
                 secrets_file: config.control_credentials_file.clone(),
                 audit_dir: config.data_dir.clone(),
+                read_model_enabled: config.control_read_model,
             },
             Arc::new(now),
         )?),

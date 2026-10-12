@@ -90,6 +90,7 @@ async fn harness() -> Harness {
             daemon_version: "0.0.1".into(),
             secrets_file: dir.join("machine-credentials.json"),
             audit_dir: dir.clone(),
+            read_model_enabled: true,
         },
         Arc::new(move || Timestamp(tick.load(Ordering::SeqCst))),
     )

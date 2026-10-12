@@ -82,6 +82,7 @@ fn harness() -> Harness {
             daemon_version: "0.0.1".into(),
             secrets_file: dir.join("credentials.json"),
             audit_dir: dir.clone(),
+            read_model_enabled: true,
         },
         Arc::new(|| Timestamp(1_790_900_000_000)),
     )

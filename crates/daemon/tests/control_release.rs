@@ -121,6 +121,7 @@ fn daemon(control: bool) -> Daemon {
                 daemon_version: "0.1.17".into(),
                 secrets_file: dir.join("machine-credentials.json"),
                 audit_dir: dir.clone(),
+                read_model_enabled: true,
             },
             Arc::new(|| Timestamp(1_790_900_000_000)),
         )

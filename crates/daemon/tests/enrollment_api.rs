@@ -53,6 +53,15 @@ impl Drop for Daemon {
 }
 
 fn daemon(control: bool, behind_serve: bool, peer: &str) -> Daemon {
+    daemon_with_read_model(control, behind_serve, peer, true)
+}
+
+fn daemon_with_read_model(
+    control: bool,
+    behind_serve: bool,
+    peer: &str,
+    read_model_enabled: bool,
+) -> Daemon {
     let dir = std::env::temp_dir().join(format!(
         "sentinal-enroll-api-{}-{}",
         std::process::id(),
@@ -85,6 +94,7 @@ fn daemon(control: bool, behind_serve: bool, peer: &str) -> Daemon {
                 daemon_version: "0.0.1".into(),
                 secrets_file: dir.join("machine-credentials.json"),
                 audit_dir: dir.clone(),
+                read_model_enabled,
             },
             Arc::new(|| Timestamp(1_790_900_000_000)),
         )
@@ -249,6 +259,19 @@ async fn control_projection_snapshot_is_one_bounded_owner_resource() {
     );
     assert!(snapshot.machines[0].sessions.is_empty());
     assert!(!snapshot.machines[0].projection_available);
+}
+
+#[tokio::test]
+async fn disabled_control_read_model_returns_fallback_status() {
+    let d = daemon_with_read_model(true, false, "100.64.0.2:5000", false);
+    let session = d.owner_session().await;
+    let response = d
+        .send("GET", "/api/v1/control/snapshot", Some(&session), &[], None)
+        .await;
+
+    assert_eq!(response.status, StatusCode::NOT_FOUND);
+    assert_eq!(response.body["code"], "NOT_FOUND");
+    assert_eq!(response.body["message"], "control read model is disabled");
 }
 
 #[tokio::test]

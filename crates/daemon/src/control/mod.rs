@@ -83,6 +83,8 @@ pub struct ControlSettings {
     pub secrets_file: PathBuf,
     /// Directory for `pairing-audit.jsonl`.
     pub audit_dir: PathBuf,
+    /// Whether the disposable dashboard projection is accepted and served.
+    pub read_model_enabled: bool,
 }
 
 /// A refused control request: HTTP status plus a secret-free body.
@@ -466,6 +468,7 @@ impl ControlService {
         bearer: &str,
         batch: ProjectionBatch,
     ) -> Result<ProjectionAcknowledgement, ControlFailure> {
+        self.ensure_read_model_enabled()?;
         let now = (self.clock)();
         let machine_id = match &batch {
             ProjectionBatch::Delta { machine_id, .. }
@@ -561,6 +564,7 @@ impl ControlService {
         &self,
         after: u64,
     ) -> Result<Vec<ControlProjectionMessage>, ControlFailure> {
+        self.ensure_read_model_enabled()?;
         let current = self
             .store
             .control_projection_revision()
@@ -598,6 +602,7 @@ impl ControlService {
 
     /// Build one bounded owner dashboard snapshot from local SQLite only.
     pub fn projection_snapshot(&self) -> Result<ControlProjectionSnapshot, ControlFailure> {
+        self.ensure_read_model_enabled()?;
         let now = (self.clock)();
         let registry = self.registry()?;
         let omitted_machines = registry
@@ -685,6 +690,16 @@ impl ControlService {
         machine_id: &MachineId,
         report: &protocol::ProjectionSyncReport,
     ) -> Result<ProjectionSyncDirective, ControlFailure> {
+        if !self.settings.read_model_enabled {
+            return Ok(ProjectionSyncDirective {
+                enabled: false,
+                schema_version: PROJECTION_SCHEMA_VERSION,
+                committed_cursor: 0,
+                max_batch_bytes: MAX_PROJECTION_BATCH_BYTES as u32,
+                max_changes: MAX_PROJECTION_CHANGES as u16,
+                action: ProjectionSyncAction::Disabled,
+            });
+        }
         let stored = self
             .store
             .control_projection_state(machine_id)
@@ -714,6 +729,18 @@ impl ControlService {
             max_changes: MAX_PROJECTION_CHANGES as u16,
             action,
         })
+    }
+
+    fn ensure_read_model_enabled(&self) -> Result<(), ControlFailure> {
+        if self.settings.read_model_enabled {
+            Ok(())
+        } else {
+            Err(ControlFailure::new(
+                404,
+                LinkFailureCode::NotFound,
+                "control read model is disabled",
+            ))
+        }
     }
 
     /// Authenticate and durably accept one bounded worker notification batch.

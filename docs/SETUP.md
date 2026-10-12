@@ -317,11 +317,20 @@ On the Machine you choose as control, add to its `daemon.toml`:
 bind = "127.0.0.1:7420"                 # published only through Tailscale Serve
 behind_tailscale_serve = true           # lockout keys on Tailscale-User-Login
 allowed_origins = ["https://sentinal-control.TAILNET.ts.net"]
+control_read_model = true               # bounded dashboard projection (default)
 
 [control]
 enabled = true
 public_url = "https://sentinal-control.TAILNET.ts.net"
 ```
+
+For rollback or diagnosis, set the top-level `control_read_model = false` and
+restart the control. Workers then receive a disabled projection directive,
+the projection HTTP resources return `404`, and the PWA uses its bounded
+60-second direct-query compatibility path. Existing projection tables are
+preserved, so setting it back to `true` resumes synchronization without
+deleting worker or control data. This switch never changes which worker owns
+terminal bytes or authorizes a live action.
 
 Publish the API next to the package role and check it:
 
