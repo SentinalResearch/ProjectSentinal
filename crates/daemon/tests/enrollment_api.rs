@@ -219,32 +219,23 @@ async fn control_projection_snapshot_is_one_bounded_owner_resource() {
         StatusCode::UNAUTHORIZED
     );
     assert_eq!(
-        d.send(
-            "GET",
-            "/api/v1/control/snapshot",
-            Some(TOKEN),
-            &[],
-            None,
-        )
-        .await
-        .status,
+        d.send("GET", "/api/v1/control/snapshot", Some(TOKEN), &[], None,)
+            .await
+            .status,
         StatusCode::FORBIDDEN
     );
     let session = d.owner_session().await;
     let response = d
-        .send(
-            "GET",
-            "/api/v1/control/snapshot",
-            Some(&session),
-            &[],
-            None,
-        )
+        .send("GET", "/api/v1/control/snapshot", Some(&session), &[], None)
         .await;
     assert_eq!(response.status, StatusCode::OK);
     let snapshot: protocol::ControlProjectionSnapshot =
         serde_json::from_value(response.body).unwrap();
     assert_eq!(snapshot.machines.len(), 1);
-    assert_eq!(snapshot.machines[0].freshness, protocol::ProjectionFreshness::Stale);
+    assert_eq!(
+        snapshot.machines[0].freshness,
+        protocol::ProjectionFreshness::Stale
+    );
     assert!(snapshot.machines[0].sessions.is_empty());
 }
 
