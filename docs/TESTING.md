@@ -118,7 +118,8 @@ just network --dry-run # validate/inspect the Tailscale development launch
 just demo              # explicit local fixture UI (not a backend test)
 cargo test -p protocol # one crate
 cargo test session     # tests whose name contains "session"
-cargo test -- --ignored  # integration tests
+cargo test -- --ignored  # every integration test, including real-Tailnet ones
+just test-local-integration  # host-local suite: real shells, PTYs, sockets, daemons
 ```
 
 `just check` also runs `scripts/tests/run-network-test.sh`. The script test

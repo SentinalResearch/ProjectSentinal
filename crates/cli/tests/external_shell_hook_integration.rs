@@ -75,7 +75,10 @@ fn exercise(daemon: &Daemon, shell: &str) {
         found = block_on(shell_session(daemon, pid));
         found.as_ref().is_some_and(|session| {
             let commands = block_on(history(daemon, session));
-            commands.len() == 5 && commands.iter().all(|command| command.exit_code.is_some())
+            // Idle is its own update after the last Command finishes.
+            session.state == SessionState::Idle
+                && commands.len() == 5
+                && commands.iter().all(|command| command.exit_code.is_some())
         })
     });
     let session = found.unwrap();

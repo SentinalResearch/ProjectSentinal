@@ -112,6 +112,11 @@ user-test:
 test-integration:
     cargo test --workspace -- --ignored
 
+# Host-local integration suite (F14): real shells, PTYs, sockets and daemons,
+# without the real-Tailnet, controlling-terminal and timing tests
+test-local-integration:
+    cargo test --workspace -- --ignored --skip enrollment_tailnet_integration --skip tailnet_bootstrap_integration --skip hook_benchmark --skip raw_terminal_integration
+
 # Type-check and run the fast web tests
 web-check:
     pnpm -C web check
