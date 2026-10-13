@@ -21,18 +21,45 @@ live FULL Sessions (audit finding F1, until Reliability R1).
 
 ## 2. Install the control
 
-Download `install.sh`, `SHA256SUMS`, and `SHA256SUMS.sig` from the newest
-GitHub release, check the signature, then run it:
+Download the installer, the signed checksums, and the pinned release key into
+an empty directory:
+
+```console
+vm$ mkdir -p ~/sentinal-install && cd ~/sentinal-install
+vm$ base=https://github.com/SentinalResearch/ProjectSentinal/releases/latest/download
+vm$ curl -fsSLO "$base/install.sh"
+vm$ curl -fsSLO "$base/SHA256SUMS"
+vm$ curl -fsSLO "$base/SHA256SUMS.sig"
+vm$ curl -fsSL -o allowed_signers \
+      https://raw.githubusercontent.com/SentinalResearch/ProjectSentinal/main/packaging/release-keys/allowed_signers
+```
+
+For a specific release, use `base=https://github.com/SentinalResearch/ProjectSentinal/releases/download/v0.1.19`
+instead of `latest`.
+
+Check the owner's signature, then that `install.sh` is the signed file:
 
 ```console
 vm$ ssh-keygen -Y verify -f allowed_signers -I sentinal-release -n sentinal-release \
       -s SHA256SUMS.sig < SHA256SUMS
+Good "sentinal-release" signature for sentinal-release with ED25519 key SHA256:…
+vm$ grep ' install.sh$' SHA256SUMS | sha256sum -c -
+install.sh: OK
+```
+
+Both must succeed; if either fails, stop and do not run the script. Then
+install:
+
+```console
 vm$ sh install.sh
 ```
 
-`allowed_signers` is `packaging/release-keys/allowed_signers` from the
-repository. The installer also refuses any release that is not signed by a
-pinned key.
+The installer downloads the archive for this Machine. It refuses any archive
+whose checksum is not in the owner-signed `SHA256SUMS` from a pinned key. It
+installs `sentinal` and `sentinald` into `~/.local/bin` and starts the user
+service. If `~/.local/bin` is not on `PATH`, it prints the line to add.
+
+On macOS, use `shasum -a 256 -c -` in place of `sha256sum -c -`.
 
 ## 3. Make it the control
 
