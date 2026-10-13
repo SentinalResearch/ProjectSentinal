@@ -534,9 +534,9 @@ must not be called production enterprise software.
   `sentinal release rollback 0.1.17`.
 - **Lost control VM:** provision a VM, install, then `sentinal backup restore`,
   then `sentinal setup` (control). Workers reconnect on their own: same ID and
-  credentials, new address learned through `--reconnect` when the MagicDNS name
-  differs.
-- **No backup:** a new control. Workers report "different control"; re-pair
+  credentials, as long as the MagicDNS name is the same. (`--reconnect` for a
+  changed name is not built; such workers pair again.)
+- **No backup:** a new control. It refuses the workers' heartbeats; re-pair
   each worker; Push devices subscribe again.
 
 ## Implementation order (after approval)
@@ -1022,6 +1022,42 @@ the e2e daemons do not have. It is part of the real-Machine acceptance.
     route, bootstrap `install.sh`, and `sentinal update`, which is four
     formats for a single-owner pilot.
   - Revisit with fleets that need mixed channels.
+
+### Step 8 — pilot runbook, backup, and preflight (2026-10-13)
+
+- **`sentinal backup create [--output FILE]`:**
+  - stops the user service, writes a 0600 `tar.gz` of the config and data
+    directories, and always starts the service again;
+  - refuses an output inside either directory or an existing file;
+  - warns that the archive holds credentials.
+- **`sentinal backup restore FILE`:**
+  - only with the service stopped and an empty data/config directory (a lone
+    `daemon.toml` is allowed);
+  - refuses links, special files, `..`, absolute paths, and any entry outside
+    the two directories;
+  - resets both directories to 0700.
+- **`sentinal doctor --pilot`** (read-only) adds:
+  - listeners on 7420/7422 loopback-only (`lsof`, else `ss`);
+  - exactly the two Serve routes, no raw TCP on 443, Funnel off (shared with
+    setup);
+  - HTTPS health, the dashboard, and `install.sh`;
+  - the stable release;
+  - the newest backup no older than 7 days.
+- **`docs/PILOT.md`:** VM, install, setup, verify, workers and ACL, updates,
+  backup, restore, and rebuilding without a backup.
+
+**Not built (recorded in §8 and the recovery sequences):**
+- `sentinal setup --reconnect` (moving a worker to a renamed control without
+  pairing);
+- a worker message for "a different control". Workers see their heartbeats
+  refused, and the runbook says to disconnect and pair again.
+
+**Tests:**
+- `cli/tests/backup.rs` (4: stop/start order, 0600, entries, refused outputs,
+  restore preconditions, hostile archive). Mutation-checked: dropping the
+  entry filter fails a test.
+- `cli/tests/doctor_pilot.rs` (2: a correct pilot; exposure + Funnel + dead
+  HTTPS).
 
 ## Proving tests
 

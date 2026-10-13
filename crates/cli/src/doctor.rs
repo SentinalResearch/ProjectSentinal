@@ -8,7 +8,12 @@ use std::{
 };
 
 /// Inspect binaries, config, Tailscale, and the native user service.
-pub fn run(prefix: Option<PathBuf>, config_dir: Option<PathBuf>, out: &mut dyn Write) -> ExitCode {
+pub fn run(
+    prefix: Option<PathBuf>,
+    config_dir: Option<PathBuf>,
+    pilot: bool,
+    out: &mut dyn Write,
+) -> ExitCode {
     let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
         let _ = writeln!(out, "Binaries: ERROR (HOME is not set)");
         let _ = writeln!(out, "Config: ERROR (HOME is not set)");
@@ -53,9 +58,11 @@ pub fn run(prefix: Option<PathBuf>, config_dir: Option<PathBuf>, out: &mut dyn W
         crate::doctor_storage::describe(&config_dir.join("daemon.toml"), &home)
     );
 
-    if [&binaries, &config, &tailscale, &service, &pairing]
-        .iter()
-        .all(|result| result.is_ok())
+    let pilot_ok = !pilot || crate::doctor_pilot::run(&config_dir.join("daemon.toml"), &home, out);
+    if pilot_ok
+        && [&binaries, &config, &tailscale, &service, &pairing]
+            .iter()
+            .all(|result| result.is_ok())
     {
         ExitCode::SUCCESS
     } else {
@@ -225,7 +232,7 @@ fn describe_updates(settings: Option<&Settings>, release: Option<&Release>) -> S
 
 /// `SENTINAL_TAILSCALE_CLI` when set; otherwise `tailscale` on PATH, then the
 /// CLI inside the macOS app bundle (the App Store/standalone app has no PATH entry).
-fn tailscale_candidates() -> Vec<PathBuf> {
+pub(crate) fn tailscale_candidates() -> Vec<PathBuf> {
     if let Some(explicit) =
         std::env::var_os("SENTINAL_TAILSCALE_CLI").filter(|value| !value.is_empty())
     {

@@ -216,7 +216,10 @@ fn publish(
 }
 
 /// Routes still to add on HTTPS 443, or why Serve cannot be used.
-fn serve_plan(status: &serde_json::Value, dns_name: &str) -> Result<Vec<ServeRoute>, String> {
+pub(crate) fn serve_plan(
+    status: &serde_json::Value,
+    dns_name: &str,
+) -> Result<Vec<ServeRoute>, String> {
     let host = format!("{dns_name}:443");
     if status
         .get("AllowFunnel")

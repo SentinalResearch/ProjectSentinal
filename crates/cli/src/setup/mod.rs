@@ -8,6 +8,7 @@ mod control;
 mod system;
 mod worker;
 
+pub(crate) use control::serve_plan;
 use std::{
     fs,
     io::{BufRead, Write},

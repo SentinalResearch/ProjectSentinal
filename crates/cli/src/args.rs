@@ -60,6 +60,10 @@ pub enum Command {
         /// Daemon configuration directory; defaults to ~/.config/terminal-agent.
         #[arg(long)]
         config_dir: Option<PathBuf>,
+        /// Also check a pilot control: loopback-only listeners, Serve and
+        /// Funnel, HTTPS, the published release, and backup age.
+        #[arg(long)]
+        pilot: bool,
     },
     /// Make this Machine a control, or connect it to one, after a preview.
     ///
@@ -85,6 +89,15 @@ pub enum Command {
         prefix: Option<PathBuf>,
         /// Daemon configuration directory; defaults to ~/.config/terminal-agent.
         #[arg(long)]
+        config_dir: Option<PathBuf>,
+    },
+    /// Back up or restore this Machine's config and data (credentials included).
+    Backup {
+        /// Backup operation.
+        #[command(subcommand)]
+        action: BackupAction,
+        /// Daemon configuration directory; defaults to ~/.config/terminal-agent.
+        #[arg(long, global = true)]
         config_dir: Option<PathBuf>,
     },
     /// Check, install, or roll back signed releases on the control.
@@ -302,4 +315,20 @@ pub enum SetupRoleArg {
     Control,
     /// Run Sessions for an existing control.
     Worker,
+}
+
+/// `sentinal backup` operations.
+#[derive(Debug, Subcommand)]
+pub enum BackupAction {
+    /// Stop sentinald, archive config and data (0600), and start it again.
+    Create {
+        /// Archive to write; defaults to ~/sentinal-backups/sentinal-backup-<time>.tar.gz.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Restore an archive onto a stopped install with no data.
+    Restore {
+        /// Archive written by `sentinal backup create`.
+        archive: PathBuf,
+    },
 }

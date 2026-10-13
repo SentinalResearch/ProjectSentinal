@@ -51,7 +51,7 @@ fn parses_doctor_with_optional_install_paths() {
 
     assert!(matches!(
         cli.command,
-        Command::Doctor { prefix: Some(prefix), config_dir: Some(config_dir) }
+        Command::Doctor { prefix: Some(prefix), config_dir: Some(config_dir), pilot: false }
             if prefix == Path::new("/opt/sentinal")
                 && config_dir == Path::new("/private/sentinal-config")
     ));

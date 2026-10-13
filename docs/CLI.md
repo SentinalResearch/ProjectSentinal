@@ -125,6 +125,16 @@ differently" (the file and reason are named) · 6 Tailscale missing or signed
 out. Without a terminal, pass `--role control --yes`, or
 `--role worker --control-url URL --code-stdin`.
 
+### `backup`
+
+`sentinal backup create` stops `sentinald`, writes an owner-only (0600)
+`tar.gz` of the config and data directories (default
+`~/sentinal-backups/sentinal-backup-<time>.tar.gz`), and starts it again. The
+archive holds credentials and terminal output; keep it private.
+`sentinal backup restore FILE` needs a stopped service and empty directories,
+and refuses any entry outside the two Sentinal directories. See
+`docs/PILOT.md`.
+
 ### Private install and `connect` flow
 
 An owner-controlled Tailnet control Machine can serve a
@@ -185,6 +195,10 @@ changes nothing. Besides Binaries, Config, Tailscale, and Service it prints:
   read from the link file. It never prints a credential. A control prints
   "not needed on the control".
 - `Updates`: the worker's control origin and channel, or `just receive-release` on a control.
+- `--pilot` (a control only) adds read-only `Pilot …` lines: listeners on
+  7420/7422 loopback-only, exactly the two Serve routes with Funnel off,
+  HTTPS health/dashboard/`install.sh`, the stable release, and a backup no
+  older than 7 days. Any `ERROR` makes `doctor` exit non-zero.
 - `Storage`: saved Session logs (size, count) against `[storage]`
   `session_log_max_bytes` and the age limit, plus audit-file and database size.
   It reads file sizes only.
@@ -259,7 +273,9 @@ sentinal connect CONTROL_URL [--name NAME] [--code-stdin]
 sentinal connection status [--json]
 sentinal disconnect
 sentinal identity reset [--yes]
-sentinal doctor [--prefix DIR] [--config-dir DIR]
+sentinal doctor [--prefix DIR] [--config-dir DIR] [--pilot]
+sentinal backup create [--output FILE] [--config-dir DIR]
+sentinal backup restore FILE [--config-dir DIR]
 sentinal update [--check | --rollback VERSION] [--prefix DIR]
 sentinal release check [--channel stable|beta] [--json]
 sentinal release update [--version V] [--yes] [--skip-provenance] [--health-timeout S]

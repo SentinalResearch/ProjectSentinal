@@ -52,8 +52,12 @@ async fn dispatch(
 ) -> Result<ExitCode, AppError> {
     // Hook commands never use the WebSocket API and need no token.
     let cli = match cli.command {
-        Command::Doctor { prefix, config_dir } => {
-            return Ok(crate::doctor::run(prefix, config_dir, out));
+        Command::Doctor {
+            prefix,
+            config_dir,
+            pilot,
+        } => {
+            return Ok(crate::doctor::run(prefix, config_dir, pilot, out));
         }
         Command::Setup {
             role,
@@ -80,6 +84,9 @@ async fn dispatch(
                 )
                 .await,
             ))
+        }
+        Command::Backup { action, config_dir } => {
+            return Ok(exit_code(backup(action, config_dir, out, err)))
         }
         Command::Release { action, options } => {
             return Ok(crate::release::run(action, options, out, err));
@@ -253,6 +260,7 @@ async fn dispatch(
         Command::Watch { .. }
         | Command::Doctor { .. }
         | Command::Setup { .. }
+        | Command::Backup { .. }
         | Command::Release { .. }
         | Command::Update { .. }
         | Command::Hook { .. }
@@ -398,6 +406,58 @@ async fn connect(
         err,
     )
     .await
+}
+
+fn backup(
+    action: crate::args::BackupAction,
+    config_dir: Option<PathBuf>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
+    use crate::backup::{create, restore, BackupPaths, UserService};
+    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+        let _ = writeln!(err, "sentinal backup: HOME is not set");
+        return 2;
+    };
+    let config_dir = config_dir.unwrap_or_else(|| home.join(".config/terminal-agent"));
+    let data_dir = std::fs::read_to_string(config_dir.join("daemon.toml"))
+        .ok()
+        .and_then(|text| toml::from_str::<toml::Value>(&text).ok())
+        .and_then(|value| value.get("data_dir")?.as_str().map(PathBuf::from))
+        .unwrap_or_else(|| home.join(protocol::local::DEFAULT_DATA_DIR));
+    let paths = BackupPaths {
+        home: home.clone(),
+        config_dir,
+        data_dir,
+    };
+    let result = match action {
+        crate::args::BackupAction::Create { output } => {
+            let output = output.unwrap_or_else(|| {
+                let stamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |elapsed| elapsed.as_secs());
+                home.join(format!("sentinal-backups/sentinal-backup-{stamp}.tar.gz"))
+            });
+            if let Some(parent) = output.parent() {
+                use std::os::unix::fs::DirBuilderExt;
+                let _ = std::fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(parent);
+            }
+            create(&paths, &output, &mut UserService, out)
+        }
+        crate::args::BackupAction::Restore { archive } => {
+            restore(&paths, &archive, &mut UserService, out)
+        }
+    };
+    match result {
+        Ok(()) => 0,
+        Err(message) => {
+            let _ = writeln!(err, "sentinal backup: {message}");
+            1
+        }
+    }
 }
 
 struct SetupArgs {
