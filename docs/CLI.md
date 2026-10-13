@@ -194,7 +194,7 @@ changes nothing. Besides Binaries, Config, Tailscale, and Service it prints:
 - `Pairing`: `CONNECTED to <control> as <name>`, `NOT CONNECTED`, or `REVOKED`,
   read from the link file. It never prints a credential. A control prints
   "not needed on the control".
-- `Updates`: the worker's control origin and channel, or `just receive-release` on a control.
+- `Updates`: the worker's control origin and channel, or `sentinal release update` on a control.
 - `--pilot` (a control only) adds read-only `Pilot …` lines: listeners on
   7420/7422 loopback-only, exactly the two Serve routes with Funnel off,
   HTTPS health/dashboard/`install.sh`, the stable release, and a backup no

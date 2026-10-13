@@ -235,7 +235,10 @@ fn doctor_says_the_control_needs_no_pairing_and_updates_from_releases() {
         stdout.contains("Pairing: not needed on the control"),
         "{stdout}"
     );
-    assert!(stdout.contains("Updates: just receive-release"), "{stdout}");
+    assert!(
+        stdout.contains("Updates: sentinal release update"),
+        "{stdout}"
+    );
 }
 
 struct Fixture {

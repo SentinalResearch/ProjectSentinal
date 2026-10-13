@@ -153,7 +153,7 @@ fn https(origin: &str) -> Result<String, String> {
         return Err("the dashboard did not answer".into());
     }
     if get("/install.sh").is_none() {
-        return Err("install.sh did not answer; publish a release (sentinal setup)".into());
+        return Err("install.sh did not answer; it appears once a release is published (see Pilot packages)".into());
     }
     Ok("health, dashboard, install.sh".into())
 }
@@ -161,7 +161,7 @@ fn https(origin: &str) -> Result<String, String> {
 fn packages(package_dir: Option<&Path>) -> Result<String, String> {
     let dir = package_dir.ok_or("[packages] has no directory")?;
     let text = std::fs::read_to_string(dir.join("channels/stable.json"))
-        .map_err(|_| "no release is published to stable".to_string())?;
+        .map_err(|_| "no release is published to stable; run sentinal setup, which publishes the installed release".to_string())?;
     let value: serde_json::Value =
         serde_json::from_str(&text).map_err(|_| "stable.json is not JSON".to_string())?;
     let version = value

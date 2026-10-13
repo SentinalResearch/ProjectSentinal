@@ -179,7 +179,7 @@ fn update_names_the_real_version_and_explains_a_missing_origin() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("has no update origin"), "{stderr}");
-    assert!(stderr.contains("just receive-release"), "{stderr}");
+    assert!(stderr.contains("sentinal release update"), "{stderr}");
     assert!(stderr.contains("install.sh"), "{stderr}");
 
     let version = Command::new(env!("CARGO_BIN_EXE_sentinal"))

@@ -92,7 +92,7 @@ pub enum UpdateError {
     /// The installed release records no control to update from.
     #[error(
         "this installation has no update origin ('{}' names no control_url). On the control, \
-         publish new releases with `just receive-release`; on a worker, reinstall once from \
+         update with `sentinal release update`; on a worker, reinstall once from \
          its control's https://…ts.net/install.sh",
         path.display()
     )]

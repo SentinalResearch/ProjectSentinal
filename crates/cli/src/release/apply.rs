@@ -283,12 +283,17 @@ pub(crate) fn publish_installed(
     })?;
     let version =
         Version::parse(version).ok_or_else(|| ReleaseError::InvalidVersion(version.into()))?;
-    let provenance = Command::new("gh")
-        .args(["attestation", "verify", "--help"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success());
+    // `gh attestation verify` needs gh 2.49+ *and* a signed-in gh; a fresh
+    // control usually has neither, and the owner signature is still required.
+    let gh = |args: &[&str]| {
+        Command::new("gh")
+            .args(args)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
+    };
+    let provenance = gh(&["attestation", "verify", "--help"]) && gh(&["auth", "status"]);
     let mut receive = Command::new(context.tool("receive-release.sh")?);
     receive
         .args([

@@ -219,7 +219,8 @@ fn check_pairing(settings: Option<&Settings>, link_file: &Path) -> Result<String
 
 fn describe_updates(settings: Option<&Settings>, release: Option<&Release>) -> String {
     if settings.is_some_and(|settings| settings.control_url.is_some()) {
-        return "just receive-release (this Machine is the control and publishes releases)".into();
+        return "sentinal release update (this Machine is the control and publishes releases)"
+            .into();
     }
     match release.and_then(|release| Some((release.control_url.as_deref()?, &release.channel))) {
         Some((url, channel)) => format!("{url} ({channel})"),
