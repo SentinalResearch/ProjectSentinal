@@ -126,13 +126,13 @@ if [[ "$skip_provenance" == true ]]; then
   echo "WARNING: published without GitHub build provenance (--skip-provenance); the owner signature was verified."
 fi
 
-"$SCRIPT_DIR/publish-worker-release.sh" publish --version "$version" --package-dir "$package_dir" "${artifacts[@]}" \
+bash "$SCRIPT_DIR/publish-worker-release.sh" publish --version "$version" --package-dir "$package_dir" "${artifacts[@]}" \
   --sums "$work/SHA256SUMS" --signature "$work/SHA256SUMS.sig" --allowed-signers "$allowed_signers"
 
 if [[ "$self_update" == false ]]; then
   exit 0
 fi
 # Self-update from the copy just published, re-verified by apply-release.sh.
-"$SCRIPT_DIR/apply-release.sh" --version "$version" --package-dir "$package_dir" \
+bash "$SCRIPT_DIR/apply-release.sh" --version "$version" --package-dir "$package_dir" \
   --allowed-signers "$allowed_signers" ${installer_args[@]+"${installer_args[@]}"} ||
   sentinal_package_die "published, but updating this control failed; its previous programs were restored"

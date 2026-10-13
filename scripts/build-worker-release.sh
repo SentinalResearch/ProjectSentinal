@@ -135,7 +135,9 @@ EOF
 # without duplicate hardlink entries when directories are listed explicitly.
 find "$root" -type d -exec chmod 755 {} +
 find "$root" -type f -exec chmod 644 {} +
-chmod 755 "$root/bin/sentinal" "$root/bin/sentinald" "$root/scripts/install-worker.sh"
+chmod 755 "$root/bin/sentinal" "$root/bin/sentinald" "$root/scripts/install-worker.sh" \
+  "$root/tools/scripts/receive-release.sh" "$root/tools/scripts/publish-worker-release.sh" \
+  "$root/tools/scripts/apply-release.sh"
 find "$root" -exec touch -t 198001010000 {} +
 (cd "$stage" && find sentinal-worker -print | LC_ALL=C sort >"$stage/entries")
 if tar --version 2>/dev/null | grep -qi 'gnu tar'; then

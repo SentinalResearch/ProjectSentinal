@@ -1059,6 +1059,30 @@ the e2e daemons do not have. It is part of the real-Machine acceptance.
 - `cli/tests/doctor_pilot.rs` (2: a correct pilot; exposure + Funnel + dead
   HTTPS).
 
+### Pilot findings from the v0.2.0 install (2026-10-13)
+
+- **Release tools not executable.** The builder's final mode normalization
+  (every file 644, then only the binaries and `install-worker.sh` back to 755)
+  undid the tools' 755. On a control, `receive-release.sh` was "Permission
+  denied", so `sentinal setup` could not publish workers' packages.
+  - Fixed: the builder restores 755 on the three tools (test:
+    `package-release-test.sh` checks the archive modes).
+  - The CLI and `receive-release.sh` now invoke the tools through `bash`, so
+    an already-installed 0.2.0 works too.
+- **Provenance without gh login.** `setup` asked for GitHub provenance whenever
+  `gh attestation verify --help` worked. It now also requires `gh auth status`;
+  the owner signature is always required.
+- **Owner password needed the Machine token** copied into the dashboard.
+  `sentinal setup` (control) now asks for the password at a hidden prompt and
+  sets it through `POST /api/v1/auth/setup` on loopback with the token it
+  reads itself.
+  - Nothing goes in argv.
+  - Re-running setup asks until a password exists.
+  - Without a terminal it is skipped, with a hint.
+  - Tests: `cli/tests/setup.rs` (+3) and a raw-request unit test.
+- **Doctor wording:** `Updates:` on a control names `sentinal release update`,
+  and the pilot package error says how to publish.
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

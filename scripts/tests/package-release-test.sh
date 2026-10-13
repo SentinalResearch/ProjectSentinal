@@ -64,6 +64,11 @@ for tool in tools/scripts/receive-release.sh tools/scripts/publish-worker-releas
   tools/scripts/lib/package-common.sh tools/scripts/lib/release-signature.sh tools/packaging/release-keys/allowed_signers; do
   printf '%s\n' "$entries" | grep -qx "sentinal-worker/$tool" || fail "archive is missing $tool"
 done
+# The release tools are run directly on the control, so they must stay executable.
+for tool in receive-release.sh publish-worker-release.sh apply-release.sh; do
+  mode="$(tar -tvzf "$first_artifact" "sentinal-worker/tools/scripts/$tool" | awk '{print $1}')"
+  [[ "$mode" == -rwxr-xr-x ]] || fail "tools/scripts/$tool is not executable in the archive ($mode)"
+done
 duplicates="$(printf '%s\n' "$entries" | LC_ALL=C sort | uniq -d)"
 [[ -z "$duplicates" ]] || fail "archive contains duplicate entries: $duplicates"
 while IFS= read -r listing; do

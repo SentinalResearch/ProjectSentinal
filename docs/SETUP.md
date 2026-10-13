@@ -528,12 +528,16 @@ output or authentication data is meant to exist in Cache Storage.
 ## First start and authentication
 
 The daemon creates an owner-only Machine token on first start. There is no
-default password. On the control Machine, start the UI as described below,
-open its displayed URL, and use the setup page to submit the Machine token
-and choose the single owner's password. Later browser visits use that
-password.
+default password. On the control, `sentinal setup` asks for the owner
+password at a hidden prompt (twice) and sets it with that token. You never
+see or copy the token; re-running setup asks again until a password exists.
 
-Read the bootstrap token only in a private worker terminal:
+Why a token at all: until a password exists, the setup page is reachable by
+anyone on your Tailnet. Requiring the token, which only a shell on the control
+can read, means only you can claim the dashboard.
+
+Manual fallback (the dashboard's setup page asks for the Machine token):
+read it only in a private terminal on the control:
 
 ```console
 $ cat ~/.config/terminal-agent/token

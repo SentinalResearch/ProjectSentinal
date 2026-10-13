@@ -61,7 +61,8 @@ pub(crate) fn update(
         out,
     )?;
 
-    let mut receive = Command::new(context.tool("receive-release.sh")?);
+    let mut receive = Command::new("bash");
+    receive.arg(context.tool("receive-release.sh")?);
     receive
         .args(["--version", &target.to_string(), "--package-dir"])
         .arg(&context.package_dir)
@@ -184,8 +185,9 @@ fn restore(context: &Context, version: Version) -> bool {
     ) else {
         return false;
     };
-    let mut pointer = Command::new(publisher);
+    let mut pointer = Command::new("bash");
     pointer
+        .arg(publisher)
         .args([
             "rollback",
             "--version",
@@ -193,8 +195,9 @@ fn restore(context: &Context, version: Version) -> bool {
             "--package-dir",
         ])
         .arg(&context.package_dir);
-    let mut apply = Command::new(applier);
+    let mut apply = Command::new("bash");
     apply
+        .arg(applier)
         .args(["--version", &version.to_string(), "--package-dir"])
         .arg(&context.package_dir)
         .arg("--allowed-signers")
@@ -294,7 +297,8 @@ pub(crate) fn publish_installed(
             .is_ok_and(|status| status.success())
     };
     let provenance = gh(&["attestation", "verify", "--help"]) && gh(&["auth", "status"]);
-    let mut receive = Command::new(context.tool("receive-release.sh")?);
+    let mut receive = Command::new("bash");
+    receive.arg(context.tool("receive-release.sh")?);
     receive
         .args([
             "--version",

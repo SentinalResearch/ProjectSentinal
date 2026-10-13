@@ -78,8 +78,11 @@ Setup previews every change, then applies it:
 It never turns on Funnel and never replaces a Serve route it did not create.
 Re-run it any time; on a finished control it prints "Nothing to do".
 
-Open `https://<vm>.<tailnet>.ts.net` on a Tailnet device and set the owner
-password.
+Last, setup asks for the dashboard's owner password (twice, hidden). There is
+no token to find or copy: setup reads the Machine token from
+`~/.config/terminal-agent/token` itself and sends both only to the daemon on
+`127.0.0.1`. Then open `https://<vm>.<tailnet>.ts.net` on a Tailnet device and
+sign in. If you skip the prompt, re-run `sentinal setup` to set it later.
 
 ## 4. Verify
 

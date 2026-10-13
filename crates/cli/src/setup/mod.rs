@@ -5,6 +5,7 @@
 
 pub mod config;
 mod control;
+mod password;
 mod system;
 mod worker;
 

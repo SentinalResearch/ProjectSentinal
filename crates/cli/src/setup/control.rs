@@ -108,11 +108,21 @@ pub(super) fn control(
                 "the daemon does not answer its health check; run sentinal doctor",
             );
         }
-        if published {
-            let _ = writeln!(io.out, "Nothing to do.");
-            return Outcome::Exit(exit::OK);
+        if !published {
+            if let Outcome::Exit(code) = publish(options, system, io, &origin) {
+                if code != exit::OK {
+                    return Outcome::Exit(code);
+                }
+            }
         }
-        return publish(options, system, io, &origin);
+        let had_password = system.password_needed() != Some(true);
+        let password = super::password::ensure(options, token_file(existing, options), system, io);
+        if published && had_password {
+            let _ = writeln!(io.out, "Nothing to do.");
+        } else if password {
+            let _ = writeln!(io.out, "Done. Open {origin} and sign in.");
+        }
+        return Outcome::Exit(exit::OK);
     }
 
     preview(
@@ -189,11 +199,23 @@ pub(super) fn control(
             }
         }
     }
-    let _ = writeln!(
-        io.out,
-        "Done. Open {origin} on a Tailnet device to set your password."
-    );
+    if super::password::ensure(options, token_file(existing, options), system, io) {
+        let _ = writeln!(io.out, "Done. Open {origin} and sign in.");
+    } else {
+        let _ = writeln!(
+            io.out,
+            "Done. Open {origin} once the owner password is set."
+        );
+    }
     Outcome::Exit(exit::OK)
+}
+
+/// The daemon's Machine token file (`token_file`, or the default).
+fn token_file(existing: Option<&str>, options: &SetupOptions) -> PathBuf {
+    existing
+        .and_then(|text| toml::from_str::<toml::Value>(text).ok())
+        .and_then(|value| value.get("token_file")?.as_str().map(PathBuf::from))
+        .unwrap_or_else(|| options.config_dir.join("token"))
 }
 
 fn publish(

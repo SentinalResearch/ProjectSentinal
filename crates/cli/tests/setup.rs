@@ -40,6 +40,9 @@ struct Fake {
     restart_fails: bool,
     unhealthy: bool,
     discovered: cli::discovery::Discovered,
+    password_needed: Option<bool>,
+    typed: std::collections::VecDeque<String>,
+    password_set: Option<String>,
     calls: Vec<String>,
 }
 
@@ -86,6 +89,21 @@ impl System for Fake {
     }
     fn discover(&mut self) -> Result<cli::discovery::Discovered, String> {
         Ok(self.discovered.clone())
+    }
+    fn password_needed(&mut self) -> Option<bool> {
+        self.password_needed
+    }
+    fn read_password(&mut self, _prompt: &str) -> Option<String> {
+        self.typed.pop_front()
+    }
+    fn set_password(&mut self, token_file: &Path, password: &str) -> Result<(), String> {
+        self.calls.push(format!(
+            "set password with {}",
+            token_file.file_name().unwrap().to_string_lossy()
+        ));
+        self.password_set = Some(password.to_string());
+        self.password_needed = Some(false);
+        Ok(())
     }
 }
 
@@ -541,6 +559,96 @@ fn a_control_that_supports_approval_is_asked_to_approve() {
             control_name: "Owner's Sentinal".into(),
             name: None,
         },
+        "{stdout}"
+    );
+}
+
+const PASSWORD: &str = "correct horse battery";
+
+#[test]
+fn the_control_sets_the_owner_password_without_showing_the_token() {
+    let setup = Setup::new("password");
+    let mut fake = Fake {
+        password_needed: Some(true),
+        typed: ["short", PASSWORD, "different password", PASSWORD, PASSWORD]
+            .map(String::from)
+            .into(),
+        ..linux()
+    };
+    let (outcome, stdout, stderr) =
+        setup.run(setup.options(Some(SetupRole::Control), true), &mut fake, "");
+    assert_eq!(outcome, Outcome::Exit(0), "{stderr}");
+    assert_eq!(fake.password_set.as_deref(), Some(PASSWORD));
+    assert!(
+        fake.calls.contains(&"set password with token".to_string()),
+        "{:?}",
+        fake.calls
+    );
+    assert!(stdout.contains("at least 12 characters"), "{stdout}");
+    assert!(stdout.contains("did not match"), "{stdout}");
+    assert!(stdout.contains("✓ owner password"), "{stdout}");
+    assert!(
+        stdout.contains(&format!("Open {ORIGIN} and sign in")),
+        "{stdout}"
+    );
+    assert!(!stdout.contains(PASSWORD) && !stderr.contains(PASSWORD));
+}
+
+#[test]
+fn rerunning_asks_for_a_missing_password_and_cancelling_skips_it() {
+    let setup = Setup::new("password-rerun");
+    setup.run(
+        setup.options(Some(SetupRole::Control), true),
+        &mut linux(),
+        "",
+    );
+    fs::create_dir_all(setup.data_dir.join("packages/releases")).unwrap();
+    fs::write(setup.data_dir.join("packages/releases/0.1.18.json"), "{}").unwrap();
+    let serve = serde_json::json!({"Web": {format!("{DNS}:443"): {"Handlers": {
+        "/": {"Proxy": "http://127.0.0.1:7422"},
+        "/api": {"Proxy": "http://127.0.0.1:7420/api"}}}}});
+
+    let mut fake = Fake {
+        serve: serve.clone(),
+        linger: Some(true),
+        password_needed: Some(true),
+        typed: [PASSWORD, PASSWORD].map(String::from).into(),
+        ..Fake::default()
+    };
+    let (outcome, stdout, _) = setup.run(setup.options(None, false), &mut fake, "1\n");
+    assert_eq!(outcome, Outcome::Exit(0));
+    assert_eq!(fake.password_set.as_deref(), Some(PASSWORD), "{stdout}");
+
+    let mut cancelled = Fake {
+        serve,
+        linger: Some(true),
+        password_needed: Some(true),
+        ..Fake::default()
+    };
+    let (outcome, stdout, _) = setup.run(setup.options(None, false), &mut cancelled, "1\n");
+    assert_eq!(outcome, Outcome::Exit(0));
+    assert!(cancelled.password_set.is_none());
+    assert!(stdout.contains("run sentinal setup again"), "{stdout}");
+}
+
+#[test]
+fn without_a_terminal_the_password_is_left_for_later() {
+    let setup = Setup::new("password-no-tty");
+    let mut fake = Fake {
+        password_needed: Some(true),
+        typed: [PASSWORD, PASSWORD].map(String::from).into(),
+        ..linux()
+    };
+    let mut options = setup.options(Some(SetupRole::Control), true);
+    options.interactive = false;
+    let (outcome, stdout, _) = setup.run(options, &mut fake, "");
+    assert_eq!(outcome, Outcome::Exit(0));
+    assert!(
+        fake.password_set.is_none(),
+        "never prompts without a terminal"
+    );
+    assert!(
+        stdout.contains("run sentinal setup in a terminal"),
         "{stdout}"
     );
 }
