@@ -229,4 +229,31 @@ if "$builder" --version 0.0.4 --target x86_64-apple-darwin \
   fail 'builder accepted a group-writable supplied binary'
 fi
 
+# Retention: the newest 5 releases (and whatever stable points at) are kept;
+# older manifests, signatures, and artifacts are deleted after a publish.
+retention_dir="$test_root/retention packages"
+for patch in 1 2 3 4 5 6 7; do
+  build="$test_root/retention build $patch"
+  "$builder" --version "0.1.$patch" --target x86_64-apple-darwin \
+    --bin-dir "$fake_bins" --output "$build" --source-date-epoch 1790712000 >/dev/null
+  sign_dir "$build"
+  "$publisher" publish --version "0.1.$patch" --package-dir "$retention_dir" \
+    --artifact "$build/sentinal-worker-0.1.$patch-x86_64-apple-darwin.tar.gz" \
+    --sums "$build/SHA256SUMS" --signature "$build/SHA256SUMS.sig" --allowed-signers "$allowed" >/dev/null
+done
+kept="$(cd "$retention_dir/releases" && ls ./*.json | sed 's#^\./##; s#\.json$##' | LC_ALL=C sort | tr '\n' ' ')"
+[[ "$kept" == "0.1.3 0.1.4 0.1.5 0.1.6 0.1.7 " ]] || fail "retention kept '$kept'"
+[[ ! -e "$retention_dir/releases/0.1.2.SHA256SUMS" && ! -e "$retention_dir/releases/0.1.2.SHA256SUMS.sig" ]] ||
+  fail 'retention left an old signature behind'
+[[ ! -e "$retention_dir/artifacts/sentinal-worker-0.1.1-x86_64-apple-darwin.tar.gz" ]] || fail 'retention left an old artifact'
+[[ -e "$retention_dir/artifacts/sentinal-worker-0.1.3-x86_64-apple-darwin.tar.gz" ]] || fail 'retention deleted a kept artifact'
+grep -q '"release_version": "0.1.7"' "$retention_dir/channels/stable.json" || fail 'stable does not point at the newest release'
+
+# A rolled-back channel keeps its release even when newer ones push it out.
+"$publisher" rollback --version 0.1.3 --package-dir "$retention_dir" >/dev/null
+SENTINAL_PACKAGE_KEEP=2 "$publisher" prune --package-dir "$retention_dir" >/dev/null
+kept="$(cd "$retention_dir/releases" && ls ./*.json | sed 's#^\./##; s#\.json$##' | LC_ALL=C sort | tr '\n' ' ')"
+[[ "$kept" == "0.1.3 0.1.6 0.1.7 " ]] || fail "prune with stable on 0.1.3 kept '$kept'"
+
 echo 'package release test: passed'
+

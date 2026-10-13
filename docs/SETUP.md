@@ -103,6 +103,16 @@ The publisher validates target, size, and SHA-256; installs immutable files
 first; and atomically moves `stable` last. Reusing a version with different
 bytes is refused. An interruption cannot partially advance stable.
 
+After each publish the publisher keeps the newest 5 releases plus the one
+`stable` points at. It deletes older manifests, signatures, and artifacts,
+so rollback reaches the last 5 releases. Set `SENTINAL_PACKAGE_KEEP` to change
+the number, or run `publish-worker-release.sh prune --package-dir DIR` alone.
+
+Workers follow the control's channel. The control publishes what its release
+policy follows (`sentinal release policy … --channel beta` includes
+pre-releases) to the one worker channel, so every worker gets what the control
+runs.
+
 Enable the package role in the control Machine's existing
 `~/.config/terminal-agent/daemon.toml` using real absolute values:
 

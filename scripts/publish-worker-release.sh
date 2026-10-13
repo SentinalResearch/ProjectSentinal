@@ -12,6 +12,10 @@ Usage:
   scripts/publish-worker-release.sh publish --version VERSION --package-dir DIR --artifact FILE [--artifact FILE...]
       --sums SHA256SUMS --signature SHA256SUMS.sig [--allowed-signers FILE] [--published-at MS]
   scripts/publish-worker-release.sh rollback --version VERSION --package-dir DIR
+  scripts/publish-worker-release.sh prune --package-dir DIR
+
+Publishing prunes automatically: the newest SENTINAL_PACKAGE_KEEP (default 5)
+releases and the one stable points at are kept, older ones are deleted.
 EOF
 }
 
@@ -40,11 +44,48 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-sentinal_package_valid_version "$version" || sentinal_package_die "invalid release version '$version'; expected MAJOR.MINOR.PATCH"
+[[ "$action" == prune ]] || sentinal_package_valid_version "$version" ||
+  sentinal_package_die "invalid release version '$version'; expected MAJOR.MINOR.PATCH"
 [[ -n "$package_dir" ]] || sentinal_package_die "--package-dir is required"
 sentinal_package_require_absolute package "$package_dir"
 mkdir -p "$package_dir/channels" "$package_dir/releases" "$package_dir/artifacts" "$package_dir/.staging"
 chmod 700 "$package_dir" "$package_dir/channels" "$package_dir/releases" "$package_dir/artifacts" "$package_dir/.staging"
+
+# Delete releases beyond the newest $SENTINAL_PACKAGE_KEEP, never the one
+# stable points at: manifests, signatures, and artifacts no kept release uses.
+prune_releases() {
+  local keep="${SENTINAL_PACKAGE_KEEP:-5}" pinned="" version name
+  [[ "$keep" =~ ^[1-9][0-9]*$ ]] || sentinal_package_die "SENTINAL_PACKAGE_KEEP must be a positive integer"
+  if [[ -f "$package_dir/channels/stable.json" ]]; then
+    pinned="$(sed -n 's/.*"release_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$package_dir/channels/stable.json" | head -n 1)"
+  fi
+  local index=0
+  while IFS= read -r version; do
+    [[ -n "$version" ]] || continue
+    index=$((index + 1))
+    if ((index <= keep)) || [[ "$version" == "$pinned" ]]; then
+      continue
+    fi
+    sentinal_package_valid_version "$version" || continue
+    rm -f -- "$package_dir/releases/$version.json" "$package_dir/releases/$version.SHA256SUMS" \
+      "$package_dir/releases/$version.SHA256SUMS.sig"
+    for name in "$package_dir/artifacts/sentinal-worker-$version-"*.tar.gz; do
+      [[ -e "$name" ]] && rm -f -- "$name"
+    done
+    echo "Pruned Sentinal worker $version"
+  done < <(
+    for name in "$package_dir/releases/"*.json; do
+      [[ -f "$name" && ! -L "$name" ]] || continue
+      name="$(basename "$name" .json)"
+      printf '%s\n' "$name"
+    done | LC_ALL=C sort -t. -k1,1nr -k2,2nr -k3,3nr
+  )
+}
+
+if [[ "$action" == prune ]]; then
+  prune_releases
+  exit 0
+fi
 
 if [[ "$action" == rollback ]]; then
   [[ ${#artifacts[@]} -eq 0 ]] || sentinal_package_die "rollback does not accept artifacts"
@@ -172,3 +213,4 @@ cp "$release" "$temporary_channel"
 chmod 600 "$temporary_channel"
 mv -f "$temporary_channel" "$package_dir/channels/stable.json"
 echo "Published Sentinal worker $version to stable"
+prune_releases

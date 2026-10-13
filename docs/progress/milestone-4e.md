@@ -1005,8 +1005,23 @@ the e2e daemons do not have. It is part of the real-Machine acceptance.
 - `WorkerUpdatesCard.test.tsx` (4).
 - Playwright 13/13.
 
-**Next (7b):** the beta channel and retention of 5 releases per channel in
-the publishing scripts.
+### Step 7b — retention and the channel decision (2026-10-13)
+
+- **Retention:** `publish-worker-release.sh` prunes after every publish. It
+  keeps the newest `SENTINAL_PACKAGE_KEEP` releases (default 5), ordered by
+  version, plus whatever `stable` points at. It deletes older
+  `releases/<v>.{json,SHA256SUMS,SHA256SUMS.sig}` and
+  `artifacts/sentinal-worker-<v>-*`. There is also a standalone
+  `prune --package-dir DIR`. Test: `package-release-test.sh` (7 publishes →
+  0.1.3–0.1.7; a rolled-back stable keeps its release under `KEEP=2`).
+- **Beta (deviation from §10):** there is no separate worker `beta` pointer.
+  The control's release policy already chooses stable or beta from GitHub
+  (step 2), and whatever it receives is published to the one worker channel.
+  Workers therefore follow the control's choice.
+  - Why: a second worker pointer would need a channel-aware manifest, package
+    route, bootstrap `install.sh`, and `sentinal update`, which is four
+    formats for a single-owner pilot.
+  - Revisit with fleets that need mixed channels.
 
 ## Proving tests
 
