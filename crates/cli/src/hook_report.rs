@@ -229,6 +229,8 @@ fn kind_of(response: &LocalResponse) -> String {
         LocalResponse::Command { .. } => "COMMAND".into(),
         LocalResponse::Identity { .. } => "IDENTITY".into(),
         LocalResponse::Connection { .. } => "CONNECTION".into(),
+        LocalResponse::ApprovalRequested { .. } => "APPROVAL_REQUESTED".into(),
+        LocalResponse::ApprovalState { .. } => "APPROVAL_STATE".into(),
         LocalResponse::Error { code, .. } => format!("ERROR {code:?}"),
     }
 }

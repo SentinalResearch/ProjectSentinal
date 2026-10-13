@@ -139,7 +139,7 @@ async fn a_control_names_itself_without_authentication() {
     assert_eq!(discovery.display_name, "Owner's Sentinal");
     assert_eq!(discovery.control_machine_id.0, CONTROL_ID);
     assert_eq!(discovery.release, "0.1.18");
-    assert!(discovery.pairing.code);
+    assert!(discovery.pairing.code && discovery.pairing.approval);
 
     let fallback = daemon(true, None);
     let (_, _, body) = get(&fallback).await;

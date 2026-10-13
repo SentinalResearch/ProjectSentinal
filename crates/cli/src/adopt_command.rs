@@ -215,7 +215,9 @@ async fn adopt(
         }
         LocalResponse::Command { .. }
         | LocalResponse::Identity { .. }
-        | LocalResponse::Connection { .. } => Err("sentinald sent an unexpected reply".into()),
+        | LocalResponse::Connection { .. }
+        | LocalResponse::ApprovalRequested { .. }
+        | LocalResponse::ApprovalState { .. } => Err("sentinald sent an unexpected reply".into()),
     }
 }
 

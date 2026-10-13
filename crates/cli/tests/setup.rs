@@ -522,3 +522,25 @@ fn with_no_control_found_the_owner_types_a_url() {
         }
     );
 }
+
+#[test]
+fn a_control_that_supports_approval_is_asked_to_approve() {
+    let setup = Setup::new("discover-approve");
+    let mut discovered = found(&[(DNS, "Owner's Sentinal")]);
+    discovered.controls[0].discovery.pairing.approval = true;
+    let mut fake = Fake {
+        discovered,
+        ..linux()
+    };
+    let (outcome, stdout, _) = setup.run(setup.options(None, false), &mut fake, "2\n1\n");
+    assert_eq!(
+        outcome,
+        Outcome::Approve {
+            control_url: ORIGIN.into(),
+            control_machine_id: protocol::MachineId("01K2C7RQ9M3X8V6T4N2P0SDB5A".into()),
+            control_name: "Owner's Sentinal".into(),
+            name: None,
+        },
+        "{stdout}"
+    );
+}

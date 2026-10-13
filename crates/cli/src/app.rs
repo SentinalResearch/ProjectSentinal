@@ -444,6 +444,33 @@ async fn setup(args: SetupArgs, out: &mut dyn Write, err: &mut dyn Write) -> i32
     };
     match outcome {
         Outcome::Exit(code) => code,
+        Outcome::Approve {
+            control_url,
+            control_machine_id,
+            control_name,
+            name,
+        } => {
+            let Some(socket) = connect_command::default_socket() else {
+                let _ = writeln!(err, "sentinal: HOME is not set; set SENTINAL_SOCKET");
+                return connect_command::exit::LOCAL_DAEMON;
+            };
+            crate::approval_command::approve(
+                &socket,
+                crate::approval_command::ApprovalTarget {
+                    control_url: &control_url,
+                    control_name: &control_name,
+                    control_machine_id: &control_machine_id,
+                },
+                name.as_deref(),
+                std::time::Duration::from_secs(2),
+                async {
+                    let _ = tokio::signal::ctrl_c().await;
+                },
+                out,
+                err,
+            )
+            .await
+        }
         Outcome::Connect { control_url, name } => {
             connect(&control_url, name.as_deref(), args.code_stdin, out, err).await
         }

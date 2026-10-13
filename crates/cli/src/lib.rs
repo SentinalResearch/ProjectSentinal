@@ -2,6 +2,7 @@
 
 pub mod adopt_command;
 pub mod app;
+pub mod approval_command;
 pub mod args;
 pub mod auto_command;
 pub mod auto_wrap;

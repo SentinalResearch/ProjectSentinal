@@ -4,6 +4,7 @@
 //! credential it presents and only a SHA-256 of the control credential it
 //! verifies. The pairing code passes through once, in one request body.
 
+mod approval;
 mod client;
 mod file;
 
@@ -360,6 +361,7 @@ struct Inner {
     heartbeats_running: AtomicBool,
     projection_store: Mutex<Option<Arc<Store>>>,
     projection_directive: Mutex<Option<ProjectionSyncDirective>>,
+    approval: Mutex<Option<approval::PendingApproval>>,
 }
 
 /// This daemon's link to an owner-selected control Machine.
@@ -382,6 +384,7 @@ impl LinkManager {
                 heartbeats_running: AtomicBool::new(false),
                 projection_store: Mutex::new(None),
                 projection_directive: Mutex::new(None),
+                approval: Mutex::new(None),
             }),
         };
         if matches!(manager.read_link(), Ok(Some(link)) if link.state == StoredState::Active) {
@@ -518,6 +521,16 @@ impl LinkManager {
                 .await
                 .map(|connection| LocalResponse::Connection { connection }),
             LocalRequest::ResetIdentity => self.reset_identity().await,
+            LocalRequest::RequestApproval {
+                control_url,
+                control_machine_id,
+                display_name,
+            } => {
+                self.request_approval(&control_url, control_machine_id, display_name.as_deref())
+                    .await
+            }
+            LocalRequest::ClaimApproval => self.claim_approval().await,
+            LocalRequest::CancelApproval => self.cancel_approval().await,
             _ => Err(LinkFailure::new(
                 LocalErrorCode::Unavailable,
                 "not a Machine link request",

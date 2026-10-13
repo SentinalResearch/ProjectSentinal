@@ -64,7 +64,7 @@ impl ControlService {
                 max: protocol::PROTOCOL_VERSION,
             },
             pairing: PairingSupport {
-                approval: false,
+                approval: true,
                 code: true,
             },
         }

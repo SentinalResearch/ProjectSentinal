@@ -16,7 +16,16 @@ pub(super) fn worker(
             None => return io.cancelled(),
         },
         None => match choose(system, io) {
-            Ok(Some(url)) => url,
+            Ok(Some(Choice::Discovered(found))) if found.pairing.approval => {
+                return Outcome::Approve {
+                    control_url: found.origin,
+                    control_machine_id: found.control_machine_id,
+                    control_name: found.display_name,
+                    name: options.name.clone(),
+                }
+            }
+            Ok(Some(Choice::Discovered(found))) => found.origin,
+            Ok(Some(Choice::Typed(url))) => url,
             Ok(None) => return io.cancelled(),
             Err(outcome) => return outcome,
         },
@@ -40,8 +49,16 @@ fn ask_url(io: &mut Io<'_>) -> Option<String> {
         .filter(|url| !url.is_empty())
 }
 
+/// What the owner picked.
+enum Choice {
+    /// A control discovery found (and validated).
+    Discovered(protocol::pairing::DiscoveryResponse),
+    /// A URL typed by hand: one-time code.
+    Typed(String),
+}
+
 /// Discover, list, and let the owner pick; `Ok(None)` is a cancel.
-fn choose(system: &mut dyn System, io: &mut Io<'_>) -> Result<Option<String>, Outcome> {
+fn choose(system: &mut dyn System, io: &mut Io<'_>) -> Result<Option<Choice>, Outcome> {
     let _ = writeln!(io.out, "Looking for Sentinal controls on your Tailnet…");
     let found = match system.discover() {
         Ok(found) => found,
@@ -64,7 +81,7 @@ fn choose(system: &mut dyn System, io: &mut Io<'_>) -> Result<Option<String>, Ou
             io.out,
             "No Sentinal control found on your Tailnet. Enter its URL to use a one-time code."
         );
-        return Ok(ask_url(io));
+        return Ok(ask_url(io).map(Choice::Typed));
     }
     for (index, control) in found.controls.iter().enumerate() {
         let discovery = &control.discovery;
@@ -84,10 +101,10 @@ fn choose(system: &mut dyn System, io: &mut Io<'_>) -> Result<Option<String>, Ou
         return Ok(None);
     };
     match answer.parse::<usize>() {
-        Ok(choice) if (1..other).contains(&choice) => {
-            Ok(Some(found.controls[choice - 1].discovery.origin.clone()))
-        }
-        Ok(choice) if choice == other => Ok(ask_url(io)),
+        Ok(choice) if (1..other).contains(&choice) => Ok(Some(Choice::Discovered(
+            found.controls[choice - 1].discovery.clone(),
+        ))),
+        Ok(choice) if choice == other => Ok(ask_url(io).map(Choice::Typed)),
         _ => Ok(None),
     }
 }

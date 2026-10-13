@@ -416,12 +416,12 @@ fn read_code(
     }
 }
 
-enum LocalCallError {
+pub(crate) enum LocalCallError {
     Unavailable(String),
     Timeout,
 }
 
-async fn local(
+pub(crate) async fn local(
     socket: &Path,
     request: LocalRequest,
     deadline: Duration,
@@ -436,7 +436,7 @@ async fn local(
     }
 }
 
-fn report_local_error(error: LocalCallError, err: &mut dyn Write) -> i32 {
+pub(crate) fn report_local_error(error: LocalCallError, err: &mut dyn Write) -> i32 {
     let message = match error {
         LocalCallError::Unavailable(message) => message,
         LocalCallError::Timeout => "sentinald did not answer in time".into(),
@@ -445,7 +445,7 @@ fn report_local_error(error: LocalCallError, err: &mut dyn Write) -> i32 {
     exit::LOCAL_DAEMON
 }
 
-fn failure(response: LocalResponse, err: &mut dyn Write) -> i32 {
+pub(crate) fn failure(response: LocalResponse, err: &mut dyn Write) -> i32 {
     let (code, message) = match response {
         LocalResponse::Error { code, message } => (code, message),
         _ => (

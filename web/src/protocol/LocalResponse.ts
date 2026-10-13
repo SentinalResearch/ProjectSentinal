@@ -3,7 +3,9 @@ import type { Command } from "./Command";
 import type { ConnectionReport } from "./ConnectionReport";
 import type { LocalErrorCode } from "./LocalErrorCode";
 import type { MachineId } from "./MachineId";
+import type { PairingRequestState } from "./PairingRequestState";
 import type { Session } from "./Session";
+import type { Timestamp } from "./Timestamp";
 
 /**
  * Replies emitted by the private local Unix socket.
@@ -36,6 +38,26 @@ export type LocalResponse = {
    * Link state without secrets.
    */
   connection: ConnectionReport;
+} | {
+  "type": "APPROVAL_REQUESTED";
+  /**
+   * `pr_` handle.
+   */
+  request_id: string;
+  /**
+   * Words the owner must see on the control too.
+   */
+  verification_words: Array<string>;
+  /**
+   * When the request expires.
+   */
+  expires_at: Timestamp;
+} | {
+  "type": "APPROVAL_STATE";
+  /**
+   * `PENDING` (ask again), `REJECTED`, `CANCELLED`, or `EXPIRED`.
+   */
+  state: PairingRequestState;
 } | {
   "type": "ERROR";
   /**

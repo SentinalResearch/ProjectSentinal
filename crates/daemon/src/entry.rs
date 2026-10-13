@@ -287,6 +287,9 @@ pub async fn run() -> Result<(), DaemonError> {
                 | LocalRequest::ConnectControl { .. }
                 | LocalRequest::ConnectionStatus
                 | LocalRequest::DisconnectControl
+                | LocalRequest::RequestApproval { .. }
+                | LocalRequest::ClaimApproval
+                | LocalRequest::CancelApproval
                 | LocalRequest::ResetIdentity => link.handle_local(request).await,
                 other => sessions.handle_local(other),
             }

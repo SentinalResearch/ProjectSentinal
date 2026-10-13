@@ -868,6 +868,65 @@ phone:
   accepting an answer without the origin check fails a test.
 - `cli/tests/setup.rs` (+3: list and pick, no auto-pick, none found).
 
+### Step 5 — approval pairing (2026-10-13)
+
+- **5a, protocol** (`6a488f1`):
+  - request/created/proof/list/approval/claim/cancel types;
+  - `MACHINE_ALREADY_LINKED`, `PAIRING_BUSY`, `INVALID_CLAIM`;
+  - the 256-word list;
+  - words = the first 4 bytes of SHA-256 over the NUL-separated
+    `sentinal-pair-v1` transcript;
+  - a shared vector in the fixture, computed independently in Python.
+- **5b, store** (`4482c98`): migration **010** (008/009 were taken by 4.D.1),
+  holding only the secret's hash and public nonces.
+  - Approval requires a verified, unexpired PENDING row.
+  - Claim requires the secret hash and an APPROVED, unclaimed, unexpired row.
+    It writes the Machine and link in one transaction, using the registry/link
+    writes now shared with code exchange; approval applies the owner's name.
+- **5c, control** (`7b6d7e8`): `POST /api/v1/pairing/requests` verifies
+  before answering.
+  - The control calls the claimed endpoint back:
+    `GET http://<addr>:<port>/api/v1/pairing/proof/<id>` must echo the request
+    ID, the secret hash, and this control's ID.
+  - Then `tailscale whois --json <addr>` must name the node at the same
+    address.
+  - Otherwise the request is cancelled and the reply is 403.
+  - The owner lists, approves, and rejects. The worker claims (202/200/403/410,
+    409 once claimed) or cancels.
+  - Limits are control-wide: 5 pending, 20 per 10 min, and 20 wrong secrets
+    cancel every open request.
+- **5d, worker** (this commit):
+  - The daemon (`link/approval.rs`) creates the secret and an unrelated
+    control credential, and binds the first proof callback's request ID.
+  - It refuses a reply naming a different control ID or request ID, and saves
+    the link only on claim. The request is kept in memory only.
+  - Local socket: `REQUEST_APPROVAL`, `CLAIM_APPROVAL`, `CANCEL_APPROVAL`.
+  - `sentinal setup` sends a discovered control that advertises `approval`
+    through `approval_command.rs` (words, 2 s claims, Ctrl-C cancels).
+    Discovery now advertises `approval: true`.
+
+**Deviations from §6:**
+- **Migration number:** 010, not 008.
+- **Pending requests are in memory on the worker:** a worker restart abandons
+  them.
+- **A mismatched control ID makes the control refuse the proof (403).** The
+  worker therefore reports "could not verify (unreachable, or not the control
+  that was discovered)" rather than a dedicated "different control" message.
+
+**Tests:**
+- `protocol/tests/pairing.rs` (6);
+- `store/tests/pairing_requests.rs` (4; mutation-checked: dropping the
+  `proof_ok` or the secret condition fails a test);
+- `daemon/tests/approval_api.rs` (6; mutation-checked: an unchecked proof
+  secret fails a test);
+- `daemon/tests/approval_link.rs` (4, worker ↔ control over loopback HTTP
+  with the real proof path);
+- `cli/tests/approval_command.rs` (3);
+- `cli/tests/setup.rs` (+1).
+
+**Not usable end to end yet:** the owner approves through the API only until
+the step 6 dashboard UI lands.
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

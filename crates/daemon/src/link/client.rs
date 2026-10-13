@@ -103,4 +103,30 @@ impl ControlClient {
             ))),
         }
     }
+
+    /// Send `body` and return the status and a bounded body, whatever the status.
+    pub(super) async fn send_raw<B: Serialize>(
+        &self,
+        method: reqwest::Method,
+        control_url: &str,
+        path: &str,
+        body: &B,
+    ) -> Result<(reqwest::StatusCode, Vec<u8>), CallError> {
+        let response = self
+            .http
+            .request(method, format!("{control_url}{path}"))
+            .json(body)
+            .send()
+            .await
+            .map_err(|error| CallError::Unreachable(error.without_url().to_string()))?;
+        let status = response.status();
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|error| CallError::Unreachable(error.without_url().to_string()))?;
+        if bytes.len() > 64 * 1024 {
+            return Err(CallError::Unexpected("response too large".into()));
+        }
+        Ok((status, bytes.to_vec()))
+    }
 }

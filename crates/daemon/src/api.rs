@@ -397,6 +397,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/api/v1/health", get(health))
         .route("/api/v1/link/identity", get(link_identity))
+        .route("/api/v1/pairing/proof/{request_id}", get(pairing_proof))
         .merge(auth_routes::routes())
         .merge(protected)
         .with_state(state)
@@ -405,6 +406,21 @@ pub fn router(state: AppState) -> Router {
             origins,
             crate::origin::enforce,
         ))
+}
+
+/// Approval pairing callback: proof that this worker made the open request.
+async fn pairing_proof(
+    State(state): State<AppState>,
+    axum::extract::Path(request_id): axum::extract::Path<String>,
+) -> Response {
+    match state
+        .link
+        .as_ref()
+        .and_then(|link| link.pairing_proof(&request_id))
+    {
+        Some(proof) => Json(proof).into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 /// The control proves its link: its bearer must hash to the stored value.

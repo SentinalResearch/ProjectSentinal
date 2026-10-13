@@ -106,7 +106,12 @@ and otherwise prints "Nothing to do".
 - **Worker:** option 2 lists the controls found on the Tailnet (name,
   origin, release, and a short control ID) and never picks one by itself;
   option 3, or `--control-url`, takes a typed URL. Either way it continues with
-  the one-time code (`connect`) until click-to-approve pairing lands.
+  the one-time code (`connect`) when the control predates approval pairing.
+  A discovered control that supports approval gets a request instead: setup
+  prints four verification words and the control's name and short ID, and the
+  owner approves the request whose words match in the dashboard. The daemon
+  holds the request secret; setup only asks it to claim every 2 s. Ctrl-C
+  withdraws the request. Exit 4 means rejected or expired (10 minutes).
   Discovery reads only `tailscale status --json`: online peers with a `.ts.net`
   name and a Tailscale address, at most 64 peers and 8 probes at a time, about
   6 s in all. Each probe is `https://<peer>/api/v1/discovery`, pinned to that

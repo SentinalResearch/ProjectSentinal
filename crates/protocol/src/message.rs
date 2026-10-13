@@ -321,6 +321,19 @@ pub enum LocalRequest {
     DisconnectControl,
     /// Replace a corrupt or unwanted Machine identity with a new one.
     ResetIdentity,
+    /// Ask a discovered control to approve this Machine (4.E §6).
+    RequestApproval {
+        /// Control origin.
+        control_url: String,
+        /// The control's Machine ID from discovery; a different answer is refused.
+        control_machine_id: MachineId,
+        /// Proposed display name; the hostname when absent.
+        display_name: Option<String>,
+    },
+    /// Try to claim the pending approval once.
+    ClaimApproval,
+    /// Withdraw the pending approval request.
+    CancelApproval,
 }
 
 impl LocalRequest {
@@ -379,6 +392,25 @@ impl LocalRequest {
                     .transpose()?;
                 Ok(())
             }
+            LocalRequest::RequestApproval {
+                control_url,
+                control_machine_id,
+                display_name,
+            } => {
+                validate_control_url(control_url, ControlUrlPolicy::Development)
+                    .or_else(|_| validate_control_url(control_url, ControlUrlPolicy::Production))?;
+                if !control_machine_id.is_ulid() {
+                    return Err(ProtocolError::InvalidPairingRequest(
+                        "control Machine ID is not a ULID",
+                    ));
+                }
+                display_name
+                    .as_deref()
+                    .map(validate_display_name)
+                    .transpose()?;
+                Ok(())
+            }
+            LocalRequest::ClaimApproval | LocalRequest::CancelApproval => Ok(()),
             LocalRequest::GetIdentity
             | LocalRequest::ConnectionStatus
             | LocalRequest::DisconnectControl
@@ -444,6 +476,20 @@ pub enum LocalResponse {
     Connection {
         /// Link state without secrets.
         connection: ConnectionReport,
+    },
+    /// The control recorded and verified an approval request.
+    ApprovalRequested {
+        /// `pr_` handle.
+        request_id: String,
+        /// Words the owner must see on the control too.
+        verification_words: Vec<String>,
+        /// When the request expires.
+        expires_at: Timestamp,
+    },
+    /// The approval request has not produced a link (yet, or ever).
+    ApprovalState {
+        /// `PENDING` (ask again), `REJECTED`, `CANCELLED`, or `EXPIRED`.
+        state: crate::pairing::PairingRequestState,
     },
     /// Request failed without stopping the listener.
     Error {

@@ -67,6 +67,17 @@ pub struct SetupOptions {
 pub enum Outcome {
     /// Finished with this exit code.
     Exit(i32),
+    /// Ask this discovered control to approve this Machine.
+    Approve {
+        /// Validated control origin.
+        control_url: String,
+        /// The control's Machine ID from discovery.
+        control_machine_id: protocol::MachineId,
+        /// The control's name from discovery.
+        control_name: String,
+        /// Proposed display name.
+        name: Option<String>,
+    },
     /// Pair with this control using a one-time code.
     Connect {
         /// Validated control origin.

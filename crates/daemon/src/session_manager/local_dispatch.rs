@@ -63,6 +63,9 @@ impl SessionManager {
             | LocalRequest::ConnectControl { .. }
             | LocalRequest::ConnectionStatus
             | LocalRequest::DisconnectControl
+            | LocalRequest::RequestApproval { .. }
+            | LocalRequest::ClaimApproval
+            | LocalRequest::CancelApproval
             | LocalRequest::ResetIdentity => {
                 return LocalResponse::Error {
                     code: LocalErrorCode::Unavailable,
