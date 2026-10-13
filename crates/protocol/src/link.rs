@@ -211,6 +211,9 @@ pub struct RegistryMachine {
     pub capabilities: Vec<MachineCapability>,
     /// Active credential metadata.
     pub credential: Option<LinkCredentialInfo>,
+    /// The latest dashboard-started update.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update: Option<crate::worker_update::WorkerUpdateStatus>,
 }
 
 /// The control registry.
@@ -220,6 +223,9 @@ pub struct RegistryMachine {
 pub struct RegistryMachines {
     /// Every registered Machine, control first.
     pub machines: Vec<RegistryMachine>,
+    /// Version on the control's stable channel, when it publishes packages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub available_release: Option<String>,
 }
 
 /// Owner request to rename a Machine.
@@ -302,6 +308,9 @@ pub struct LinkHeartbeatRequest {
     /// Optional projection capability and worker cursor state.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projection_sync: Option<ProjectionSyncReport>,
+    /// The latest dashboard-started update, until superseded (4.E §11).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_status: Option<crate::worker_update::WorkerUpdateStatus>,
 }
 
 /// State of an accepted link.
@@ -335,6 +344,9 @@ pub struct LinkHeartbeatResponse {
     /// Optional control projection synchronization directive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projection_sync: Option<ProjectionSyncDirective>,
+    /// Version on the control's stable channel, when it publishes packages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub available_release: Option<String>,
 }
 
 /// Worker → control: rotate both credentials.
@@ -415,11 +427,13 @@ pub enum LinkFailureCode {
     PairingBusy,
     /// A claim or cancel presented the wrong request secret.
     InvalidClaim,
+    /// Live FULL Sessions would be interrupted; the owner must confirm.
+    LiveSessions,
 }
 
 impl LinkFailureCode {
     /// Every code, in declaration order.
-    pub const ALL: [LinkFailureCode; 15] = [
+    pub const ALL: [LinkFailureCode; 16] = [
         LinkFailureCode::InvalidCode,
         LinkFailureCode::PairingLocked,
         LinkFailureCode::InvalidMachine,
@@ -435,6 +449,7 @@ impl LinkFailureCode {
         LinkFailureCode::MachineAlreadyLinked,
         LinkFailureCode::PairingBusy,
         LinkFailureCode::InvalidClaim,
+        LinkFailureCode::LiveSessions,
     ];
 }
 

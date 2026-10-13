@@ -137,6 +137,7 @@ fn control(proof_ok: bool, whois_ok: bool) -> Control {
             machine_id: MachineId(CONTROL_ID.into()),
             display_name: "control".into(),
             discovery_name: None,
+            package_dir: None,
             os: Os::Macos,
             daemon_version: "0.1.18".into(),
             secrets_file: dir.join("machine-credentials.json"),

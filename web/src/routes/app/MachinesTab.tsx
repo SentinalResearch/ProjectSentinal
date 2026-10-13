@@ -7,6 +7,7 @@ import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import { AddMachineDialog } from "./AddMachineDialog";
 import { ControlReleaseCard } from "./ControlReleaseCard";
 import { PairingRequestsCard } from "./PairingRequestsCard";
+import { WorkerUpdatesCard } from "./WorkerUpdatesCard";
 import { useIsPhone } from "../../hooks/useViewport";
 import { PhoneMachineCards } from "./phone/PhoneMachineCards";
 import styles from "./SettingsPage.module.css";
@@ -67,6 +68,7 @@ export function MachinesTab({ pollMs }: MachinesTabProps) {
 
       <PairingRequestsCard />
       <ControlReleaseCard />
+      <WorkerUpdatesCard />
 
       {load.kind === "error" ? (
         <p className={styles.tabLoading} role="alert">

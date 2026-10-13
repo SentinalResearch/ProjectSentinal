@@ -184,6 +184,26 @@ pub fn run(
     Ok(ExitCode::SUCCESS)
 }
 
+/// Write `{"ok":…,"reason":…}` (0600) for the daemon that started this update.
+pub fn record_result(path: &Path, error: Option<&UpdateError>) {
+    let reason = error.map(|error| {
+        error
+            .to_string()
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(200)
+            .collect::<String>()
+    });
+    let body = serde_json::json!({ "ok": error.is_none(), "reason": reason });
+    let temporary = path.with_extension("json.tmp");
+    let written = fs::write(&temporary, body.to_string())
+        .and_then(|()| set_owner_only(&temporary))
+        .and_then(|()| fs::rename(&temporary, path));
+    if let Err(error) = written {
+        eprintln!("sentinal update: could not record the result: {error}");
+    }
+}
+
 fn installed_prefix() -> Result<PathBuf, UpdateError> {
     let executable = std::env::current_exe().map_err(|_| UpdateError::MissingPrefix)?;
     executable

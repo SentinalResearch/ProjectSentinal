@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { pairingApi } from "../../data/api/pairing";
 import type { PairingRequestView } from "../../protocol/PairingRequestView";
-import styles from "./PairingRequestsCard.module.css";
+import styles from "./ActionCard.module.css";
 
 function minutesLeft(expiresAt: number): string {
   const minutes = Math.max(0, Math.ceil((expiresAt - Date.now()) / 60_000));

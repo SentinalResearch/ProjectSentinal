@@ -18,4 +18,5 @@ export type LinkFailureCode =
   | "INTERNAL"
   | "MACHINE_ALREADY_LINKED"
   | "PAIRING_BUSY"
-  | "INVALID_CLAIM";
+  | "INVALID_CLAIM"
+  | "LIVE_SESSIONS";

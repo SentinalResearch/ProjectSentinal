@@ -7,6 +7,7 @@ import type { MachineRole } from "./MachineRole";
 import type { Os } from "./Os";
 import type { RegistryStatus } from "./RegistryStatus";
 import type { Timestamp } from "./Timestamp";
+import type { WorkerUpdateStatus } from "./WorkerUpdateStatus";
 
 /**
  * One Machine in the control registry.
@@ -52,4 +53,8 @@ export type RegistryMachine = {
    * Active credential metadata.
    */
   credential: LinkCredentialInfo | null;
+  /**
+   * The latest dashboard-started update.
+   */
+  update?: WorkerUpdateStatus | null;
 };

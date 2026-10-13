@@ -79,6 +79,7 @@ fn harness() -> Harness {
             machine_id: machine_id.clone(),
             display_name: "Control".into(),
             discovery_name: None,
+            package_dir: None,
             os: Os::Macos,
             daemon_version: "0.0.1".into(),
             secrets_file: dir.join("credentials.json"),

@@ -17,6 +17,7 @@ mod release_routes;
 pub mod release_watch;
 pub mod routes;
 mod secrets;
+mod worker_update;
 
 pub use approval_verify::{verification_words, PairingVerifier, TailnetVerifier, VerifyFuture};
 pub use refresh::RefreshFault;
@@ -87,6 +88,8 @@ pub struct ControlSettings {
     /// Name discovery shows to Tailnet peers (`[control] display_name`);
     /// `None` uses `display_name`.
     pub discovery_name: Option<String>,
+    /// Package directory (`[packages] directory`), for the stable release workers can install.
+    pub package_dir: Option<PathBuf>,
     /// This control's OS.
     pub os: Os,
     /// This daemon's version.
@@ -146,6 +149,10 @@ pub struct ControlService {
     refresh_fault: Arc<Mutex<Option<RefreshFault>>>,
     discovery_limit: Arc<discovery::DiscoveryLimit>,
     verifier: Arc<dyn PairingVerifier>,
+    worker_updates: Arc<
+        Mutex<std::collections::HashMap<MachineId, protocol::worker_update::WorkerUpdateStatus>>,
+    >,
+    worker_http: reqwest::Client,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -198,6 +205,8 @@ impl ControlService {
             refresh_fault: Arc::new(Mutex::new(None)),
             discovery_limit: Arc::new(discovery::DiscoveryLimit::default()),
             verifier: Arc::new(TailnetVerifier::default()),
+            worker_updates: Arc::default(),
+            worker_http: worker_update::worker_client(),
         };
         // A refresh interrupted by a crash never reached the worker: undo it.
         service
@@ -473,7 +482,9 @@ impl ControlService {
             .as_ref()
             .map(|report| self.projection_directive(&request.machine_id, report))
             .transpose()?;
+        self.record_worker_update(&request.machine_id, request.update_status.clone());
         Ok(LinkHeartbeatResponse {
+            available_release: self.available_release(),
             status: LinkStatus::Active,
             display_name,
             next_heartbeat_ms: self.settings.heartbeat_interval_ms,
@@ -847,7 +858,10 @@ impl ControlService {
             .into_iter()
             .map(|row| self.registry_entry(row, now))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(RegistryMachines { machines })
+        Ok(RegistryMachines {
+            machines,
+            available_release: self.available_release(),
+        })
     }
 
     /// Rename a Machine (owner only); the ID never changes.
@@ -1036,6 +1050,7 @@ impl ControlService {
         } else {
             None
         };
+        let update = self.worker_update_view(&row.machine_id, now);
         Ok(RegistryMachine {
             machine_id: row.machine_id,
             display_name: row.display_name,
@@ -1047,6 +1062,7 @@ impl ControlService {
             daemon_version: row.daemon_version,
             capabilities: row.capabilities,
             credential,
+            update,
         })
     }
 

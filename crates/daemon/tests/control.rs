@@ -81,6 +81,7 @@ fn open_with_read_model(
             machine_id: MachineId(CONTROL.into()),
             display_name: "Mac mini".into(),
             discovery_name: None,
+            package_dir: None,
             os: Os::Macos,
             daemon_version: "0.0.1".into(),
             secrets_file: dir.join("machine-credentials.json"),
@@ -154,6 +155,7 @@ impl Harness {
                     daemon_version: "0.0.1".into(),
                     capabilities: vec![MachineCapability::Sessions],
                     projection_sync: None,
+                    update_status: None,
                 },
             )
             .map(|_| ())
@@ -242,6 +244,7 @@ fn heartbeat_negotiates_projection_upload_without_breaking_legacy_workers() {
             last_acked_cursor: 0,
             snapshot_required: false,
         }),
+        update_status: None,
     };
     let response = h
         .control
@@ -306,6 +309,7 @@ fn disabled_read_model_refuses_projection_without_deleting_existing_data() {
                     last_acked_cursor: 0,
                     snapshot_required: false,
                 }),
+                update_status: None,
             },
         )
         .unwrap();
@@ -871,6 +875,7 @@ fn heartbeats_reject_replays_wrong_machines_skew_and_unknown_credentials() {
             daemon_version: "0.0.1".into(),
             capabilities: vec![],
             projection_sync: None,
+            update_status: None,
         },
     );
     assert_eq!(
@@ -894,6 +899,7 @@ fn endpoint_changes_are_recorded_and_audited() {
                 daemon_version: "0.0.1".into(),
                 capabilities: vec![],
                 projection_sync: None,
+                update_status: None,
             },
         )
         .unwrap();
@@ -1057,6 +1063,7 @@ fn a_crash_mid_refresh_is_rolled_back_when_the_control_restarts() {
             daemon_version: "0.0.1".into(),
             capabilities: vec![MachineCapability::Sessions],
             projection_sync: None,
+            update_status: None,
         },
     );
     assert!(
@@ -1090,6 +1097,7 @@ fn a_worker_still_on_its_previous_credential_is_told_to_refresh_again() {
                     daemon_version: "0.0.1".into(),
                     capabilities: vec![MachineCapability::Sessions],
                     projection_sync: None,
+                    update_status: None,
                 },
             )
             .unwrap()

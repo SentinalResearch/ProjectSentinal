@@ -33,7 +33,26 @@
     },
     "live_full_sessions": 0
   },
-  "update_request": {"version": "0.1.18", "allow_interrupt": true},
-  "update_started": {"update_id": "cu_1792000000000"},
-  "policy_request": {"policy": "OFF", "channel": "STABLE"}
+  "update_request": {
+    "version": "0.1.18",
+    "allow_interrupt": true
+  },
+  "update_started": {
+    "update_id": "cu_1792000000000"
+  },
+  "policy_request": {
+    "policy": "OFF",
+    "channel": "STABLE"
+  },
+  "worker_update_request": {
+    "version": "0.1.18",
+    "allow_interrupt": false
+  },
+  "worker_update_status": {
+    "version": "0.1.18",
+    "previous": "0.1.17",
+    "state": "FAILED",
+    "reason": "the restarted daemon did not pass its health check",
+    "started_at": 1792000000000
+  }
 }

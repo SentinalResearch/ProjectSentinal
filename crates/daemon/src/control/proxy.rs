@@ -254,7 +254,7 @@ async fn routed_output(
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
-fn worker_url(target: &RoutingTarget, scheme: &str, path: &str) -> String {
+pub(super) fn worker_url(target: &RoutingTarget, scheme: &str, path: &str) -> String {
     let address = if target.endpoint.address.contains(':') {
         format!("[{}]", target.endpoint.address)
     } else {

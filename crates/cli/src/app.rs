@@ -88,7 +88,14 @@ async fn dispatch(
             check,
             rollback,
             prefix,
-        } => return Ok(crate::update::run(check, rollback, prefix, out)?),
+            result_file,
+        } => {
+            let result = crate::update::run(check, rollback, prefix, out);
+            if let Some(path) = result_file {
+                crate::update::record_result(&path, result.as_ref().err());
+            }
+            return Ok(result?);
+        }
         Command::Hook { action } => return Ok(crate::hook_command::run(action, out, err).await),
         Command::Auto { action } => {
             let urls = if matches!(&action, AutoAction::Enter { .. }) {

@@ -133,6 +133,7 @@ impl ControlRoutes {
             .merge(super::release_routes::routes())
             .merge(super::discovery::routes())
             .merge(super::approval_routes::routes())
+            .merge(super::worker_update::routes())
             .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES));
         let projection_routes = Router::new()
             .route("/api/v1/link/projection", post(projection_batch))

@@ -4,6 +4,7 @@ import type { MachineCapability } from "./MachineCapability";
 import type { MachineId } from "./MachineId";
 import type { ProjectionSyncReport } from "./ProjectionSyncReport";
 import type { Timestamp } from "./Timestamp";
+import type { WorkerUpdateStatus } from "./WorkerUpdateStatus";
 
 /**
  * Worker → control liveness and endpoint report.
@@ -37,4 +38,8 @@ export type LinkHeartbeatRequest = {
    * Optional projection capability and worker cursor state.
    */
   projection_sync?: ProjectionSyncReport | null;
+  /**
+   * The latest dashboard-started update, until superseded (4.E §11).
+   */
+  update_status?: WorkerUpdateStatus | null;
 };

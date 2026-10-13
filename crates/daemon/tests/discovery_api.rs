@@ -79,6 +79,7 @@ fn daemon(control: bool, discovery_name: Option<&str>) -> Daemon {
                 machine_id: MachineId(CONTROL_ID.into()),
                 display_name: "mac-mini".into(),
                 discovery_name: discovery_name.map(Into::into),
+                package_dir: None,
                 os: Os::Macos,
                 daemon_version: "0.1.18".into(),
                 secrets_file: dir.join("machine-credentials.json"),

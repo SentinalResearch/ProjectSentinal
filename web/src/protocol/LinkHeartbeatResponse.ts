@@ -32,4 +32,8 @@ export type LinkHeartbeatResponse = {
    * Optional control projection synchronization directive.
    */
   projection_sync?: ProjectionSyncDirective | null;
+  /**
+   * Version on the control's stable channel, when it publishes packages.
+   */
+  available_release?: string | null;
 };

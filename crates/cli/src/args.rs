@@ -107,6 +107,9 @@ pub enum Command {
         /// Installed program prefix; defaults to the running binary's prefix.
         #[arg(long)]
         prefix: Option<PathBuf>,
+        /// Record the outcome here (used by sentinald for dashboard updates).
+        #[arg(long, hide = true)]
+        result_file: Option<PathBuf>,
     },
     /// Run this terminal inside a persistent Sentinal Session and attach.
     ///

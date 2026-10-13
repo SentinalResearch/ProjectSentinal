@@ -362,6 +362,7 @@ struct Inner {
     projection_store: Mutex<Option<Arc<Store>>>,
     projection_directive: Mutex<Option<ProjectionSyncDirective>>,
     approval: Mutex<Option<approval::PendingApproval>>,
+    updater: Mutex<Option<crate::worker_update::WorkerUpdater>>,
 }
 
 /// This daemon's link to an owner-selected control Machine.
@@ -385,12 +386,21 @@ impl LinkManager {
                 projection_store: Mutex::new(None),
                 projection_directive: Mutex::new(None),
                 approval: Mutex::new(None),
+                updater: Mutex::new(None),
             }),
         };
         if matches!(manager.read_link(), Ok(Some(link)) if link.state == StoredState::Active) {
             manager.spawn_heartbeats();
         }
         manager
+    }
+
+    /// Report this worker's dashboard-started updates in heartbeats.
+    pub fn with_updater(self, updater: crate::worker_update::WorkerUpdater) -> Self {
+        if let Ok(mut slot) = self.inner.updater.lock() {
+            *slot = Some(updater);
+        }
+        self
     }
 
     /// Attach the local Store used for projection heartbeat negotiation.
@@ -741,6 +751,12 @@ impl LinkManager {
             daemon_version: self.inner.settings.daemon_version.clone(),
             capabilities: all_capabilities(),
             projection_sync,
+            update_status: self
+                .inner
+                .updater
+                .lock()
+                .ok()
+                .and_then(|updater| updater.as_ref().and_then(|updater| updater.status())),
         };
         let result: Result<Option<LinkHeartbeatResponse>, CallError> = self
             .inner

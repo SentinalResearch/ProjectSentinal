@@ -47,6 +47,7 @@ pub mod session;
 pub mod session_log;
 pub mod time;
 pub mod training;
+pub mod worker_update;
 
 pub use auth::{
     AuthChangePasswordRequest, AuthFailure, AuthFailureCode, AuthLoginRequest, AuthSession,

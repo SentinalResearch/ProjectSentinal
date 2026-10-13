@@ -52,6 +52,7 @@ pub struct AppState {
     push: Option<PushGateway>,
     release: Option<crate::control::ControlRelease>,
     insights: Option<MachineInsights>,
+    worker_updater: Option<crate::worker_update::WorkerUpdater>,
 }
 
 impl AppState {
@@ -75,6 +76,7 @@ impl AppState {
             push: None,
             release: None,
             insights: None,
+            worker_updater: None,
         }
     }
 
@@ -87,6 +89,12 @@ impl AppState {
     /// Enable the control role.
     pub fn with_control(mut self, control: Option<ControlService>) -> Self {
         self.control = control;
+        self
+    }
+
+    /// Let the control start this worker's self-update (4.E §11).
+    pub fn with_worker_updater(mut self, updater: crate::worker_update::WorkerUpdater) -> Self {
+        self.worker_updater = Some(updater);
         self
     }
 
@@ -398,6 +406,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/health", get(health))
         .route("/api/v1/link/identity", get(link_identity))
         .route("/api/v1/pairing/proof/{request_id}", get(pairing_proof))
+        .route("/api/v1/link/update", axum::routing::post(link_update))
         .merge(auth_routes::routes())
         .merge(protected)
         .with_state(state)
@@ -406,6 +415,38 @@ pub fn router(state: AppState) -> Router {
             origins,
             crate::origin::enforce,
         ))
+}
+
+/// The control asks this worker to update itself; only the control's
+/// credential for this link is accepted.
+async fn link_update(State(state): State<AppState>, request: Request) -> Response {
+    let authorized = state.link.as_ref().is_some_and(|link| {
+        auth_routes::bearer_from_headers(request.headers())
+            .and_then(|bearer| link.verify_control_credential(bearer))
+            .is_some()
+    });
+    if !authorized {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let Some(updater) = state.worker_updater.as_ref() else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 4096).await {
+        Ok(body) => body,
+        Err(_) => return StatusCode::PAYLOAD_TOO_LARGE.into_response(),
+    };
+    let Ok(update) = serde_json::from_slice::<protocol::worker_update::WorkerUpdateRequest>(&body)
+    else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    match updater.start(&update) {
+        Ok(status) => (StatusCode::ACCEPTED, Json(status)).into_response(),
+        Err((status, failure)) => (
+            StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            Json(failure),
+        )
+            .into_response(),
+    }
 }
 
 /// Approval pairing callback: proof that this worker made the open request.

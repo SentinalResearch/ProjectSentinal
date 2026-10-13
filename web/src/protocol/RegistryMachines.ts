@@ -9,4 +9,8 @@ export type RegistryMachines = {
    * Every registered Machine, control first.
    */
   machines: Array<RegistryMachine>;
+  /**
+   * Version on the control's stable channel, when it publishes packages.
+   */
+  available_release?: string | null;
 };

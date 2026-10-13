@@ -103,6 +103,7 @@ async fn pair() -> Pair {
             machine_id: MachineId(CONTROL.into()),
             display_name: "Control".into(),
             discovery_name: None,
+            package_dir: None,
             os: Os::Macos,
             daemon_version: "0.1.18".into(),
             secrets_file: control_dir.join("machine-credentials.json"),

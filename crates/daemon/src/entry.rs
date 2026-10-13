@@ -186,6 +186,10 @@ pub async fn run() -> Result<(), DaemonError> {
                 machine_id: identity.machine_id.clone(),
                 display_name: machine.name.clone(),
                 discovery_name: control.display_name.clone(),
+                package_dir: config
+                    .packages
+                    .as_ref()
+                    .map(|packages| packages.directory.clone()),
                 os: machine.os,
                 daemon_version: crate::DAEMON_VERSION.into(),
                 secrets_file: config.control_credentials_file.clone(),
@@ -429,7 +433,16 @@ pub async fn run() -> Result<(), DaemonError> {
             }
         }
     }
-    let state = AppState::new(sessions, machine, auth)
+    let worker_updater = if config.control.is_none() {
+        sibling_sentinal_bin().ok().map(|sentinal_bin| {
+            let updater = worker_updater(&config, sentinal_bin, sessions.clone());
+            let _ = link.clone().with_updater(updater.clone());
+            updater
+        })
+    } else {
+        None
+    };
+    let mut state = AppState::new(sessions, machine, auth)
         .with_insights(insights)
         .with_origins(origins)
         .with_control(control)
@@ -440,6 +453,9 @@ pub async fn run() -> Result<(), DaemonError> {
         .with_release(release)
         .with_tailscale_serve(config.behind_tailscale_serve)
         .with_development(config.development);
+    if let Some(updater) = worker_updater {
+        state = state.with_worker_updater(updater);
+    }
     let (local_shutdown, local_shutdown_rx) = tokio::sync::watch::channel(false);
     let local_task = tokio::spawn(local_socket.serve(local_shutdown_rx, handler));
     let package_task = if let Some(package_config) = config.packages.clone() {
@@ -547,6 +563,43 @@ fn push_key_file(home: &std::path::Path) -> PathBuf {
 /// The `sentinal` CLI binary installed beside this running `sentinald`.
 /// The dashboard's release service: it runs the sibling `sentinal` CLI and
 /// counts live FULL Sessions an update would interrupt.
+/// Live FULL Sessions on this Machine (an update or restart interrupts them).
+fn live_full_sessions(sessions: SessionManager) -> std::sync::Arc<dyn Fn() -> u32 + Send + Sync> {
+    std::sync::Arc::new(move || {
+        sessions.list().map_or(0, |list| {
+            list.iter()
+                .filter(|session| {
+                    session.capture == protocol::CaptureLevel::Full && !session.state.is_finished()
+                })
+                .count() as u32
+        })
+    })
+}
+
+fn detach() -> crate::control::Detach {
+    // systemd stops a unit's whole cgroup on restart; the updater needs its own unit.
+    if cfg!(target_os = "linux") && which("systemd-run") {
+        crate::control::Detach::SystemdRun
+    } else {
+        crate::control::Detach::ProcessGroup
+    }
+}
+
+fn worker_updater(
+    config: &DaemonConfig,
+    sentinal_bin: PathBuf,
+    sessions: SessionManager,
+) -> crate::worker_update::WorkerUpdater {
+    crate::worker_update::WorkerUpdater {
+        data_dir: config.data_dir.clone(),
+        cli: sentinal_bin,
+        detach: detach(),
+        daemon_version: crate::DAEMON_VERSION.into(),
+        live_full_sessions: live_full_sessions(sessions),
+        clock: Arc::new(now),
+    }
+}
+
 fn control_release(
     config: &DaemonConfig,
     config_path: &Path,
@@ -558,12 +611,7 @@ fn control_release(
         .and_then(Path::parent)
         .map(Path::to_path_buf)
         .unwrap_or_default();
-    // systemd stops a unit's whole cgroup on restart; the updater needs its own unit.
-    let detach = if cfg!(target_os = "linux") && which("systemd-run") {
-        crate::control::Detach::SystemdRun
-    } else {
-        crate::control::Detach::ProcessGroup
-    };
+    let detach = detach();
     crate::control::ControlRelease::new(crate::control::ControlReleaseSettings {
         data_dir: config.data_dir.clone(),
         config_dir: config_path
@@ -573,16 +621,7 @@ fn control_release(
         prefix,
         cli: sentinal_bin,
         detach,
-        live_full_sessions: std::sync::Arc::new(move || {
-            sessions.list().map_or(0, |list| {
-                list.iter()
-                    .filter(|session| {
-                        session.capture == protocol::CaptureLevel::Full
-                            && !session.state.is_finished()
-                    })
-                    .count() as u32
-            })
-        }),
+        live_full_sessions: live_full_sessions(sessions),
     })
 }
 

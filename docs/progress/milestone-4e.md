@@ -941,7 +941,72 @@ reconnect text, empty/worker, phone). Playwright 13/13 still passes.
 **Not automated:** an approval Playwright run needs `tailscale whois`, which
 the e2e daemons do not have. It is part of the real-Machine acceptance.
 
-The worker-update UI (§11) arrives with step 7.
+### Step 7a — worker update coordination (2026-10-13)
+
+- **Protocol** (`protocol::worker_update`):
+  - `WorkerUpdateRequest {version, allow_interrupt}`;
+  - `WorkerUpdateStatus {version, previous, state STARTED|INSTALLED|FAILED|UNKNOWN, reason, started_at}`;
+  - the heartbeat request carries `update_status`; the heartbeat response and
+    the registry carry `available_release`, and each registry Machine its
+    `update`;
+  - new failure code `LIVE_SESSIONS`. All additive.
+- **Control** (`control/worker_update.rs`): `POST /api/v1/machines/{id}/update`
+  (owner only).
+  - It offers only the version in its own `channels/stable.json`
+    (`ControlSettings.package_dir`).
+  - It forwards the request to `POST http://<worker>/api/v1/link/update` with
+    the control credential.
+  - The worker's 409 `LIVE_SESSIONS` is passed through.
+  - The latest report per worker is kept in memory and refreshed by every
+    heartbeat. A STARTED with no report after 5 min shows as UNKNOWN.
+  - Started, refused, installed, and failed updates are audited.
+- **Worker** (`worker_update.rs`): `/api/v1/link/update` accepts only this
+  link's control credential.
+  - It refuses with live FULL Sessions unless `allow_interrupt`, and refuses
+    while an update runs.
+  - It records `worker-update.json` (0600), then starts
+    `sentinal update --result-file …` detached: `systemd-run --user` on Linux,
+    a new process group otherwise.
+  - Status is derived after its own restart:
+    - FAILED when the updater reported failure;
+    - INSTALLED when the running version changed;
+    - otherwise STARTED.
+- **CLI:** `sentinal update` gains a hidden `--result-file`. The update itself
+  is unchanged: install from the pinned control origin, verified, with the
+  installer's own service-failure restore.
+- **Web:** `WorkerUpdatesCard` (Settings → Machines) lists workers behind the
+  stable release.
+  - Each row has Update, with a confirmation naming the versions; a second
+    confirmation appears for LIVE_SESSIONS.
+  - It shows STARTED/FAILED (with the reason)/UNKNOWN.
+  - It uses a bottom sheet on phones and is hidden when every worker is
+    current. It shares `ActionCard.module.css` with the approval card.
+
+**Deviations from §11:**
+- **Health after the update:** the worker relies on the existing installer,
+  which restores the previous release when the service fails to start. It
+  does not add a separate 60 s heartbeat check.
+- **Reported state names:** INSTALLED/FAILED, rather than
+  STAGED/ROLLED_BACK.
+- **No "update all workers in order"** yet; each worker is updated separately.
+
+**Tests:**
+- `daemon/tests/worker_update_api.rs` (2, over loopback HTTP with the real
+  worker router):
+  - unpublished version refused;
+  - LIVE_SESSIONS, then consent;
+  - the worker runs exactly `update --result-file …`;
+  - the failure reaches the registry through a heartbeat;
+  - only the control credential is accepted.
+
+  Mutation check: removing the live-Session gate fails a test.
+- `worker_update` status unit test;
+- `protocol/tests/release.rs` (+1);
+- `WorkerUpdatesCard.test.tsx` (4).
+- Playwright 13/13.
+
+**Next (7b):** the beta channel and retention of 5 releases per channel in
+the publishing scripts.
 
 ## Proving tests
 

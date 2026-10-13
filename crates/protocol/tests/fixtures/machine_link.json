@@ -126,6 +126,7 @@
     { "code": "INTERNAL", "message": "the control could not complete the request" },
     { "code": "MACHINE_ALREADY_LINKED", "message": "this Machine is already connected; disconnect it first" },
     { "code": "PAIRING_BUSY", "message": "too many pairing requests are waiting; try again later" },
-    { "code": "INVALID_CLAIM", "message": "the request secret does not match" }
+    { "code": "INVALID_CLAIM", "message": "the request secret does not match" },
+    { "code": "LIVE_SESSIONS", "message": "2 live FULL Sessions would be interrupted; confirm to update anyway" }
   ]
 }

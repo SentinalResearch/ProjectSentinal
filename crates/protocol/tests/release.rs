@@ -52,3 +52,20 @@ fn update_requests_accept_only_strict_versions() {
         assert!(request.validate().is_err(), "{bad}");
     }
 }
+
+#[test]
+fn worker_update_bodies_round_trip_and_validate() {
+    use protocol::worker_update::{WorkerUpdateRequest, WorkerUpdateState, WorkerUpdateStatus};
+    let fixture = fixture();
+    let request: WorkerUpdateRequest = round_trip(&fixture["worker_update_request"]);
+    assert!(request.validate().is_ok());
+    let status: WorkerUpdateStatus = round_trip(&fixture["worker_update_status"]);
+    assert_eq!(status.state, WorkerUpdateState::Failed);
+    for bad in ["0.1", "v0.1.18", "0.1.18;x", ""] {
+        let request = WorkerUpdateRequest {
+            version: bad.into(),
+            allow_interrupt: true,
+        };
+        assert!(request.validate().is_err(), "{bad}");
+    }
+}
