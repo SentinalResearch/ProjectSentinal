@@ -924,8 +924,24 @@ phone:
 - `cli/tests/approval_command.rs` (3);
 - `cli/tests/setup.rs` (+1).
 
-**Not usable end to end yet:** the owner approves through the API only until
-the step 6 dashboard UI lands.
+### Step 6 — approval UI (2026-10-13)
+
+`PairingRequestsCard` sits at the top of Settings → Machines (desktop and
+phone). It shows only verified PENDING/APPROVED requests:
+- the claimed name and Tailscale's identity (node · login · OS · address);
+- "Reconnects <name>" for a known inactive Machine;
+- the four words in large monospace, the time left, and Approve/Reject per
+  row. There is no "approve all".
+
+It polls every 3 s and renders nothing on a worker or with nothing waiting.
+
+**Tests:** `PairingRequestsCard.test.tsx` (4: per-row approve, reject and
+reconnect text, empty/worker, phone). Playwright 13/13 still passes.
+
+**Not automated:** an approval Playwright run needs `tailscale whois`, which
+the e2e daemons do not have. It is part of the real-Machine acceptance.
+
+The worker-update UI (§11) arrives with step 7.
 
 ## Proving tests
 

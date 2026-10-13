@@ -277,9 +277,9 @@ request storm.
 ## Milestone 4.E — V1 installation, discovery, and private pilot
 - [x] Approve the release trust, installer formats, discovery, approval-pairing contract, and private-VM threat model
 - [ ] Ship normal installers for the approved macOS/Linux targets plus a verified curl/archive fallback
-- [ ] Add idempotent `sentinal setup` for CONTROL, WORKER, and manual recovery paths
-- [ ] Discover controls only from bounded Tailscale peer data and verified MagicDNS HTTPS origins
-- [ ] Add expiring click-to-approve pairing with matching verification words and code fallback
+- [x] Add idempotent `sentinal setup` for CONTROL, WORKER, and manual recovery paths
+- [x] Discover controls only from bounded Tailscale peer data and verified MagicDNS HTTPS origins
+- [x] Add expiring click-to-approve pairing with matching verification words and code fallback
 - [ ] Publish and verify private stable/beta releases, Machine-scoped update status, rollback, and data preservation
 - [x] Update the control like a worker: signed release watch, one-button update with health check and rollback, then workers in order; optional automatic-when-idle policy (control side; workers follow in step 7)
 - [ ] Deploy one single-tenant control on a small Tailnet VM with no public Sentinal port

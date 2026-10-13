@@ -374,6 +374,17 @@ Tailnet ACL (grants) for the intended devices only:
 
 ### Connect a worker
 
+**With approval (recommended):** on the installed worker run `sentinal setup`
+and choose *Connect to my existing Sentinal*. It lists the controls it finds on
+the Tailnet; pick yours. The worker prints four words, for example
+`squid · thistle · otter · arrow`. In the control's dashboard, Settings →
+Machines shows *Waiting for approval*, with the same words and the node's
+Tailscale identity. Press **Approve** on the row whose words match. The worker
+prints `Connected as "…"`. Requests expire after 10 minutes. Ctrl-C on the
+worker withdraws its request.
+
+**With a one-time code** (an older control, or no discovery):
+
 1. In the control UI, open Settings → Machines → **Add Machine**. It shows a
    one-time code (10 minutes, one use) and a command without the code.
 2. On the already-installed worker:

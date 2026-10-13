@@ -1,0 +1,108 @@
+/* Machines waiting for approval (4.E §6–7). Square, Swiss: no radius. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--bg-1);
+  box-shadow: inset 0 0 0 1px var(--s-waiting-fg);
+}
+
+.overline {
+  color: var(--s-waiting-fg);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.who {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.identity {
+  overflow-wrap: anywhere;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.words {
+  flex: 1 1 220px;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.actions {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.actions .muted {
+  margin-right: auto;
+}
+
+.primary,
+.secondary {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.primary {
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.secondary {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-1);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.55;
+}
+
+.status,
+.muted,
+.problem {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.status {
+  color: var(--text-1);
+}
+
+.muted {
+  color: var(--text-3);
+}
+
+.problem {
+  color: var(--s-failed-fg);
+}
