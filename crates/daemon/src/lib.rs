@@ -39,5 +39,6 @@ pub mod scrollback;
 pub mod session_manager;
 pub mod shell;
 pub mod storage;
+pub mod tailnet_dns;
 pub mod tracker;
 pub mod worker_update;

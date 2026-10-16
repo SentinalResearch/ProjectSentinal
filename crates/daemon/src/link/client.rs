@@ -61,6 +61,10 @@ impl ControlClient {
             .connect_timeout(CONNECT_TIMEOUT)
             .https_only(!development)
             .user_agent(concat!("sentinald/", env!("CARGO_PKG_VERSION")))
+            // *.ts.net through Tailscale, not /etc/resolv.conf (see tailnet_dns).
+            .dns_resolver(crate::tailnet_dns::TailnetResolver::new(
+                std::sync::Arc::new(crate::tailnet_dns::real_status),
+            ))
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
         ControlClient { http }

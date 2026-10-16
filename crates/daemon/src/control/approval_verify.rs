@@ -57,19 +57,7 @@ impl Default for TailnetVerifier {
             .timeout(Duration::from_secs(4))
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
-        let tailscale = std::env::var_os("SENTINAL_TAILSCALE_CLI")
-            .map(PathBuf::from)
-            .or_else(|| {
-                std::env::var_os("PATH").and_then(|paths| {
-                    std::env::split_paths(&paths)
-                        .map(|dir| dir.join("tailscale"))
-                        .find(|path| path.is_file())
-                })
-            })
-            .or_else(|| {
-                let app = PathBuf::from("/Applications/Tailscale.app/Contents/MacOS/Tailscale");
-                app.is_file().then_some(app)
-            });
+        let tailscale = crate::tailnet_dns::tailscale_cli();
         Self { http, tailscale }
     }
 }

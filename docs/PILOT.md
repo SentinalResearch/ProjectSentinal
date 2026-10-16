@@ -126,6 +126,13 @@ Tailnet ACL (grants), so only the intended devices reach Sentinal:
 ]
 ```
 
+**Unreachable control on Google Cloud (fixed in 0.2.3):** before 0.2.3 the
+static daemon read `/etc/resolv.conf` directly, which on GCP Ubuntu points at
+the metadata DNS (`169.254.169.254`) and cannot resolve `*.ts.net`. Pairing
+failed with "error sending request" even though `curl` worked. 0.2.3 resolves
+Tailnet names through Tailscale. On older releases, run
+`sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf`.
+
 ## 6. Updates
 
 - **The control:** Settings → Machines → *Control release* shows new signed
