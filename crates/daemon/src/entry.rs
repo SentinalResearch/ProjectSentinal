@@ -282,11 +282,36 @@ pub async fn run() -> Result<(), DaemonError> {
         UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
     let handler_sessions = sessions.clone();
     let handler_link = link.clone();
+    let handler_control = control.clone();
     let handler: LocalHandler = Arc::new(move |request| {
         let sessions = handler_sessions.clone();
         let link = handler_link.clone();
+        let control = handler_control.clone();
         Box::pin(async move {
             match request {
+                LocalRequest::HandoffWorkers {
+                    control_url,
+                    control_machine_id,
+                    dry_run,
+                } => {
+                    let Some(control) = control else {
+                        return protocol::LocalResponse::Error {
+                            code: protocol::LocalErrorCode::InvalidRequest,
+                            message: "this Machine is not a control".into(),
+                        };
+                    };
+                    let target = protocol::pairing::LinkMoveRequest {
+                        control_url,
+                        control_machine_id,
+                    };
+                    match control.handoff_workers(&target, dry_run).await {
+                        Ok(workers) => protocol::LocalResponse::Handoff { workers },
+                        Err(message) => protocol::LocalResponse::Error {
+                            code: protocol::LocalErrorCode::InvalidRequest,
+                            message,
+                        },
+                    }
+                }
                 LocalRequest::GetIdentity
                 | LocalRequest::ConnectControl { .. }
                 | LocalRequest::ConnectionStatus

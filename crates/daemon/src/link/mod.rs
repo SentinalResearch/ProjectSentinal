@@ -7,6 +7,7 @@
 mod approval;
 mod client;
 mod file;
+mod handoff;
 
 use crate::{
     control::all_capabilities,
@@ -536,8 +537,13 @@ impl LinkManager {
                 control_machine_id,
                 display_name,
             } => {
-                self.request_approval(&control_url, control_machine_id, display_name.as_deref())
-                    .await
+                self.request_approval(
+                    &control_url,
+                    control_machine_id,
+                    display_name.as_deref(),
+                    false,
+                )
+                .await
             }
             LocalRequest::ClaimApproval => self.claim_approval().await,
             LocalRequest::CancelApproval => self.cancel_approval().await,

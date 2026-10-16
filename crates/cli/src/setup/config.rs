@@ -148,3 +148,67 @@ fn is_key(line: &str, key: &str) -> bool {
         .strip_prefix(key)
         .is_some_and(|rest| rest.trim_start().starts_with('='))
 }
+
+/// Turn a control's `daemon.toml` back into a worker's: drop `[control]`,
+/// `[packages]`, `behind_tailscale_serve`, `allowed_origins`, and setup's own
+/// comment, and bind the API to this Machine's Tailscale address (the new
+/// control calls the worker there). Every other line is kept.
+pub fn worker_config(existing: &str, tailscale_bind: &str) -> Result<String, Conflict> {
+    let mut lines = Vec::new();
+    let mut table = String::new();
+    let mut skipping_array = false;
+    for line in existing.lines() {
+        let trimmed = line.trim_start();
+        if skipping_array {
+            skipping_array = !trimmed.contains(']');
+            continue;
+        }
+        if trimmed.starts_with('[') {
+            table = trimmed.trim_end().to_string();
+        }
+        if table == "[control]" || table == "[packages]" {
+            continue;
+        }
+        if !table.is_empty() {
+            lines.push(line.to_string());
+            continue;
+        }
+        if trimmed.starts_with("# Added by `sentinal setup`")
+            || trimmed == "# through Tailscale Serve."
+        {
+            continue;
+        }
+        if is_key(line, "behind_tailscale_serve") {
+            continue;
+        }
+        if is_key(line, "allowed_origins") {
+            skipping_array = trimmed.contains('[') && !trimmed.contains(']');
+            continue;
+        }
+        if is_key(line, "bind") {
+            lines.push(format!(
+                "bind = {}",
+                toml::Value::String(tailscale_bind.to_string())
+            ));
+            continue;
+        }
+        lines.push(line.to_string());
+    }
+    if !lines.iter().any(|line| is_key(line, "bind")) {
+        lines.insert(
+            0,
+            format!("bind = {}", toml::Value::String(tailscale_bind.to_string())),
+        );
+    }
+    while lines.last().is_some_and(|line| line.trim().is_empty()) {
+        lines.pop();
+    }
+    let mut result = lines.join("\n");
+    result.push('\n');
+    let value: toml::Value = toml::from_str(&result)
+        .map_err(|error| Conflict(format!("the edited file would be invalid ({error})")))?;
+    if value.get("control").is_some() || value.get("packages").is_some() {
+        return Err(Conflict("the control sections could not be removed".into()));
+    }
+    Ok(result)
+}

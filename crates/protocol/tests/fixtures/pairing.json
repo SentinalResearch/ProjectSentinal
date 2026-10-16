@@ -123,5 +123,9 @@
   },
   "cancel": {
     "request_secret": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "move": {
+    "control_url": "https://sentinal-control-one.example.ts.net",
+    "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A"
   }
 }

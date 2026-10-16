@@ -340,7 +340,7 @@ fn preview(
     );
 }
 
-fn write_config(
+pub(super) fn write_config(
     path: &Path,
     backup: &Path,
     existing: Option<&str>,

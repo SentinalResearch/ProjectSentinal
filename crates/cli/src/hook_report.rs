@@ -231,6 +231,7 @@ fn kind_of(response: &LocalResponse) -> String {
         LocalResponse::Connection { .. } => "CONNECTION".into(),
         LocalResponse::ApprovalRequested { .. } => "APPROVAL_REQUESTED".into(),
         LocalResponse::ApprovalState { .. } => "APPROVAL_STATE".into(),
+        LocalResponse::Handoff { .. } => "HANDOFF".into(),
         LocalResponse::Error { code, .. } => format!("ERROR {code:?}"),
     }
 }

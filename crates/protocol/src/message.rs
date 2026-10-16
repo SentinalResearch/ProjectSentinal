@@ -334,6 +334,15 @@ pub enum LocalRequest {
     ClaimApproval,
     /// Withdraw the pending approval request.
     CancelApproval,
+    /// On a control: list (`dry_run`) or move every active worker to another control.
+    HandoffWorkers {
+        /// The new control's origin.
+        control_url: String,
+        /// The new control's Machine ID, from discovery.
+        control_machine_id: MachineId,
+        /// Only list the workers that would be moved.
+        dry_run: bool,
+    },
 }
 
 impl LocalRequest {
@@ -411,6 +420,15 @@ impl LocalRequest {
                 Ok(())
             }
             LocalRequest::ClaimApproval | LocalRequest::CancelApproval => Ok(()),
+            LocalRequest::HandoffWorkers {
+                control_url,
+                control_machine_id,
+                ..
+            } => crate::pairing::LinkMoveRequest {
+                control_url: control_url.clone(),
+                control_machine_id: control_machine_id.clone(),
+            }
+            .validate(ControlUrlPolicy::Development),
             LocalRequest::GetIdentity
             | LocalRequest::ConnectionStatus
             | LocalRequest::DisconnectControl
@@ -490,6 +508,11 @@ pub enum LocalResponse {
     ApprovalState {
         /// `PENDING` (ask again), `REJECTED`, `CANCELLED`, or `EXPIRED`.
         state: crate::pairing::PairingRequestState,
+    },
+    /// Workers listed or moved by a handoff.
+    Handoff {
+        /// One entry per active worker.
+        workers: Vec<crate::pairing::WorkerHandoff>,
     },
     /// Request failed without stopping the listener.
     Error {

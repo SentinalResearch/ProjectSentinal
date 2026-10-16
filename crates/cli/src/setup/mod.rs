@@ -5,7 +5,9 @@
 
 pub mod config;
 mod control;
+mod local;
 mod password;
+mod switch;
 mod system;
 mod worker;
 
@@ -180,12 +182,11 @@ pub fn run(
     };
     match role {
         SetupRole::Control => control::control(&options, existing.as_deref(), system, &mut io),
-        SetupRole::Worker if is_control => io.fail(
-            exit::CONFLICT,
-            &format!(
-                "this Machine is a control ({} has [control] enabled); a control does not pair with another control",
-                config_path.display()
-            ),
+        SetupRole::Worker if is_control => switch::to_worker(
+            &options,
+            existing.as_deref().unwrap_or_default(),
+            system,
+            &mut io,
         ),
         SetupRole::Worker => worker::worker(&options, skip_discovery, system, &mut io),
     }

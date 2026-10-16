@@ -1083,6 +1083,50 @@ the e2e daemons do not have. It is part of the real-Machine acceptance.
 - **Doctor wording:** `Updates:` on a control names `sentinal release update`,
   and the pilot package error says how to publish.
 
+### Control handoff: a control becomes a worker (2026-10-16)
+
+`sentinal setup --role worker` on a control.
+
+- **Protocol:**
+  - `LinkMoveRequest {control_url, control_machine_id}`, control → worker
+    `POST /api/v1/link/move` (control credential only);
+  - `WorkerHandoff`;
+  - local `HANDOFF_WORKERS {…, dry_run}` → `HANDOFF {workers}`.
+- **Old control** (`control/handoff.rs`, reached only through the local
+  socket):
+  - validates the target and refuses itself;
+  - sends the move to every active worker;
+  - reports each one (not reachable, or an older release without the route);
+  - audits `WORKER_HANDOFF`.
+- **Worker** (`link/handoff.rs`):
+  - asks the new control through the normal approval flow (callback proof +
+    `whois` + owner approval), under its owner-chosen name;
+  - keeps its current link until it claims the new one (claims every 2 s, gives
+    up after 11 min);
+  - the heartbeat loop then follows the new link.
+- **CLI** (`setup/switch.rs`):
+  - discovery, excluding this control's own origin;
+  - preview listing the workers, then confirm;
+  - handoff;
+  - `worker_config` (removes `[control]`/`[packages]`, the Serve keys, and
+    setup's comment; binds the Tailscale address; keeps other lines);
+  - restart + health on the Tailscale address; restores the control config on
+    failure;
+  - `tailscale serve --https=443 off`;
+  - then `Outcome::Approve` for this Machine.
+
+**Tests:**
+- `daemon/tests/handoff_api.rs` (2):
+  - the full move over loopback HTTP: dry run, refusing self, the worker asks,
+    still linked to the old control before approval, switched after;
+  - only the control credential is accepted. Mutation-checked.
+- `cli/tests/setup.rs` (+5): config round-trip, switch call order, decline,
+  failed restart, no other control.
+- `protocol/tests/pairing.rs` (+1).
+
+**Owner approval is kept on purpose:** a control stepping down cannot attach
+its workers anywhere without the new control's owner approving each one.
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

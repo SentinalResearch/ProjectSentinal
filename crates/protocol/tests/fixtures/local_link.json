@@ -62,6 +62,15 @@
       "payload": {
         "type": "CANCEL_APPROVAL"
       }
+    },
+    {
+      "version": 1,
+      "payload": {
+        "type": "HANDOFF_WORKERS",
+        "control_url": "https://sentinal-control.example.ts.net",
+        "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A",
+        "dry_run": true
+      }
     }
   ],
   "responses": [
@@ -200,6 +209,26 @@
       "payload": {
         "type": "APPROVAL_STATE",
         "state": "PENDING"
+      }
+    },
+    {
+      "version": 1,
+      "payload": {
+        "type": "HANDOFF",
+        "workers": [
+          {
+            "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+            "display_name": "RTX PC",
+            "moved": true,
+            "message": null
+          },
+          {
+            "machine_id": "01M40Q6XMY22VM973434SCPS90",
+            "display_name": "MacBook",
+            "moved": false,
+            "message": "the worker could not be reached over Tailscale"
+          }
+        ]
       }
     }
   ]

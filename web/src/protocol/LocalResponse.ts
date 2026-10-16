@@ -6,6 +6,7 @@ import type { MachineId } from "./MachineId";
 import type { PairingRequestState } from "./PairingRequestState";
 import type { Session } from "./Session";
 import type { Timestamp } from "./Timestamp";
+import type { WorkerHandoff } from "./WorkerHandoff";
 
 /**
  * Replies emitted by the private local Unix socket.
@@ -58,6 +59,12 @@ export type LocalResponse = {
    * `PENDING` (ask again), `REJECTED`, `CANCELLED`, or `EXPIRED`.
    */
   state: PairingRequestState;
+} | {
+  "type": "HANDOFF";
+  /**
+   * One entry per active worker.
+   */
+  workers: Array<WorkerHandoff>;
 } | {
   "type": "ERROR";
   /**

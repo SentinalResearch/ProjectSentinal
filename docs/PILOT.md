@@ -137,6 +137,24 @@ Tailnet ACL (grants), so only the intended devices reach Sentinal:
 - **Releases kept:** the newest 5 releases stay published, so
   `sentinal release rollback <version>` can go back that far.
 
+## 6b. Turning an extra control into a worker
+
+On the control that should step down (never the one you keep):
+
+```console
+old$ sentinal setup --role worker
+```
+
+1. Pick the control to join. Setup shows which workers move with it.
+2. Confirm.
+3. In the kept control's **Settings → Machines**, approve each waiting row
+   (the moved workers, then this Machine with its four words).
+
+Workers stay on the old link until approved. If you never approve them, their
+requests expire after 10 minutes and nothing changes for them. To undo:
+`mv ~/.config/terminal-agent/daemon.toml.control-backup ~/.config/terminal-agent/daemon.toml`,
+restart `sentinald`, and run `sentinal setup`.
+
 ## 7. Back up
 
 ```console

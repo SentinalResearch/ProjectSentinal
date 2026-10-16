@@ -407,6 +407,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/link/identity", get(link_identity))
         .route("/api/v1/pairing/proof/{request_id}", get(pairing_proof))
         .route("/api/v1/link/update", axum::routing::post(link_update))
+        .route("/api/v1/link/move", axum::routing::post(link_move))
         .merge(auth_routes::routes())
         .merge(protected)
         .with_state(state)
@@ -446,6 +447,31 @@ async fn link_update(State(state): State<AppState>, request: Request) -> Respons
             Json(failure),
         )
             .into_response(),
+    }
+}
+
+/// The current control hands this worker to another control (it is stepping
+/// down). Only this link's control credential is accepted.
+async fn link_move(State(state): State<AppState>, request: Request) -> Response {
+    let Some(link) = state.link.clone() else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let authorized = auth_routes::bearer_from_headers(request.headers())
+        .and_then(|bearer| link.verify_control_credential(bearer))
+        .is_some();
+    if !authorized {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 4096).await {
+        Ok(body) => body,
+        Err(_) => return StatusCode::PAYLOAD_TOO_LARGE.into_response(),
+    };
+    let Ok(target) = serde_json::from_slice::<protocol::pairing::LinkMoveRequest>(&body) else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    match link.begin_move(target) {
+        Ok(()) => StatusCode::ACCEPTED.into_response(),
+        Err(message) => (StatusCode::BAD_REQUEST, message).into_response(),
     }
 }
 

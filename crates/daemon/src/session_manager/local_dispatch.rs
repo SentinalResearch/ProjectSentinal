@@ -66,6 +66,7 @@ impl SessionManager {
             | LocalRequest::RequestApproval { .. }
             | LocalRequest::ClaimApproval
             | LocalRequest::CancelApproval
+            | LocalRequest::HandoffWorkers { .. }
             | LocalRequest::ResetIdentity => {
                 return LocalResponse::Error {
                     code: LocalErrorCode::Unavailable,

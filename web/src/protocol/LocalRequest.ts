@@ -127,4 +127,19 @@ export type LocalRequest =
     display_name: string | null;
   }
   | { "type": "CLAIM_APPROVAL" }
-  | { "type": "CANCEL_APPROVAL" };
+  | { "type": "CANCEL_APPROVAL" }
+  | {
+    "type": "HANDOFF_WORKERS";
+    /**
+     * The new control's origin.
+     */
+    control_url: string;
+    /**
+     * The new control's Machine ID, from discovery.
+     */
+    control_machine_id: MachineId;
+    /**
+     * Only list the workers that would be moved.
+     */
+    dry_run: boolean;
+  };

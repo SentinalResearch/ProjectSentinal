@@ -119,6 +119,23 @@ and otherwise prints "Nothing to do".
   counts only if it names exactly the probed origin. A 404 is listed as an
   older Sentinal.
 
+- **Control → worker:** on a control, `sentinal setup --role worker` (or
+  option 2) lists the *other* controls on the Tailnet and asks which to join.
+  After a preview and confirmation, it:
+  1. tells each active worker over its link to ask that control for approval.
+     The workers keep their current link until you approve them in the new
+     control's dashboard.
+  2. rewrites `daemon.toml` as a worker config bound to this Machine's
+     Tailscale address. The control config is kept as
+     `daemon.toml.control-backup`.
+  3. restarts and health-checks the daemon.
+  4. removes this Machine's Serve routes.
+  5. asks the chosen control to approve this Machine, showing the
+     verification words.
+
+  A failed restart restores the control config. Workers that cannot be
+  reached are listed; run `sentinal setup` on them later.
+
 Exit codes: 0 done or nothing to do · 1 a step failed (files restored) ·
 2 cancelled or usage · 3–5 as `connect`, with 5 also meaning "already set up
 differently" (the file and reason are named) · 6 Tailscale missing or signed

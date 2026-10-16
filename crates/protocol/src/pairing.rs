@@ -333,3 +333,49 @@ pub fn verification_words(digest: &[u8]) -> Vec<String> {
         .map(|byte| crate::pairing_words::WORDS[usize::from(*byte)].to_string())
         .collect()
 }
+
+// ---------------------------------------------------------------------------
+// Control handoff (a control stepping down moves its workers)
+// ---------------------------------------------------------------------------
+
+/// Control → worker (`POST /api/v1/link/move`, control credential): ask the
+/// owner of this other control to approve you. The worker keeps its current
+/// link until the new one is claimed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct LinkMoveRequest {
+    /// The new control's origin.
+    pub control_url: String,
+    /// The new control's Machine ID, from discovery.
+    pub control_machine_id: MachineId,
+}
+
+impl LinkMoveRequest {
+    /// Shape checks; the worker verifies the control again when it asks.
+    pub fn validate(&self, policy: crate::link::ControlUrlPolicy) -> Result<(), ProtocolError> {
+        crate::link::validate_control_url(&self.control_url, policy)?;
+        if self.control_machine_id.is_ulid() {
+            Ok(())
+        } else {
+            Err(ProtocolError::InvalidPairingRequest(
+                "control Machine ID is not a ULID",
+            ))
+        }
+    }
+}
+
+/// What happened to one worker during a handoff.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct WorkerHandoff {
+    /// The worker.
+    pub machine_id: MachineId,
+    /// Its display name.
+    pub display_name: String,
+    /// It accepted the move and is asking the new control.
+    pub moved: bool,
+    /// Why not (bounded, no secrets).
+    pub message: Option<String>,
+}

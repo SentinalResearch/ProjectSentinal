@@ -9,6 +9,7 @@ mod approval_claim;
 mod approval_routes;
 mod approval_verify;
 mod discovery;
+mod handoff;
 mod proxy;
 mod refresh;
 mod release;

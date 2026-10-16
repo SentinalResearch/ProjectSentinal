@@ -158,3 +158,24 @@ fn verification_words_follow_the_shared_vector() {
     assert_eq!(ends[0], "acorn");
     assert_eq!(ends[2], "zephyr");
 }
+
+#[test]
+fn a_move_names_a_valid_control_only() {
+    use protocol::{link::ControlUrlPolicy, pairing::LinkMoveRequest};
+    let request: LinkMoveRequest = round_trip("move");
+    assert!(request.validate(ControlUrlPolicy::Production).is_ok());
+    for (url, id) in [
+        ("http://100.64.0.1:7420", "01K2C7RQ9M3X8V6T4N2P0SDB5A"),
+        ("https://evil.example.com", "01K2C7RQ9M3X8V6T4N2P0SDB5A"),
+        ("https://c.example.ts.net", "not-a-ulid"),
+    ] {
+        let bad = LinkMoveRequest {
+            control_url: url.into(),
+            control_machine_id: protocol::MachineId(id.into()),
+        };
+        assert!(
+            bad.validate(ControlUrlPolicy::Production).is_err(),
+            "{url} {id}"
+        );
+    }
+}

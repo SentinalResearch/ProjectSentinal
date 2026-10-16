@@ -43,6 +43,7 @@ struct Fake {
     password_needed: Option<bool>,
     typed: std::collections::VecDeque<String>,
     password_set: Option<String>,
+    workers: Vec<protocol::pairing::WorkerHandoff>,
     calls: Vec<String>,
 }
 
@@ -89,6 +90,30 @@ impl System for Fake {
     }
     fn discover(&mut self) -> Result<cli::discovery::Discovered, String> {
         Ok(self.discovered.clone())
+    }
+    fn handoff(
+        &mut self,
+        control_url: &str,
+        _id: &protocol::MachineId,
+        dry_run: bool,
+    ) -> Result<Vec<protocol::pairing::WorkerHandoff>, String> {
+        self.calls.push(format!(
+            "handoff {}{control_url}",
+            if dry_run { "dry " } else { "" }
+        ));
+        Ok(self
+            .workers
+            .iter()
+            .cloned()
+            .map(|mut worker| {
+                worker.moved = !dry_run;
+                worker
+            })
+            .collect())
+    }
+    fn stop_serving(&mut self) -> Result<(), String> {
+        self.calls.push("serve off".into());
+        Ok(())
     }
     fn password_needed(&mut self) -> Option<bool> {
         self.password_needed
@@ -330,18 +355,6 @@ fn a_connected_worker_is_not_turned_into_a_control() {
     assert_eq!(outcome, Outcome::Exit(5));
     assert!(stderr.contains("sentinal disconnect"), "{stderr}");
     assert_eq!(setup.config(), before);
-}
-
-#[test]
-fn a_control_is_not_offered_the_worker_role() {
-    let setup = Setup::new("control-to-worker");
-    let mut fake = linux();
-    setup.run(setup.options(Some(SetupRole::Control), true), &mut fake, "");
-    let mut fake = linux();
-    let (outcome, _, stderr) =
-        setup.run(setup.options(Some(SetupRole::Worker), true), &mut fake, "");
-    assert_eq!(outcome, Outcome::Exit(5));
-    assert!(stderr.contains("daemon.toml"), "{stderr}");
 }
 
 #[test]
@@ -651,4 +664,161 @@ fn without_a_terminal_the_password_is_left_for_later() {
         stdout.contains("run sentinal setup in a terminal"),
         "{stdout}"
     );
+}
+
+#[test]
+fn a_control_config_turns_back_into_a_worker_config() {
+    use cli::setup::config::{control_config, worker_config, ConfigChange, ControlInputs};
+    let original = "# mine\nbind = \"100.90.80.70:7420\"\ndata_dir = \"/srv/data\"\n\n[storage]\nsession_log_max_age_days = 30\n";
+    let ConfigChange::Write(control) = control_config(
+        Some(original),
+        &ControlInputs {
+            origin: ORIGIN,
+            display_name: "Lab",
+            package_dir: Path::new("/srv/packages"),
+            web_root: None,
+        },
+    )
+    .unwrap() else {
+        panic!("expected a write");
+    };
+    let hand_written = "bind = \"127.0.0.1:7420\"\nbehind_tailscale_serve = true\nallowed_origins = [\n  \"https://c.example.ts.net\",\n]\n[control]\nenabled = true\npublic_url = \"https://c.example.ts.net\"\n[packages]\nenabled = true\ndirectory = \"/p\"\npublic_base_url = \"https://c.example.ts.net\"\n";
+    for text in [control.as_str(), hand_written] {
+        let worker = worker_config(text, "100.90.80.70:7420").unwrap();
+        let parsed =
+            daemon::config::DaemonConfig::from_toml(&worker, Path::new("/home/owner")).unwrap();
+        assert!(
+            parsed.control.is_none() && parsed.packages.is_none(),
+            "{worker}"
+        );
+        assert_eq!(parsed.bind.to_string(), "100.90.80.70:7420");
+        assert!(
+            !parsed.behind_tailscale_serve && parsed.allowed_origins.is_empty(),
+            "{worker}"
+        );
+    }
+    let back = worker_config(&control, "100.90.80.70:7420").unwrap();
+    assert!(back.starts_with("# mine\n"), "{back}");
+    assert!(
+        back.contains("[storage]\nsession_log_max_age_days = 30"),
+        "{back}"
+    );
+    assert!(!back.contains("sentinal setup"), "{back}");
+}
+
+const TARGET: &str = "https://control-one.example-tailnet.ts.net";
+
+/// A finished control at ORIGIN, with SENTINAL control-one on the Tailnet.
+fn switching(name: &str) -> (Setup, Fake) {
+    let setup = Setup::new(name);
+    setup.run(
+        setup.options(Some(SetupRole::Control), true),
+        &mut linux(),
+        "",
+    );
+    let mut discovered = found(&[
+        (DNS, "This one"),
+        ("control-one.example-tailnet.ts.net", "Control One"),
+    ]);
+    for control in &mut discovered.controls {
+        control.discovery.pairing.approval = true;
+    }
+    discovered.controls[1].discovery.control_machine_id =
+        protocol::MachineId("01J9Y0C7RQ9M3X8V6T4N2P0SDB".into());
+    let fake = Fake {
+        discovered,
+        linger: Some(true),
+        workers: vec![protocol::pairing::WorkerHandoff {
+            machine_id: protocol::MachineId("01J9Z3K8V6Q2T7M4X5C0RNB8DA".into()),
+            display_name: "RTX PC".into(),
+            moved: false,
+            message: None,
+        }],
+        ..Fake::default()
+    };
+    (setup, fake)
+}
+
+#[test]
+fn a_control_hands_off_its_workers_and_becomes_a_worker_of_the_chosen_control() {
+    let (setup, mut fake) = switching("switch");
+    let control = setup.config();
+    let (outcome, stdout, stderr) = setup.run(
+        setup.options(Some(SetupRole::Worker), false),
+        &mut fake,
+        "1\ny\n",
+    );
+    assert_eq!(
+        outcome,
+        Outcome::Approve {
+            control_url: TARGET.into(),
+            control_machine_id: protocol::MachineId("01J9Y0C7RQ9M3X8V6T4N2P0SDB".into()),
+            control_name: "Control One".into(),
+            name: None,
+        },
+        "{stdout}{stderr}"
+    );
+    assert!(
+        !stdout.contains("This one"),
+        "this control is never offered: {stdout}"
+    );
+    assert!(stdout.contains("1 worker (RTX PC)"), "{stdout}");
+    assert!(stdout.contains("✓ RTX PC asked Control One"), "{stdout}");
+    assert_eq!(
+        fake.calls,
+        vec![
+            format!("handoff dry {TARGET}"),
+            format!("handoff {TARGET}"),
+            "restart".into(),
+            "health http://100.90.80.70:7420/api/v1/health".into(),
+            "serve off".into(),
+        ]
+    );
+    let parsed = daemon::config::DaemonConfig::from_toml(&setup.config(), &setup.dir.0).unwrap();
+    assert!(parsed.control.is_none());
+    assert_eq!(parsed.bind.to_string(), "100.90.80.70:7420");
+    assert_eq!(
+        fs::read_to_string(setup.config_dir.join("daemon.toml.control-backup")).unwrap(),
+        control
+    );
+}
+
+#[test]
+fn declining_the_switch_changes_nothing() {
+    let (setup, mut fake) = switching("switch-no");
+    let control = setup.config();
+    let (outcome, ..) = setup.run(
+        setup.options(Some(SetupRole::Worker), false),
+        &mut fake,
+        "1\nn\n",
+    );
+    assert_eq!(outcome, Outcome::Exit(2));
+    assert_eq!(setup.config(), control);
+    assert_eq!(fake.calls, vec![format!("handoff dry {TARGET}")]);
+}
+
+#[test]
+fn a_failed_restart_keeps_the_control() {
+    let (setup, mut fake) = switching("switch-fail");
+    fake.unhealthy = true;
+    let control = setup.config();
+    let (outcome, _, stderr) = setup.run(
+        setup.options(Some(SetupRole::Worker), true),
+        &mut fake,
+        "1\n",
+    );
+    assert_eq!(outcome, Outcome::Exit(1), "{stderr}");
+    assert!(stderr.contains("still the control"), "{stderr}");
+    assert_eq!(setup.config(), control);
+    assert!(!fake.calls.contains(&"serve off".to_string()));
+}
+
+#[test]
+fn with_no_other_control_there_is_nothing_to_switch_to() {
+    let (setup, mut fake) = switching("switch-alone");
+    fake.discovered.controls.truncate(1);
+    let (outcome, _, stderr) =
+        setup.run(setup.options(Some(SetupRole::Worker), true), &mut fake, "");
+    assert_eq!(outcome, Outcome::Exit(5));
+    assert!(stderr.contains("no other Sentinal control"), "{stderr}");
 }

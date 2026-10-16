@@ -40,10 +40,12 @@ impl LinkManager {
         control_url: &str,
         control_machine_id: MachineId,
         display_name: Option<&str>,
+        moving: bool,
     ) -> Result<LocalResponse, LinkFailure> {
         let _operation = self.inner.operation.lock().await;
         let machine_id = self.machine_id().map_err(identity_failure)?;
-        if let Some(link) = self.read_link()? {
+        // A handoff keeps the current link until the new one is claimed.
+        if let Some(link) = self.read_link()?.filter(|_| !moving) {
             if link.state == super::file::StoredState::Active {
                 return Err(LinkFailure::new(
                     LocalErrorCode::AlreadyConnected,
