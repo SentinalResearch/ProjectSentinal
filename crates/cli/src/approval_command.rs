@@ -18,6 +18,8 @@ pub struct ApprovalTarget<'a> {
     pub control_name: &'a str,
     /// Its Machine ID from discovery.
     pub control_machine_id: &'a MachineId,
+    /// Moving from another control: stay connected there until approved.
+    pub keep_current_link: bool,
 }
 
 /// Ask for approval and wait; `cancel` resolves on Ctrl-C.
@@ -34,6 +36,7 @@ pub async fn approve(
         control_url: target.control_url.to_string(),
         control_machine_id: target.control_machine_id.clone(),
         display_name: name.map(str::to_string),
+        keep_current_link: target.keep_current_link,
     };
     let words = match local(socket, request, REQUEST_DEADLINE).await {
         Ok(LocalResponse::ApprovalRequested {

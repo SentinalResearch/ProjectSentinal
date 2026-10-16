@@ -79,6 +79,9 @@ pub enum Outcome {
         control_machine_id: protocol::MachineId,
         /// The control's name from discovery.
         control_name: String,
+        /// This worker is moving from another control: stay connected there
+        /// until the new control approves it.
+        moving: bool,
         /// Proposed display name.
         name: Option<String>,
     },

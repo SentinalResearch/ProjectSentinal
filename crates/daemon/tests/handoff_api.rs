@@ -210,21 +210,30 @@ async fn a_stepping_down_control_hands_its_worker_to_the_new_one() {
         control_url: new_url.clone(),
         control_machine_id: MachineId(NEW.into()),
     };
-    let listed = old.handoff_workers(&target, true).await.unwrap();
+    let listed = old.handoff_workers(Some(&target), true).await.unwrap();
     assert_eq!(listed.len(), 1);
     assert!(!listed[0].moved, "a dry run moves nothing");
+    assert_eq!(
+        old.handoff_workers(None, true).await.unwrap().len(),
+        1,
+        "listing needs no target"
+    );
+    assert!(
+        old.handoff_workers(None, false).await.is_err(),
+        "moving needs a target"
+    );
     let refused = old
         .handoff_workers(
-            &LinkMoveRequest {
+            Some(&LinkMoveRequest {
                 control_url: new_url.clone(),
                 control_machine_id: MachineId(OLD.into()),
-            },
+            }),
             false,
         )
         .await;
     assert!(refused.is_err(), "a control cannot hand workers to itself");
 
-    let moved = old.handoff_workers(&target, false).await.unwrap();
+    let moved = old.handoff_workers(Some(&target), false).await.unwrap();
     assert!(moved[0].moved, "{:?}", moved[0].message);
 
     let mut request_id = None;
@@ -274,6 +283,18 @@ async fn a_stepping_down_control_hands_its_worker_to_the_new_one() {
     assert!(
         switched,
         "the worker moved to the new control after approval"
+    );
+    let left = old
+        .registry()
+        .unwrap()
+        .machines
+        .into_iter()
+        .find(|machine| machine.machine_id == worker.machine_id().unwrap())
+        .unwrap();
+    assert_eq!(
+        left.status,
+        protocol::link::RegistryStatus::Disconnected,
+        "the old control was told the worker left"
     );
     assert_eq!(
         new.pairing_requests().unwrap().requests[0].state,

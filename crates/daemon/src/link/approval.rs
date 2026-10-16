@@ -241,6 +241,7 @@ impl LinkManager {
             ));
         }
         let now = (self.inner.clock)();
+        self.leave_previous_control(&link.control_machine_id).await;
         let file = LinkFile::active(
             control_url,
             link.control_machine_id,
@@ -287,6 +288,38 @@ impl LinkManager {
         Ok(LocalResponse::ApprovalState {
             state: PairingRequestState::Cancelled,
         })
+    }
+
+    /// Moving to another control: tell the one being left, so it shows this
+    /// Machine as disconnected instead of offline. Best effort; a control that
+    /// is stepping down may already be gone.
+    async fn leave_previous_control(&self, new_control: &MachineId) {
+        let Ok(Some(previous)) = self.read_link() else {
+            return;
+        };
+        let (super::file::StoredState::Active, Some(credential), Some(previous_id)) = (
+            previous.state,
+            &previous.worker_credential,
+            &previous.control_machine_id,
+        ) else {
+            return;
+        };
+        if previous_id == new_control {
+            return;
+        }
+        let Ok(machine_id) = self.machine_id() else {
+            return;
+        };
+        let _ = self
+            .inner
+            .client
+            .post::<_, serde_json::Value>(
+                &previous.control_url,
+                "/api/v1/link/disconnect",
+                Some(credential.expose()),
+                &protocol::link::LinkDisconnectRequest { machine_id },
+            )
+            .await;
     }
 
     fn set_pending(&self, value: Option<PendingApproval>) -> Result<(), LinkFailure> {

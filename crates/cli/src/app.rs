@@ -516,6 +516,7 @@ async fn setup(args: SetupArgs, out: &mut dyn Write, err: &mut dyn Write) -> i32
             control_machine_id,
             control_name,
             name,
+            moving,
         } => {
             let Some(socket) = connect_command::default_socket() else {
                 let _ = writeln!(err, "sentinal: HOME is not set; set SENTINAL_SOCKET");
@@ -527,6 +528,7 @@ async fn setup(args: SetupArgs, out: &mut dyn Write, err: &mut dyn Write) -> i32
                     control_url: &control_url,
                     control_name: &control_name,
                     control_machine_id: &control_machine_id,
+                    keep_current_link: moving,
                 },
                 name.as_deref(),
                 std::time::Duration::from_secs(2),

@@ -536,12 +536,13 @@ impl LinkManager {
                 control_url,
                 control_machine_id,
                 display_name,
+                keep_current_link,
             } => {
                 self.request_approval(
                     &control_url,
                     control_machine_id,
                     display_name.as_deref(),
-                    false,
+                    keep_current_link,
                 )
                 .await
             }

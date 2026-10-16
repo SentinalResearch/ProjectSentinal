@@ -67,8 +67,18 @@
       "version": 1,
       "payload": {
         "type": "HANDOFF_WORKERS",
-        "control_url": "https://sentinal-control.example.ts.net",
-        "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A",
+        "target": {
+          "control_url": "https://sentinal-control.example.ts.net",
+          "control_machine_id": "01K2C7RQ9M3X8V6T4N2P0SDB5A"
+        },
+        "dry_run": false
+      }
+    },
+    {
+      "version": 1,
+      "payload": {
+        "type": "HANDOFF_WORKERS",
+        "target": null,
         "dry_run": true
       }
     }

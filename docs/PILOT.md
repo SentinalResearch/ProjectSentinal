@@ -137,6 +137,25 @@ Tailnet ACL (grants), so only the intended devices reach Sentinal:
 - **Releases kept:** the newest 5 releases stay published, so
   `sentinal release rollback <version>` can go back that far.
 
+## 6a. Moving a worker to another control
+
+Several controls can share one Tailnet, each with its own workers. To move a
+worker from one to another, run this on the worker:
+
+```console
+worker$ sentinal setup        # 2) Connect → pick the other control
+```
+
+It lists the other controls (never the current one) and prints four words.
+Approve the matching row in the new control's **Settings → Machines**. The
+worker stays connected to its current control until you approve. Then it
+switches and tells the old control, which shows it as *Disconnected*. Its
+Machine ID and name come along.
+
+If the Machine joins a different Tailnet, its Tailscale address changes.
+`sentinal setup` notices that the API is still bound to the old address,
+shows the change, and fixes it before looking for controls.
+
 ## 6b. Turning an extra control into a worker
 
 On the control that should step down (never the one you keep):
@@ -145,7 +164,9 @@ On the control that should step down (never the one you keep):
 old$ sentinal setup --role worker
 ```
 
-1. Pick the control to join. Setup shows which workers move with it.
+1. Pick the control to join, or *None yet* to become a worker with no
+   control. Setup shows which workers move with it, or, with *None yet*, which
+   will lose their control.
 2. Confirm.
 3. In the kept control's **Settings → Machines**, approve each waiting row
    (the moved workers, then this Machine with its four words).

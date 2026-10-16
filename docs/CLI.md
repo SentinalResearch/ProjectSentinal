@@ -119,6 +119,13 @@ and otherwise prints "Nothing to do".
   counts only if it names exactly the probed origin. A 404 is listed as an
   older Sentinal.
 
+- **Worker → another control:** on a connected worker, option 2 lists the
+  *other* controls and asks the chosen one for approval
+  (`keep_current_link`). The worker stays connected until that control's
+  owner approves it, then switches and tells the old control it left.
+- **New Tailscale address:** on a worker bound to a Tailscale address that
+  is no longer this Machine's (it joined another Tailnet), setup previews
+  and applies the new `bind` first, keeping `daemon.toml.before-rebind`.
 - **Control → worker:** on a control, `sentinal setup --role worker` (or
   option 2) lists the *other* controls on the Tailnet and asks which to join.
   After a preview and confirmation, it:
@@ -134,7 +141,9 @@ and otherwise prints "Nothing to do".
      verification words.
 
   A failed restart restores the control config. Workers that cannot be
-  reached are listed; run `sentinal setup` on them later.
+  reached are listed; run `sentinal setup` on them later. Choosing *None yet*
+  makes an unconnected worker, after warning which workers lose their
+  control.
 
 Exit codes: 0 done or nothing to do · 1 a step failed (files restored) ·
 2 cancelled or usage · 3–5 as `connect`, with 5 also meaning "already set up

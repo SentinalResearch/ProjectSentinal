@@ -329,6 +329,10 @@ pub enum LocalRequest {
         control_machine_id: MachineId,
         /// Proposed display name; the hostname when absent.
         display_name: Option<String>,
+        /// Moving from another control: keep the current link until this
+        /// request is claimed (absent from older CLIs: false).
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        keep_current_link: bool,
     },
     /// Try to claim the pending approval once.
     ClaimApproval,
@@ -336,10 +340,8 @@ pub enum LocalRequest {
     CancelApproval,
     /// On a control: list (`dry_run`) or move every active worker to another control.
     HandoffWorkers {
-        /// The new control's origin.
-        control_url: String,
-        /// The new control's Machine ID, from discovery.
-        control_machine_id: MachineId,
+        /// The control to move them to; `None` only lists them (`dry_run`).
+        target: Option<crate::pairing::LinkMoveRequest>,
         /// Only list the workers that would be moved.
         dry_run: bool,
     },
@@ -405,6 +407,7 @@ impl LocalRequest {
                 control_url,
                 control_machine_id,
                 display_name,
+                ..
             } => {
                 validate_control_url(control_url, ControlUrlPolicy::Development)
                     .or_else(|_| validate_control_url(control_url, ControlUrlPolicy::Production))?;
@@ -420,15 +423,13 @@ impl LocalRequest {
                 Ok(())
             }
             LocalRequest::ClaimApproval | LocalRequest::CancelApproval => Ok(()),
-            LocalRequest::HandoffWorkers {
-                control_url,
-                control_machine_id,
-                ..
-            } => crate::pairing::LinkMoveRequest {
-                control_url: control_url.clone(),
-                control_machine_id: control_machine_id.clone(),
-            }
-            .validate(ControlUrlPolicy::Development),
+            LocalRequest::HandoffWorkers { target, dry_run } => match target {
+                Some(target) => target.validate(ControlUrlPolicy::Development),
+                None if *dry_run => Ok(()),
+                None => Err(ProtocolError::InvalidPairingRequest(
+                    "a handoff needs a control to move the workers to",
+                )),
+            },
             LocalRequest::GetIdentity
             | LocalRequest::ConnectionStatus
             | LocalRequest::DisconnectControl

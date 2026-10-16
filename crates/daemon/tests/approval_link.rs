@@ -166,6 +166,7 @@ impl Pair {
                 control_url: self.url.clone(),
                 control_machine_id: MachineId(control_id.into()),
                 display_name: Some("RTX PC".into()),
+                keep_current_link: false,
             })
             .await
     }

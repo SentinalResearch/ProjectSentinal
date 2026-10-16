@@ -1127,6 +1127,21 @@ the e2e daemons do not have. It is part of the real-Machine acceptance.
 **Owner approval is kept on purpose:** a control stepping down cannot attach
 its workers anywhere without the new control's owner approving each one.
 
+**Follow-ups (same day):**
+- **Worker → another control** on the same Tailnet. On a connected worker,
+  `setup` (`move_worker`) lists the other controls.
+  `REQUEST_APPROVAL.keep_current_link` (additive, default false) keeps the
+  current link until the claim.
+- **Telling the old control:** after a successful claim from a different
+  control, the worker best-effort POSTs `/api/v1/link/disconnect` to the old
+  one, so it shows Disconnected. Asserted in `handoff_api.rs`.
+- **Control → unconnected worker:** a *None yet* option, after warning which
+  workers lose their control. `HANDOFF_WORKERS.target` is now optional; a dry
+  run with no target only lists the workers.
+- **Tailnet change:** worker `setup` re-binds to the current Tailscale
+  address after a preview, restoring the previous config on a failed restart.
+- **Tests:** `cli/tests/setup.rs` (+3).
+
 ## Proving tests
 
 - Installer/package: every target; fresh install, reinstall, upgrade, explicit

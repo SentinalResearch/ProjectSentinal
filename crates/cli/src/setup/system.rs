@@ -70,10 +70,11 @@ pub trait System {
     /// On a control: list (`dry_run`) or move its workers to another control.
     fn handoff(
         &mut self,
-        control_url: &str,
-        control_machine_id: &protocol::MachineId,
+        target: Option<(&str, &protocol::MachineId)>,
         dry_run: bool,
     ) -> Result<Vec<protocol::pairing::WorkerHandoff>, String>;
+    /// The control this worker is actively connected to, if any.
+    fn current_control(&mut self) -> Option<(String, protocol::MachineId)>;
     /// Remove this Machine's HTTPS 443 Serve routes.
     fn stop_serving(&mut self) -> Result<(), String>;
     /// Whether the dashboard still has no owner password (`None`: unknown).
@@ -270,19 +271,32 @@ impl System for RealSystem {
 
     fn handoff(
         &mut self,
-        control_url: &str,
-        control_machine_id: &protocol::MachineId,
+        target: Option<(&str, &protocol::MachineId)>,
         dry_run: bool,
     ) -> Result<Vec<protocol::pairing::WorkerHandoff>, String> {
         let request = protocol::LocalRequest::HandoffWorkers {
-            control_url: control_url.to_string(),
-            control_machine_id: control_machine_id.clone(),
+            target: target.map(|(url, id)| protocol::pairing::LinkMoveRequest {
+                control_url: url.to_string(),
+                control_machine_id: id.clone(),
+            }),
             dry_run,
         };
         match super::local::local_socket(request)? {
             protocol::LocalResponse::Handoff { workers } => Ok(workers),
             protocol::LocalResponse::Error { message, .. } => Err(message),
             _ => Err("sentinald sent an unexpected reply".into()),
+        }
+    }
+
+    fn current_control(&mut self) -> Option<(String, protocol::MachineId)> {
+        match super::local::local_socket(protocol::LocalRequest::ConnectionStatus).ok()? {
+            protocol::LocalResponse::Connection { connection }
+                if connection.state == protocol::link::LocalLinkState::Active
+                    || connection.state == protocol::link::LocalLinkState::ControlUnreachable =>
+            {
+                Some((connection.control_url?, connection.control_machine_id?))
+            }
+            _ => None,
         }
     }
 

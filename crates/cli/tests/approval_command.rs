@@ -92,6 +92,7 @@ async fn run(fake: &Fake, cancel: impl std::future::Future<Output = ()>) -> (i32
             control_url: "https://pilot.example.ts.net",
             control_name: "Owner's Sentinal",
             control_machine_id: &control_machine_id,
+            keep_current_link: false,
         },
         Some("RTX PC"),
         Duration::from_millis(5),

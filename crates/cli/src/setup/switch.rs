@@ -5,6 +5,7 @@
 //! A failed restart restores the control config; nothing else has changed.
 
 use super::{config::worker_config, exit, Io, Outcome, SetupOptions, System};
+use protocol::pairing::WorkerHandoff;
 use std::fs;
 
 pub(super) fn to_worker(
@@ -48,12 +49,6 @@ pub(super) fn to_worker(
                 .is_none_or(|url| url.trim_end_matches('/') == control.origin)
         })
         .collect();
-    if others.is_empty() {
-        return io.fail(
-            exit::CONFLICT,
-            "there is no other Sentinal control on your Tailnet to join; this Machine stays the control",
-        );
-    }
     for (index, control) in others.iter().enumerate() {
         let short_id: String = control.control_machine_id.0.chars().take(8).collect();
         let _ = writeln!(
@@ -65,18 +60,23 @@ pub(super) fn to_worker(
             control.release
         );
     }
-    let Some(choice) = io.ask(&format!("Join which control? 1-{}: ", others.len())) else {
+    let none = others.len() + 1;
+    let _ = writeln!(
+        io.out,
+        "  {none}) None yet: become a worker that is not connected to any control"
+    );
+    let Some(choice) = io.ask(&format!("Join which control? 1-{none}: ")) else {
         return io.cancelled();
     };
-    let Some(target) = choice
-        .parse::<usize>()
-        .ok()
-        .and_then(|n| n.checked_sub(1))
-        .and_then(|n| others.get(n))
-    else {
-        return io.cancelled();
+    let target = match choice.parse::<usize>() {
+        Ok(n) if n == none => None,
+        Ok(n) => match n.checked_sub(1).and_then(|n| others.get(n)) {
+            Some(target) => Some(target),
+            None => return io.cancelled(),
+        },
+        Err(_) => return io.cancelled(),
     };
-    if !target.pairing.approval {
+    if let Some(target) = target.filter(|target| !target.pairing.approval) {
         return io.fail(
             exit::CONFLICT,
             &format!(
@@ -85,8 +85,9 @@ pub(super) fn to_worker(
             ),
         );
     }
+    let target_ref = target.map(|target| (target.origin.as_str(), &target.control_machine_id));
 
-    let workers = match system.handoff(&target.origin, &target.control_machine_id, true) {
+    let workers = match system.handoff(None, true) {
         Ok(workers) => workers,
         Err(message) => {
             return io.fail(
@@ -95,23 +96,12 @@ pub(super) fn to_worker(
             )
         }
     };
-    let names: Vec<&str> = workers
-        .iter()
-        .map(|worker| worker.display_name.as_str())
-        .collect();
     let _ = writeln!(io.out, "Preview — nothing has changed yet:");
-    if workers.is_empty() {
-        let _ = writeln!(io.out, "  workers       none are paired to this control");
-    } else {
-        let _ = writeln!(
-            io.out,
-            "  workers       {} worker{} ({}) will ask {} to approve them; approve each in its dashboard",
-            workers.len(),
-            if workers.len() == 1 { "" } else { "s" },
-            names.join(", "),
-            target.display_name
-        );
-    }
+    preview_workers(
+        io,
+        &workers,
+        target.map(|target| target.display_name.as_str()),
+    );
     let _ = writeln!(io.out, "  config        {} becomes a worker config (control config kept as daemon.toml.control-backup)", config_path.display());
     let _ = writeln!(
         io.out,
@@ -127,11 +117,12 @@ pub(super) fn to_worker(
         "  data          kept (Machine ID, history); this dashboard stops serving"
     );
     if !options.yes {
+        let question = match target {
+            Some(target) => format!("Hand off and join {}? [y/N]: ", target.display_name),
+            None => "Stop being a control and become an unconnected worker? [y/N]: ".into(),
+        };
         match io
-            .ask(&format!(
-                "Hand off and join {}? [y/N]: ",
-                target.display_name
-            ))
+            .ask(&question)
             .as_deref()
             .map(str::to_ascii_lowercase)
             .as_deref()
@@ -141,33 +132,15 @@ pub(super) fn to_worker(
         }
     }
 
-    match system.handoff(&target.origin, &target.control_machine_id, false) {
-        Ok(moved) => {
-            for worker in moved {
-                match worker.message {
-                    None if worker.moved => {
-                        let _ = writeln!(
-                            io.out,
-                            "  ✓ {} asked {}",
-                            worker.display_name, target.display_name
-                        );
-                    }
-                    message => {
-                        let _ = writeln!(
-                            io.out,
-                            "  ✗ {}: {} (run sentinal setup on it later)",
-                            worker.display_name,
-                            message.unwrap_or_else(|| "not moved".into())
-                        );
-                    }
-                }
+    if let Some(target) = target {
+        match system.handoff(target_ref, false) {
+            Ok(moved) => report_moves(io, &moved, &target.display_name),
+            Err(message) => {
+                return io.fail(
+                    exit::FAILED,
+                    &format!("the handoff failed before anything changed: {message}"),
+                )
             }
-        }
-        Err(message) => {
-            return io.fail(
-                exit::FAILED,
-                &format!("the handoff failed before anything changed: {message}"),
-            )
         }
     }
 
@@ -205,10 +178,57 @@ pub(super) fn to_worker(
             let _ = writeln!(io.out, "  · could not remove the Serve routes ({message}); run: tailscale serve --https=443 off");
         }
     }
-    Outcome::Approve {
-        control_url: target.origin.clone(),
-        control_machine_id: target.control_machine_id.clone(),
-        control_name: target.display_name.clone(),
-        name: options.name.clone(),
+    match target {
+        Some(target) => Outcome::Approve {
+            control_url: target.origin.clone(),
+            control_machine_id: target.control_machine_id.clone(),
+            control_name: target.display_name.clone(),
+            moving: false,
+            name: options.name.clone(),
+        },
+        None => {
+            let _ = writeln!(
+                io.out,
+                "This Machine is now a worker, not connected to any control. When it is on the Tailnet of the control it should join, run sentinal setup."
+            );
+            Outcome::Exit(exit::OK)
+        }
+    }
+}
+
+fn preview_workers(io: &mut Io<'_>, workers: &[WorkerHandoff], target: Option<&str>) {
+    let names: Vec<&str> = workers
+        .iter()
+        .map(|worker| worker.display_name.as_str())
+        .collect();
+    let _ = match (workers.len(), target) {
+        (0, _) => writeln!(io.out, "  workers       none are paired to this control"),
+        (count, Some(target)) => writeln!(
+            io.out,
+            "  workers       {count} worker{} ({}) will ask {target} to approve them; approve each in its dashboard",
+            if count == 1 { "" } else { "s" },
+            names.join(", ")
+        ),
+        (count, None) => writeln!(
+            io.out,
+            "  workers       {} will lose {} control; run sentinal setup on {} afterwards",
+            names.join(", "),
+            if count == 1 { "its" } else { "their" },
+            if count == 1 { "it" } else { "each" }
+        ),
+    };
+}
+
+fn report_moves(io: &mut Io<'_>, moved: &[WorkerHandoff], target: &str) {
+    for worker in moved {
+        let _ = match &worker.message {
+            None if worker.moved => writeln!(io.out, "  ✓ {} asked {target}", worker.display_name),
+            message => writeln!(
+                io.out,
+                "  ✗ {}: {} (run sentinal setup on it later)",
+                worker.display_name,
+                message.as_deref().unwrap_or("not moved")
+            ),
+        };
     }
 }

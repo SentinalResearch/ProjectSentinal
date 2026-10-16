@@ -17,7 +17,7 @@ impl ControlService {
     /// List (`dry_run`) or move every active worker to `target`.
     pub async fn handoff_workers(
         &self,
-        target: &LinkMoveRequest,
+        target: Option<&LinkMoveRequest>,
         dry_run: bool,
     ) -> Result<Vec<WorkerHandoff>, String> {
         let policy = if self.settings.development {
@@ -25,11 +25,15 @@ impl ControlService {
         } else {
             protocol::link::ControlUrlPolicy::Production
         };
-        target.validate(policy).map_err(|error| error.to_string())?;
-        if target.control_machine_id == self.settings.machine_id {
-            return Err(
-                "that is this control; choose the control the workers should move to".into(),
-            );
+        if let Some(target) = target {
+            target.validate(policy).map_err(|error| error.to_string())?;
+            if target.control_machine_id == self.settings.machine_id {
+                return Err(
+                    "that is this control; choose the control the workers should move to".into(),
+                );
+            }
+        } else if !dry_run {
+            return Err("a handoff needs a control to move the workers to".into());
         }
         let workers = self
             .store
@@ -45,7 +49,7 @@ impl ControlService {
                 moved: false,
                 message: None,
             };
-            if !dry_run {
+            if let (false, Some(target)) = (dry_run, target) {
                 match self.send_move(&row.machine_id, target).await {
                     Ok(()) => entry.moved = true,
                     Err(message) => entry.message = Some(message),
