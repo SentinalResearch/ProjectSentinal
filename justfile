@@ -63,6 +63,7 @@ check:
     bash scripts/tests/receive-release-test.sh
     bash scripts/tests/release-signature-test.sh
     bash scripts/tests/github-install-test.sh
+    bash scripts/tests/ship-release-test.sh
 
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:
@@ -127,3 +128,8 @@ test-e2e:
 
 # Run all fast checks and the isolated browser acceptance suite
 acceptance: check test-e2e
+
+# Owner only, on your own machine: tag, wait for the build, sign, and publish
+# one release (key from .release.local: key=PATH). Re-run to resume.
+ship version:
+    bash scripts/ship-release.sh {{version}}

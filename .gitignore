@@ -20,6 +20,8 @@
 
 # Machine-local environment and credentials
 .env
+# Owner's release-key path for scripts/ship-release.sh (never the key itself)
+/.release.local
 .env.*
 !web/.env.demo
 !web/.env.test

@@ -213,7 +213,28 @@ owner$ ssh-keygen -t ed25519    -C sentinal-release-backup  -f /secure/offline/s
   `sentinal-release namespaces="sentinal-release" <type> <base64 key> <comment>`.
 - Commit that file. Never commit, upload, or copy a private key to CI or the control.
 
-**For each tagged release:**
+**For each release, one command (recommended):**
+
+```console
+owner$ echo 'key=~/.ssh/sentinal-release' > .release.local   # once; gitignored
+owner$ just ship 0.2.2
+```
+
+`just ship` (`scripts/ship-release.sh`) does the following:
+1. Pushes `main` and tags `v0.2.2`. It refuses uncommitted changes and any
+   branch but `main`.
+2. Waits for the GitHub build.
+3. Downloads the draft into `dist/release-v0.2.2`.
+4. Signs `SHA256SUMS` with your key. `sign-release.sh` checks every file
+   against it first; your key may ask for its passphrase or a touch.
+5. Uploads `SHA256SUMS.sig` and publishes the release as the latest normal
+   release.
+
+Every step is skipped when already done, so re-run it after an interruption.
+Signing stays on your machine on purpose: a key in GitHub Actions would let
+anyone who can change a workflow sign releases.
+
+**The same steps by hand:**
 1. `.github/workflows/release.yml` builds every target, attaches GitHub build
    provenance, renders `install.sh` with the pinned keys, and leaves an
    **unsigned draft**.
@@ -225,8 +246,11 @@ owner$ scripts/sign-release.sh --dir /tmp/v0.1.18 --key ~/.ssh/sentinal-release
 owner$ gh release upload v0.1.18 /tmp/v0.1.18/SHA256SUMS.sig --clobber
 ```
 
-3. Publish the draft. `sign-release.sh` checks every listed file before
-   signing, and refuses a key that is not pinned.
+3. Publish it as the latest normal release (not a pre-release, which
+   `latest` URLs and the stable channel skip):
+   `gh release edit v0.1.18 --draft=false --prerelease=false --latest`.
+   `sign-release.sh` checks every listed file before signing, and refuses a
+   key that is not pinned.
 
 ### Releases from GitHub (control)
 
