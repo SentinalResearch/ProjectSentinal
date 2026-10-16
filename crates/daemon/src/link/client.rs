@@ -82,7 +82,7 @@ impl ControlClient {
         let response = request
             .send()
             .await
-            .map_err(|error| CallError::Unreachable(error.without_url().to_string()))?;
+            .map_err(|error| CallError::Unreachable(describe(error)))?;
         let status = response.status();
         if status == reqwest::StatusCode::NO_CONTENT {
             return Ok(None);
@@ -90,7 +90,7 @@ impl ControlClient {
         let bytes = response
             .bytes()
             .await
-            .map_err(|error| CallError::Unreachable(error.without_url().to_string()))?;
+            .map_err(|error| CallError::Unreachable(describe(error)))?;
         if status.is_success() {
             return serde_json::from_slice(&bytes).map(Some).map_err(|_| {
                 CallError::Unexpected(format!("HTTP {status} with an unrecognized body"))
@@ -118,15 +118,55 @@ impl ControlClient {
             .json(body)
             .send()
             .await
-            .map_err(|error| CallError::Unreachable(error.without_url().to_string()))?;
+            .map_err(|error| CallError::Unreachable(describe(error)))?;
         let status = response.status();
         let bytes = response
             .bytes()
             .await
-            .map_err(|error| CallError::Unreachable(error.without_url().to_string()))?;
+            .map_err(|error| CallError::Unreachable(describe(error)))?;
         if bytes.len() > 64 * 1024 {
             return Err(CallError::Unexpected("response too large".into()));
         }
         Ok((status, bytes.to_vec()))
+    }
+}
+
+/// The request error with its causes ("dns error: …", "certificate …"), but
+/// never the URL, so replies and logs carry no query or path.
+fn describe(error: reqwest::Error) -> String {
+    let error = error.without_url();
+    let mut text = error.to_string();
+    let mut source = std::error::Error::source(&error);
+    while let Some(cause) = source {
+        let cause_text = cause.to_string();
+        if !text.contains(&cause_text) {
+            text.push_str(": ");
+            text.push_str(&cause_text);
+        }
+        source = cause.source();
+    }
+    text
+}
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn unreachable_errors_name_their_cause() {
+        let client = super::ControlClient::new(true);
+        let error = client
+            .post::<_, serde_json::Value>(
+                "http://sentinal-no-such-host.invalid",
+                "/x",
+                None,
+                &serde_json::json!({}),
+            )
+            .await
+            .unwrap_err();
+        let text = error.to_string();
+        assert!(
+            text.contains("dns") || text.contains("lookup") || text.contains("resolve"),
+            "{text}"
+        );
+        assert!(!text.contains("/x"), "no URL path in the message: {text}");
     }
 }
