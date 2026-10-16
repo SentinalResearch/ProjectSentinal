@@ -69,7 +69,9 @@ pub(crate) fn update(
         .arg("--allowed-signers")
         .arg(&context.allowed_signers)
         .args(["--repo", &context.repo]);
-    if request.skip_provenance {
+    // Provenance needs a signed-in gh 2.49+; without it the owner signature
+    // (always required) is the check. The dashboard never passes the flag.
+    if request.skip_provenance || !gh_can_verify() {
         receive.arg("--skip-provenance");
     }
     if !run_tool(receive) {
@@ -286,17 +288,7 @@ pub(crate) fn publish_installed(
     })?;
     let version =
         Version::parse(version).ok_or_else(|| ReleaseError::InvalidVersion(version.into()))?;
-    // `gh attestation verify` needs gh 2.49+ *and* a signed-in gh; a fresh
-    // control usually has neither, and the owner signature is still required.
-    let gh = |args: &[&str]| {
-        Command::new("gh")
-            .args(args)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|status| status.success())
-    };
-    let provenance = gh(&["attestation", "verify", "--help"]) && gh(&["auth", "status"]);
+    let provenance = gh_can_verify();
     let mut receive = Command::new("bash");
     receive.arg(context.tool("receive-release.sh")?);
     receive
@@ -320,4 +312,18 @@ pub(crate) fn publish_installed(
             "publishing {version} for workers failed; run sentinal setup again"
         )))
     }
+}
+
+/// `gh attestation verify` needs gh 2.49+ *and* a signed-in gh; a fresh
+/// control usually has neither, and the owner signature is still required.
+fn gh_can_verify() -> bool {
+    let gh = |args: &[&str]| {
+        Command::new("gh")
+            .args(args)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
+    };
+    gh(&["attestation", "verify", "--help"]) && gh(&["auth", "status"])
 }
