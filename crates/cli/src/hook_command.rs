@@ -103,11 +103,27 @@ pub(crate) fn rc_env() -> Result<(RcEnv, PathBuf), String> {
     let rc_env = RcEnv {
         home: home.clone(),
         shell: env::var("SHELL").ok(),
-        zdotdir: env::var_os("ZDOTDIR").map(PathBuf::from),
+        zdotdir: user_zdotdir(
+            env::var_os(SESSION_ENV).is_some_and(|id| !id.is_empty()),
+            env::var_os("ZDOTDIR"),
+            env::var_os("TA_USER_ZDOTDIR"),
+        ),
         xdg_config_home: env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
         macos: cfg!(target_os = "macos"),
     };
     Ok((rc_env, home))
+}
+
+/// The user's zsh config directory. Inside a Sentinal Session `ZDOTDIR` is
+/// the daemon's hook wrapper, so editing `$ZDOTDIR/.zshrc` there would change
+/// Sentinal's own file and never the user's; the daemon keeps the user's
+/// original in `TA_USER_ZDOTDIR` (unset means `~/.zshrc`).
+fn user_zdotdir(
+    in_session: bool,
+    zdotdir: Option<std::ffi::OsString>,
+    user: Option<std::ffi::OsString>,
+) -> Option<PathBuf> {
+    if in_session { user } else { zdotdir }.map(PathBuf::from)
 }
 
 async fn report(kind: ReportKind, pid: u32, shell: String, seq: u64, exit: i32, at: &str) {
@@ -165,4 +181,25 @@ fn backup_note(backup: Option<&Path>, home: &Path) -> String {
     backup.map_or_else(String::new, |backup| {
         format!(" (backup: {})", shown(backup, home))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::user_zdotdir;
+    use std::path::PathBuf;
+
+    #[test]
+    fn inside_a_session_the_users_zdotdir_is_used_not_sentinals_wrapper() {
+        let path = "/home/u/.local/share/terminal-agent/shell/zsh";
+        let wrapper = Some(path.into());
+        assert_eq!(
+            user_zdotdir(false, wrapper.clone(), None),
+            Some(PathBuf::from(path))
+        );
+        assert_eq!(user_zdotdir(true, wrapper.clone(), None), None, "~/.zshrc");
+        assert_eq!(
+            user_zdotdir(true, wrapper, Some("/home/u/.config/zsh".into())),
+            Some(PathBuf::from("/home/u/.config/zsh"))
+        );
+    }
 }
