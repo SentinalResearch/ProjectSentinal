@@ -59,7 +59,16 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       socket.send(JSON.stringify(envelope));
     }
 
+    // The shell lays out its output for the PTY's size, so the PTY must match
+    // this terminal: size it before the snapshot is taken, and send RESIZE
+    // again once the snapshot arrives (that RESIZE is also the attachment
+    // acknowledgement, as in the CLI).
+    const resizeToTerminal = () =>
+      sendRequest({ type: "RESIZE", session_id: numericId, cols: terminal.cols, rows: terminal.rows });
+    let snapshotReceived = false;
+
     socket.onopen = () => {
+      resizeToTerminal();
       sendRequest({ type: "ATTACH", session_id: numericId });
       setAttached(true);
     };
@@ -79,7 +88,16 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       }
       const data = event.data instanceof Blob ? await event.data.arrayBuffer() : event.data;
       const frame = decodeTerminalFrame(new Uint8Array(data));
-      if (frame.sessionId === numericId) terminal.write(frame.payload);
+      if (frame.sessionId !== numericId) return;
+      if (!snapshotReceived) {
+        // The first frame redraws the whole screen; start from a clean one.
+        snapshotReceived = true;
+        terminal.reset();
+        terminal.write(frame.payload);
+        resizeToTerminal();
+        return;
+      }
+      terminal.write(frame.payload);
     };
 
     const dataDisposable = terminal.onData((data) => sendBytes(encoder.encode(data)));

@@ -116,7 +116,9 @@ export function TerminalPane({
     const term = new Terminal({
       cursorBlink: !readOnly,
       disableStdin: readOnly,
-      convertEol: true,
+      // Only mock lines need \n → \r\n; real PTY bytes already carry their own
+      // carriage returns, and converting breaks shells' cursor movement.
+      convertEol: isMockData,
       scrollback: 4000,
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
       fontSize: 13,
@@ -134,6 +136,10 @@ export function TerminalPane({
       console.warn("WebGL terminal renderer is unavailable", err);
     }
     fit.fit();
+    // The first fit may measure the fallback font; refit once the real one loads.
+    void document.fonts?.ready.then(() => {
+      if (terminalRef.current === term) fit.fit();
+    });
     terminalRef.current = term;
     setTerminal(term);
 
