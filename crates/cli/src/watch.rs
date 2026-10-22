@@ -20,6 +20,8 @@ pub struct WatchContext {
     pub existing_session: Option<String>,
     /// Whether stdin and stdout are an interactive terminal.
     pub interactive: bool,
+    /// The environment the Session's shell starts from (see `session_env`).
+    pub env: Option<Vec<(String, String)>>,
 }
 
 /// What `sentinal watch` should do, decided before contacting the daemon.
@@ -86,6 +88,7 @@ pub fn plan_watch(
         origin: SessionOrigin::Watch,
         title,
         command,
+        env: context.env.clone(),
     };
     request.validate()?;
     if !context.interactive {

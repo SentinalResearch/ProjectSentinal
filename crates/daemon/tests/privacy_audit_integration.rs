@@ -100,6 +100,7 @@ async fn privacy_audit_integration() {
             origin: SessionOrigin::Ui,
             title: None,
             command: None,
+            env: None,
         })
         .await
         .unwrap();

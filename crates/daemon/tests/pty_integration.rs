@@ -34,6 +34,7 @@ async fn persistent_session_integration() {
             origin: protocol::SessionOrigin::Ui,
             title: None,
             command: None,
+            env: None,
         })
         .await
         .unwrap();

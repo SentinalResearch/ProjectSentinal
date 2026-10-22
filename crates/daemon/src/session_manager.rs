@@ -88,6 +88,9 @@ pub struct CreateSession {
     pub title: Option<String>,
     /// Optional initial argv for WATCH Sessions, typed once after shell readiness.
     pub command: Option<Vec<String>>,
+    /// The starting terminal's environment (AUTO_WRAP and WATCH only); the
+    /// shell starts from it instead of the daemon's environment.
+    pub env: Option<Vec<(String, String)>>,
 }
 
 /// A screen snapshot followed by a receiver for live terminal bytes.

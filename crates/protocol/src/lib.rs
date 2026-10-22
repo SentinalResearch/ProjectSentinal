@@ -44,6 +44,7 @@ pub mod projection;
 pub mod recipe;
 pub mod release;
 pub mod session;
+pub mod session_env;
 pub mod session_log;
 pub mod time;
 pub mod training;

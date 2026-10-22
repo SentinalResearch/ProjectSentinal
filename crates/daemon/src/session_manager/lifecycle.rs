@@ -67,6 +67,7 @@ impl SessionManager {
                 origin: SessionOrigin::Watch,
                 title: Some(title),
                 command: None,
+                env: None,
             },
             None,
             None,
@@ -90,6 +91,7 @@ impl SessionManager {
                 origin: SessionOrigin::Ui,
                 title,
                 command: None,
+                env: None,
             },
             source.project_id,
             Some(source_id),
@@ -129,8 +131,30 @@ impl SessionManager {
         let home = std::env::var_os("HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| cwd.clone());
+        // A terminal-started shell starts from that terminal's environment
+        // (its PATH, virtualenv, …); any other from the user's login
+        // environment. The service's minimal one is only the fallback.
+        let base_env: Option<Vec<(String, String)>> = request
+            .env
+            .or_else(|| self.inner.backend.login_env(&shell))
+            .map(|env| {
+                env.into_iter()
+                    .filter(|(name, _)| !protocol::session_env::daemon_owned(name))
+                    .collect()
+            });
+        let user_zdotdir = match &base_env {
+            Some(env) => env
+                .iter()
+                .find(|(name, _)| name == "ZDOTDIR")
+                .map(|(_, value)| value.clone()),
+            None => std::env::var("ZDOTDIR").ok(),
+        };
         let mut shell_launch = match install_hooks(&self.inner.config.data_dir, &home) {
-            Ok(hook_dir) => launch(PathBuf::from(&shell).as_path(), &hook_dir),
+            Ok(hook_dir) => launch(
+                PathBuf::from(&shell).as_path(),
+                &hook_dir,
+                user_zdotdir.as_deref(),
+            ),
             Err(error) if initial_command.is_some() => {
                 return Err(SessionManagerError::InitialCommandHooks(error.to_string()));
             }
@@ -179,6 +203,7 @@ impl SessionManager {
             session_id: id,
             shell: shell.clone(),
             args: shell_launch.args,
+            base_env,
             env: shell_launch.env,
             cwd: cwd.clone(),
             cols: request.cols,

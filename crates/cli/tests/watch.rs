@@ -46,6 +46,7 @@ fn context() -> WatchContext {
         shell: Some("/bin/zsh".into()),
         existing_session: None,
         interactive: true,
+        env: Some(vec![("PATH".into(), "/opt/homebrew/bin:/usr/bin".into())]),
     }
 }
 
@@ -124,6 +125,7 @@ fn plan_uses_current_cwd_dimensions_shell_and_watch_origin() {
             origin: SessionOrigin::Watch,
             title: Some("Job".into()),
             command: Some(command),
+            env: Some(vec![("PATH".into(), "/opt/homebrew/bin:/usr/bin".into())]),
         })
     );
 }

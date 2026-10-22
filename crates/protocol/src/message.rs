@@ -100,6 +100,11 @@ pub enum ClientRequest {
         /// Optional initial Command represented as executable plus exact arguments.
         #[serde(default)]
         command: Option<Vec<String>>,
+        /// The starting terminal's environment (AUTO_WRAP and WATCH only), so
+        /// the shell sees the same PATH and variables as that terminal.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        env: Option<Vec<(String, String)>>,
     },
     /// Continue one finished FULL Session as a distinct generation.
     ContinueSession {
@@ -208,6 +213,7 @@ impl ClientRequest {
                 origin,
                 title,
                 command,
+                env,
                 ..
             } => {
                 if !matches!(
@@ -225,7 +231,7 @@ impl ClientRequest {
                 if let Some(argv) = command {
                     validate_argv(argv)?;
                 }
-                Ok(())
+                crate::session_env::validate_session_env(*origin, env.as_deref())
             }
             ClientRequest::ContinueSession { session_id } if session_id.0 == 0 => {
                 Err(ProtocolError::InvalidIdentifier {
@@ -757,6 +763,7 @@ mod tests {
             origin: SessionOrigin::Ui,
             title: None,
             command: None,
+            env: None,
         };
         assert!(req.validate().is_err());
     }
@@ -841,6 +848,7 @@ mod tests {
             origin: SessionOrigin::Watch,
             title: None,
             command: Some(vec!["python".into(), "train.py".into()]),
+            env: None,
         };
         assert!(request.validate().unwrap_err().to_string().contains("cwd"));
 
@@ -852,6 +860,7 @@ mod tests {
             origin: SessionOrigin::Watch,
             title: None,
             command: Some(Vec::new()),
+            env: None,
         };
         assert!(empty.validate().unwrap_err().to_string().contains("argv"));
 
@@ -863,6 +872,7 @@ mod tests {
             origin: SessionOrigin::Watch,
             title: None,
             command: Some(vec![String::new()]),
+            env: None,
         };
         assert!(executable
             .validate()

@@ -20,6 +20,9 @@ pub struct PtySpawnRequest {
     pub shell: String,
     /// Additional arguments used to load shell hooks.
     pub args: Vec<String>,
+    /// The environment to start from instead of the daemon's own (a
+    /// terminal's, for AUTO_WRAP and WATCH); `env` is applied on top.
+    pub base_env: Option<Vec<(String, String)>>,
     /// Additional environment entries used to load shell hooks.
     pub env: Vec<(String, String)>,
     /// Initial working directory.
@@ -66,6 +69,12 @@ pub enum PtyError {
 pub trait PtyBackend: Send + Sync {
     /// Spawn one shell and return its PTY capabilities.
     fn spawn(&self, request: &PtySpawnRequest) -> Result<SpawnedPty, PtyError>;
+
+    /// The user's login environment for `shell`, for Sessions no terminal
+    /// started; `None` keeps the daemon's own environment.
+    fn login_env(&self, _shell: &str) -> Option<Vec<(String, String)>> {
+        None
+    }
 }
 
 /// PTY backend backed by the host operating system.
@@ -73,6 +82,13 @@ pub trait PtyBackend: Send + Sync {
 pub struct RealPty;
 
 impl PtyBackend for RealPty {
+    fn login_env(&self, shell: &str) -> Option<Vec<(String, String)>> {
+        crate::login_env::resolve(
+            std::path::Path::new(shell),
+            crate::login_env::RESOLVE_TIMEOUT,
+        )
+    }
+
     fn spawn(&self, request: &PtySpawnRequest) -> Result<SpawnedPty, PtyError> {
         use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 
@@ -95,6 +111,12 @@ impl PtyBackend for RealPty {
 
         let mut command = CommandBuilder::new(&request.shell);
         command.args(&request.args);
+        if let Some(base) = &request.base_env {
+            command.env_clear();
+            for (key, value) in base {
+                command.env(key, value);
+            }
+        }
         for (key, value) in &request.env {
             command.env(key, value);
         }
@@ -213,12 +235,20 @@ pub struct FakePtyOperationCounts {
 #[derive(Debug, Default)]
 pub struct FakePty {
     sessions: Arc<Mutex<HashMap<SessionId, FakeControl>>>,
+    login_env: Mutex<Option<Vec<(String, String)>>>,
 }
 
 impl FakePty {
     /// Create an empty fake backend.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Pretend the user's login shell provides `env`.
+    pub fn set_login_env(&self, env: Vec<(String, String)>) {
+        if let Ok(mut login_env) = self.login_env.lock() {
+            *login_env = Some(env);
+        }
     }
 
     /// Emit bytes as if a child wrote them to its PTY.
@@ -331,6 +361,10 @@ impl FakePty {
 }
 
 impl PtyBackend for FakePty {
+    fn login_env(&self, _shell: &str) -> Option<Vec<(String, String)>> {
+        self.login_env.lock().ok()?.clone()
+    }
+
     fn spawn(&self, request: &PtySpawnRequest) -> Result<SpawnedPty, PtyError> {
         let (sender, receiver) = mpsc::channel();
         let input = Arc::new(Mutex::new(Vec::new()));

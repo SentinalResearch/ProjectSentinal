@@ -195,6 +195,7 @@ async fn dispatch(
                 origin: SessionOrigin::Ui,
                 title: None,
                 command: None,
+                env: None,
             };
             match client.request(request).await? {
                 DaemonMessage::SessionUpdated { session } => {
@@ -287,6 +288,7 @@ async fn watch(
         shell: std::env::var("SHELL").ok(),
         existing_session: std::env::var(SESSION_ENV).ok().filter(|id| !id.is_empty()),
         interactive: std::io::stdin().is_terminal() && std::io::stdout().is_terminal(),
+        env: crate::session_env::terminal_env(),
     };
     match plan_watch(title, command, &context)? {
         WatchPlan::AlreadyWatched {

@@ -42,10 +42,30 @@ pub fn install_hooks(data_dir: &Path, home: &Path) -> Result<PathBuf, ShellHookE
 
     let quoted_root = shell_quote(&root.to_string_lossy());
     let quoted_home = shell_quote(&home.to_string_lossy());
+    // Inside ${ZDOTDIR:-…} a double-quoted home needs only ", \, $ and ` escaped.
+    let zsh_home: String = home
+        .to_string_lossy()
+        .chars()
+        .flat_map(|c| match c {
+            '"' | '\\' | '$' | '`' => vec!['\\', c],
+            c => vec![c],
+        })
+        .collect();
+    // zsh reads $ZDOTDIR/.zshenv before .zshrc, so the wrapper directory has
+    // both. Each runs the user's own file with the user's ZDOTDIR (unset
+    // means ~), and a ZDOTDIR the user's .zshenv sets is remembered for .zshrc.
+    write(
+        &root.join("zsh/.zshenv"),
+        &format!(
+            "_ta_wrapper=\"$ZDOTDIR\"\nif [[ -n \"${{TA_USER_ZDOTDIR:-}}\" ]]; then ZDOTDIR=\"$TA_USER_ZDOTDIR\"; else unset ZDOTDIR; fi\nif [[ -f \"${{ZDOTDIR:-{home}}}/.zshenv\" ]]; then source \"${{ZDOTDIR:-{home}}}/.zshenv\"; fi\nif [[ -n \"${{ZDOTDIR:-}}\" ]]; then export TA_USER_ZDOTDIR=\"$ZDOTDIR\"; fi\nZDOTDIR=\"$_ta_wrapper\"\nunset _ta_wrapper\n",
+            home = zsh_home
+        ),
+    )?;
     write(
         &root.join("zsh/.zshrc"),
         &format!(
-            "export TA_HOOK_DIR={quoted_root}\nsource {quoted_root}/ta.zsh\nif [[ -n \"${{TA_USER_ZDOTDIR:-}}\" && -f \"$TA_USER_ZDOTDIR/.zshrc\" ]]; then source \"$TA_USER_ZDOTDIR/.zshrc\"; elif [[ -f {quoted_home}/.zshrc ]]; then source {quoted_home}/.zshrc; fi\n"
+            "export TA_HOOK_DIR={quoted_root}\nsource {quoted_root}/ta.zsh\nif [[ -n \"${{TA_USER_ZDOTDIR:-}}\" ]]; then export ZDOTDIR=\"$TA_USER_ZDOTDIR\"; else unset ZDOTDIR; fi\nif [[ -f \"${{ZDOTDIR:-{home}}}/.zshrc\" ]]; then source \"${{ZDOTDIR:-{home}}}/.zshrc\"; fi\n",
+            home = zsh_home
         ),
     )?;
     write(
@@ -58,7 +78,8 @@ pub fn install_hooks(data_dir: &Path, home: &Path) -> Result<PathBuf, ShellHookE
 }
 
 /// Select startup arguments and environment for zsh, bash, or fish.
-pub fn launch(shell: &Path, hook_dir: &Path) -> ShellLaunch {
+/// `user_zdotdir` is the ZDOTDIR of the environment the shell starts from.
+pub fn launch(shell: &Path, hook_dir: &Path, user_zdotdir: Option<&str>) -> ShellLaunch {
     let name = shell
         .file_name()
         .and_then(|value| value.to_str())
@@ -71,11 +92,8 @@ pub fn launch(shell: &Path, hook_dir: &Path) -> ShellLaunch {
                     "ZDOTDIR".into(),
                     hook_dir.join("zsh").to_string_lossy().into_owned(),
                 )];
-                if let Some(user_zdotdir) = std::env::var_os("ZDOTDIR") {
-                    env.push((
-                        "TA_USER_ZDOTDIR".into(),
-                        user_zdotdir.to_string_lossy().into_owned(),
-                    ));
+                if let Some(user_zdotdir) = user_zdotdir.filter(|dir| !dir.is_empty()) {
+                    env.push(("TA_USER_ZDOTDIR".into(), user_zdotdir.into()));
                 }
                 env
             },
@@ -132,18 +150,63 @@ mod tests {
     #[test]
     fn shell_launches_use_the_required_loading_mechanism() {
         let hooks = Path::new("/tmp/terminal agent/hooks");
-        let zsh = launch(Path::new("/bin/zsh"), hooks);
+        let zsh = launch(Path::new("/bin/zsh"), hooks, None);
         assert!(zsh.env.iter().any(|(key, _)| key == "ZDOTDIR"));
-        let bash = launch(Path::new("/bin/bash"), hooks);
+        let bash = launch(Path::new("/bin/bash"), hooks, None);
         assert_eq!(bash.args.first().map(String::as_str), Some("--rcfile"));
-        let fish = launch(Path::new("/usr/bin/fish"), hooks);
+        let fish = launch(Path::new("/usr/bin/fish"), hooks, None);
         assert_eq!(fish.args.first().map(String::as_str), Some("-C"));
+    }
+
+    #[test]
+    fn the_zsh_wrapper_loads_the_users_zshenv_and_zshrc_with_their_zdotdir() {
+        let Some(zsh) = ["/bin/zsh", "/usr/bin/zsh"]
+            .into_iter()
+            .map(Path::new)
+            .find(|path| path.is_file())
+        else {
+            return; // zsh is not installed here
+        };
+        let base =
+            std::env::temp_dir().join(format!("sentinal-zsh-wrapper-{}", std::process::id()));
+        let home = base.join("home");
+        fs::create_dir_all(home.join("cfg")).unwrap();
+        // A common layout: ~/.zshenv moves ZDOTDIR, and .zshrc lives there.
+        fs::write(
+            home.join(".zshenv"),
+            "export FROM_ZSHENV=1\nZDOTDIR=\"$HOME/cfg\"\n",
+        )
+        .unwrap();
+        fs::write(home.join("cfg/.zshrc"), "export FROM_ZSHRC=\"$ZDOTDIR\"\n").unwrap();
+        let root = install_hooks(&base.join("data"), &home).unwrap();
+        let mut command = std::process::Command::new(zsh);
+        command
+            .args([
+                "-i",
+                "-c",
+                "print -r -- \"<$FROM_ZSHENV|$FROM_ZSHRC|${ZDOTDIR-unset}>\"",
+            ])
+            .env_clear()
+            .env("HOME", &home)
+            .env("PATH", "/usr/bin:/bin")
+            .env("TERM", "dumb")
+            .stdin(std::process::Stdio::null());
+        for (key, value) in launch(zsh, &root, None).env {
+            command.env(key, value);
+        }
+        let output = command.output().unwrap();
+        let cfg = home.join("cfg").to_string_lossy().into_owned();
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains(&format!("<1|{cfg}|{cfg}>")),
+            "{output:?}"
+        );
+        let _ = fs::remove_dir_all(base);
     }
 
     #[test]
     fn unknown_shell_still_launches_without_hooks() {
         assert_eq!(
-            launch(Path::new("/bin/sh"), Path::new("/tmp/hooks")),
+            launch(Path::new("/bin/sh"), Path::new("/tmp/hooks"), None),
             ShellLaunch::default()
         );
     }

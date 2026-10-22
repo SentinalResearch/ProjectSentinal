@@ -69,6 +69,10 @@ pub enum ProtocolError {
         rows: u16,
     },
 
+    /// A CreateSession terminal environment was refused.
+    #[error("invalid Session environment: {0}")]
+    InvalidSessionEnv(String),
+
     /// A process identifier cannot name an OS process.
     #[error("invalid pid {0}; pid must be greater than zero")]
     InvalidPid(u32),

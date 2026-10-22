@@ -52,6 +52,7 @@ fn request() -> CreateSession {
         origin: SessionOrigin::Ui,
         title: None,
         command: None,
+        env: None,
     }
 }
 

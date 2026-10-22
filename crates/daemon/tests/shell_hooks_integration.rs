@@ -46,6 +46,7 @@ async fn exercise(shell: &str) {
             origin: protocol::SessionOrigin::Ui,
             title: None,
             command: None,
+            env: None,
         })
         .await
         .unwrap();

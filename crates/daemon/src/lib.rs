@@ -24,6 +24,7 @@ pub mod link_crypto;
 pub mod local_socket;
 pub mod log_discovery;
 pub mod log_tail;
+pub mod login_env;
 pub mod metrics;
 pub mod notifications;
 pub mod origin;

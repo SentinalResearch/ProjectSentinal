@@ -69,6 +69,7 @@ fn watch(command: Option<Vec<String>>) -> CreateSession {
         origin: SessionOrigin::Watch,
         title: Some("Qwen Training".into()),
         command,
+        env: None,
     }
 }
 

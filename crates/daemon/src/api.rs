@@ -190,6 +190,7 @@ impl AppState {
                 origin,
                 title,
                 command,
+                env,
             } => {
                 let request = CreateSession {
                     shell,
@@ -199,6 +200,7 @@ impl AppState {
                     origin,
                     title,
                     command,
+                    env,
                 };
                 match self.sessions.create(request).await {
                     Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),

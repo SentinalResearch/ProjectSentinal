@@ -42,6 +42,11 @@ export type ClientRequest =
      * Optional initial Command represented as executable plus exact arguments.
      */
     command: Array<string> | null;
+    /**
+     * The starting terminal's environment (AUTO_WRAP and WATCH only), so
+     * the shell sees the same PATH and variables as that terminal.
+     */
+    env?: Array<[string, string]>;
   }
   | {
     "type": "CONTINUE_SESSION";

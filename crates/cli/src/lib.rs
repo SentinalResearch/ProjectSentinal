@@ -23,6 +23,7 @@ pub mod rc_file;
 pub mod rc_install;
 pub mod release;
 pub mod release_args;
+pub mod session_env;
 pub mod setup;
 pub mod top;
 pub mod update;
