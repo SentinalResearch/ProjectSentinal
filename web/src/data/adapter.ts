@@ -141,6 +141,14 @@ export interface DataAdapter {
     metrics(machineId: string, range: import("./types").MetricRangeKey): Promise<import("./types").MachineMetricSample[]>;
   };
 
+  /** Settings → Diagnostics: fresh measurements, never cached. */
+  diagnostics: {
+    /** This browser to the Machine, through the control for a worker. */
+    ping(machineId: string, samples?: number): Promise<import("./types").PingResult>;
+    /** The control to a worker, with the Tailscale path between them. */
+    controlPing(machineId: string): Promise<import("./types").ControlPingResult>;
+  };
+
   notifications: {
     getRules(): Promise<NotificationRules>;
     setRule(sessionId: string, rules: NotificationRuleSet): Promise<void>;

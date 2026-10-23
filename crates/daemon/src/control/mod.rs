@@ -10,6 +10,7 @@ mod approval_routes;
 mod approval_verify;
 mod discovery;
 mod handoff;
+mod ping;
 mod proxy;
 mod refresh;
 mod release;

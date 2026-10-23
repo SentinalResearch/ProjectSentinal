@@ -67,6 +67,11 @@ export function PhoneSettingsHome() {
           <span className={styles.rowMeta}>Push and per-Session rules</span>
           <span className={styles.chevron} aria-hidden="true">›</span>
         </Link>
+        <Link className={styles.linkRow} to="/app/settings/diagnostics">
+          <span className={styles.rowTitle}>Diagnostics</span>
+          <span className={styles.rowMeta}>Network test between devices</span>
+          <span className={styles.chevron} aria-hidden="true">›</span>
+        </Link>
         <Link className={styles.linkRow} to="/app/settings/account">
           <span className={styles.rowTitle}>Account</span>
           <span className={styles.rowMeta}>Password and this browser</span>

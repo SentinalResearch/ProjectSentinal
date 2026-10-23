@@ -105,8 +105,9 @@ export default defineConfig({
     // Phone layouts last, after the other specs have created Sessions and Recipes.
     { name: "mobile", testMatch: "mobile.spec.ts", dependencies: ["native-push"] },
     { name: "desktop-session", testMatch: "desktop-session.spec.ts", dependencies: ["mobile"] },
+    { name: "diagnostics", testMatch: "diagnostics.spec.ts", dependencies: ["desktop-session"] },
     // Milestone 4.D.1 acceptance: disconnects worker B, so it runs last.
-    { name: "projection-acceptance", testMatch: "projection-acceptance.spec.ts", dependencies: ["desktop-session"] },
+    { name: "projection-acceptance", testMatch: "projection-acceptance.spec.ts", dependencies: ["diagnostics"] },
   ],
   webServer: [
     {

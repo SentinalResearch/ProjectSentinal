@@ -224,3 +224,16 @@ export interface TrainingView {
   learningRate?: number;
   trend: "UNKNOWN" | "IMPROVING" | "STABLE" | "WORSENING";
 }
+
+/** Round trips measured for Settings → Diagnostics. */
+export interface PingResult {
+  roundTripsMs: number[];
+  failed: number;
+  error?: string;
+}
+
+export interface ControlPingResult extends PingResult {
+  path: "DIRECT" | "RELAYED" | "UNKNOWN";
+  /** DERP region code when relayed. */
+  relay?: string;
+}

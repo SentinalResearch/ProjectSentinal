@@ -391,6 +391,39 @@ pub struct LinkIdentity {
     pub control_machine_id: MachineId,
 }
 
+/// How the control reaches a worker over Tailscale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TailnetPath {
+    /// A direct peer-to-peer connection.
+    Direct,
+    /// Through a Tailscale DERP relay, which adds delay.
+    Relayed,
+    /// Tailscale did not say (no CLI, no traffic yet, or not a Tailnet address).
+    Unknown,
+}
+
+/// Result of the control timing its connection to one worker.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct MachinePing {
+    /// The worker that was timed.
+    pub machine_id: MachineId,
+    /// Round trips that succeeded, in microseconds, in the order taken.
+    pub round_trips_us: Vec<u32>,
+    /// Attempts that failed.
+    pub failed: u32,
+    /// The last failure's reason; never contains a secret.
+    pub error: Option<String>,
+    /// How Tailscale reaches the worker from the control.
+    pub path: TailnetPath,
+    /// The DERP region code when relayed, e.g. `"nyc"`.
+    pub relay: Option<String>,
+}
+
 /// Stable reason a pairing, registry, or link request failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]

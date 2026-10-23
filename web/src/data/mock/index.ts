@@ -293,6 +293,26 @@ export const mockAdapter: DataAdapter = {
     metrics: mockMetrics,
   },
 
+  diagnostics: {
+    async ping(machineId, samples = 5) {
+      const machine = store.machines.find((entry) => entry.id === machineId);
+      if (!machine) throw new Error(`unknown Machine '${machineId}'`);
+      if (machine.status !== "ONLINE") return delay({ roundTripsMs: [], failed: samples, error: "the selected Machine is unreachable" });
+      const base = machine.id === "rtx" ? 38 : 9;
+      return delay({ roundTripsMs: Array.from({ length: samples }, (_, index) => base + index * 1.5), failed: 0 });
+    },
+    async controlPing(machineId) {
+      const machine = store.machines.find((entry) => entry.id === machineId);
+      if (!machine) throw new Error(`unknown Machine '${machineId}'`);
+      if (machine.status !== "ONLINE") {
+        return delay({ roundTripsMs: [], failed: 5, error: "the selected Machine is unreachable", path: "UNKNOWN" as const });
+      }
+      return delay(machine.id === "rtx"
+        ? { roundTripsMs: [31, 29.5, 30.2, 29.8, 30.1], failed: 0, path: "RELAYED" as const, relay: "fra" }
+        : { roundTripsMs: [3.1, 2.4, 2.2, 2.5, 2.3], failed: 0, path: "DIRECT" as const });
+    },
+  },
+
   notifications: {
     async getRules() {
       return delay({ ...store.notificationRules });

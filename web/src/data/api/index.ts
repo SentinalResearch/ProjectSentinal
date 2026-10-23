@@ -9,6 +9,7 @@ import type { Health } from "../../protocol/Health";
 import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { MachineDetails as WireMachineDetails } from "../../protocol/MachineDetails";
 import type { MachineMetricPoint } from "../../protocol/MachineMetricPoint";
+import type { MachinePing } from "../../protocol/MachinePing";
 import type { Recipe as WireRecipe } from "../../protocol/Recipe";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import type { Session as WireSession } from "../../protocol/Session";
@@ -1113,6 +1114,50 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
         (reply) => isFullSessionUpdate(reply, local) && reply.type === "SESSION_UPDATED" &&
           reply.session.machine_id === connection.id,
       );
+    },
+    diagnostics: {
+      async ping(machineId, samples = 5) {
+        await ensureInitialized();
+        const connection = connections.get(machineId);
+        if (!connection) throw daemonError(`unknown Machine '${machineId}'`);
+        const roundTripsMs: number[] = [];
+        let failed = 0;
+        let error: string | undefined;
+        for (let sample = 0; sample < samples; sample += 1) {
+          const started = performance.now();
+          try {
+            await connection.transport.request({ type: "GET_MACHINE" }, (message) => message.type === "MACHINE");
+            roundTripsMs.push(performance.now() - started);
+          } catch (failure) {
+            failed += 1;
+            error = failure instanceof Error ? failure.message : String(failure);
+          }
+        }
+        return error === undefined ? { roundTripsMs, failed } : { roundTripsMs, failed, error };
+      },
+      async controlPing(machineId) {
+        const response = await fetcher(`${authBaseUrl}/machines/${encodeURIComponent(machineId)}/ping`, {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          let message = `control ping failed with status ${response.status}`;
+          try {
+            message = ((await response.json()) as { message?: string }).message ?? message;
+          } catch {
+            // Keep the status-only message for a non-JSON proxy error.
+          }
+          throw daemonError(message);
+        }
+        const ping = (await response.json()) as MachinePing;
+        return {
+          roundTripsMs: ping.round_trips_us.map((microseconds) => microseconds / 1_000),
+          failed: ping.failed,
+          ...(ping.error === null ? {} : { error: ping.error }),
+          path: ping.path,
+          ...(ping.relay === null ? {} : { relay: ping.relay }),
+        };
+      },
     },
     async runRecipe(recipeId, params, targetMachineId) {
       await ensureInitialized();

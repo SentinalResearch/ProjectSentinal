@@ -35,11 +35,11 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone)]
-struct ProxyState {
-    control: Option<ControlService>,
-    auth: AuthManager,
-    http: reqwest::Client,
-    development: bool,
+pub(super) struct ProxyState {
+    pub(super) control: Option<ControlService>,
+    pub(super) auth: AuthManager,
+    pub(super) http: reqwest::Client,
+    pub(super) development: bool,
 }
 
 pub(super) fn routes(
@@ -59,6 +59,10 @@ pub(super) fn routes(
             "/api/v1/machines/{machine_id}/sessions/{session_id}/output",
             get(routed_output),
         )
+        .route(
+            "/api/v1/machines/{machine_id}/ping",
+            get(super::ping::machine_ping),
+        )
         .with_state(ProxyState {
             control,
             auth,
@@ -67,7 +71,7 @@ pub(super) fn routes(
         })
 }
 
-fn owner_target(
+pub(super) fn owner_target(
     state: &ProxyState,
     token: Option<&str>,
     machine_id: String,
@@ -96,7 +100,10 @@ fn owner_target(
     Ok((target, token.to_string()))
 }
 
-async fn prove_identity(state: &ProxyState, target: &RoutingTarget) -> Result<(), ControlFailure> {
+pub(super) async fn prove_identity(
+    state: &ProxyState,
+    target: &RoutingTarget,
+) -> Result<(), ControlFailure> {
     let response = state
         .http
         .get(worker_url(target, "http", "/api/v1/link/identity"))
@@ -307,7 +314,7 @@ fn unreachable_worker(error: impl std::fmt::Display) -> ControlFailure {
     )
 }
 
-fn failure_response(failure: ControlFailure) -> Response {
+pub(super) fn failure_response(failure: ControlFailure) -> Response {
     let status = StatusCode::from_u16(failure.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     (status, axum::Json(failure.failure)).into_response()
 }

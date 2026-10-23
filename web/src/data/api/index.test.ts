@@ -151,6 +151,17 @@ class FakeAuthServer {
     if (url.pathname === "/api/v1/machines") {
       return json({ machines: this.registryMachines });
     }
+    const ping = url.pathname.match(/^\/api\/v1\/machines\/([^/]+)\/ping$/);
+    if (ping) {
+      return json({
+        machine_id: decodeURIComponent(ping[1]),
+        round_trips_us: [12_500, 4_000],
+        failed: 1,
+        error: "the selected Machine is unreachable",
+        path: "RELAYED",
+        relay: "fra",
+      });
+    }
     const registryMachine = url.pathname.match(/^\/api\/v1\/machines\/([^/]+)$/);
     if (registryMachine && request.method === "DELETE") {
       const id = decodeURIComponent(registryMachine[1]);
@@ -882,6 +893,30 @@ describe("apiAdapter multi-Machine routing", () => {
       type: "CREATE_SESSION", origin: "UI", cols: 120, rows: 40,
     }));
     await expect(adapter.createSession({ machineId: "no-such-machine" })).rejects.toThrow(/no-such-machine/);
+  });
+
+  it("times browser and control round trips to a worker for Diagnostics", async () => {
+    const { adapter, server, sockets } = setup();
+    server.registryMachines = [workerRegistry()];
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getMachines();
+    const worker = sockets.find((socket) => socket.machineId === "worker-machine")!;
+    const before = worker.requests.filter((request) => request.type === "GET_MACHINE").length;
+
+    const browser = await adapter.diagnostics.ping("worker-machine", 3);
+    const control = await adapter.diagnostics.controlPing("worker-machine");
+
+    expect(browser.roundTripsMs).toHaveLength(3);
+    expect(browser.failed).toBe(0);
+    expect(worker.requests.filter((request) => request.type === "GET_MACHINE").length - before).toBe(3);
+    expect(control).toEqual({
+      roundTripsMs: [12.5, 4],
+      failed: 1,
+      error: "the selected Machine is unreachable",
+      path: "RELAYED",
+      relay: "fra",
+    });
+    await expect(adapter.diagnostics.ping("no-such-machine")).rejects.toThrow(/no-such-machine/);
   });
 
   it("keeps each daemon's own hardware description across registry refreshes", async () => {

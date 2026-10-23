@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MockBadge } from "../../components/MockBadge";
 import { isMockData } from "../../data";
 import { AccountTab } from "./AccountTab";
+import { DiagnosticsTab } from "./DiagnosticsTab";
 import { MachinesTab } from "./MachinesTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { SimulationTab } from "./SimulationTab";
@@ -37,6 +38,7 @@ export function SettingsPage() {
         <div className={phone.page}>
           {active === "machines" && <MachinesTab />}
           {active === "notifications" && <NotificationsTab />}
+          {active === "diagnostics" && <DiagnosticsTab />}
           {active === "account" && <AccountTab />}
           {active === "simulation" && isMockData && <SimulationTab />}
         </div>
@@ -75,6 +77,7 @@ export function SettingsPage() {
           <MockBadge />
           {active === "machines" && <MachinesTab />}
           {active === "notifications" && <NotificationsTab />}
+          {active === "diagnostics" && <DiagnosticsTab />}
           {active === "account" && <AccountTab />}
           {active === "simulation" && isMockData && <SimulationTab />}
         </div>
