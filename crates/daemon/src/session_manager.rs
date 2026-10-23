@@ -23,6 +23,7 @@ use crate::{
     tracker::{CommandTracker, TrackerIds},
 };
 pub use error::SessionManagerError;
+pub use operations::{ScreenSource, RESET_TERMINAL};
 use protocol::{DaemonMessage, Event, MachineId, Session, SessionId, SessionOrigin, Timestamp};
 pub use replay::{
     OutputReplay, DEFAULT_OUTPUT_PAGE_BYTES, MAX_OUTPUT_PAGE_BYTES, MAX_OUTPUT_SCAN_BYTES,
@@ -102,6 +103,8 @@ pub struct Attachment {
     /// Structured command, event, Session, and metric updates.
     pub structured: broadcast::Receiver<DaemonMessage>,
     pub(crate) confirmation: Arc<AtomicBool>,
+    /// Redraws this viewer if it falls behind `output`.
+    pub screen_source: ScreenSource,
 }
 
 impl Attachment {

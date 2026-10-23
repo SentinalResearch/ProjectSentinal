@@ -55,8 +55,12 @@ pub(super) fn spawn_reader(
                         if let Err(error) = save(&mut encoder, &mut budget, &trailing) {
                             tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append trailing session log");
                         }
+                        // Published under the screen lock: see `ScreenSource::snapshot`.
                         match handle.parser.lock() {
-                            Ok(mut parser) => parser.process(&trailing),
+                            Ok(mut parser) => {
+                                parser.process(&trailing);
+                                let _ = handle.output.send(trailing.clone());
+                            }
                             Err(_) => {
                                 tracing::error!(session = session_id.0, "screen lock poisoned");
                             }
@@ -68,7 +72,6 @@ pub(super) fn spawn_reader(
                             }
                         }
                         apply_output(session_id, &handle, store.as_deref(), &trailing, clock());
-                        let _ = handle.output.send(trailing);
                     }
                     finish_output(session_id, &handle, store.as_deref(), clock());
                     return;
@@ -87,8 +90,12 @@ pub(super) fn spawn_reader(
             if let Err(error) = save(&mut encoder, &mut budget, bytes) {
                 tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append session log");
             }
+            // Published under the screen lock: see `ScreenSource::snapshot`.
             match handle.parser.lock() {
-                Ok(mut parser) => parser.process(bytes),
+                Ok(mut parser) => {
+                    parser.process(bytes);
+                    let _ = handle.output.send(bytes.to_vec());
+                }
                 Err(_) => {
                     tracing::error!(session = session_id.0, "screen lock poisoned");
                     return;
@@ -101,7 +108,6 @@ pub(super) fn spawn_reader(
                     return;
                 }
             }
-            let _ = handle.output.send(bytes.to_vec());
             let mut prompt_ready = false;
             for signal in parsed.signals {
                 prompt_ready |= signal == ShellSignal::PromptStart;

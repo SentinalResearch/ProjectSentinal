@@ -28,16 +28,9 @@ impl SessionManager {
             &handle.output,
             &handle.structured,
             handle.attached.clone(),
-            || {
-                Ok(handle
-                    .parser
-                    .lock()
-                    .map_err(|_| SessionManagerError::Lock {
-                        resource: "screen",
-                        session_id,
-                    })?
-                    .screen()
-                    .state_formatted())
+            ScreenSource {
+                session_id,
+                parser: handle.parser.clone(),
             },
         )
     }
@@ -237,23 +230,63 @@ fn is_closed_device_error(error: &std::io::Error) -> bool {
     ) || error.raw_os_error() == Some(5)
 }
 
+/// Full terminal reset (RIS): a viewer drops everything it has drawn, so a
+/// redraw that follows starts from a clean terminal.
+pub const RESET_TERMINAL: &[u8] = b"\x1bc";
+
+/// The Session's screen, for redrawing a viewer that fell behind.
+#[derive(Clone)]
+pub struct ScreenSource {
+    session_id: SessionId,
+    parser: Arc<std::sync::Mutex<vt100::Parser>>,
+}
+
+impl ScreenSource {
+    #[cfg(test)]
+    pub(crate) fn new(session_id: SessionId, parser: Arc<std::sync::Mutex<vt100::Parser>>) -> Self {
+        Self { session_id, parser }
+    }
+
+    /// The current screen, with `output` replaced by a receiver that starts
+    /// exactly after it. The PTY reader publishes output while holding the
+    /// screen lock, so no byte is both in the screen and in the receiver, or
+    /// in neither.
+    pub fn snapshot(
+        &self,
+        output: &broadcast::Receiver<Vec<u8>>,
+    ) -> Result<(Vec<u8>, broadcast::Receiver<Vec<u8>>), SessionManagerError> {
+        let parser = self.parser.lock().map_err(|_| SessionManagerError::Lock {
+            resource: "screen",
+            session_id: self.session_id,
+        })?;
+        Ok((parser.screen().state_formatted(), output.resubscribe()))
+    }
+
+    /// After a lag: a reset followed by the current screen, and a receiver
+    /// that continues from that screen.
+    pub fn resync(
+        &self,
+        output: &broadcast::Receiver<Vec<u8>>,
+    ) -> Result<(Vec<u8>, broadcast::Receiver<Vec<u8>>), SessionManagerError> {
+        let (screen, receiver) = self.snapshot(output)?;
+        Ok(([RESET_TERMINAL, &screen].concat(), receiver))
+    }
+}
+
 fn snapshot_and_subscribe(
     output_sender: &broadcast::Sender<Vec<u8>>,
     structured_sender: &broadcast::Sender<DaemonMessage>,
     confirmation: Arc<AtomicBool>,
-    snapshot: impl FnOnce() -> Result<Vec<u8>, SessionManagerError>,
+    screen_source: ScreenSource,
 ) -> Result<Attachment, SessionManagerError> {
-    // Subscribe before taking the snapshot. Output written while the parser
-    // lock is contended is then either present in the snapshot or waiting in
-    // this receiver, never lost between the two operations.
-    let output = output_sender.subscribe();
     let structured = structured_sender.subscribe();
-    let screen = snapshot()?;
+    let (screen, output) = screen_source.snapshot(&output_sender.subscribe())?;
     Ok(Attachment {
         screen,
         output,
         structured,
         confirmation,
+        screen_source,
     })
 }
 
@@ -262,22 +295,69 @@ fn snapshot_and_subscribe(
 mod tests {
     use super::*;
 
+    fn source() -> ScreenSource {
+        ScreenSource {
+            session_id: SessionId(1),
+            parser: Arc::new(std::sync::Mutex::new(vt100::Parser::new(4, 20, 0))),
+        }
+    }
+
+    /// What the PTY reader does: draw and publish under the screen lock.
+    fn produce(source: &ScreenSource, output: &broadcast::Sender<Vec<u8>>, bytes: &[u8]) {
+        let mut parser = source.parser.lock().unwrap();
+        parser.process(bytes);
+        let _ = output.send(bytes.to_vec());
+    }
+
     #[test]
-    fn attachment_subscribes_before_snapshotting() {
+    fn attachment_output_starts_exactly_after_the_screen() {
         let (output, _) = broadcast::channel(4);
         let (structured, _) = broadcast::channel(4);
+        let source = source();
+        produce(&source, &output, b"before");
         let mut attachment = snapshot_and_subscribe(
             &output,
             &structured,
             Arc::new(AtomicBool::new(false)),
-            || {
-                let _ = output.send(b"during snapshot".to_vec());
-                Ok(b"screen".to_vec())
-            },
+            source.clone(),
         )
         .unwrap();
+        produce(&source, &output, b" after");
 
-        assert_eq!(attachment.screen, b"screen");
-        assert_eq!(attachment.output.try_recv().unwrap(), b"during snapshot");
+        assert!(String::from_utf8_lossy(&attachment.screen).contains("before"));
+        assert_eq!(attachment.output.try_recv().unwrap(), b" after");
+        assert!(attachment.output.try_recv().is_err());
+    }
+
+    #[test]
+    fn a_lagged_viewer_is_redrawn_and_continues_from_the_redraw() {
+        let (output, _) = broadcast::channel(2);
+        let (structured, _) = broadcast::channel(2);
+        let source = source();
+        let mut attachment = snapshot_and_subscribe(
+            &output,
+            &structured,
+            Arc::new(AtomicBool::new(false)),
+            source.clone(),
+        )
+        .unwrap();
+        for line in ["one\r\n", "two\r\n", "three\r\n", "four"] {
+            produce(&source, &output, line.as_bytes());
+        }
+        assert!(matches!(
+            attachment.output.try_recv(),
+            Err(broadcast::error::TryRecvError::Lagged(2))
+        ));
+
+        let (redraw, mut receiver) = source.resync(&attachment.output).unwrap();
+        produce(&source, &output, b"!");
+
+        assert!(redraw.starts_with(RESET_TERMINAL));
+        let screen = String::from_utf8_lossy(&redraw);
+        for line in ["one", "two", "three", "four"] {
+            assert!(screen.contains(line), "{line} missing from the redraw");
+        }
+        assert_eq!(receiver.try_recv().unwrap(), b"!");
+        assert!(receiver.try_recv().is_err());
     }
 }

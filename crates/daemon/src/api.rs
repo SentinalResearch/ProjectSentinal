@@ -1,5 +1,6 @@
 //! Axum HTTP and WebSocket API for daemon clients.
 
+mod attach;
 pub mod auth_routes;
 #[cfg(test)]
 mod capture_tests;
@@ -17,6 +18,7 @@ use crate::{
     recipes::RecipeCatalog,
     session_manager::{Attachment, CreateSession, SessionManager},
 };
+use attach::AttachedOutput;
 use axum::{
     extract::{
         connect_info::ConnectInfo,
@@ -721,7 +723,7 @@ async fn apply_action(
         }
         WsAction::Attach {
             session_id,
-            mut attachment,
+            attachment,
         } => {
             if socket
                 .send(Message::Binary(
@@ -736,37 +738,7 @@ async fn apply_action(
                 previous.task.abort();
             }
             let confirmation = attachment.confirmation.clone();
-            let output_tx = output_tx.clone();
-            let task = tokio::spawn(async move {
-                loop {
-                    tokio::select! {
-                        output = attachment.output.recv() => match output {
-                            Ok(bytes) => {
-                                if output_tx.send(AttachedOutput::Binary(
-                                    encode_terminal_frame(session_id, &bytes),
-                                )).await.is_err() {
-                                    return;
-                                }
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                                tracing::warn!(session = session_id.0, skipped, "attached terminal client lagged");
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
-                        },
-                        structured = attachment.structured.recv() => match structured {
-                            Ok(message) => {
-                                if output_tx.send(AttachedOutput::Structured(Box::new(message))).await.is_err() {
-                                    return;
-                                }
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                                tracing::warn!(session = session_id.0, skipped, "attached structured client lagged");
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
-                        },
-                    }
-                }
-            });
+            let task = attach::spawn_forwarder(session_id, attachment, output_tx.clone());
             attachments.insert(session_id, AttachedForwarder { task, confirmation });
             true
         }
@@ -782,11 +754,6 @@ async fn apply_action(
 struct AttachedForwarder {
     task: JoinHandle<()>,
     confirmation: std::sync::Arc<std::sync::atomic::AtomicBool>,
-}
-
-enum AttachedOutput {
-    Binary(Vec<u8>),
-    Structured(Box<DaemonMessage>),
 }
 
 async fn send_daemon_message(socket: &mut WebSocket, message: DaemonMessage) -> bool {
