@@ -45,6 +45,52 @@ enum AppError {
     WatchAttach { id: u64, source: ClientError },
 }
 
+/// Before `sentinal update` restarts sentinald: say how many live terminals
+/// it ends and ask. An unreachable daemon has none to end.
+async fn confirm_update(
+    url: Option<&str>,
+    token_file: Option<PathBuf>,
+    yes: bool,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> bool {
+    use crate::update_guard::{confirm, decide, live_terminals, warning, Decision};
+
+    let Ok(token_file) = token_file.map_or_else(default_token_file, Ok) else {
+        return true;
+    };
+    let Ok(urls) = resolve_daemon_urls(url) else {
+        return true;
+    };
+    let Ok(mut client) = DaemonClient::connect(&urls, &token_file).await else {
+        return true;
+    };
+    let sessions = match client.request(ClientRequest::ListSessions).await {
+        Ok(DaemonMessage::Sessions { sessions }) => sessions,
+        _ => return true,
+    };
+    let machine = match client.request(ClientRequest::GetMachine).await {
+        Ok(DaemonMessage::Machine { machine }) => machine.name,
+        _ => "this Machine".into(),
+    };
+    let inside = std::env::var_os("SENTINAL_SESSION_ID").is_some();
+    let text = warning(live_terminals(&sessions), &machine, inside);
+    match decide(text, yes, std::io::stdin().is_terminal()) {
+        Decision::Proceed => true,
+        Decision::Ask(question) => {
+            let agreed = confirm(&question, &mut std::io::stdin().lock(), out);
+            if !agreed {
+                let _ = writeln!(err, "sentinal update: cancelled; nothing was changed");
+            }
+            agreed
+        }
+        Decision::Refuse(message) => {
+            let _ = writeln!(err, "sentinal update: {message}");
+            false
+        }
+    }
+}
+
 async fn dispatch(
     cli: Cli,
     out: &mut dyn Write,
@@ -96,7 +142,15 @@ async fn dispatch(
             rollback,
             prefix,
             result_file,
+            yes,
         } => {
+            // A dashboard update was confirmed there and records a result file.
+            if !check
+                && result_file.is_none()
+                && !confirm_update(cli.url.as_deref(), cli.token_file, yes, out, err).await
+            {
+                return Ok(ExitCode::FAILURE);
+            }
             let result = crate::update::run(check, rollback, prefix, out);
             if let Some(path) = result_file {
                 crate::update::record_result(&path, result.as_ref().err());

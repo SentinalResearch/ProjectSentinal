@@ -76,7 +76,7 @@ describe("ControlReleaseCard", () => {
 
     const user = userEvent.setup();
     await user.click(within(card).getByRole("button", { name: "Update control" }));
-    expect(screen.getByText(/2 live FULL Sessions on this control will be interrupted/)).toBeInTheDocument();
+    expect(screen.getByText(/This ends 2 live terminals on this control\./)).toBeInTheDocument();
     expect(screen.getByText(/dashboard reconnects/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
@@ -165,7 +165,7 @@ describe("ControlReleaseCard", () => {
     const card = await screen.findByRole("region", { name: "Control release" });
     await userEvent.setup().click(within(card).getByRole("button", { name: "Update control" }));
     const sheet = screen.getByRole("dialog", { name: "Update this control to 0.1.18?" });
-    expect(within(sheet).getByText(/No live FULL Sessions/)).toBeInTheDocument();
+    expect(within(sheet).getByText(/No live terminals run on this control/)).toBeInTheDocument();
   });
 
   it("renders nothing when this is not a control", async () => {

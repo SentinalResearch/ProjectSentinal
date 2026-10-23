@@ -28,8 +28,8 @@ function ago(at: number | null): string {
 }
 
 function sessionsText(count: number): string {
-  if (count === 0) return "No live FULL Sessions run on this control.";
-  return `${count} live FULL Session${count === 1 ? "" : "s"} on this control will be interrupted (until Reliability R1).`;
+  if (count === 0) return "No live terminals run on this control.";
+  return `This ends ${count} live terminal${count === 1 ? "" : "s"} on this control.`;
 }
 
 /**
@@ -200,7 +200,7 @@ export function ControlReleaseCard({ pollMs = 3_000 }: { pollMs?: number }) {
         </div>
         <p className={styles.muted}>
           {release.policy === "AUTOMATIC_WHEN_IDLE"
-            ? `Updates install between ${release.window} when no live FULL Session runs.`
+            ? `Updates install between ${release.window} when no live terminal runs.`
             : release.policy === "OFF"
               ? "No automatic checks; use Check now."
               : `Checks daily and notifies you · maintenance window ${release.window}.`}

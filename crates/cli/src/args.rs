@@ -123,6 +123,9 @@ pub enum Command {
         /// Record the outcome here (used by sentinald for dashboard updates).
         #[arg(long, hide = true)]
         result_file: Option<PathBuf>,
+        /// Update even though it ends this Machine's live terminals.
+        #[arg(short = 'y', long)]
+        yes: bool,
     },
     /// Run this terminal inside a persistent Sentinal Session and attach.
     ///

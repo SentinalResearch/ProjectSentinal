@@ -13,6 +13,13 @@ interface Pending {
   interrupt: string | null;
 }
 
+/** "This ends 2 live terminals on RTX PC." from the worker's LIVE_SESSIONS refusal. */
+function endsText(refusal: string, machine: string): string {
+  const count = /^(\d+) live/.exec(refusal)?.[1];
+  if (count === undefined) return refusal.replace(/; confirm.*$/, ".");
+  return `This ends ${count} live terminal${count === "1" ? "" : "s"} on ${machine}.`;
+}
+
 function statusText(machine: RegistryMachine): string | null {
   const update = machine.update;
   if (!update) return null;
@@ -31,7 +38,7 @@ function statusText(machine: RegistryMachine): string | null {
 /**
  * Workers behind the release on this control's stable channel (MILESTONE 4.E
  * §11). Each updates on its own, from its own pinned control, after a
- * confirmation; live FULL Sessions need a second, explicit one.
+ * confirmation; live terminals need a second, explicit one.
  */
 export function WorkerUpdatesCard({ pollMs = 5_000 }: { pollMs?: number }) {
   const [available, setAvailable] = useState<string | null>(null);
@@ -84,9 +91,9 @@ export function WorkerUpdatesCard({ pollMs = 5_000 }: { pollMs?: number }) {
     ? `Update ${pending.machine.display_name} from ${pending.machine.daemon_version ?? "its release"} to ${available}?`
     : "";
   const consequence = pending?.interrupt
-    ? `${pending.interrupt.replace(/; confirm.*$/, "")} (until Reliability R1). The Machine restarts sentinald and reconnects on its own.`
+    ? `${endsText(pending.interrupt, pending.machine.display_name)} The Machine restarts sentinald and reconnects on its own.`
     : "The Machine installs the release from this control, verifies it, restarts sentinald, and keeps its previous release if anything fails.";
-  const confirmLabel = pending?.interrupt ? "Interrupt and update" : `Update to ${available}`;
+  const confirmLabel = pending?.interrupt ? "End terminals and update" : `Update to ${available}`;
 
   return (
     <section className={styles.card} aria-label="Worker updates">

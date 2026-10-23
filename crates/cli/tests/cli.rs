@@ -66,7 +66,8 @@ fn parses_update_check_and_explicit_rollback() {
             check: true,
             rollback: None,
             prefix: None,
-            result_file: None
+            result_file: None,
+            yes: false
         }
     ));
 
@@ -77,11 +78,12 @@ fn parses_update_check_and_explicit_rollback() {
         "0.0.1",
         "--prefix",
         "/opt/sentinal",
+        "--yes",
     ])
     .unwrap();
     assert!(matches!(
         rollback.command,
-        Command::Update { check: false, rollback: Some(version), prefix: Some(prefix), result_file: None }
+        Command::Update { check: false, rollback: Some(version), prefix: Some(prefix), result_file: None, yes: true }
             if version == "0.0.1" && prefix == Path::new("/opt/sentinal")
     ));
     assert!(Cli::try_parse_from(["sentinal", "update", "--check", "--rollback", "0.0.1"]).is_err());

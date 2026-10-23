@@ -42,6 +42,8 @@ impl Drop for TestDir {
 fn sentinal() -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_sentinal"));
     command.env("SENTINAL_SOCKET", "/nonexistent/sentinal-test.sock");
+    // Never this Machine's real daemon: it may have live terminals.
+    command.env("SENTINAL_URL", "ws://127.0.0.1:9");
     command
 }
 

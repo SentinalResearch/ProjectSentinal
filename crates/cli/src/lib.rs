@@ -27,5 +27,6 @@ pub mod session_env;
 pub mod setup;
 pub mod top;
 pub mod update;
+mod update_guard;
 pub mod version;
 pub mod watch;

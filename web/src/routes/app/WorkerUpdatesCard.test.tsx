@@ -91,7 +91,7 @@ describe("WorkerUpdatesCard", () => {
     expect(calls.find((call) => call.method === "POST")?.body).toEqual({ version: "0.1.19", allow_interrupt: false });
   });
 
-  it("asks again before interrupting live FULL Sessions", async () => {
+  it("asks again, saying how many live terminals the update ends", async () => {
     const machines = [machine("01RTX", "RTX PC", "0.1.18")];
     const calls = stubFetch({
       "GET /api/v1/machines": () => ({ status: 200, body: { machines, available_release: "0.1.19" } }),
@@ -106,8 +106,8 @@ describe("WorkerUpdatesCard", () => {
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Update to 0.1.19" }));
 
     const second = await screen.findByRole("dialog");
-    await waitFor(() => expect(second).toHaveTextContent("2 live FULL Sessions would be interrupted"));
-    await userEvent.click(within(second).getByRole("button", { name: "Interrupt and update" }));
+    await waitFor(() => expect(second).toHaveTextContent("This ends 2 live terminals on RTX PC."));
+    await userEvent.click(within(second).getByRole("button", { name: "End terminals and update" }));
     await waitFor(() => expect(calls.filter((call) => call.method === "POST")).toHaveLength(2));
     expect(calls.filter((call) => call.method === "POST")[1].body).toEqual({ version: "0.1.19", allow_interrupt: true });
   });

@@ -281,8 +281,8 @@ Behaviour:
 The dashboard shows the same under **Settings → Machines → Control release**:
 - the installed release and the newest signed one, with Check now;
 - the policy and channel;
-- **Update control**, which asks first and states how many live FULL
-  Sessions would be interrupted.
+- **Update control**, which asks first and states how many live terminals
+  the update ends.
 
 The daemon runs the update detached (its own `systemd-run --user` unit on
 Linux), so it survives the restart. The page follows it through to

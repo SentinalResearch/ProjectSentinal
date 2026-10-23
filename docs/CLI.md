@@ -207,9 +207,14 @@ Package installation and maintenance commands available now are:
 curl -fsSL https://sentinal-control.TAILNET.ts.net/install.sh | sh
 sentinal doctor [--prefix DIR] [--config-dir DIR]
 sentinal update --check [--prefix DIR]
-sentinal update [--prefix DIR]
-sentinal update --rollback VERSION [--prefix DIR]
+sentinal update [--yes] [--prefix DIR]
+sentinal update --rollback VERSION [--yes] [--prefix DIR]
 ```
+
+`update` restarts sentinald, which ends this Machine's live terminals (until
+Reliability R1). When any are running it says so ("This ends 2 live terminals
+on pop-os.", adding "including this one" inside a Session) and asks; without a
+terminal to ask on it stops unless `--yes` is given.
 
 `doctor` reads local installation/configuration state and invokes the native
 service manager and Tailscale status commands. It makes no network request and
@@ -302,7 +307,7 @@ sentinal identity reset [--yes]
 sentinal doctor [--prefix DIR] [--config-dir DIR] [--pilot]
 sentinal backup create [--output FILE] [--config-dir DIR]
 sentinal backup restore FILE [--config-dir DIR]
-sentinal update [--check | --rollback VERSION] [--prefix DIR]
+sentinal update [--check | --rollback VERSION] [--yes] [--prefix DIR]
 sentinal release check [--channel stable|beta] [--json]
 sentinal release update [--version V] [--yes] [--skip-provenance] [--health-timeout S]
 sentinal release rollback VERSION [--yes]
