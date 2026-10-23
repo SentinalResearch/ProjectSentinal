@@ -28,7 +28,9 @@ export const mockAdapter: DataAdapter = {
 
   async createSession(options = {}) {
     await delay(undefined);
-    const machine = store.machines.find((entry) => entry.status === "ONLINE");
+    const machine = store.machines.find(
+      (entry) => entry.status === "ONLINE" && (options.machineId === undefined || entry.id === options.machineId),
+    );
     if (!machine) throw new Error("cannot create session: no online machine");
     const id = `session-${Date.now()}`;
     const session: Session = {

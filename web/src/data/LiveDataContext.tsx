@@ -1,12 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { dataAdapter } from "./index";
+import { latestGenerations } from "./lineage";
 import type { LiveEvent } from "./adapter";
 import type { Machine, Session } from "./types";
 
 export interface LiveDataValue {
   machines: Machine[];
+  /** Every Session, including earlier generations of continued terminals. */
   sessions: Session[];
+  /** One entry per terminal (its latest generation): what lists and counts show. */
+  terminals: Session[];
   /** True until the first getMachines()/getSessions() round-trip resolves. */
   loading: boolean;
 }
@@ -88,7 +92,11 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const value = useMemo<LiveDataValue>(() => ({ machines, sessions, loading }), [machines, sessions, loading]);
+  const terminals = useMemo(() => latestGenerations(sessions), [sessions]);
+  const value = useMemo<LiveDataValue>(
+    () => ({ machines, sessions, terminals, loading }),
+    [machines, sessions, terminals, loading],
+  );
 
   return <LiveDataContext.Provider value={value}>{children}</LiveDataContext.Provider>;
 }

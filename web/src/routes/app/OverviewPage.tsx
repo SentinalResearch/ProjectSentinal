@@ -46,7 +46,7 @@ export function OverviewPage() {
 function DesktopOverview() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { machines, sessions, loading } = useLiveData();
+  const { machines, terminals: sessions, loading } = useLiveData();
   const machineFilter = searchParams.get("machine");
 
   const open = (id: string) => navigate(`/app/sessions/${id}`);

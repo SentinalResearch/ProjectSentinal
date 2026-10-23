@@ -84,31 +84,31 @@ test("three Session generations survive reload with input only on the latest", a
   await page.keyboard.type("must not reach the closed PTY");
   expect(sentFrames.filter((frame) => typeof frame !== "string")).toHaveLength(0);
 
-  await page.getByRole("button", { name: "Continue in new Session" }).click();
+  await page.getByRole("button", { name: "Resume terminal" }).click();
   await expect.poll(() => Number(decodeURIComponent(page.url().split("/").at(-1) ?? "").split(":").at(-1)))
     .not.toBe(finished.id);
   const secondId = Number(decodeURIComponent(page.url().split("/").at(-1) ?? "").split(":").at(-1));
   expect(secondId).not.toBe(finished.id);
   await expect(page.getByRole("heading", { name: "Finished record" })).toBeVisible();
-  await expect(page.getByText(`Session ${finished.id} ended — continued as Session ${secondId}`)).toBeVisible();
-  await expect(page.getByText("Generation 2 of 2", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/ — resumed at /)).toBeVisible();
+  await expect(page.getByText("Part 2 of 2", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("attached", { exact: true })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByText(`Session ${finished.id} ended — continued as Session ${secondId}`)).toBeVisible();
+  await expect(page.getByText(/ — resumed at /)).toBeVisible();
 
   await daemonRequest(env("SENTINAL_E2E_CONTROL_WS"), "test-token", {
     type: "KILL", session_id: secondId,
   }, "SESSION_UPDATED");
   await page.reload();
-  await expect(page.getByRole("button", { name: "Continue in new Session" })).toBeVisible();
-  await page.getByRole("button", { name: "Continue in new Session" }).click();
+  await expect(page.getByRole("button", { name: "Resume terminal" })).toBeVisible();
+  await page.getByRole("button", { name: "Resume terminal" }).click();
   await expect.poll(() => Number(decodeURIComponent(page.url().split("/").at(-1) ?? "").split(":").at(-1)))
     .not.toBe(secondId);
   const thirdId = Number(decodeURIComponent(page.url().split("/").at(-1) ?? "").split(":").at(-1));
   expect(new Set([finished.id, secondId, thirdId]).size).toBe(3);
-  await expect(page.getByText("Generation 3 of 3", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(`Session ${secondId} ended — continued as Session ${thirdId}`)).toBeVisible();
+  await expect(page.getByText("Part 3 of 3", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/ — resumed at /)).toHaveCount(2);
 
   await page.reload();
   const terminalHosts = page.getByTestId("terminal-host");

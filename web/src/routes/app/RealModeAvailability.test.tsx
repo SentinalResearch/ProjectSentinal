@@ -41,6 +41,7 @@ vi.mock("../../data/LiveDataContext", () => ({
       },
     ],
     sessions: [],
+    terminals: [],
     loading: false,
   }),
 }));

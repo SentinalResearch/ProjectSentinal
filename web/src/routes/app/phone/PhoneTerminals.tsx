@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { StateTag } from "../../../components/StateTag";
-import { dataAdapter } from "../../../data";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Session } from "../../../data/types";
 import { usePeekLines } from "../../../terminal/peek";
 import { isReadOnlyTerminalState } from "../../../terminal/lifecycle";
+import { useNewSession } from "../NewSession";
 import shell from "./phone.module.css";
 import styles from "./phoneLists.module.css";
 import { PageTitle } from "./PageTitle";
@@ -48,16 +48,12 @@ function TerminalCard({ session, machineName, focused }: { session: Session; mac
 
 /** C3 · Terminals on phones: live terminal cards; tap one for full screen. */
 export function PhoneTerminals() {
-  const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { machines, sessions, loading } = useLiveData();
+  const { machines, terminals: sessions, loading } = useLiveData();
   const live = sessions.filter((session) => !isReadOnlyTerminalState(session.state));
   const focus = params.get("focus");
 
-  async function newSession() {
-    const session = await dataAdapter.createSession();
-    navigate(`/app/sessions/${session.id}/terminal`);
-  }
+  const newSession = useNewSession((id) => `/app/sessions/${id}/terminal`);
 
   if (loading) return <div className={shell.page}>Loading…</div>;
   return (
@@ -67,10 +63,11 @@ export function PhoneTerminals() {
           <PageTitle>Terminals</PageTitle>
           <span className={styles.subtitle}>{live.length} open · tap one to go full screen</span>
         </div>
-        <button type="button" className={styles.plus} aria-label="New session" onClick={() => void newSession()}>
+        <button type="button" className={styles.plus} aria-label="New session" onClick={() => newSession.start()}>
           +
         </button>
       </header>
+      {newSession.chooser}
       <div className={styles.cardStack}>
         {live.map((session) => (
           <TerminalCard

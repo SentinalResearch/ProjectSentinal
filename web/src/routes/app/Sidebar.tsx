@@ -5,7 +5,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { needsAttention, slugifyProject } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
-import { dataAdapter, isMockData } from "../../data";
+import { isMockData } from "../../data";
+import { useNewSession } from "./NewSession";
 import styles from "./Sidebar.module.css";
 
 interface ActiveStyle {
@@ -34,7 +35,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { machines, sessions } = useLiveData();
+  const { machines, terminals: sessions } = useLiveData();
   const { theme, toggleTheme } = useTheme();
   const { logout } = useAuth();
 
@@ -52,13 +53,11 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
   const projectMatch = location.pathname.match(/^\/app\/projects\/(.+)$/);
   const activeProjectId = projectMatch ? projectMatch[1] : null;
 
-  async function newSession() {
-    if (isMockData) {
-      navigate("/app/recipes");
-      return;
-    }
-    const session = await dataAdapter.createSession();
-    navigate(`/app/sessions/${session.id}`);
+  const newSession = useNewSession((id) => `/app/sessions/${id}`);
+
+  function startNewSession() {
+    if (isMockData) navigate("/app/recipes");
+    else newSession.start(machineFilter);
   }
 
   return (
@@ -84,12 +83,13 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
       </div>
 
       <div className={styles.actions}>
-        <button type="button" className={styles.newSession} onClick={() => void newSession()}>
+        <button type="button" className={styles.newSession} onClick={startNewSession}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ flex: "none" }}>
             <path d="M8 3v10M3 8h10" />
           </svg>
           {expanded && <span>New session</span>}
         </button>
+        {newSession.chooser}
         <button type="button" className={styles.searchHistory} onClick={() => navigate("/app/history")}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ flex: "none" }}>
             <circle cx="7" cy="7" r="4.5" />

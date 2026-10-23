@@ -18,7 +18,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled])';
  */
 export function PhoneMenu({ needsYou, onClose }: { needsYou: number; onClose: (restoreFocus: boolean) => void }) {
   const { pathname } = useLocation();
-  const { sessions, machines } = useLiveData();
+  const { terminals: sessions, machines } = useLiveData();
   const [query, setQuery] = useState("");
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);

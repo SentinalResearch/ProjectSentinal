@@ -16,10 +16,10 @@ import styles from "./ProjectPage.module.css";
 export function ProjectPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { machines, sessions, loading } = useLiveData();
+  const { machines, sessions, terminals, loading } = useLiveData();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  const projectSessions = sessions.filter((s) => s.project && slugifyProject(s.project) === id);
+  const projectSessions = terminals.filter((s) => s.project && slugifyProject(s.project) === id);
   const projectName = projectSessions[0]?.project;
 
   useEffect(() => {

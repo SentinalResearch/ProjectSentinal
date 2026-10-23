@@ -1,8 +1,8 @@
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
-import { dataAdapter } from "../../../data";
 import { needsAttention } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
+import { useNewSession } from "../NewSession";
 import { NeedsYouCard } from "./NeedsYouCard";
 import { PhoneSessionRow } from "./PhoneSessionRow";
 import styles from "./phoneSession.module.css";
@@ -11,9 +11,8 @@ import { PageTitle } from "./PageTitle";
 
 /** B2 · Overview on phones. */
 export function PhoneOverview() {
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { machines, sessions, loading } = useLiveData();
+  const { machines, terminals: sessions, loading } = useLiveData();
   const filter = params.get("machine");
   // The top bar's needs-you count opens Overview filtered to just those Sessions.
   const needsOnly = params.get("needs") === "1";
@@ -21,10 +20,7 @@ export function PhoneOverview() {
   const needs = visible.filter(needsAttention);
   const groups = needsOnly ? [] : filter ? machines.filter((machine) => machine.id === filter) : machines;
 
-  async function newSession() {
-    const session = await dataAdapter.createSession();
-    navigate(`/app/sessions/${session.id}/terminal`);
-  }
+  const newSession = useNewSession((id) => `/app/sessions/${id}/terminal`);
 
   if (loading) return <div className={shell.page}>Loading…</div>;
 
@@ -32,10 +28,11 @@ export function PhoneOverview() {
     <div className={shell.page}>
       <header className={styles.titleRow}>
         <PageTitle>Overview</PageTitle>
-        <button type="button" className={styles.plus} aria-label="New session" onClick={() => void newSession()}>
+        <button type="button" className={styles.plus} aria-label="New session" onClick={() => newSession.start(filter)}>
           +
         </button>
       </header>
+      {newSession.chooser}
 
       <div className={styles.chips} role="group" aria-label="Machines">
         <button type="button" className={styles.chip} aria-pressed={!filter && !needsOnly} onClick={() => setParams({})}>

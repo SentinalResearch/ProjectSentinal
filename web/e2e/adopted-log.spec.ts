@@ -45,7 +45,7 @@ test("an adopted log Session shows progress on a phone with no terminal controls
     await expect(page.getByLabel("Watch fully next time")).toBeVisible();
 
     await expect(page.getByTestId("terminal-host")).toHaveCount(0);
-    for (const name of ["Ctrl‑C…", "y", "n", "Run again", "Continue in new Session"]) {
+    for (const name of ["Ctrl‑C…", "y", "n", "Run again", "Resume terminal"]) {
       await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
     }
     // The page never scrolls sideways at phone width.

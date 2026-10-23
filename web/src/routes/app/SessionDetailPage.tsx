@@ -152,7 +152,7 @@ function DesktopSessionDetail() {
       setContinuing(false);
       navigate(`/app/sessions/${created.id}`);
     } catch (error) {
-      setContinueError(error instanceof Error ? error.message : "Could not create a new Session.");
+      setContinueError(error instanceof Error ? error.message : "Could not resume the terminal.");
       setContinuing(false);
     }
   }
@@ -257,7 +257,7 @@ function DesktopSessionDetail() {
                 disabled={continuing}
                 onClick={() => void continueInNewSession(latest)}
               >
-                {continuing ? "Creating Session…" : "Continue in new Session"}
+                {continuing ? "Resuming…" : "Resume terminal"}
               </button>
             )}
             {session.id !== latest.id && (
@@ -266,7 +266,7 @@ function DesktopSessionDetail() {
                 className={styles.continueButton}
                 onClick={() => navigate(`/app/sessions/${latest.id}`)}
               >
-                View latest Session
+                Go to the live terminal
               </button>
             )}
           </div>

@@ -15,6 +15,35 @@ export interface SessionLineage {
   bytesPerGeneration: number;
 }
 
+/**
+ * One entry per terminal: a Session continued after it ended (for example
+ * after a daemon restart) is the same terminal, so lists show only its latest
+ * generation, with `generations` counting the whole chain.
+ */
+export function latestGenerations(sessions: Session[]): Session[] {
+  const byId = new Map(sessions.map((session) => [session.id, session]));
+  const continued = new Set<string>();
+  for (const session of sessions) {
+    const predecessor = session.continuedFrom ? byId.get(session.continuedFrom) : undefined;
+    if (predecessor && predecessor.machine === session.machine) continued.add(predecessor.id);
+  }
+  return sessions
+    .filter((session) => !continued.has(session.id))
+    .map((session) => {
+      let generations = 1;
+      let current = session;
+      const seen = new Set([session.id]);
+      while (current.continuedFrom && generations < HISTORY_METADATA_GENERATIONS) {
+        const predecessor = byId.get(current.continuedFrom);
+        if (!predecessor || predecessor.machine !== current.machine || seen.has(predecessor.id)) break;
+        seen.add(predecessor.id);
+        generations += 1;
+        current = predecessor;
+      }
+      return generations === session.generations ? session : { ...session, generations };
+    });
+}
+
 /** Resolve and bound one persisted linear Session history from LIST_SESSIONS. */
 export function resolveSessionLineage(sessions: Session[], selectedId: string): SessionLineage {
   const byId = new Map(sessions.map((session) => [session.id, session]));

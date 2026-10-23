@@ -23,6 +23,8 @@ export interface HistoryFilters {
 }
 
 export interface CreateSessionOptions {
+  /** The Machine to start the shell on; the control when omitted. */
+  machineId?: string;
   shell?: string;
   cwd?: string;
   title?: string;

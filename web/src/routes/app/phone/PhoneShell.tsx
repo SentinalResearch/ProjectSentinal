@@ -16,7 +16,7 @@ import styles from "./phone.module.css";
  */
 export function PhoneShell() {
   const { pathname, search } = useLocation();
-  const { sessions } = useLiveData();
+  const { terminals: sessions } = useLiveData();
   const needsYou = sessions.filter(needsAttention).length;
   const [menuOpen, setMenuOpen] = useState(false);
   const opener = useRef<HTMLElement | null>(null);

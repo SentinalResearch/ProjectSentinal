@@ -898,9 +898,14 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     async createSession(create = {}) {
       await ensureInitialized();
       if (controlMachineId === null) throw daemonError("missing control Machine");
-      const transport = connections.get(controlMachineId)?.transport;
-      if (!transport) throw daemonError("missing control Machine connection");
-      const message = await transport.request({
+      // Workers are reached through the control's routed connection, as Recipes are.
+      const target = create.machineId ?? controlMachineId;
+      const connection = connections.get(target);
+      if (!connection) throw daemonError(`unknown Machine '${target}'`);
+      if (connection.machine.status !== "ONLINE") {
+        throw daemonError(`Machine '${target}' is not live; the Session was not started`);
+      }
+      const message = await connection.transport.request({
         type: "CREATE_SESSION",
         shell: create.shell ?? null,
         cwd: create.cwd ?? null,
@@ -909,7 +914,8 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
         origin: "UI",
         title: create.title ?? null,
         command: null,
-      }, (reply) => isFullSessionUpdate(reply));
+      }, (reply) =>
+        isFullSessionUpdate(reply) && reply.type === "SESSION_UPDATED" && reply.session.machine_id === target);
       if (message.type !== "SESSION_UPDATED") throw daemonError("missing created Session");
       return mapSession(message.session);
     },

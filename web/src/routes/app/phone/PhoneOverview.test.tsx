@@ -32,6 +32,27 @@ describe("B2 · phone Overview", () => {
     expect(within(needs).getAllByRole("article")).toHaveLength(count);
   });
 
+  it("asks which online Machine a new Session starts on", async () => {
+    const create = vi.spyOn(dataAdapter, "createSession");
+    const user = userEvent.setup();
+    renderAt("/app/overview", routes);
+    await user.click(await screen.findByRole("button", { name: "New session" }, { timeout: 5000 }));
+    const sheet = screen.getByRole("dialog", { name: "Start a Session on" });
+    expect(within(sheet).getByRole("button", { name: /Mac Mini/ })).toBeInTheDocument();
+    expect(within(sheet).queryByRole("button", { name: /MacBook/ })).not.toBeInTheDocument();
+    await user.click(within(sheet).getByRole("button", { name: /RTX-PC/ }));
+    expect(create).toHaveBeenCalledWith({ machineId: "rtx" });
+    expect(await screen.findByTestId("where")).toHaveTextContent(/^\/app\/sessions\/.+\/terminal$/);
+  });
+
+  it("starts a new Session on the Machine the Overview is filtered to", async () => {
+    const create = vi.spyOn(dataAdapter, "createSession");
+    renderAt("/app/overview?machine=mini", routes);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "New session" }, { timeout: 5000 }));
+    expect(create).toHaveBeenCalledWith({ machineId: "mini" });
+    expect(screen.queryByRole("dialog", { name: "Start a Session on" })).not.toBeInTheDocument();
+  });
+
   it("puts the state badge and duration above the title, never on the title line", async () => {
     renderAt("/app/overview", routes);
     const row = await screen.findByRole("link", { name: /Qwen Training/ }, { timeout: 5000 });

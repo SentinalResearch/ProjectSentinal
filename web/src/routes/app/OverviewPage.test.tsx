@@ -69,3 +69,21 @@ describe("OverviewPage", () => {
     machine.status = previous;
   });
 });
+
+describe("OverviewPage continued terminals", () => {
+  it("lists a terminal continued after it ended once, as its latest generation", async () => {
+    const added = [
+      { id: "restart-1", machine: "rtx", name: "Long build", state: "INTERRUPTED", capture: "FULL", origin: "UI" },
+      { id: "restart-2", machine: "rtx", name: "Long build", state: "INTERRUPTED", capture: "FULL", origin: "UI", continuedFrom: "restart-1" },
+      { id: "restart-3", machine: "rtx", name: "Long build", state: "IDLE", capture: "FULL", origin: "UI", continuedFrom: "restart-2" },
+    ] as const;
+    store.sessions.push(...added.map((session) => ({ ...session, events: [] })));
+    try {
+      renderOverview();
+      const rows = await screen.findAllByText("Long build");
+      expect(rows).toHaveLength(1);
+    } finally {
+      store.sessions.splice(store.sessions.findIndex((session) => session.id === "restart-1"), added.length);
+    }
+  });
+});

@@ -27,7 +27,7 @@ export function NotificationsTab() {
 }
 
 function NotificationRules() {
-  const { sessions, machines } = useLiveData();
+  const { terminals: sessions, machines } = useLiveData();
   const [rules, setRules] = useState<NotificationRules | null>(null);
   const [journal, setJournal] = useState<JournalNotification[]>([]);
   const [statuses, setStatuses] = useState<NotificationDeliveryStatus[]>([]);

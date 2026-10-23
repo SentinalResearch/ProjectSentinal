@@ -49,16 +49,16 @@ export function SessionHistoryTerminals({
       <section
         key={generation.id}
         className={primary ? `${styles.generation} ${styles.generationPrimary}` : styles.generation}
-        aria-label={`Generation ${generationIndex + 1} of ${lineage.ordered.length}`}
+        aria-label={`Part ${generationIndex + 1} of ${lineage.ordered.length}`}
       >
         {multiple && previous && (
           <div className={styles.generationBoundary}>
-            Session {displayedSessionId(previous.id)} ended — continued as Session {displayedSessionId(generation.id)} at {generationTime(generation)}
+            {previous.state} — resumed at {generationTime(generation)}
           </div>
         )}
         {multiple && (
           <div className={styles.generationHeader}>
-            <strong>Generation {generationIndex + 1} of {lineage.ordered.length}</strong>
+            <strong>Part {generationIndex + 1} of {lineage.ordered.length}</strong>
             <span>
               Session {displayedSessionId(generation.id)} · {generation.state}
               {generation.exitCode !== null && generation.exitCode !== undefined
@@ -93,7 +93,7 @@ export function SessionHistoryTerminals({
     <div className={styles.history}>
       {multiple && (
         <div className={styles.historyStack}>
-          <nav className={styles.generationNav} aria-label="Session generations">
+          <nav className={styles.generationNav} aria-label="Terminal parts">
             {lineage.ordered.map((generation, index) => (
               <button
                 type="button"
@@ -107,7 +107,7 @@ export function SessionHistoryTerminals({
           </nav>
           {lineage.omittedBefore > 0 && (
             <p className={styles.historyOmitted} role="status">
-              {lineage.omittedBefore} earlier generations omitted from this view; their saved data remains available.
+              {lineage.omittedBefore} earlier parts omitted from this view; their saved data remains available.
             </p>
           )}
           {lineage.visible.slice(0, lastVisible).map((generation, visibleIndex) =>
@@ -115,7 +115,7 @@ export function SessionHistoryTerminals({
           )}
           {lineage.omittedAfter > 0 && (
             <p className={styles.historyOmitted} role="status">
-              {lineage.omittedAfter} later generations omitted from this view; select one from the timeline to move the window.
+              {lineage.omittedAfter} later parts omitted from this view; select one from the timeline to move the window.
             </p>
           )}
           <p className={styles.historyMachine}>History stored on {machineName}</p>

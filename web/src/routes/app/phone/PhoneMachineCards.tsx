@@ -67,7 +67,7 @@ export function PhoneMachineCards({ machines, onChanged }: { machines: RegistryM
               )}
             </div>
             {expanded && liveMachine && (
-              <MachinePanel machine={liveMachine} sessions={live.sessions.filter((session) => session.machine === liveMachine.id)} />
+              <MachinePanel machine={liveMachine} sessions={live.terminals.filter((session) => session.machine === liveMachine.id)} />
             )}
           </article>
         );

@@ -4,6 +4,7 @@ import type { Session } from "./types";
 import {
   HISTORY_OUTPUT_BUDGET_BYTES,
   HISTORY_WINDOW_GENERATIONS,
+  latestGenerations,
   resolveSessionLineage,
 } from "./lineage";
 
@@ -63,5 +64,24 @@ describe("resolveSessionLineage", () => {
     expect(older.visible[0].id).toBe("1");
     expect(older.visible.at(-1)?.id).toBe("32");
     expect(older.omittedAfter).toBe(8);
+  });
+});
+
+describe("latestGenerations", () => {
+  it("lists each continued terminal once, as its latest generation", () => {
+    const sessions = [generation(1), generation(2, 1), generation(3, 2), generation(7)];
+
+    const terminals = latestGenerations(sessions);
+
+    expect(terminals.map((session) => [session.id, session.generations])).toEqual([
+      ["3", 3],
+      ["7", 1],
+    ]);
+  });
+
+  it("keeps a generation whose successor is not loaded and never merges Machines", () => {
+    const sessions = [generation(1, 9), generation(2, 1, "machine-b")];
+
+    expect(latestGenerations(sessions).map((session) => session.id)).toEqual(["1", "2"]);
   });
 });

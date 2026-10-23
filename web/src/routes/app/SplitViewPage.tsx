@@ -25,7 +25,7 @@ export function SplitViewPage() {
 function DesktopSplitView() {
   const [searchParams] = useSearchParams();
   const focus = searchParams.get("focus");
-  const { machines, sessions, loading } = useLiveData();
+  const { machines, terminals: sessions, loading } = useLiveData();
 
   const [pane, setPane] = useState<PaneState>({ ids: [], active: null });
   const [addOpen, setAddOpen] = useState(false);

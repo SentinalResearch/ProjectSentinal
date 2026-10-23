@@ -115,12 +115,12 @@ describe("SessionDetailPage", () => {
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "pytest" });
 
-    await user.dblClick(screen.getByRole("button", { name: "Continue in new Session" }));
+    await user.dblClick(screen.getByRole("button", { name: "Resume terminal" }));
 
-    expect(await screen.findByText("Generation 2 of 2", { selector: "strong" })).toBeInTheDocument();
+    expect(await screen.findByText("Part 2 of 2", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "pytest" })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("pytest tests/")).not.toBeInTheDocument());
-    expect(screen.getByText(/Session pytest ended — continued as Session session-/)).toBeInTheDocument();
+    expect(screen.getByText(/^FAILED — resumed at /)).toBeInTheDocument();
     const terminals = screen.getAllByTestId("terminal-host");
     expect(terminals).toHaveLength(2);
     expect(terminals[0]).toHaveAttribute("aria-readonly", "true");
@@ -166,7 +166,7 @@ describe("SessionDetailPage", () => {
     // The prompt is shown, but Sentinal cannot answer it.
     expect(screen.getAllByText("Overwrite checkpoint? [y/N]").length).toBeGreaterThan(0);
     expect(screen.getByText(/Answer where the process runs/)).toBeInTheDocument();
-    for (const name of ["y", "n", "Ctrl‑C…", "Run again", "Show output", "Continue in new Session"]) {
+    for (const name of ["y", "n", "Ctrl‑C…", "Run again", "Show output", "Resume terminal"]) {
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }
     expect(screen.queryByTestId("terminal-host")).not.toBeInTheDocument();
@@ -201,7 +201,7 @@ describe("SessionDetailPage", () => {
     expect(screen.queryByText("COMPLETED")).not.toBeInTheDocument();
     expect(screen.queryByText(/Session ended — output saved/)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Continue in new Session" }),
+      screen.queryByRole("button", { name: "Resume terminal" }),
     ).not.toBeInTheDocument();
   });
 

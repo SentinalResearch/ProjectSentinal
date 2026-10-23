@@ -864,6 +864,26 @@ describe("apiAdapter multi-Machine routing", () => {
     }));
   });
 
+  it("starts a new Session on the chosen worker through the control", async () => {
+    const { adapter, server, sockets } = setup();
+    server.registryMachines = [workerRegistry()];
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getMachines();
+    const control = sockets.find((socket) => socket.machineId === "test-machine")!;
+    const worker = sockets.find((socket) => socket.machineId === "worker-machine")!;
+    const controlCreates = () => control.requests.filter((request) => request.type === "CREATE_SESSION").length;
+    const before = controlCreates();
+
+    const created = await adapter.createSession({ machineId: "worker-machine", cols: 120, rows: 40 });
+
+    expect(created).toMatchObject({ id: "worker-machine:1", machine: "worker-machine" });
+    expect(controlCreates()).toBe(before);
+    expect(worker.requests).toContainEqual(expect.objectContaining({
+      type: "CREATE_SESSION", origin: "UI", cols: 120, rows: 40,
+    }));
+    await expect(adapter.createSession({ machineId: "no-such-machine" })).rejects.toThrow(/no-such-machine/);
+  });
+
   it("keeps each daemon's own hardware description across registry refreshes", async () => {
     const { adapter, server } = setup();
     server.registryMachines = [

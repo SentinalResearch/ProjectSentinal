@@ -20,7 +20,7 @@ export function MoreRedirect() {
 
 /** E1 · Settings (formerly More), opened from the Menu: Machines, Projects, settings, theme, sign out. */
 export function PhoneSettingsHome() {
-  const { machines, sessions } = useLiveData();
+  const { machines, terminals: sessions } = useLiveData();
   const { preference, setPreference } = useTheme();
   const { logout } = useAuth();
   const online = machines.filter((machine) => machine.status === "ONLINE").length;

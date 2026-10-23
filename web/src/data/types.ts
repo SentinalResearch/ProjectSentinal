@@ -95,6 +95,8 @@ export interface Session {
   log?: SessionLog;
   /** Direct predecessor in a persisted linear Session history. */
   continuedFrom?: string;
+  /** Sessions in this terminal's continuation chain, set by `latestGenerations`. */
+  generations?: number;
   /** Unix milliseconds when this generation was created. */
   createdAt?: number;
   /** Unix milliseconds when this generation last changed lifecycle state. */
