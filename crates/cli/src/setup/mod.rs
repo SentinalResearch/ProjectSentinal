@@ -6,6 +6,7 @@
 pub mod config;
 mod control;
 mod local;
+pub(crate) use local::local_socket;
 mod password;
 mod switch;
 mod system;

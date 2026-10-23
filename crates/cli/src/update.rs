@@ -105,7 +105,8 @@ pub enum UpdateError {
     ScriptFailed(std::process::ExitStatus),
 }
 
-/// Reuse the installed Tailnet origin to check, update, or roll back.
+/// Check, update, or roll back from the control this Machine is connected to
+/// (or, when it is not connected, the control it was installed from).
 pub fn run(
     check: bool,
     rollback: Option<String>,
@@ -124,8 +125,9 @@ pub fn run(
         }
     }
     let state_path = prefix.join("share/sentinal/release.json");
-    let origin = read_origin(&state_path)?;
+    let origin = update_origin(connected_control(), read_origin(&state_path))?;
     validate_origin(&origin)?;
+    let _ = writeln!(out, "Updating from {origin}");
 
     let temporary = TemporaryDirectory::create()?;
     let script = temporary.path.join("install.sh");
@@ -201,6 +203,35 @@ pub fn record_result(path: &Path, error: Option<&UpdateError>) {
         .and_then(|()| fs::rename(&temporary, path));
     if let Err(error) = written {
         eprintln!("sentinal update: could not record the result: {error}");
+    }
+}
+
+/// A worker moved to another control keeps the installing control's URL in
+/// release.json, so prefer the control the daemon is linked to now. The
+/// installer then records that one, so later updates agree.
+fn update_origin(
+    connected: Option<String>,
+    installed: Result<String, UpdateError>,
+) -> Result<String, UpdateError> {
+    match connected.filter(|url| validate_origin(url).is_ok()) {
+        Some(url) => Ok(url),
+        None => installed,
+    }
+}
+
+/// The control the local daemon is linked to, if any (also while unreachable).
+fn connected_control() -> Option<String> {
+    use protocol::link::LocalLinkState;
+    match crate::setup::local_socket(protocol::LocalRequest::ConnectionStatus).ok()? {
+        protocol::LocalResponse::Connection { connection }
+            if matches!(
+                connection.state,
+                LocalLinkState::Active | LocalLinkState::ControlUnreachable
+            ) =>
+        {
+            connection.control_url
+        }
+        _ => None,
     }
 }
 
@@ -323,4 +354,41 @@ fn set_owner_only(path: &Path) -> Result<(), std::io::Error> {
 #[cfg(not(unix))]
 fn set_owner_only(_path: &Path) -> Result<(), std::io::Error> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::update_origin;
+
+    #[test]
+    fn updates_come_from_the_connected_control_before_the_installing_one() {
+        let installed = || Ok("https://old-pilot.example.ts.net".to_string());
+        assert_eq!(
+            update_origin(
+                Some("https://control-one.example.ts.net".into()),
+                installed()
+            )
+            .unwrap(),
+            "https://control-one.example.ts.net"
+        );
+        assert_eq!(
+            update_origin(None, installed()).unwrap(),
+            "https://old-pilot.example.ts.net",
+            "not connected: the control it was installed from"
+        );
+        assert_eq!(
+            update_origin(Some("http://not-tailnet.example.com".into()), installed()).unwrap(),
+            "https://old-pilot.example.ts.net",
+            "an unusable connected URL is ignored"
+        );
+        assert_eq!(
+            update_origin(
+                Some("https://control-one.example.ts.net".into()),
+                Err(super::UpdateError::MissingPrefix)
+            )
+            .unwrap(),
+            "https://control-one.example.ts.net",
+            "release.json without control_url"
+        );
+    }
 }

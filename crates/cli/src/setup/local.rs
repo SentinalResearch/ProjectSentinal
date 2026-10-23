@@ -6,7 +6,7 @@ use super::config::API_BIND;
 use std::time::Duration;
 
 /// One request on the daemon's private local socket (same-user only).
-pub(super) fn local_socket(
+pub(crate) fn local_socket(
     request: protocol::LocalRequest,
 ) -> Result<protocol::LocalResponse, String> {
     use std::io::{Read, Write};

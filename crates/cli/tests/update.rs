@@ -38,6 +38,13 @@ impl Drop for TestDir {
     }
 }
 
+/// `sentinal` that never reaches a real daemon on this machine.
+fn sentinal() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sentinal"));
+    command.env("SENTINAL_SOCKET", "/nonexistent/sentinal-test.sock");
+    command
+}
+
 #[test]
 #[cfg(unix)]
 fn update_reuses_control_install_script_for_check_install_and_rollback() {
@@ -83,7 +90,7 @@ cp "$SENTINAL_SERVED_SCRIPT" "$output"
         vec!["update"],
         vec!["update", "--rollback", "0.0.1"],
     ] {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_sentinal"));
+        let mut command = sentinal();
         command
             .args(args)
             .args(["--prefix", prefix.to_str().unwrap()]);
@@ -122,7 +129,7 @@ fn update_rejects_unsafe_origin_and_oversized_script() {
         r#"{"schema_version":1,"version":"0.0.1","control_url":"http://public.example.com"}"#,
     )
     .unwrap();
-    let unsafe_output = Command::new(env!("CARGO_BIN_EXE_sentinal"))
+    let unsafe_output = sentinal()
         .args(["update", "--prefix", prefix.to_str().unwrap()])
         .output()
         .unwrap();
@@ -140,7 +147,7 @@ fn update_rejects_unsafe_origin_and_oversized_script() {
         &fake_bin.join("curl"),
         "#!/bin/sh\noutput=''\nwhile [ \"$#\" -gt 0 ]; do if [ \"$1\" = --output ]; then output=\"$2\"; shift 2; else shift; fi; done\ndd if=/dev/zero of=\"$output\" bs=65537 count=1 2>/dev/null\n",
     );
-    let output = Command::new(env!("CARGO_BIN_EXE_sentinal"))
+    let output = sentinal()
         .args(["update", "--prefix", prefix.to_str().unwrap()])
         .env(
             "PATH",
@@ -167,7 +174,7 @@ fn update_names_the_real_version_and_explains_a_missing_origin() {
         r#"{"schema_version":1,"version":"0.1.15","target":"x86_64-unknown-linux-musl"}"#,
     )
     .unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_sentinal"))
+    let output = sentinal()
         .args(["update", "--check", "--prefix", prefix.to_str().unwrap()])
         .output()
         .unwrap();
@@ -182,10 +189,7 @@ fn update_names_the_real_version_and_explains_a_missing_origin() {
     assert!(stderr.contains("sentinal release update"), "{stderr}");
     assert!(stderr.contains("install.sh"), "{stderr}");
 
-    let version = Command::new(env!("CARGO_BIN_EXE_sentinal"))
-        .arg("--version")
-        .output()
-        .unwrap();
+    let version = sentinal().arg("--version").output().unwrap();
     assert_eq!(
         String::from_utf8_lossy(&version.stdout).trim(),
         "sentinal 0.0.1 (development build)"
