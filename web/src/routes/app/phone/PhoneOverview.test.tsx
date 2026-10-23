@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { dataAdapter } from "../../../data";
 import { resetSimulation } from "../../../data/mock/simulation";
+import { store } from "../../../data/mock/store";
 import { resetViewport, setViewport } from "../../../test-viewport";
 import { OverviewPage } from "../OverviewPage";
 import { renderAt } from "./harness";
@@ -30,6 +31,18 @@ describe("B2 · phone Overview", () => {
     const count = Number(/(\d+)/.exec(within(needs).getByRole("heading").textContent ?? "")?.[1]);
     expect(count).toBeGreaterThan(0);
     expect(within(needs).getAllByRole("article")).toHaveLength(count);
+  });
+
+  it("shows a delayed Machine as online with its last update", async () => {
+    Object.assign(store.machines.find((machine) => machine.id === "mini")!, {
+      freshness: "STALE",
+      syncedAt: Date.now() - 14_400,
+    });
+    renderAt("/app/overview", routes);
+    const group = await screen.findByRole("region", { name: "Mac Mini" }, { timeout: 5000 });
+    expect(within(group).getByText("online · updated 14 s ago")).toBeInTheDocument();
+    const chip = within(screen.getByRole("group", { name: "Machines" })).getByRole("button", { name: /Mac Mini/ });
+    expect(chip.querySelector("[data-delayed='true']")).not.toBeNull();
   });
 
   it("asks which online Machine a new Session starts on", async () => {

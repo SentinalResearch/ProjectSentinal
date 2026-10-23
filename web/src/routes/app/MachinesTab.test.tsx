@@ -22,12 +22,12 @@ vi.mock("../../data", async () => {
   return { isMockData: false, dataAdapter: { registry }, RegistryError };
 });
 
+const live = vi.hoisted(() => ({
+  machines: [] as { id: string; name: string; os: string; hardware: string; status: string; freshness?: string; syncedAt?: number }[],
+}));
+
 vi.mock("../../data/LiveDataContext", () => ({
-  useLiveData: () => ({
-    machines: [{ id: "local", name: "Development Mac", os: "macOS", hardware: "Apple Silicon", status: "ONLINE" }],
-    sessions: [],
-    loading: false,
-  }),
+  useLiveData: () => ({ machines: live.machines, sessions: [], loading: false }),
 }));
 
 function machine(overrides: Partial<RegistryMachine>): RegistryMachine {
@@ -61,6 +61,7 @@ function status(state: PairingCodeStatus["state"], machine_id: string | null = n
 }
 
 beforeEach(() => {
+  live.machines = [{ id: "local", name: "Development Mac", os: "macOS", hardware: "Apple Silicon", status: "ONLINE" }];
   for (const mock of Object.values(registry)) mock.mockReset();
   registry.list.mockResolvedValue([control, workerA, workerB]);
   registry.createCode.mockResolvedValue({
@@ -90,6 +91,18 @@ describe("MachinesTab (control registry)", () => {
     expect(within(rows[1]).getByText("01J9Z3")).toBeInTheDocument();
     expect(within(rows[2]).getByText("01J9Z6")).toBeInTheDocument();
     expect(within(rows[1]).getByText(/Online/)).toBeInTheDocument();
+  });
+
+  it("says a worker whose updates are late is online and delayed", async () => {
+    live.machines = [{
+      id: workerA.machine_id, name: "RTX PC", os: "Linux", hardware: "", status: "ONLINE",
+      freshness: "STALE", syncedAt: Date.now() - 14_400,
+    }];
+    render(<MachinesTab pollMs={10} />);
+
+    const rows = await screen.findAllByRole("row");
+    expect(within(rows[1]).getByText("Online · updated 14 s ago")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("Online")).toBeInTheDocument();
   });
 
   it("explains when the daemon is not a control Machine", async () => {

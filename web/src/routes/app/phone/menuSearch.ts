@@ -1,4 +1,5 @@
 import { slugifyProject } from "../../../data/format";
+import { machineStatusText } from "../../../data/machine-status";
 import type { HistoryEntry, Machine, Recipe, Session } from "../../../data/types";
 
 /** The five top-level phone pages, in menu order (MOBILE_SPEC.md → Navigation). */
@@ -70,7 +71,7 @@ export function searchEverything(
       results: data.machines.filter((machine) => matches(query, machine.name)).map((machine) => ({
         key: machine.id,
         title: machine.name,
-        detail: machine.status === "ONLINE" ? "online" : machine.status.toLowerCase(),
+        detail: machineStatusText(machine, Date.now()),
         to: `/app/overview?machine=${encodeURIComponent(machine.id)}`,
       })),
     },

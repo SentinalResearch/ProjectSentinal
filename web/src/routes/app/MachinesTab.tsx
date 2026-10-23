@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { dataAdapter } from "../../data";
 import { RegistryError } from "../../data/adapter";
 import { useLiveData } from "../../data/LiveDataContext";
+import { isDelayed, machineStatusLabel } from "../../data/machine-status";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import { AddMachineDialog } from "./AddMachineDialog";
 import { ControlReleaseCard } from "./ControlReleaseCard";
@@ -130,6 +131,9 @@ function RegistryRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const online = machine.status === "ONLINE";
+  // The registry knows the heartbeat; the live projection knows whether its Sessions are current.
+  const projected = useLiveData().machines.find((entry) => entry.id === machine.machine_id);
+  const delayed = online && projected !== undefined && isDelayed(projected);
   const canRevoke = machine.role === "WORKER" && machine.status !== "REVOKED";
 
   async function act(action: () => Promise<unknown>) {
@@ -198,11 +202,11 @@ function RegistryRow({
         <span
           className={styles.statusDot}
           style={{
-            background: online ? "var(--s-running)" : "transparent",
+            background: online ? (delayed ? "var(--s-waiting)" : "var(--s-running)") : "transparent",
             boxShadow: online ? "none" : "inset 0 0 0 1.5px var(--s-disconnected-fg)",
           }}
         />
-        {statusLabel(machine)}
+        {delayed && projected ? machineStatusLabel(projected, Date.now()) : statusLabel(machine)}
       </span>
       <span className={`${styles.machineToken} mono`}>
         {machine.endpoint ? `${machine.endpoint.address}:${machine.endpoint.port}` : "—"}

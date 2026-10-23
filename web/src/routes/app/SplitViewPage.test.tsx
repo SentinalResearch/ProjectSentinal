@@ -75,7 +75,7 @@ describe("SplitViewPage", () => {
     renderSplit("/app/split?focus=compression");
 
     await screen.findByText("4 of 4 terminals");
-    expect(screen.getAllByText(/RTX-PC · ONLINE/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Mac Mini · ONLINE/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/RTX-PC · online/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Mac Mini · online/).length).toBeGreaterThan(0);
   });
 });

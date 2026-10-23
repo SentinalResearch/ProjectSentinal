@@ -60,7 +60,8 @@ describe("control projection view", () => {
     const view = projectionView(snapshot(10, 100), 1_000);
     expect(view?.machines.size).toBe(10);
     expect([...view!.machines.values()].flatMap((machine) => machine.sessions)).toHaveLength(1_000);
-    expect(view?.machines.get("machine-1")?.machine.status).toBe("OFFLINE");
+    // A delayed projection is not an offline Machine: the heartbeat still says ONLINE.
+    expect(view?.machines.get("machine-1")?.machine.status).toBe("ONLINE");
     expect(view?.machines.get("machine-1")?.machine.freshness).toBe("STALE");
   });
 

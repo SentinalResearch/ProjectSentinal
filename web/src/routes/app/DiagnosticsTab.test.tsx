@@ -6,6 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
 import { resetSimulation } from "../../data/mock/simulation";
+import { store } from "../../data/mock/store";
 import { AppShell } from "./AppShell";
 import { SettingsPage } from "./SettingsPage";
 import { settingsTabs } from "./settings-tabs";
@@ -35,6 +36,16 @@ describe("Diagnostics", () => {
   it("is a Settings tab in both data modes", () => {
     expect(settingsTabs(false).map((tab) => tab.key)).toContain("diagnostics");
     expect(settingsTabs(true).map((tab) => tab.key)).toContain("diagnostics");
+  });
+
+  it("shows a delayed Machine as online with its last update", async () => {
+    Object.assign(store.machines.find((machine) => machine.id === "mini")!, {
+      freshness: "STALE",
+      syncedAt: Date.now() - 14_400,
+    });
+    renderDiagnostics();
+    const row = await screen.findByRole("row", { name: /Mac Mini/ }, { timeout: 5000 });
+    expect(within(row).getByText("Online · updated 14 s ago")).toBeInTheDocument();
   });
 
   it("measures each Machine from this browser and from the control, with the Tailscale path", async () => {

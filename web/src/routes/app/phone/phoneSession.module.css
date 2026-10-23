@@ -59,6 +59,10 @@
   box-shadow: none;
 }
 
+.dot[data-delayed="true"] {
+  background: var(--s-waiting);
+}
+
 .sectionHead {
   display: flex;
   align-items: baseline;

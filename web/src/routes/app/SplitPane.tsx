@@ -5,6 +5,7 @@ import { StateTag } from "../../components/StateTag";
 import { CaptureBadge } from "../../components/CaptureBadge";
 import { captureCapabilities, captureOf, exitUnknown } from "../../data/capture";
 import { formatSessionFact } from "../../data/format";
+import { machineStatusText } from "../../data/machine-status";
 import type { Machine, Session } from "../../data/types";
 import { TerminalPane } from "../../terminal/TerminalPane";
 import { ReducedCapturePanel } from "./ReducedCapturePanel";
@@ -44,7 +45,7 @@ export function SplitPane({ session, machine, active, gridRow, onFocus, onClose 
         <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />
         <span className={styles.name}>{session.name}</span>
         <span className={styles.fact}>
-          {machine?.name ?? session.machine} · {machine?.status ?? "OFFLINE"} · {formatSessionFact(session)}
+          {machine?.name ?? session.machine} · {machine ? machineStatusText(machine, Date.now()) : "offline"} · {formatSessionFact(session)}
         </span>
         <button type="button" className={styles.detailsBtn} title="Open session" onClick={openDetails}>
           Details

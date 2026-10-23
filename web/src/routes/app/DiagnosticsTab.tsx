@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { dataAdapter } from "../../data";
 import { useLiveData } from "../../data/LiveDataContext";
+import { machineStatusLabel } from "../../data/machine-status";
 import type { ControlPingResult, Machine, PingResult } from "../../data/types";
 import settings from "./SettingsPage.module.css";
 import styles from "./DiagnosticsTab.module.css";
@@ -143,7 +144,7 @@ export function DiagnosticsTab() {
                     {isControl && <span className={styles.role}>Control</span>}
                   </th>
                   <td>
-                    {machine.status === "ONLINE" ? "Online" : machine.status.toLowerCase().replace("_", " ")}
+                    {machineStatusLabel(machine, Date.now())}
                     {machine.lastSeen ? <span className={styles.muted}> · seen {machine.lastSeen} ago</span> : null}
                   </td>
                   <td>

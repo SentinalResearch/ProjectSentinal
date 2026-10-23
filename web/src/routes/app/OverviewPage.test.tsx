@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
+import { resetSimulation } from "../../data/mock/simulation";
 import { store } from "../../data/mock/store";
 import { AppShell } from "./AppShell";
 import { OverviewPage } from "./OverviewPage";
@@ -42,6 +43,19 @@ describe("OverviewPage", () => {
     expect(screen.getAllByText("Waiting for input")).toHaveLength(2);
     // Machine name appears once in the sidebar and once as a group heading.
     expect((await screen.findAllByText("MacBook")).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("shows a delayed Machine as online with its last update", async () => {
+    const mini = store.machines.find((machine) => machine.id === "mini")!;
+    Object.assign(mini, { freshness: "STALE", syncedAt: Date.now() - 14_400 });
+    try {
+      renderOverview();
+      expect(await screen.findByText("Online · updated 14 s ago")).toBeInTheDocument();
+      // Sidebar row: an amber dot and the same words on hover.
+      expect(screen.getByTitle("Mac Mini · online · updated 14 s ago")).toBeInTheDocument();
+    } finally {
+      resetSimulation();
+    }
   });
 
   it("resolves a waiting prompt via y/n and removes it from Needs you", async () => {

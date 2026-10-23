@@ -634,6 +634,19 @@ describe("apiAdapter authentication", () => {
     expect(sockets).toHaveLength(1);
   });
 
+  it("keeps live actions routed to a delayed projected Machine", async () => {
+    const { adapter, server } = setup();
+    const snapshot = controlProjection();
+    snapshot.machines[1].freshness = "STALE";
+    server.projectionSnapshot = snapshot;
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getSessions();
+
+    const worker = (await adapter.getMachines()).find((machine) => machine.id === "worker-machine");
+    expect(worker).toMatchObject({ status: "ONLINE", freshness: "STALE" });
+    expect(() => adapter.resolveTerminal("worker-machine:1")).not.toThrow();
+  });
+
   it("maps the watcher's training summary onto the Session", () => {
     const mapped = mapSession({
       ...session,

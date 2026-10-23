@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { needsAttention } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
+import { isDelayed, machineStatusText } from "../../../data/machine-status";
 import { useNewSession } from "../NewSession";
 import { NeedsYouCard } from "./NeedsYouCard";
 import { PhoneSessionRow } from "./PhoneSessionRow";
@@ -51,7 +52,12 @@ export function PhoneOverview() {
             aria-pressed={!needsOnly && filter === machine.id}
             onClick={() => setParams({ machine: machine.id })}
           >
-            <span className={styles.dot} data-online={machine.status === "ONLINE"} aria-hidden="true" />
+            <span
+              className={styles.dot}
+              data-online={machine.status === "ONLINE"}
+              data-delayed={isDelayed(machine)}
+              aria-hidden="true"
+            />
             {machine.name}
           </button>
         ))}
@@ -78,7 +84,7 @@ export function PhoneOverview() {
           <section key={machine.id} aria-label={machine.name}>
             <h2 className={styles.sectionHead}>
               <span className={styles.machineName}>{machine.name}</span>
-              <span className={styles.machineState}>{machine.status === "ONLINE" ? "online" : machine.status.toLowerCase()}</span>
+              <span className={styles.machineState}>{machineStatusText(machine, Date.now())}</span>
             </h2>
             {rows.map((session) => (
               <PhoneSessionRow key={session.id} session={session} />

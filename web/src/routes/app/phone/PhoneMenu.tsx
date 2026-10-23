@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { SentinalMark } from "../../../components/SentinalMark";
 import { dataAdapter } from "../../../data";
 import { useLiveData } from "../../../data/LiveDataContext";
+import { isDelayed } from "../../../data/machine-status";
 import type { HistoryEntry, Recipe } from "../../../data/types";
 import { isReadOnlyTerminalState } from "../../../terminal/lifecycle";
 import { currentPage, PAGES, projectsOf, searchEverything } from "./menuSearch";
@@ -161,7 +162,12 @@ export function PhoneMenu({ needsYou, onClose }: { needsYou: number; onClose: (r
                     className={styles.chip}
                     onClick={leave}
                   >
-                    <span className={styles.dot} data-online={machine.status === "ONLINE"} aria-hidden="true" />
+                    <span
+                      className={styles.dot}
+                      data-online={machine.status === "ONLINE"}
+                      data-delayed={isDelayed(machine)}
+                      aria-hidden="true"
+                    />
                     {machine.name}
                   </Link>
                 ))}

@@ -28,7 +28,7 @@ function duration(milliseconds: number): string {
 function machineStatus(machine: ControlProjectedMachine): MachineStatus {
   switch (machine.freshness) {
     case "LIVE": return "ONLINE";
-    case "STALE": return "OFFLINE";
+    case "STALE": return "ONLINE";
     case "AUTH_EXPIRED": return "AUTH_EXPIRED";
     case "DISCONNECTED": return "DISCONNECTED";
     case "REVOKED": return "REVOKED";

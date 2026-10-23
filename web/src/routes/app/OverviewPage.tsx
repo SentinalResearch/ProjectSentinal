@@ -8,6 +8,7 @@ import { captureCapabilities, captureOf, exitUnknown } from "../../data/capture"
 import { dataAdapter } from "../../data";
 import { formatSessionDuration, formatSessionFact, needsAttention } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
+import { isDelayed, machineStatusLabel } from "../../data/machine-status";
 import type { Machine, Session } from "../../data/types";
 import { useIsPhone } from "../../hooks/useViewport";
 import { MachinePanel } from "./MachinePanel";
@@ -21,7 +22,7 @@ function needsFact(session: Session): string {
 
 function connectionLabel(machine: Machine): string {
   switch (machine.status) {
-    case "ONLINE": return `Online · ${machine.os}`;
+    case "ONLINE": return isDelayed(machine) ? machineStatusLabel(machine, Date.now()) : `Online · ${machine.os}`;
     case "AUTH_EXPIRED": return `Authentication expired · last seen ${machine.lastSeen ?? "never"}`;
     case "DISCONNECTED": return `Disconnected · last seen ${machine.lastSeen ?? "never"}`;
     case "REVOKED": return `Revoked · last seen ${machine.lastSeen ?? "never"}`;
@@ -172,7 +173,7 @@ function DesktopOverview() {
                 <span
                   className={styles.machineDot}
                   style={{
-                    background: online ? "var(--s-running)" : "transparent",
+                    background: online ? (isDelayed(machine) ? "var(--s-waiting)" : "var(--s-running)") : "transparent",
                     boxShadow: online ? "none" : "inset 0 0 0 1.5px var(--s-disconnected-fg)",
                   }}
                 />

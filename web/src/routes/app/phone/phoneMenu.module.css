@@ -167,6 +167,10 @@
   box-shadow: none;
 }
 
+.dot[data-delayed="true"] {
+  background: var(--s-waiting);
+}
+
 .results {
   margin: 0;
   padding: 0;

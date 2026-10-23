@@ -3,6 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { useTheme, type ThemePreference } from "../../../context/ThemeContext";
 import { useLiveData } from "../../../data/LiveDataContext";
+import { machineStatusText } from "../../../data/machine-status";
 import { projectsOf } from "./menuSearch";
 import { PageTitle } from "./PageTitle";
 import styles from "./phone.module.css";
@@ -35,7 +36,7 @@ export function PhoneSettingsHome() {
         {machines.map((machine) => (
           <Link key={machine.id} className={styles.linkRow} to={`/app/overview?machine=${encodeURIComponent(machine.id)}`}>
             <span className={styles.rowTitle}>{machine.name}</span>
-            <span className={styles.rowMeta}>{machine.status === "ONLINE" ? "online" : machine.status.toLowerCase()}</span>
+            <span className={styles.rowMeta}>{machineStatusText(machine, Date.now())}</span>
             <span className={styles.chevron} aria-hidden="true">›</span>
           </Link>
         ))}

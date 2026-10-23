@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { needsAttention, slugifyProject } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
+import { isDelayed, machineStatusText } from "../../data/machine-status";
 import { isMockData } from "../../data";
 import { useNewSession } from "./NewSession";
 import styles from "./Sidebar.module.css";
@@ -143,12 +144,13 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                   type="button"
                   className={styles.machineRow}
                   style={{ ...a, color: dimmed ? "var(--text-3)" : a.color }}
+                  title={`${m.name} · ${machineStatusText(m, Date.now())}`}
                   onClick={() => navigate(`/app/overview?machine=${m.id}`)}
                 >
                   <span
                     className={styles.machineDot}
                     style={{
-                      background: m.status === "ONLINE" ? "var(--s-running)" : "transparent",
+                      background: m.status !== "ONLINE" ? "transparent" : isDelayed(m) ? "var(--s-waiting)" : "var(--s-running)",
                       boxShadow: m.status === "ONLINE" ? "none" : "inset 0 0 0 1.5px var(--s-disconnected-fg)",
                     }}
                   />
