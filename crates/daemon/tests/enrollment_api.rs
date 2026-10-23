@@ -252,6 +252,26 @@ async fn control_projection_snapshot_is_one_bounded_owner_resource() {
         response.headers.get("x-content-type-options").unwrap(),
         "nosniff"
     );
+    let timing = response
+        .headers
+        .get("server-timing")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        timing.starts_with("auth;dur=") && timing.contains(", snapshot;dur="),
+        "{timing}"
+    );
+    let registry = d
+        .send("GET", "/api/v1/machines", Some(&session), &[], None)
+        .await;
+    let timing = registry
+        .headers
+        .get("server-timing")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(timing.contains("registry;dur="), "{timing}");
     let snapshot: protocol::ControlProjectionSnapshot =
         serde_json::from_value(response.body).unwrap();
     assert_eq!(snapshot.machines.len(), 1);

@@ -38,6 +38,7 @@ import {
 } from "./machine-connections";
 import { createRegistryApi } from "./registry";
 import { applyProjectionMessage, projectionView, type ProjectionView } from "./projection-view";
+import { markLoad } from "../load-timing";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
 
@@ -581,6 +582,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       }
       const next = projectionView(await response.json() as ControlProjectionSnapshot, now());
       if (next === null) return false;
+      markLoad("snapshot");
       installProjection(next);
       startProjectionStream();
       await refreshProjectedLegacy();
@@ -593,6 +595,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     if (projection === null || projectionSocket !== null) return;
     const socket = socketFactory(projectionUrl(projection.revision));
     projectionSocket = socket;
+    socket.onopen = () => markLoad("live");
     socket.onmessage = (event: MessageEvent<string | ArrayBuffer | Blob>) => {
       if (typeof event.data !== "string" || projection === null) return;
       let message: ControlProjectionMessage;

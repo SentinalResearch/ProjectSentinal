@@ -1,10 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
+import { markLoad, resetLoadTiming } from "../../data/load-timing";
 import { resetSimulation } from "../../data/mock/simulation";
 import { store } from "../../data/mock/store";
 import { AppShell } from "./AppShell";
@@ -36,6 +37,20 @@ describe("Diagnostics", () => {
   it("is a Settings tab in both data modes", () => {
     expect(settingsTabs(false).map((tab) => tab.key)).toContain("diagnostics");
     expect(settingsTabs(true).map((tab) => tab.key)).toContain("diagnostics");
+  });
+
+  it("shows when each step of the last page load happened", async () => {
+    resetLoadTiming();
+    const now = vi.spyOn(performance, "now");
+    now.mockReturnValue(120);
+    markLoad("snapshot");
+    now.mockReturnValue(340);
+    markLoad("live");
+    now.mockRestore();
+    renderDiagnostics();
+    expect(await screen.findByText(/^Last page load:/, {}, { timeout: 5000 })).toHaveTextContent(
+      /snapshot 120 ms · live updates 340 ms/,
+    );
   });
 
   it("shows a delayed Machine as online with its last update", async () => {

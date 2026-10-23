@@ -5,7 +5,7 @@
 //! one-time code (exchange) or a worker credential (heartbeat, refresh,
 //! disconnect). Secrets travel only in bodies and Authorization headers.
 
-use super::{proxy, ControlFailure, ControlService};
+use super::{proxy, timing::ServerTiming, ControlFailure, ControlService};
 use crate::{
     api::auth_routes::{bearer_from_headers, credential_from_headers},
     auth::{AuthManager, CredentialKind},
@@ -233,8 +233,12 @@ async fn cancel_code(
 }
 
 async fn registry(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Response {
-    match routes.owner(&headers) {
-        Ok(control) => reply(control.registry()),
+    let mut timing = ServerTiming::default();
+    match timing.measure("auth", || routes.owner(&headers)) {
+        Ok(control) => {
+            let response = timing.measure("registry", || reply(control.registry()));
+            timing.apply(response)
+        }
         Err(failure) => failure_response(failure),
     }
 }
@@ -316,8 +320,12 @@ async fn projection_batch(
 }
 
 async fn projection_snapshot(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Response {
-    match routes.owner(&headers) {
-        Ok(control) => no_store(reply(control.projection_snapshot())),
+    let mut timing = ServerTiming::default();
+    match timing.measure("auth", || routes.owner(&headers)) {
+        Ok(control) => {
+            let response = timing.measure("snapshot", || reply(control.projection_snapshot()));
+            no_store(timing.apply(response))
+        }
         Err(failure) => failure_response(failure),
     }
 }

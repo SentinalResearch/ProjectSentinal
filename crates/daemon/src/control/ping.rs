@@ -1,7 +1,10 @@
 //! Settings → Diagnostics: the control times its connection to one worker
 //! and reports whether Tailscale reaches it directly or through a relay.
 
-use super::proxy::{failure_response, owner_target, prove_identity, ProxyState};
+use super::{
+    proxy::{failure_response, owner_target, prove_identity, ProxyState},
+    timing::ServerTiming,
+};
 use crate::{api::auth_routes::credential_from_headers, tailnet_dns};
 use axum::{
     extract::{Path, State},
@@ -21,11 +24,15 @@ pub(super) async fn machine_ping(
     Path(machine_id): Path<String>,
     headers: HeaderMap,
 ) -> Response {
+    let mut timing = ServerTiming::default();
     let supplied = credential_from_headers(&headers, state.development);
-    let (target, _) = match owner_target(&state, supplied.as_deref(), machine_id) {
+    let (target, _) = match timing.measure("auth", || {
+        owner_target(&state, supplied.as_deref(), machine_id)
+    }) {
         Ok(value) => value,
         Err(error) => return failure_response(error),
     };
+    let samples_started = Instant::now();
     let mut round_trips_us = Vec::new();
     let mut failed = 0;
     let mut error = None;
@@ -40,24 +47,29 @@ pub(super) async fn machine_ping(
             }
         }
     }
+    timing.record("worker", samples_started.elapsed());
+    let status_started = Instant::now();
     let status = tokio::task::spawn_blocking(tailnet_dns::real_status)
         .await
         .ok()
         .flatten();
+    timing.record("tailscale", status_started.elapsed());
     let (path, relay) = status
         .as_ref()
         .map_or((TailnetPath::Unknown, None), |status| {
             peer_path(status, &target.endpoint)
         });
-    Json(MachinePing {
-        machine_id: target.machine_id,
-        round_trips_us,
-        failed,
-        error,
-        path,
-        relay,
-    })
-    .into_response()
+    timing.apply(
+        Json(MachinePing {
+            machine_id: target.machine_id,
+            round_trips_us,
+            failed,
+            error,
+            path,
+            relay,
+        })
+        .into_response(),
+    )
 }
 
 /// How `tailscale status --json` says this Machine reaches `endpoint`:

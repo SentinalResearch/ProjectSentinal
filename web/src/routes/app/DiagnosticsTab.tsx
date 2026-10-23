@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { dataAdapter } from "../../data";
+import { loadTimeline, type LoadTiming } from "../../data/load-timing";
 import { useLiveData } from "../../data/LiveDataContext";
 import { machineStatusLabel } from "../../data/machine-status";
 import type { ControlPingResult, Machine, PingResult } from "../../data/types";
@@ -62,6 +63,12 @@ function note(machine: Machine, isControl: boolean, measurement?: Measurement): 
   return isControl ? "Round trip from this browser to the control." : "";
 }
 
+function timelineText(steps: LoadTiming[]): string {
+  return steps
+    .map((step) => `${step.label} ${Math.round(step.ms)} ms${step.serverMs === undefined ? "" : ` (control ${step.serverMs} ms)`}`)
+    .join(" · ");
+}
+
 /** Settings → Diagnostics: how long each hop takes, measured on demand. */
 export function DiagnosticsTab() {
   const { machines } = useLiveData();
@@ -69,6 +76,8 @@ export function DiagnosticsTab() {
   const [results, setResults] = useState<Record<string, Measurement>>({});
   const [running, setRunning] = useState(false);
   const [ranAt, setRanAt] = useState<Date | null>(null);
+  // Re-read on every render: steps keep arriving while live data loads.
+  const timeline = loadTimeline();
 
   useEffect(() => {
     let cancelled = false;
@@ -165,6 +174,11 @@ export function DiagnosticsTab() {
           : "Nothing is measured until you run the test."}{" "}
         The browser → worker figure goes through the control, so it is what a terminal on that worker feels like from here.
       </p>
+      {timeline.length > 0 && (
+        <p className={styles.footer}>
+          Last page load: {timelineText(timeline)}. Times count from when this page started loading.
+        </p>
+      )}
     </>
   );
 }

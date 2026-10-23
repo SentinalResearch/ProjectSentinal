@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 import { dataAdapter } from "./index";
 import { latestGenerations } from "./lineage";
+import { markLoad } from "./load-timing";
 import type { LiveEvent } from "./adapter";
 import type { Machine, Session } from "./types";
 
@@ -37,6 +38,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
       setMachines(m);
       setSessions(s);
       setLoading(false);
+      markLoad("shown");
     });
 
     const unsubscribe = dataAdapter.subscribe((event: LiveEvent) => {

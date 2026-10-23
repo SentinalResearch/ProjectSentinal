@@ -55,4 +55,9 @@ test("Diagnostics measures the browser and the control to every connected Machin
   await expect(rows.filter({ hasText: /\d+\.\d ms/ })).toHaveCount(3);
   await expect(page.getByText("Unreachable")).toHaveCount(0);
   expect(pings).toEqual(["200", "200"]);
+
+  // The page load timeline includes the control's own snapshot time (Server-Timing).
+  await expect(page.getByText(/^Last page load:/)).toHaveText(
+    /snapshot \d+ ms \(control \d+(\.\d)? ms\).* · live updates \d+ ms/,
+  );
 });

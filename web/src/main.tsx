@@ -6,7 +6,10 @@ import { AppRouter } from "./AppRouter";
 import { PwaUpdatePrompt } from "./components/PwaUpdatePrompt";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { markLoad } from "./data/load-timing";
 import "./styles/global.css";
+
+markLoad("script");
 
 const queryClient = new QueryClient();
 const root = document.getElementById("root");

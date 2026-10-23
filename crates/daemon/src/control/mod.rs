@@ -19,6 +19,7 @@ mod release_routes;
 pub mod release_watch;
 pub mod routes;
 mod secrets;
+mod timing;
 mod worker_update;
 
 pub use approval_verify::{verification_words, PairingVerifier, TailnetVerifier, VerifyFuture};
