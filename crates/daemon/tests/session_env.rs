@@ -114,6 +114,40 @@ async fn dashboard_sessions_start_from_the_login_environment() {
 }
 
 #[tokio::test]
+async fn sessions_without_a_locale_get_a_utf8_one() {
+    let (manager, fake) = fake_manager("locale");
+    let without = vec![pair("PATH", "/usr/bin:/bin")];
+    let session = manager
+        .create(request(SessionOrigin::AutoWrap, "/bin/sh", Some(without)))
+        .await
+        .unwrap();
+    // End the Session before asserting: a failed assertion must not leave
+    // the fake PTY's reader running.
+    fake.exit(session.id, 0).unwrap();
+    let lang = fake
+        .spawn_request(session.id)
+        .unwrap()
+        .env
+        .into_iter()
+        .find(|(name, _)| name == "LANG")
+        .map(|(_, value)| value)
+        .expect("a locale for a Session that has none");
+    assert!(lang.to_ascii_lowercase().contains("utf"), "{lang}");
+
+    let with = vec![pair("PATH", "/usr/bin:/bin"), pair("LANG", "de_DE.UTF-8")];
+    let session = manager
+        .create(request(SessionOrigin::AutoWrap, "/bin/sh", Some(with)))
+        .await
+        .unwrap();
+    fake.exit(session.id, 0).unwrap();
+    let spawned = fake.spawn_request(session.id).unwrap();
+    assert!(
+        !spawned.env.iter().any(|(name, _)| name == "LANG"),
+        "the user's own locale is kept"
+    );
+}
+
+#[tokio::test]
 #[ignore = "uses a real PTY and shell"]
 async fn a_real_shell_sees_only_the_terminal_environment() {
     let dir = data_dir("real");

@@ -22,6 +22,7 @@ pub mod link;
 pub mod link_audit;
 pub mod link_crypto;
 pub mod local_socket;
+pub mod locale;
 pub mod log_discovery;
 pub mod log_tail;
 pub mod login_env;

@@ -170,6 +170,16 @@ impl SessionManager {
         shell_launch
             .env
             .push(("COLORTERM".into(), "truecolor".into()));
+        let lang = crate::locale::session_lang(|name| match &base_env {
+            Some(env) => env
+                .iter()
+                .find(|(key, _)| key == name)
+                .map(|(_, value)| value.clone()),
+            None => std::env::var(name).ok(),
+        });
+        if let Some(lang) = lang {
+            shell_launch.env.push(("LANG".into(), lang));
+        }
         shell_launch
             .env
             .push(("SENTINAL_SESSION_ID".into(), id.0.to_string()));
