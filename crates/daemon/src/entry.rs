@@ -712,6 +712,7 @@ fn spawn_metric_sampler(
     tokio::spawn(async move {
         let mut sampler = MetricsSampler::new();
         let mut debouncers = HashMap::<protocol::SessionId, ResourceDebouncer>::new();
+        let mut last_health_prune = i64::MIN;
         let mut interval = tokio::time::interval(Duration::from_secs(2));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
@@ -807,6 +808,13 @@ fn spawn_metric_sampler(
             }
             if let Err(error) = store.downsample_metrics(at) {
                 tracing::warn!(%error, "failed to downsample raw metrics");
+            }
+            // Health retention (4.H) needs minute resolution, not every tick.
+            if at.0.saturating_sub(last_health_prune) >= 60_000 {
+                last_health_prune = at.0;
+                if let Err(error) = store.prune_health(at) {
+                    tracing::warn!(%error, "failed to prune health data");
+                }
             }
         }
     });

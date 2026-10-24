@@ -1,0 +1,60 @@
+{
+  "sample_batch": {
+    "samples": [
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "TYPING_ECHO_MS", "at": 1792771200000, "value": 12.5 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "TERMINAL_OPEN_MS", "at": 1792771200100, "value": 140.0 },
+      { "machine_id": "01J9Y0CTRL0000000000000000", "metric": "PAGE_LOAD_STEP_MS", "label": "LOAD_SCRIPT", "at": 1792771200000, "value": 20.0 },
+      { "machine_id": "01J9Y0CTRL0000000000000000", "metric": "PAGE_LOAD_STEP_MS", "label": "LOAD_SNAPSHOT", "at": 1792771200000, "value": 120.0 },
+      { "machine_id": "01J9Y0CTRL0000000000000000", "metric": "PAGE_LOAD_STEP_MS", "label": "LOAD_LIVE", "at": 1792771200000, "value": 340.0 },
+      { "machine_id": "01J9Y0CTRL0000000000000000", "metric": "PAGE_LOAD_STEP_MS", "label": "LOAD_SHOWN", "at": 1792771200000, "value": 360.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "LINK_RTT_MS", "at": 1792771200000, "value": 118.2 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "UPLOAD_DELAY_MS", "at": 1792771200000, "value": 950.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "UPLOAD_FAILURES", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "DAEMON_RSS_BYTES", "at": 1792771200000, "value": 19922944.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "DAEMON_CPU_PERCENT", "at": 1792771200000, "value": 0.4 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "LIVE_SESSIONS", "at": 1792771200000, "value": 3.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "LOG_DISK_BYTES", "at": 1792771200000, "value": 52428800.0 },
+      { "machine_id": "01J9Y0CTRL0000000000000000", "metric": "ROUTE_MS", "label": "ROUTE_SNAPSHOT", "at": 1792771200000, "value": 3.1 },
+      { "machine_id": "01J9Y0CTRL0000000000000000", "metric": "ROUTE_MS", "label": "ROUTE_REGISTRY", "at": 1792771200000, "value": 0.8 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ROUTE_MS", "label": "ROUTE_PING", "at": 1792771200000, "value": 600.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ROUTE_MS", "label": "ROUTE_TERMINAL_SETUP", "at": 1792771200000, "value": 410.0 },
+      { "machine_id": "01J9Y0CTRL0000000000000000", "metric": "WS_RECONNECTS", "label": "SOCKET_DASHBOARD", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "WS_RECONNECTS", "label": "SOCKET_TERMINAL", "at": 1792771200000, "value": 2.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "WS_RECONNECTS", "label": "SOCKET_MACHINE", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "VIEWER_RESYNCS", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_ATTACH", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_INPUT", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_CREATE", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_TIMEOUT", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_UNREACHABLE", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Y0CTRL0000000000000000", "metric": "ERRORS", "label": "ERROR_AUTH_EXPIRED", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_UPLOAD", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_HEARTBEAT", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_LOG_WRITE", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_STORE", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_PTY", "at": 1792771200000, "value": 1.0 },
+      { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "metric": "ERRORS", "label": "ERROR_OTHER", "at": 1792771200000, "value": 1.0 }
+    ]
+  },
+  "daemon_reports": [
+    {
+      "at": 1792771200000, "rss_bytes": 19922944, "cpu_percent": 0.4, "live_sessions": 3,
+      "log_disk_bytes": 52428800, "uptime_ms": 86400000, "restarts": 4,
+      "upload_delay_ms": 950, "upload_failures": 1,
+      "errors": [{ "code": "ERROR_UPLOAD", "count": 1 }]
+    },
+    {
+      "at": 1792771200000, "rss_bytes": 18874368, "cpu_percent": 0.0, "live_sessions": 0,
+      "log_disk_bytes": 0, "uptime_ms": 1000, "restarts": 1, "upload_failures": 0
+    }
+  ],
+  "incidents": [
+    { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "kind": "OFFLINE", "started_at": 1792771200000, "ended_at": 1792771320000 },
+    { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "kind": "DELAYED", "started_at": 1792771200000, "ended_at": null },
+    { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "kind": "RELAYED", "started_at": 1792771200000, "ended_at": 1792772400000, "detail": "fra" },
+    { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "kind": "RESTARTED", "started_at": 1792771200000, "ended_at": 1792771200000, "detail": "0.3.0" },
+    { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "kind": "UPDATE_FAILED", "started_at": 1792771200000, "ended_at": 1792771200000, "detail": "0.3.1" },
+    { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "kind": "ERROR_BURST", "started_at": 1792771200000, "ended_at": 1792771260000, "detail": "ERROR_UPLOAD" }
+  ],
+  "stat": { "count": 120, "sum": 1500.0, "min": 9.0, "p50": 12.0, "p95": 20.0, "max": 41.0 }
+}

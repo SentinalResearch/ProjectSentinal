@@ -1,6 +1,7 @@
 //! SQLite persistence for Machines, Sessions, Commands, Events, and Metrics.
 
 mod error;
+pub mod health;
 mod lineage;
 mod log_cursors;
 mod metrics;
@@ -49,6 +50,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
         include_str!("../migrations/009_projection_snapshot_required.sql"),
     ),
     (10, include_str!("../migrations/010_pairing_requests.sql")),
+    (11, include_str!("../migrations/011_health.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.
