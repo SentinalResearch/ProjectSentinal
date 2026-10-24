@@ -1299,6 +1299,8 @@ fn freshness_opens_and_closes_offline_and_delayed_incidents() {
     h.control.observe_freshness();
     assert!(open_incidents(&h).is_empty(), "just synced: live");
 
+    // The worker reports changes the control does not have yet.
+    sync_heartbeat(&h, &a, 2, 2);
     h.advance(11_000);
     h.control.observe_freshness();
     assert_eq!(
@@ -1314,7 +1316,7 @@ fn freshness_opens_and_closes_offline_and_delayed_incidents() {
         "offline replaces delayed"
     );
 
-    h.heartbeat(&a, WORKER_A, 2).unwrap();
+    h.heartbeat(&a, WORKER_A, 3).unwrap();
     h.control.observe_freshness();
     assert_eq!(
         open_incidents(&h),
@@ -1511,4 +1513,42 @@ fn health_data_never_holds_terminal_content_paths_ips_or_hostnames() {
         assert!(!anonymous.contains(name), "{name} in an anonymous report");
     }
     assert!(all.contains("\"fra\""), "the sweep saw the stored data");
+}
+
+fn sync_heartbeat(h: &Harness, credential: &Secret, sequence: u64, current_cursor: u64) {
+    let mut request = health_heartbeat(WORKER_A, sequence, h.now().0, 1);
+    request.health = None;
+    request.projection_sync = Some(protocol::ProjectionSyncReport {
+        schema_version: PROJECTION_SCHEMA_VERSION,
+        source_epoch: "pe_test".into(),
+        current_cursor,
+        last_acked_cursor: 1,
+        snapshot_required: false,
+    });
+    h.control.heartbeat(credential.expose(), request).unwrap();
+}
+
+#[test]
+fn a_quiet_worker_with_nothing_pending_stays_live_between_heartbeats() {
+    let h = harness();
+    let a = h.pair(WORKER_A, "A");
+    h.control
+        .accept_projection(a.expose(), projection_batch(WORKER_A))
+        .unwrap();
+    let status = |h: &Harness| h.control.worker_freshness()[0].2;
+
+    // Nothing pending (the worker's cursor is the control's): still live after 25 s.
+    h.advance(25_000);
+    sync_heartbeat(&h, &a, 1, 1);
+    h.advance(25_000);
+    assert_eq!(status(&h), protocol::ProjectionFreshness::Live);
+    h.control.observe_freshness();
+    assert!(
+        open_incidents(&h).is_empty(),
+        "no delayed incident for a quiet worker"
+    );
+
+    // A missed heartbeat window means the copy may be behind.
+    h.advance(21_000);
+    assert_eq!(status(&h), protocol::ProjectionFreshness::Stale);
 }

@@ -59,7 +59,9 @@ impl ControlService {
                     .credential
                     .as_ref()
                     .is_some_and(|credential| credential.expires_at.0 <= now.0);
-                let freshness = projection_freshness(machine.status, expired, state.as_ref(), now);
+                let pending = self.projection_pending(&machine.machine_id);
+                let freshness =
+                    projection_freshness(machine.status, expired, state.as_ref(), pending, now);
                 (
                     machine.machine_id,
                     machine.status,

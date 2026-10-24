@@ -71,6 +71,9 @@ const REFRESH_WITHIN_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
 const REFRESH_GRACE_MS: i64 = 60_000;
 const NOTIFICATION_MAX_AGE_MS: i64 = 7 * 24 * 60 * 60 * 1_000;
 const PROJECTION_LIVE_MS: i64 = 10_000;
+/// A worker whose last heartbeat reported nothing pending stays live this long
+/// after its last sync: one heartbeat interval plus grace.
+const QUIET_PROJECTION_LIVE_MS: i64 = 45_000;
 const MAX_PROJECTED_MACHINES: usize = 100;
 const MAX_PROJECTED_SESSIONS: u32 = 1_000;
 const MAX_PROJECTED_EVENTS: u32 = 1_000;
@@ -161,6 +164,8 @@ pub struct ControlService {
     >,
     worker_http: reqwest::Client,
     health_starts: Arc<health::StartCounts>,
+    /// Whether each worker's last heartbeat reported changes not yet uploaded.
+    projection_pending: Arc<Mutex<std::collections::HashMap<MachineId, bool>>>,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -215,6 +220,7 @@ impl ControlService {
             verifier: Arc::new(TailnetVerifier::default()),
             worker_updates: Arc::default(),
             health_starts: Arc::default(),
+            projection_pending: Arc::default(),
             worker_http: worker_update::worker_client(),
         };
         // A refresh interrupted by a crash never reached the worker: undo it.
@@ -683,8 +689,13 @@ impl ControlService {
                 .credential
                 .as_ref()
                 .is_some_and(|credential| credential.expires_at.0 <= now.0);
-            let freshness =
-                projection_freshness(machine.status, credential_expired, state.as_ref(), now);
+            let freshness = projection_freshness(
+                machine.status,
+                credential_expired,
+                state.as_ref(),
+                self.projection_pending(&machine.machine_id),
+                now,
+            );
             machines.push(ControlProjectedMachine {
                 machine_id: machine.machine_id.clone(),
                 projection_available: state.is_some(),
@@ -769,6 +780,16 @@ impl ControlService {
         } else {
             ProjectionSyncAction::Wait
         };
+        // Nothing pending: the control's copy is complete as of this heartbeat.
+        let pending = action != ProjectionSyncAction::Wait;
+        if let Ok(mut map) = self.projection_pending.lock() {
+            map.insert(machine_id.clone(), pending);
+        }
+        if !pending && stored.is_some() {
+            self.store
+                .touch_control_projection_synced(machine_id, (self.clock)())
+                .map_err(ControlFailure::internal)?;
+        }
         Ok(ProjectionSyncDirective {
             enabled: true,
             schema_version: PROJECTION_SCHEMA_VERSION,
@@ -1248,10 +1269,22 @@ impl ControlService {
     }
 }
 
+impl ControlService {
+    /// Whether `machine_id` last reported changes it has not uploaded.
+    pub(crate) fn projection_pending(&self, machine_id: &MachineId) -> bool {
+        self.projection_pending
+            .lock()
+            .ok()
+            .and_then(|map| map.get(machine_id).copied())
+            .unwrap_or(false)
+    }
+}
+
 fn projection_freshness(
     registry: RegistryStatus,
     credential_expired: bool,
     state: Option<&store::ControlProjectionState>,
+    pending: bool,
     now: Timestamp,
 ) -> ProjectionFreshness {
     if credential_expired {
@@ -1262,10 +1295,20 @@ fn projection_freshness(
         RegistryStatus::Disconnected => ProjectionFreshness::Disconnected,
         RegistryStatus::Offline => ProjectionFreshness::Offline,
         RegistryStatus::Online => match state {
-            Some(state) if now.0.saturating_sub(state.synced_at.0) <= PROJECTION_LIVE_MS => {
-                ProjectionFreshness::Live
+            Some(state) => {
+                let age = now.0.saturating_sub(state.synced_at.0);
+                let window = if pending {
+                    PROJECTION_LIVE_MS
+                } else {
+                    QUIET_PROJECTION_LIVE_MS
+                };
+                if age <= window {
+                    ProjectionFreshness::Live
+                } else {
+                    ProjectionFreshness::Stale
+                }
             }
-            _ => ProjectionFreshness::Stale,
+            None => ProjectionFreshness::Stale,
         },
     }
 }

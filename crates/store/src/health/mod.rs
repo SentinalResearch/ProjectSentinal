@@ -410,6 +410,20 @@ impl Store {
         Ok(at.map(Timestamp))
     }
 
+    /// Record that a worker's projection is complete as of `at` (its
+    /// heartbeat reported nothing pending).
+    pub fn touch_control_projection_synced(
+        &self,
+        machine_id: &MachineId,
+        at: Timestamp,
+    ) -> Result<(), StoreError> {
+        self.lock()?.execute(
+            "UPDATE control_projection_state SET synced_at = MAX(synced_at, ?2) WHERE machine_id = ?1",
+            params![machine_id.0, at.0],
+        )?;
+        Ok(())
+    }
+
     /// Approximate bytes used by health data (rows × typical row size).
     pub fn health_storage_bytes(&self) -> Result<u64, StoreError> {
         let connection = self.lock()?;
