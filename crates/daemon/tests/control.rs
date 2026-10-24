@@ -1390,3 +1390,125 @@ fn the_doctor_report_is_an_owner_only_anonymous_file() {
     assert!(text.contains("Machine 2"));
     assert!(!text.contains("Secret Name A") && !text.contains(WORKER_A));
 }
+
+/// Section T (4.H): plant secrets everywhere Sessions carry them, run every
+/// health collector, and require that no stored row, view, or report holds
+/// any of them, an IP, a path, or this Machine's hostname.
+#[test]
+fn health_data_never_holds_terminal_content_paths_ips_or_hostnames() {
+    use protocol::{
+        health_report::{HealthRange, ReportNames},
+        link::TailnetPath,
+        observability::{HealthLabel, HealthMetric, HealthSample, HealthSampleBatch},
+    };
+    let h = harness();
+    let a = h.pair(WORKER_A, "Worker A");
+    let now = h.now().0;
+    h.heartbeat(&a, WORKER_A, 1).unwrap();
+
+    // A Session whose title, cwd, and shell carry secrets.
+    let mut session = Session::new(
+        SessionId(9),
+        MachineId(WORKER_A.into()),
+        "/bin/zsh-SECRET-SHELL",
+        "/home/me/SECRET-CWD",
+        Timestamp(START),
+    );
+    session.title = Some("SECRET-TITLE AWS_SECRET_ACCESS_KEY=abc".into());
+    session.capture = CaptureLevel::Full;
+    let batch = ProjectionBatch::Delta {
+        schema_version: PROJECTION_SCHEMA_VERSION,
+        machine_id: MachineId(WORKER_A.into()),
+        source_epoch: "pe_test".into(),
+        base_cursor: 0,
+        through_cursor: 1,
+        sent_at: Timestamp(START),
+        changes: vec![ProjectionChange::SessionUpsert {
+            cursor: 1,
+            session: ProjectedSession::from_session(&session),
+        }],
+    };
+    h.control.accept_projection(a.expose(), batch).unwrap();
+
+    // Every collector.
+    h.control
+        .heartbeat(a.expose(), health_heartbeat(WORKER_A, 2, now, 1))
+        .unwrap();
+    h.control
+        .heartbeat(a.expose(), health_heartbeat(WORKER_A, 3, now + 1, 2))
+        .unwrap();
+    let browser = |metric, label, value| HealthSample {
+        machine_id: MachineId(WORKER_A.into()),
+        metric,
+        label,
+        at: Timestamp(now),
+        value,
+    };
+    h.control
+        .accept_browser_samples(&HealthSampleBatch {
+            samples: vec![
+                browser(HealthMetric::TypingEchoMs, None, 12.0),
+                browser(HealthMetric::TerminalOpenMs, None, 140.0),
+                browser(HealthMetric::Errors, Some(HealthLabel::ErrorInput), 1.0),
+            ],
+        })
+        .unwrap();
+    let id = MachineId(WORKER_A.into());
+    h.control.record_route(
+        &id,
+        HealthLabel::RouteTerminalSetup,
+        std::time::Duration::from_millis(400),
+    );
+    h.control
+        .record_tailnet_path(&id, TailnetPath::Relayed, Some("/home/me/SECRET-CWD"));
+    h.control
+        .record_tailnet_path(&id, TailnetPath::Direct, None);
+    h.control
+        .record_tailnet_path(&id, TailnetPath::Relayed, Some("fra"));
+    h.advance(11_000);
+    h.control.observe_freshness();
+
+    // Everything health exposes.
+    let mut exposed = vec![
+        format!(
+            "{:?}",
+            h.store
+                .health_stats(Timestamp(0), Timestamp(i64::MAX))
+                .unwrap()
+        ),
+        serde_json::to_string(&h.store.health_incidents(Timestamp(0)).unwrap()).unwrap(),
+        serde_json::to_string(&h.control.health_summary(HealthRange::Month).unwrap()).unwrap(),
+        serde_json::to_string(&h.control.health_incident_list(HealthRange::Month).unwrap())
+            .unwrap(),
+    ];
+    let anonymous = serde_json::to_string(
+        &h.control
+            .health_report(HealthRange::Month, ReportNames::Anonymous)
+            .unwrap(),
+    )
+    .unwrap();
+    exposed.push(anonymous.clone());
+    let all = exposed.join("\n");
+
+    for forbidden in [
+        "SECRET",
+        "AWS_",
+        "/home",
+        "/bin",
+        "/private",
+        "100.74.239.89",
+        "7420",
+    ] {
+        assert!(
+            !all.contains(forbidden),
+            "{forbidden} leaked into health data"
+        );
+    }
+    if let Some(host) = sysinfo::System::host_name().filter(|host| host.len() > 3) {
+        assert!(!all.contains(&host), "the hostname leaked into health data");
+    }
+    for name in ["Worker A", WORKER_A, CONTROL] {
+        assert!(!anonymous.contains(name), "{name} in an anonymous report");
+    }
+    assert!(all.contains("\"fra\""), "the sweep saw the stored data");
+}
