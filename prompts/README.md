@@ -41,6 +41,7 @@ model) to build the whole system, one milestone at a time.
 | 7 | `08-milestone-7-finetune-agent.md` | Fine-tuned small model, heartbeat, journal (**V2**) |
 | R1 | `09-reliability-r1-daemon-restart-sessions.md` | Optional keeper architecture for PTYs across daemon restart |
 | 4.G | `10-milestone-4g-terminal-reliability-performance.md` | Real-terminal fidelity, keepers (includes R1), honest status, measured performance |
+| 4.H | `11-milestone-4h-observability.md` | Pre-V1: continuous health measurements on the control, health page, shareable anonymised report |
 
 Milestones 1b.0, 4.0, 4.D, and 4.D.1, plus Reliability R1, begin with a
 mandatory human review. Paste the approval back into the same agent session;
