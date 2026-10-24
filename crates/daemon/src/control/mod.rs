@@ -10,6 +10,7 @@ mod approval_routes;
 mod approval_verify;
 mod discovery;
 mod handoff;
+pub mod health;
 mod ping;
 mod proxy;
 mod refresh;
@@ -156,6 +157,7 @@ pub struct ControlService {
         Mutex<std::collections::HashMap<MachineId, protocol::worker_update::WorkerUpdateStatus>>,
     >,
     worker_http: reqwest::Client,
+    health_starts: Arc<health::StartCounts>,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -209,6 +211,7 @@ impl ControlService {
             discovery_limit: Arc::new(discovery::DiscoveryLimit::default()),
             verifier: Arc::new(TailnetVerifier::default()),
             worker_updates: Arc::default(),
+            health_starts: Arc::default(),
             worker_http: worker_update::worker_client(),
         };
         // A refresh interrupted by a crash never reached the worker: undo it.
@@ -486,6 +489,9 @@ impl ControlService {
             .map(|report| self.projection_directive(&request.machine_id, report))
             .transpose()?;
         self.record_worker_update(&request.machine_id, request.update_status.clone());
+        if let Some(health) = &request.health {
+            self.record_daemon_health(&request.machine_id, &request.daemon_version, health);
+        }
         Ok(LinkHeartbeatResponse {
             available_release: self.available_release(),
             status: LinkStatus::Active,

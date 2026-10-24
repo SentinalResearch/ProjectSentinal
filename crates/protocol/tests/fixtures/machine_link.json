@@ -92,6 +92,19 @@
     "daemon_version": "0.0.1",
     "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"]
   },
+  "heartbeat_request_with_health": {
+    "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+    "sequence": 43,
+    "sent_at": 1790900620000,
+    "endpoint": { "address": "100.74.239.89", "port": 7420, "dns_name": null },
+    "daemon_version": "0.3.0",
+    "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
+    "health": {
+      "at": 1790900600000, "rss_bytes": 19922944, "cpu_percent": 0.5, "live_sessions": 2,
+      "log_disk_bytes": 1048576, "uptime_ms": 3600000, "restarts": 3, "upload_delay_ms": 900,
+      "upload_failures": 0, "errors": [{ "code": "ERROR_HEARTBEAT", "count": 1 }]
+    }
+  },
   "heartbeat_response": {
     "status": "ACTIVE",
     "display_name": "RTX PC",

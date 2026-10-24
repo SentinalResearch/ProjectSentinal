@@ -358,6 +358,13 @@ mod machine_link {
             &section("heartbeat_request"),
             "heartbeat_request",
         );
+        let with_health = section("heartbeat_request_with_health");
+        assert_round_trip::<LinkHeartbeatRequest>(&with_health, "heartbeat_request_with_health");
+        let parsed: LinkHeartbeatRequest = serde_json::from_value(with_health).unwrap();
+        assert_eq!(parsed.health.unwrap().live_sessions, 2);
+        let older: LinkHeartbeatRequest =
+            serde_json::from_value(section("heartbeat_request")).unwrap();
+        assert!(older.health.is_none(), "an older worker sends no health");
         assert_round_trip::<LinkHeartbeatResponse>(
             &section("heartbeat_response"),
             "heartbeat_response",

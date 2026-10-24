@@ -289,7 +289,7 @@ pub struct LinkExchangeResponse {
 }
 
 /// Worker → control liveness and endpoint report.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
 pub struct LinkHeartbeatRequest {
@@ -311,6 +311,9 @@ pub struct LinkHeartbeatRequest {
     /// The latest dashboard-started update, until superseded (4.E §11).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub update_status: Option<crate::worker_update::WorkerUpdateStatus>,
+    /// How this daemon is doing (4.H); absent from older workers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<crate::observability::DaemonHealthReport>,
 }
 
 /// State of an accepted link.

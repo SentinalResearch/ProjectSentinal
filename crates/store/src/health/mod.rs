@@ -393,6 +393,23 @@ impl Store {
         Ok(raw + minutes + incidents)
     }
 
+    /// When the oldest projection change after `cursor` was queued, for the
+    /// upload-delay measurement.
+    pub fn oldest_projection_change_at(
+        &self,
+        machine_id: &MachineId,
+        source_epoch: &str,
+        cursor: u64,
+    ) -> Result<Option<Timestamp>, StoreError> {
+        let at: Option<i64> = self.lock()?.query_row(
+            "SELECT MIN(created_at) FROM projection_outbox
+             WHERE machine_id = ?1 AND source_epoch = ?2 AND cursor > ?3",
+            params![machine_id.0, source_epoch, crate::to_sql_id(cursor)?],
+            |row| row.get(0),
+        )?;
+        Ok(at.map(Timestamp))
+    }
+
     /// Approximate bytes used by health data (rows × typical row size).
     pub fn health_storage_bytes(&self) -> Result<u64, StoreError> {
         let connection = self.lock()?;

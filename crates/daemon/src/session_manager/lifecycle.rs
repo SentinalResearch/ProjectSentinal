@@ -221,6 +221,7 @@ impl SessionManager {
         }) {
             Ok(spawned) => spawned,
             Err(error) => {
+                crate::self_health::COUNTERS.error(protocol::observability::HealthLabel::ErrorPty);
                 drop(log_file);
                 remove_staged_log(&log_path);
                 return Err(error.into());

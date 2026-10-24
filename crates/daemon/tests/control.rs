@@ -156,6 +156,7 @@ impl Harness {
                     capabilities: vec![MachineCapability::Sessions],
                     projection_sync: None,
                     update_status: None,
+                    health: None,
                 },
             )
             .map(|_| ())
@@ -245,6 +246,7 @@ fn heartbeat_negotiates_projection_upload_without_breaking_legacy_workers() {
             snapshot_required: false,
         }),
         update_status: None,
+        health: None,
     };
     let response = h
         .control
@@ -310,6 +312,7 @@ fn disabled_read_model_refuses_projection_without_deleting_existing_data() {
                     snapshot_required: false,
                 }),
                 update_status: None,
+                health: None,
             },
         )
         .unwrap();
@@ -876,6 +879,7 @@ fn heartbeats_reject_replays_wrong_machines_skew_and_unknown_credentials() {
             capabilities: vec![],
             projection_sync: None,
             update_status: None,
+            health: None,
         },
     );
     assert_eq!(
@@ -900,6 +904,7 @@ fn endpoint_changes_are_recorded_and_audited() {
                 capabilities: vec![],
                 projection_sync: None,
                 update_status: None,
+                health: None,
             },
         )
         .unwrap();
@@ -1064,6 +1069,7 @@ fn a_crash_mid_refresh_is_rolled_back_when_the_control_restarts() {
             capabilities: vec![MachineCapability::Sessions],
             projection_sync: None,
             update_status: None,
+            health: None,
         },
     );
     assert!(
@@ -1098,6 +1104,7 @@ fn a_worker_still_on_its_previous_credential_is_told_to_refresh_again() {
                     capabilities: vec![MachineCapability::Sessions],
                     projection_sync: None,
                     update_status: None,
+                    health: None,
                 },
             )
             .unwrap()
@@ -1180,4 +1187,86 @@ fn registry_and_audit_never_contain_secrets() {
             & 0o777,
         0o600
     );
+}
+
+fn health_heartbeat(
+    machine_id: &str,
+    sequence: u64,
+    at: i64,
+    restarts: u32,
+) -> LinkHeartbeatRequest {
+    LinkHeartbeatRequest {
+        machine_id: MachineId(machine_id.into()),
+        sequence,
+        sent_at: protocol::Timestamp(at),
+        endpoint: endpoint("100.74.239.89"),
+        daemon_version: "0.3.0".into(),
+        capabilities: vec![MachineCapability::Sessions],
+        projection_sync: None,
+        update_status: None,
+        health: Some(protocol::observability::DaemonHealthReport {
+            at: protocol::Timestamp(at),
+            rss_bytes: 20_000_000,
+            cpu_percent: 0.5,
+            live_sessions: 2,
+            log_disk_bytes: 4_096,
+            uptime_ms: 60_000,
+            restarts,
+            upload_delay_ms: Some(900),
+            upload_failures: 0,
+            errors: vec![],
+        }),
+    }
+}
+
+#[test]
+fn worker_health_is_stored_under_the_authenticated_machine_and_restarts_are_noted() {
+    use protocol::observability::{HealthMetric, IncidentKind};
+    let h = harness();
+    let a = h.pair(WORKER_A, "A");
+    let b = h.pair(WORKER_B, "B");
+    let now = h.now().0;
+
+    // B's credential cannot report health (or anything) as A.
+    assert!(h
+        .control
+        .heartbeat(b.expose(), health_heartbeat(WORKER_A, 1, now, 1))
+        .is_err());
+    let none = h
+        .store
+        .health_stats(protocol::Timestamp(0), protocol::Timestamp(i64::MAX))
+        .unwrap();
+    assert!(none.is_empty(), "nothing stored for a refused heartbeat");
+
+    h.control
+        .heartbeat(a.expose(), health_heartbeat(WORKER_A, 1, now, 4))
+        .unwrap();
+    h.control
+        .heartbeat(a.expose(), health_heartbeat(WORKER_A, 2, now + 1, 4))
+        .unwrap();
+    let rows = h
+        .store
+        .health_stats(protocol::Timestamp(0), protocol::Timestamp(i64::MAX))
+        .unwrap();
+    assert!(rows.iter().all(|row| row.machine_id.0 == WORKER_A));
+    let rss = rows
+        .iter()
+        .find(|row| row.metric == HealthMetric::DaemonRssBytes)
+        .unwrap();
+    assert_eq!(rss.stat.count, 2);
+    assert!(
+        h.store
+            .health_incidents(protocol::Timestamp(0))
+            .unwrap()
+            .is_empty(),
+        "same start count: no restart"
+    );
+
+    h.control
+        .heartbeat(a.expose(), health_heartbeat(WORKER_A, 3, now + 2, 5))
+        .unwrap();
+    let incidents = h.store.health_incidents(protocol::Timestamp(0)).unwrap();
+    assert_eq!(incidents.len(), 1);
+    assert_eq!(incidents[0].kind, IncidentKind::Restarted);
+    assert_eq!(incidents[0].detail.as_deref(), Some("0.3.0"));
 }

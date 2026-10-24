@@ -88,6 +88,8 @@ pub(super) fn spawn_reader(
                 continue;
             }
             if let Err(error) = save(&mut encoder, &mut budget, bytes) {
+                crate::self_health::COUNTERS
+                    .error(protocol::observability::HealthLabel::ErrorLogWrite);
                 tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append session log");
             }
             // Published under the screen lock: see `ScreenSource::snapshot`.

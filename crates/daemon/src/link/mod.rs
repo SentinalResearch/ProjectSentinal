@@ -183,6 +183,7 @@ pub fn spawn_projection_uploader(
                 _ = shutdown.changed() => break,
                 _ = interval.tick() => {
                     if let Err(error) = upload_projection_once(&link, &store).await {
+                        crate::self_health::COUNTERS.upload_failed();
                         tracing::warn!(message = %error.message, "projection upload failed");
                     }
                 }
@@ -240,6 +241,10 @@ async fn upload_projection_once(link: &LinkManager, store: &Store) -> Result<(),
     let Some(through_cursor) = changes.last().map(protocol::ProjectionChange::cursor) else {
         return Ok(());
     };
+    let oldest = store
+        .oldest_projection_change_at(&machine_id, &epoch, directive.committed_cursor)
+        .ok()
+        .flatten();
     let batch = ProjectionBatch::Delta {
         schema_version: protocol::PROJECTION_SCHEMA_VERSION,
         machine_id: machine_id.clone(),
@@ -253,6 +258,9 @@ async fn upload_projection_once(link: &LinkManager, store: &Store) -> Result<(),
     match acknowledgement.status {
         protocol::ProjectionAcknowledgementStatus::Accepted
         | protocol::ProjectionAcknowledgementStatus::Duplicate => {
+            if let Some(oldest) = oldest {
+                crate::self_health::COUNTERS.upload_delay((link.inner.clock)().0 - oldest.0);
+            }
             store
                 .acknowledge_projection_cursor(
                     &machine_id,
@@ -364,6 +372,8 @@ struct Inner {
     projection_directive: Mutex<Option<ProjectionSyncDirective>>,
     approval: Mutex<Option<approval::PendingApproval>>,
     updater: Mutex<Option<crate::worker_update::WorkerUpdater>>,
+    /// The latest health report not yet delivered by a heartbeat (4.H).
+    health: Mutex<Option<protocol::observability::DaemonHealthReport>>,
 }
 
 /// This daemon's link to an owner-selected control Machine.
@@ -388,6 +398,7 @@ impl LinkManager {
                 projection_directive: Mutex::new(None),
                 approval: Mutex::new(None),
                 updater: Mutex::new(None),
+                health: Mutex::new(None),
             }),
         };
         if matches!(manager.read_link(), Ok(Some(link)) if link.state == StoredState::Active) {
@@ -717,6 +728,14 @@ impl LinkManager {
         Ok(report)
     }
 
+    /// Queue this daemon's latest health report for the next heartbeat; an
+    /// undelivered earlier report's counts are folded in.
+    pub fn set_health_report(&self, report: protocol::observability::DaemonHealthReport) {
+        if let Ok(mut pending) = self.inner.health.lock() {
+            *pending = Some(crate::self_health::merge_unsent(pending.take(), report));
+        }
+    }
+
     /// Send one heartbeat, refreshing credentials when the control asks.
     pub async fn heartbeat_once(&self) -> Result<(), LinkFailure> {
         let _operation = self.inner.operation.lock().await;
@@ -764,6 +783,12 @@ impl LinkManager {
                 .lock()
                 .ok()
                 .and_then(|updater| updater.as_ref().and_then(|updater| updater.status())),
+            health: self
+                .inner
+                .health
+                .lock()
+                .ok()
+                .and_then(|pending| pending.clone()),
         };
         let result: Result<Option<LinkHeartbeatResponse>, CallError> = self
             .inner
@@ -778,6 +803,12 @@ impl LinkManager {
         match result {
             Ok(Some(response)) => {
                 self.inner.failures.store(0, Ordering::SeqCst);
+                // Delivered: a newer report queued meanwhile is kept.
+                if let Ok(mut pending) = self.inner.health.lock() {
+                    if pending.as_ref() == request.health.as_ref() {
+                        *pending = None;
+                    }
+                }
                 link.display_name = Some(response.display_name);
                 link.last_heartbeat_at = Some(now);
                 link.heartbeat_interval_ms = response.next_heartbeat_ms;
@@ -811,6 +842,8 @@ impl LinkManager {
                 };
                 let failures = self.inner.failures.fetch_add(1, Ordering::SeqCst) + 1;
                 tracing::warn!(failures, error = %detail, "control heartbeat failed");
+                crate::self_health::COUNTERS
+                    .error(protocol::observability::HealthLabel::ErrorHeartbeat);
                 Err(LinkFailure::new(LocalErrorCode::ControlUnreachable, detail))
             }
         }

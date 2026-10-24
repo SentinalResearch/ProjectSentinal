@@ -413,6 +413,14 @@ pub async fn run() -> Result<(), DaemonError> {
         server_shutdown_rx.clone(),
     );
     spawn_projection_uploader(link.clone(), store.clone(), server_shutdown_rx.clone());
+    crate::self_health::spawn(
+        config.data_dir.clone(),
+        sessions.clone(),
+        link.clone(),
+        control.clone(),
+        std::sync::Arc::new(now),
+        server_shutdown_rx.clone(),
+    );
     if let Some(gateway) = push.clone() {
         spawn_push_delivery_worker(gateway, server_shutdown_rx.clone());
     }
@@ -807,6 +815,8 @@ fn spawn_metric_sampler(
                 }
             }
             if let Err(error) = store.downsample_metrics(at) {
+                crate::self_health::COUNTERS
+                    .error(protocol::observability::HealthLabel::ErrorStore);
                 tracing::warn!(%error, "failed to downsample raw metrics");
             }
             // Health retention (4.H) needs minute resolution, not every tick.
