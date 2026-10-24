@@ -690,6 +690,18 @@ describe("apiAdapter authentication", () => {
     expect(storage.getItem("sentinal.sessionToken")).toBeNull();
   });
 
+  it("does not reuse a dashboard load that failed before login", async () => {
+    const { adapter, server } = setup();
+    server.projectionSnapshot = controlProjection();
+    const unsubscribe = adapter.subscribe(() => undefined);
+    await adapter.auth.login("correct horse battery staple");
+
+    // The load started by subscribe() was refused (not signed in yet); the
+    // first action after login starts a fresh one instead of failing with it.
+    await expect(adapter.getMachines()).resolves.toHaveLength(2);
+    unsubscribe();
+  });
+
   it("creates sessions, emits updates, and frames remote input", async () => {
     const { adapter, sockets } = setup();
     const updates: string[] = [];

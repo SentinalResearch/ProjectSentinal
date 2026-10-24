@@ -565,7 +565,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
 
   const loadProjection = async (): Promise<boolean> => {
     if (projectionReload !== null) return projectionReload;
-    projectionReload = (async () => {
+    const reload: Promise<boolean> = (async () => {
       let response: Response;
       try {
         response = await fetcher(`${authBaseUrl}/control/snapshot`, {
@@ -587,8 +587,11 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       startProjectionStream();
       await refreshProjectedLegacy();
       return true;
-    })().finally(() => { projectionReload = null; });
-    return projectionReload;
+    })().finally(() => {
+      if (projectionReload === reload) projectionReload = null;
+    });
+    projectionReload = reload;
+    return reload;
   };
 
   const startProjectionStream = (): void => {
@@ -738,7 +741,14 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
 
   const ensureInitialized = async (): Promise<void> => {
     if (controlMachineId !== null) return;
-    initialization ??= initialize().finally(() => { initialization = null; });
+    if (initialization === null) {
+      const run = initialize();
+      initialization = run;
+      // A sign-in replaces `initialization`; an older run must not clear the new one.
+      run.then(() => undefined, () => undefined).finally(() => {
+        if (initialization === run) initialization = null;
+      });
+    }
     await initialization;
   };
 
@@ -878,6 +888,9 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       connections.clear();
       controlMachineId = null;
       firstLegacyRefresh = true;
+      // Loads started before this sign-in or sign-out ran with the old credentials.
+      initialization = null;
+      projectionReload = null;
     },
   });
 
