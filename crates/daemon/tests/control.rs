@@ -1270,3 +1270,104 @@ fn worker_health_is_stored_under_the_authenticated_machine_and_restarts_are_note
     assert_eq!(incidents[0].kind, IncidentKind::Restarted);
     assert_eq!(incidents[0].detail.as_deref(), Some("0.3.0"));
 }
+
+fn open_incidents(h: &Harness) -> Vec<(String, protocol::observability::IncidentKind)> {
+    h.store
+        .health_incidents(protocol::Timestamp(0))
+        .unwrap()
+        .into_iter()
+        .filter(|incident| incident.ended_at.is_none())
+        .map(|incident| (incident.machine_id.0, incident.kind))
+        .collect()
+}
+
+#[test]
+fn freshness_opens_and_closes_offline_and_delayed_incidents() {
+    use protocol::observability::IncidentKind;
+    let h = harness();
+    let a = h.pair(WORKER_A, "A");
+    h.heartbeat(&a, WORKER_A, 1).unwrap();
+    h.control.observe_freshness();
+    assert!(
+        open_incidents(&h).is_empty(),
+        "online without projection is not delayed"
+    );
+
+    h.control
+        .accept_projection(a.expose(), projection_batch(WORKER_A))
+        .unwrap();
+    h.control.observe_freshness();
+    assert!(open_incidents(&h).is_empty(), "just synced: live");
+
+    h.advance(11_000);
+    h.control.observe_freshness();
+    assert_eq!(
+        open_incidents(&h),
+        vec![(WORKER_A.into(), IncidentKind::Delayed)]
+    );
+
+    h.advance(90_000);
+    h.control.observe_freshness();
+    assert_eq!(
+        open_incidents(&h),
+        vec![(WORKER_A.into(), IncidentKind::Offline)],
+        "offline replaces delayed"
+    );
+
+    h.heartbeat(&a, WORKER_A, 2).unwrap();
+    h.control.observe_freshness();
+    assert_eq!(
+        open_incidents(&h),
+        vec![(WORKER_A.into(), IncidentKind::Delayed)],
+        "back, projection still old"
+    );
+    let ended = h.store.health_incidents(protocol::Timestamp(0)).unwrap();
+    assert!(ended
+        .iter()
+        .any(|incident| incident.kind == IncidentKind::Offline && incident.ended_at.is_some()));
+}
+
+#[test]
+fn only_online_unrevoked_workers_are_sampled_and_relays_are_incidents() {
+    use protocol::{link::TailnetPath, observability::IncidentKind};
+    let h = harness();
+    let a = h.pair(WORKER_A, "A");
+    let b = h.pair(WORKER_B, "B");
+    h.heartbeat(&a, WORKER_A, 1).unwrap();
+    h.heartbeat(&b, WORKER_B, 1).unwrap();
+    h.control.revoke(&MachineId(WORKER_B.into())).unwrap();
+    assert_eq!(
+        h.control.round_trip_targets(),
+        vec![MachineId(WORKER_A.into())]
+    );
+    h.advance(91_000);
+    assert!(
+        h.control.round_trip_targets().is_empty(),
+        "offline is not sampled"
+    );
+
+    let id = MachineId(WORKER_A.into());
+    h.control
+        .record_tailnet_path(&id, TailnetPath::Relayed, Some("fra"));
+    h.control
+        .record_tailnet_path(&id, TailnetPath::Unknown, None);
+    assert_eq!(
+        open_incidents(&h),
+        vec![(WORKER_A.into(), IncidentKind::Relayed)]
+    );
+    h.control
+        .record_tailnet_path(&id, TailnetPath::Direct, None);
+    assert!(open_incidents(&h).is_empty());
+}
+
+#[tokio::test]
+async fn the_monitor_stops_on_shutdown() {
+    let h = harness();
+    let (stop, stopped) = tokio::sync::watch::channel(false);
+    let task = daemon::control::health_monitor::spawn(h.control.clone(), stopped);
+    stop.send(true).unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), task)
+        .await
+        .expect("monitor exits after shutdown")
+        .unwrap();
+}

@@ -12,7 +12,10 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use protocol::link::{LinkEndpoint, MachinePing, TailnetPath};
+use protocol::{
+    link::{LinkEndpoint, MachinePing, TailnetPath},
+    observability::HealthLabel,
+};
 use serde_json::Value;
 use std::time::Instant;
 
@@ -59,6 +62,10 @@ pub(super) async fn machine_ping(
         .map_or((TailnetPath::Unknown, None), |status| {
             peer_path(status, &target.endpoint)
         });
+    if let Some(control) = &state.control {
+        control.record_tailnet_path(&target.machine_id, path, relay.as_deref());
+        control.record_route(&target.machine_id, HealthLabel::RoutePing, timing.total());
+    }
     timing.apply(
         Json(MachinePing {
             machine_id: target.machine_id,

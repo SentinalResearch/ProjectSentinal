@@ -101,8 +101,15 @@ pub(super) async fn prove_identity(
     state: &ProxyState,
     target: &RoutingTarget,
 ) -> Result<(), ControlFailure> {
-    let response = state
-        .http
+    verify_identity(&state.http, target).await
+}
+
+/// One authenticated `/link/identity` round trip that must return `target`'s ID.
+pub(super) async fn verify_identity(
+    http: &reqwest::Client,
+    target: &RoutingTarget,
+) -> Result<(), ControlFailure> {
+    let response = http
         .get(worker_url(target, "http", "/api/v1/link/identity"))
         .bearer_auth(target.control_credential.expose())
         .send()
@@ -147,6 +154,8 @@ async fn routed_websocket(
         Ok(value) => value,
         Err(error) => return failure_response(error),
     };
+    // Identity proof + upstream connect: the terminal-open cost Link v2 must beat.
+    let setup_started = std::time::Instant::now();
     if let Err(error) = prove_identity(&state, &target).await {
         return failure_response(error);
     }
@@ -168,6 +177,13 @@ async fn routed_websocket(
             Ok(Err(error)) => return failure_response(unreachable_worker(error)),
             Err(error) => return failure_response(unreachable_worker(error)),
         };
+    if let Some(control) = &state.control {
+        control.record_route(
+            &target.machine_id,
+            protocol::observability::HealthLabel::RouteTerminalSetup,
+            setup_started.elapsed(),
+        );
+    }
     upgrade
         .on_upgrade(move |browser| proxy_socket(browser, upstream, state.auth, owner_token))
         .into_response()

@@ -123,6 +123,16 @@ impl ControlService {
                     "WORKER_UPDATE_FAILED"
                 };
                 self.audit_update((self.clock)(), machine_id, kind, &status.version);
+                if status.state == WorkerUpdateState::Failed {
+                    if let Err(error) = self.store.record_health_moment(
+                        machine_id,
+                        protocol::observability::IncidentKind::UpdateFailed,
+                        (self.clock)(),
+                        Some(&status.version),
+                    ) {
+                        tracing::warn!(%error, "failed to record a failed update");
+                    }
+                }
             }
         }
     }

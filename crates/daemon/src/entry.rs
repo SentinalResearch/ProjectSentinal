@@ -413,6 +413,13 @@ pub async fn run() -> Result<(), DaemonError> {
         server_shutdown_rx.clone(),
     );
     spawn_projection_uploader(link.clone(), store.clone(), server_shutdown_rx.clone());
+    if let Some(control) = control.clone() {
+        // Runs until shutdown; nothing waits for it.
+        drop(crate::control::health_monitor::spawn(
+            control,
+            server_shutdown_rx.clone(),
+        ));
+    }
     crate::self_health::spawn(
         config.data_dir.clone(),
         sessions.clone(),

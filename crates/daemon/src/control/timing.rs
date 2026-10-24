@@ -25,6 +25,11 @@ impl ServerTiming {
         self.phases.push((name, duration));
     }
 
+    /// Sum of all phases.
+    pub(super) fn total(&self) -> Duration {
+        self.phases.iter().map(|(_, duration)| *duration).sum()
+    }
+
     fn header(&self) -> String {
         self.phases
             .iter()

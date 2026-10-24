@@ -21,6 +21,7 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
+use protocol::observability::HealthLabel;
 use protocol::{
     link::{
         LinkDisconnectRequest, LinkExchangeRequest, LinkFailure, LinkFailureCode,
@@ -237,6 +238,11 @@ async fn registry(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Re
     match timing.measure("auth", || routes.owner(&headers)) {
         Ok(control) => {
             let response = timing.measure("registry", || reply(control.registry()));
+            control.record_route(
+                control.machine_id(),
+                HealthLabel::RouteRegistry,
+                timing.total(),
+            );
             timing.apply(response)
         }
         Err(failure) => failure_response(failure),
@@ -324,6 +330,11 @@ async fn projection_snapshot(State(routes): State<ControlRoutes>, headers: Heade
     match timing.measure("auth", || routes.owner(&headers)) {
         Ok(control) => {
             let response = timing.measure("snapshot", || reply(control.projection_snapshot()));
+            control.record_route(
+                control.machine_id(),
+                HealthLabel::RouteSnapshot,
+                timing.total(),
+            );
             no_store(timing.apply(response))
         }
         Err(failure) => failure_response(failure),

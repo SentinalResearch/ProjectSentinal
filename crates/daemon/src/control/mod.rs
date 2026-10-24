@@ -11,6 +11,7 @@ mod approval_verify;
 mod discovery;
 mod handoff;
 pub mod health;
+pub mod health_monitor;
 mod ping;
 mod proxy;
 mod refresh;
