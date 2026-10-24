@@ -94,6 +94,70 @@ impl ControlService {
     }
 }
 
+/// What a browser upload did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct BrowserSamplesAccepted {
+    /// Stored.
+    pub stored: usize,
+    /// Over the per-minute cap.
+    pub dropped: usize,
+    /// For a Machine that is not in the registry (e.g. revoked meanwhile).
+    pub unknown_machine: usize,
+}
+
+impl ControlService {
+    /// Validate and store one browser upload. The whole batch is refused if
+    /// any sample is malformed or not a browser metric; samples for Machines
+    /// the owner does not have are left out and counted.
+    pub fn accept_browser_samples(
+        &self,
+        batch: &protocol::observability::HealthSampleBatch,
+    ) -> Result<BrowserSamplesAccepted, super::ControlFailure> {
+        use protocol::{link::LinkFailureCode, observability::MAX_BROWSER_SAMPLES};
+        let invalid = |message: String| {
+            super::ControlFailure::new(400, LinkFailureCode::InvalidRequest, message)
+        };
+        if batch.samples.len() > MAX_BROWSER_SAMPLES {
+            return Err(invalid(format!(
+                "at most {MAX_BROWSER_SAMPLES} samples per upload"
+            )));
+        }
+        let now = (self.clock)();
+        for sample in &batch.samples {
+            if !sample.metric.browser_reported() {
+                return Err(invalid(format!(
+                    "{:?} is not reported by browsers",
+                    sample.metric
+                )));
+            }
+            sample
+                .validate(now)
+                .map_err(|error| invalid(error.to_string()))?;
+        }
+        let known: std::collections::HashSet<MachineId> = self
+            .store
+            .registry_machines()
+            .map_err(super::ControlFailure::internal)?
+            .into_iter()
+            .map(|row| row.machine_id)
+            .collect();
+        let (owned, foreign): (Vec<_>, Vec<_>) = batch
+            .samples
+            .iter()
+            .cloned()
+            .partition(|sample| known.contains(&sample.machine_id));
+        let insert = self
+            .store
+            .record_health_samples(&owned)
+            .map_err(super::ControlFailure::internal)?;
+        Ok(BrowserSamplesAccepted {
+            stored: insert.stored,
+            dropped: insert.dropped,
+            unknown_machine: foreign.len(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::report_samples;

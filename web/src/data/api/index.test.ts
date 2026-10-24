@@ -10,6 +10,7 @@ import type { Command } from "../../protocol/Command";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import type { ControlProjectionMessage } from "../../protocol/ControlProjectionMessage";
 import type { ControlProjectionSnapshot } from "../../protocol/ControlProjectionSnapshot";
+import { createHealthCollector } from "../health";
 import { createApiAdapter, mapSession, type ApiSocket } from ".";
 
 const machine: WireMachine = {
@@ -1128,5 +1129,26 @@ describe("apiAdapter multi-Machine routing", () => {
     await expect(adapter.getMachines()).resolves.not.toContainEqual(
       expect.objectContaining({ id: "worker-machine" }),
     );
+  });
+});
+
+describe("apiAdapter health samples", () => {
+  it("posts this browser's samples to the control's health endpoint", async () => {
+    const posts: { url: string; body: unknown }[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      posts.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify({ stored: 1, dropped: 0, unknown_machine: 0 }), { status: 200 });
+    });
+    const health = createHealthCollector({ now: () => 1_700_000_000_000 });
+    createApiAdapter({ daemonHttpUrl: "http://daemon.test/api/v1", fetcher, health });
+    health.setControlMachine("ctrl");
+    health.record("TYPING_ECHO_MS", "rtx", 12);
+    health.flush(false);
+    health.stop();
+    await Promise.resolve();
+    expect(posts).toEqual([{
+      url: "http://daemon.test/api/v1/health/samples",
+      body: { samples: [{ machine_id: "rtx", metric: "TYPING_ECHO_MS", at: 1_700_000_000_000, value: 12 }] },
+    }]);
   });
 });

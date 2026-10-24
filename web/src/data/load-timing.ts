@@ -4,7 +4,17 @@
  * milliseconds since the browser started loading the page. Each step is
  * recorded once; later reconnects are not page loads.
  */
+import type { HealthLabel } from "../protocol/HealthLabel";
+import { health } from "./health";
+
 export type LoadStep = "script" | "snapshot" | "live" | "shown";
+
+const HEALTH_LABELS: Record<LoadStep, HealthLabel> = {
+  script: "LOAD_SCRIPT",
+  snapshot: "LOAD_SNAPSHOT",
+  live: "LOAD_LIVE",
+  shown: "LOAD_SHOWN",
+};
 
 const LABELS: Record<LoadStep, string> = {
   script: "app started",
@@ -32,6 +42,8 @@ export function markLoad(step: LoadStep): void {
   if (marks.has(step) || typeof performance === "undefined") return;
   const at = performance.now();
   marks.set(step, at);
+  // The health page's page-load chart (4.H); attributed to the control.
+  health.recordForControl("PAGE_LOAD_STEP_MS", at, HEALTH_LABELS[step]);
   try {
     performance.mark(`sentinal:${step}`, { startTime: at });
   } catch {

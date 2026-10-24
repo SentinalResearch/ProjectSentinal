@@ -454,3 +454,93 @@ async fn link_identity_requires_the_control_credential() {
         .await;
     assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
 }
+
+impl Daemon {
+    async fn send_text(&self, path: &str, bearer: &str, body: String) -> StatusCode {
+        let request = Request::builder()
+            .method("POST")
+            .uri(path)
+            .header("authorization", format!("Bearer {bearer}"))
+            .header("content-type", "text/plain;charset=UTF-8")
+            .body(Body::from(body))
+            .unwrap();
+        self.app.clone().oneshot(request).await.unwrap().status()
+    }
+}
+
+const NOW: i64 = 1_790_900_000_000;
+
+fn echo_sample(machine: &str) -> Value {
+    json!({ "machine_id": machine, "metric": "TYPING_ECHO_MS", "at": NOW, "value": 12.5 })
+}
+
+#[tokio::test]
+async fn browser_health_samples_need_the_owner_and_only_take_browser_metrics() {
+    let d = daemon(true, false, "100.64.0.2:5000");
+    let control = "01J9Y0CTRL0000000000000000";
+    let path = "/api/v1/health/samples";
+    let batch = json!({ "samples": [echo_sample(control)] });
+    assert_eq!(
+        d.send("POST", path, None, &[], Some(batch.clone()))
+            .await
+            .status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        d.send("POST", path, Some(TOKEN), &[], Some(batch.clone()))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
+
+    let session = d.owner_session().await;
+    let stored = d.send("POST", path, Some(&session), &[], Some(batch)).await;
+    assert_eq!(stored.status, StatusCode::OK);
+    assert_eq!(
+        stored.body,
+        json!({ "stored": 1, "dropped": 0, "unknown_machine": 0 })
+    );
+
+    // A daemon-only metric, an unknown metric, and a bad value refuse the whole batch.
+    for sample in [
+        json!({ "machine_id": control, "metric": "DAEMON_RSS_BYTES", "at": NOW, "value": 1.0 }),
+        json!({ "machine_id": control, "metric": "KEYSTROKES", "at": NOW, "value": 1.0 }),
+        json!({ "machine_id": control, "metric": "TYPING_ECHO_MS", "at": NOW, "value": -1.0 }),
+        json!({ "machine_id": control, "metric": "TYPING_ECHO_MS", "at": NOW, "value": 1.0, "text": "ls" }),
+    ] {
+        let refused = d
+            .send(
+                "POST",
+                path,
+                Some(&session),
+                &[],
+                Some(json!({ "samples": [sample.clone()] })),
+            )
+            .await;
+        assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{sample}");
+    }
+
+    // A Machine the owner does not have is left out and counted.
+    let foreign =
+        json!({ "samples": [echo_sample("01JUNKNOWN0000000000000000"), echo_sample(control)] });
+    let mixed = d
+        .send("POST", path, Some(&session), &[], Some(foreign))
+        .await;
+    assert_eq!(
+        mixed.body,
+        json!({ "stored": 1, "dropped": 0, "unknown_machine": 1 })
+    );
+
+    // sendBeacon's text/plain works; more than 64 KiB does not.
+    let beacon = json!({ "samples": [echo_sample(control)] }).to_string();
+    assert_eq!(d.send_text(path, &session, beacon).await, StatusCode::OK);
+    let huge = format!(
+        "{{\"samples\":[{}]}}",
+        vec![echo_sample(control).to_string(); 700].join(",")
+    );
+    assert!(huge.len() > 64 * 1024);
+    assert_eq!(
+        d.send_text(path, &session, huge).await,
+        StatusCode::PAYLOAD_TOO_LARGE
+    );
+}

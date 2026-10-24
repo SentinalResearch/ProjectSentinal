@@ -12,6 +12,7 @@ mod discovery;
 mod handoff;
 pub mod health;
 pub mod health_monitor;
+mod health_routes;
 mod ping;
 mod proxy;
 mod refresh;

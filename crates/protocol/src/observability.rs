@@ -200,10 +200,11 @@ impl HealthLabel {
     }
 }
 
-/// One measurement.
+/// One measurement. Unknown fields are refused, so nothing extra can ride along.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
+#[serde(deny_unknown_fields)]
 pub struct HealthSample {
     /// The Machine measured (for browser samples, the Machine the terminal or request was on).
     pub machine_id: MachineId,
@@ -266,6 +267,7 @@ pub const MAX_BROWSER_SAMPLES: usize = 500;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
+#[serde(deny_unknown_fields)]
 pub struct HealthSampleBatch {
     /// At most [`MAX_BROWSER_SAMPLES`].
     pub samples: Vec<HealthSample>,

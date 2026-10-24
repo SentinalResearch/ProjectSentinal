@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { health } from "./health";
 import { loadTimeline, markLoad, resetLoadTiming } from "./load-timing";
 
 describe("page load timeline", () => {
@@ -21,6 +22,22 @@ describe("page load timeline", () => {
       ["app started", 80],
       ["snapshot", 120],
       ["live updates", 340],
+    ]);
+  });
+
+  it("reports each step once to the health collector, for the control", () => {
+    const send = vi.fn();
+    health.setControlMachine("ctrl");
+    health.start(send);
+    health.flush(false); // drain what earlier tests recorded
+    send.mockClear();
+    vi.spyOn(performance, "now").mockReturnValue(120);
+    markLoad("snapshot");
+    markLoad("snapshot");
+    health.flush(false);
+    health.stop();
+    expect(send.mock.calls[0][0].samples).toEqual([
+      expect.objectContaining({ machine_id: "ctrl", metric: "PAGE_LOAD_STEP_MS", label: "LOAD_SNAPSHOT", value: 120 }),
     ]);
   });
 

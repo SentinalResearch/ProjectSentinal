@@ -38,6 +38,7 @@ import {
 } from "./machine-connections";
 import { createRegistryApi } from "./registry";
 import { applyProjectionMessage, projectionView, type ProjectionView } from "./projection-view";
+import { health, type createHealthCollector } from "../health";
 import { markLoad } from "../load-timing";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
@@ -80,6 +81,8 @@ export interface ApiAdapterOptions {
   socketFactory?: (url: string) => ApiSocket;
   fetcher?: typeof fetch;
   now?: () => number;
+  /** Starts sending this browser's health samples to the control (4.H). */
+  health?: ReturnType<typeof createHealthCollector>;
 }
 
 interface MachineConnection {
@@ -313,6 +316,7 @@ class DaemonTransport {
   private latestVramTotal = 0;
   private latestRamTotal = 0;
   private readonly eventDeduper = new EventDeduper();
+  private everOpened = false;
 
   constructor(
     readonly url: string,
@@ -335,6 +339,7 @@ class DaemonTransport {
         timeout: setTimeout(() => {
           const index = this.pending.indexOf(pending);
           if (index >= 0) this.pending.splice(index, 1);
+          health.count("ERRORS", this.machine === "control" ? null : this.machine, "ERROR_TIMEOUT");
           reject(daemonError(`Machine '${this.machine}' did not answer within 10 seconds`));
         }, 10_000),
       };
@@ -365,6 +370,9 @@ class DaemonTransport {
   private connect(): Promise<ApiSocket> {
     if (this.socket?.readyState === SOCKET_OPEN) return Promise.resolve(this.socket);
     if (this.connecting !== null) return this.connecting;
+    if (this.everOpened) {
+      health.count("WS_RECONNECTS", this.machine === "control" ? null : this.machine, "SOCKET_MACHINE");
+    }
     const endpoint = new URL(this.url);
     this.connecting = new Promise((resolve, reject) => {
       const socket = this.socketFactory(endpoint.toString());
@@ -372,6 +380,7 @@ class DaemonTransport {
       let opened = false;
       socket.onopen = () => {
         opened = true;
+        this.everOpened = true;
         this.socket = socket;
         this.connecting = null;
         resolve(socket);
@@ -379,6 +388,7 @@ class DaemonTransport {
       socket.onerror = () => {
         if (!opened) {
           this.connecting = null;
+          health.count("ERRORS", this.machine === "control" ? null : this.machine, "ERROR_UNREACHABLE");
           reject(daemonError("authentication or connection error"));
         }
       };
@@ -387,6 +397,7 @@ class DaemonTransport {
         this.connecting = null;
         this.rejectPending(daemonError("connection closed"));
         if (this.ownsBrowserAuthentication && event.code === 4_001) {
+          health.count("ERRORS", null, "ERROR_AUTH_EXPIRED");
           window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
         }
       };
@@ -528,6 +539,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   const installProjection = (next: ProjectionView): void => {
     projection = next;
     controlMachineId = next.controlMachineId;
+    health.setControlMachine(next.controlMachineId);
     controlTransport.setMachine(next.controlMachineId);
     const present = new Set(next.machines.keys());
     for (const [id, connection] of connections) {
@@ -577,7 +589,10 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       }
       if (response.status === 404 || response.status === 501) return false;
       if (!response.ok) {
-        if (response.status === 401) window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+        if (response.status === 401) {
+          health.count("ERRORS", null, "ERROR_AUTH_EXPIRED");
+          window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+        }
         throw daemonError(`control projection request failed with status ${response.status}`);
       }
       const next = projectionView(await response.json() as ControlProjectionSnapshot, now());
@@ -628,12 +643,14 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       if (projectionSocket !== socket) return;
       projectionSocket = null;
       if (event.code === 4_001) {
+        health.count("ERRORS", null, "ERROR_AUTH_EXPIRED");
         window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
         return;
       }
       if (projection !== null && projectionReconnect === null) {
         projectionReconnect = setTimeout(() => {
           projectionReconnect = null;
+          health.count("WS_RECONNECTS", controlMachineId, "SOCKET_DASHBOARD");
           startProjectionStream();
         }, 2_000);
       }
@@ -718,6 +735,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     const reply = await controlTransport.request({ type: "GET_MACHINE" }, (message) => message.type === "MACHINE");
     if (reply.type !== "MACHINE") throw daemonError("missing control Machine");
     controlMachineId = reply.machine.id;
+    health.setControlMachine(reply.machine.id);
     controlTransport.setMachine(reply.machine.id);
     const current = connections.get(reply.machine.id);
     if (current) {
@@ -1339,7 +1357,44 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       },
     },
   };
+  // Failed actions are counted by code (never the message) for the health page.
+  const { createSession, sendInput } = adapter;
+  adapter.createSession = async (create) => {
+    try {
+      return await createSession(create);
+    } catch (failure) {
+      health.count("ERRORS", create?.machineId ?? null, "ERROR_CREATE");
+      throw failure;
+    }
+  };
+  adapter.sendInput = async (sessionId, data) => {
+    try {
+      return await sendInput(sessionId, data);
+    } catch (failure) {
+      health.count("ERRORS", machineId(sessionId), "ERROR_INPUT");
+      throw failure;
+    }
+  };
+  if (options.health) {
+    const url = `${authBaseUrl}/health/samples`;
+    options.health.start((batch, beacon) => {
+      const body = JSON.stringify(batch);
+      if (beacon && typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon(url, new Blob([body], { type: "text/plain;charset=UTF-8" }));
+        return;
+      }
+      void fetcher(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body,
+        keepalive: true,
+      }).catch(() => undefined);
+    });
+    const collector = options.health;
+    window.addEventListener("pagehide", () => collector.flush(true));
+  }
   return adapter;
 }
 
-export const apiAdapter = createApiAdapter();
+export const apiAdapter = createApiAdapter({ health });

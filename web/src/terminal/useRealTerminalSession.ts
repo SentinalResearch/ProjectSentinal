@@ -2,6 +2,8 @@ import type { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dataAdapter } from "../data";
+import { machineId } from "../data/api/machine-connections";
+import { createEchoTimer, health } from "../data/health";
 import { decodeTerminalFrame, encodeTerminalFrame } from "../frame";
 import type { ClientRequest } from "../protocol/ClientRequest";
 import type { DaemonMessage } from "../protocol/DaemonMessage";
@@ -49,6 +51,10 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
   useEffect(() => {
     if (!terminal || numericId === undefined || websocketUrl === undefined) return;
 
+    // Measured for Settings → Diagnostics (4.H): durations only, never the bytes.
+    const machine = machineId(sessionId);
+    const openedAt = performance.now();
+    const echo = createEchoTimer();
     const socket = new WebSocket(websocketUrl);
     socket.binaryType = "arraybuffer";
     socketRef.current = socket;
@@ -79,6 +85,7 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
         try {
           const envelope = JSON.parse(event.data) as Envelope<DaemonMessage>;
           if (envelope.payload.type === "ERROR") {
+            health.count("ERRORS", machine, "ERROR_ATTACH");
             terminal.write(`\r\n\x1b[38;2;255;59;47m[error] ${envelope.payload.message}\x1b[0m\r\n`);
           }
         } catch {
@@ -89,18 +96,26 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       const data = event.data instanceof Blob ? await event.data.arrayBuffer() : event.data;
       const frame = decodeTerminalFrame(new Uint8Array(data));
       if (frame.sessionId !== numericId) return;
+      const echoed = echo.output();
+      if (echoed !== undefined) health.record("TYPING_ECHO_MS", machine, echoed);
       if (!snapshotReceived) {
         // The first frame redraws the whole screen; start from a clean one.
         snapshotReceived = true;
+        health.record("TERMINAL_OPEN_MS", machine, performance.now() - openedAt);
         terminal.reset();
         terminal.write(frame.payload);
         resizeToTerminal();
         return;
       }
+      // The daemon resets and redraws a viewer that fell behind (ESC c).
+      if (frame.payload[0] === 0x1b && frame.payload[1] === 0x63) health.count("VIEWER_RESYNCS", machine);
       terminal.write(frame.payload);
     };
 
-    const dataDisposable = terminal.onData((data) => sendBytes(encoder.encode(data)));
+    const dataDisposable = terminal.onData((data) => {
+      echo.keystroke(data);
+      sendBytes(encoder.encode(data));
+    });
     const resizeDisposable = terminal.onResize(({ cols, rows }) =>
       sendRequest({ type: "RESIZE", session_id: numericId, cols, rows }),
     );
@@ -111,7 +126,7 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       sendRequest({ type: "DETACH", session_id: numericId });
       socket.close();
     };
-  }, [terminal, numericId, websocketUrl]);
+  }, [terminal, numericId, websocketUrl, sessionId]);
 
   return { attached, sendBytes };
 }

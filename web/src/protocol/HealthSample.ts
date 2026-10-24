@@ -5,7 +5,7 @@ import type { MachineId } from "./MachineId";
 import type { Timestamp } from "./Timestamp";
 
 /**
- * One measurement.
+ * One measurement. Unknown fields are refused, so nothing extra can ride along.
  */
 export type HealthSample = {
   /**
