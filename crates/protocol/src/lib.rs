@@ -29,6 +29,7 @@ pub mod error;
 pub mod event;
 pub mod evidence;
 pub mod health;
+pub mod health_report;
 pub mod ids;
 pub mod link;
 pub mod local;

@@ -11,6 +11,7 @@ mod approval_verify;
 mod discovery;
 mod handoff;
 pub mod health;
+mod health_api;
 pub mod health_monitor;
 mod health_routes;
 mod ping;

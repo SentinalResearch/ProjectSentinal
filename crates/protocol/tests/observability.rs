@@ -118,3 +118,19 @@ fn unknown_metrics_and_labels_are_refused() {
     let text = r#"{"machine_id":"m","metric":"ERRORS","label":"ERROR_SECRET","at":1,"value":1}"#;
     assert!(serde_json::from_str::<protocol::observability::HealthSample>(text).is_err());
 }
+
+#[test]
+fn health_views_round_trip() {
+    use protocol::health_report::{HealthIncidents, HealthReport, HealthSummary, ReportNames};
+    let fixture = fixture();
+    let summary: HealthSummary = round_trip(&fixture["summary"]);
+    assert!(!summary.machines[1].reports_health);
+    let _: HealthIncidents = round_trip(&fixture["incident_list"]);
+    let report: HealthReport = round_trip(&fixture["report"]);
+    assert_eq!(report.names, ReportNames::Anonymous);
+    let text = fixture["report"].to_string();
+    assert!(
+        !text.contains("01J9"),
+        "an anonymous report fixture carries no Machine ID"
+    );
+}

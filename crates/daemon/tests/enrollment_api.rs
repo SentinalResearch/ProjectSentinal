@@ -544,3 +544,112 @@ async fn browser_health_samples_need_the_owner_and_only_take_browser_metrics() {
         StatusCode::PAYLOAD_TOO_LARGE
     );
 }
+
+#[tokio::test]
+async fn the_health_summary_incidents_and_anonymous_report_are_owner_only() {
+    let d = daemon(true, false, "100.64.0.2:5000");
+    let control = "01J9Y0CTRL0000000000000000";
+    for path in [
+        "/api/v1/health/summary",
+        "/api/v1/health/incidents",
+        "/api/v1/health/report",
+    ] {
+        assert_eq!(
+            d.send("GET", path, None, &[], None).await.status,
+            StatusCode::UNAUTHORIZED,
+            "{path}"
+        );
+    }
+    let session = d.owner_session().await;
+    let batch = json!({ "samples": [echo_sample(control), echo_sample(control)] });
+    d.send(
+        "POST",
+        "/api/v1/health/samples",
+        Some(&session),
+        &[],
+        Some(batch),
+    )
+    .await;
+
+    let summary = d
+        .send(
+            "GET",
+            "/api/v1/health/summary?range=1h",
+            Some(&session),
+            &[],
+            None,
+        )
+        .await;
+    assert_eq!(summary.status, StatusCode::OK);
+    assert_eq!(
+        summary.headers.get("cache-control").unwrap(),
+        "no-store, private"
+    );
+    assert!(summary.headers.get("server-timing").is_some());
+    let summary: protocol::health_report::HealthSummary =
+        serde_json::from_value(summary.body).unwrap();
+    assert_eq!(summary.machines[0].machine_id.0, control);
+    assert!(!summary.machines[0].reports_health, "no daemon report yet");
+    let echo = summary.machines[0]
+        .stats
+        .iter()
+        .find(|stat| stat.metric == protocol::observability::HealthMetric::TypingEchoMs)
+        .unwrap();
+    assert_eq!(echo.stat.count, 2);
+    assert_eq!(summary.machines[0].series[0].points.len(), 1);
+
+    let incidents = d
+        .send(
+            "GET",
+            "/api/v1/health/incidents?range=7d",
+            Some(&session),
+            &[],
+            None,
+        )
+        .await;
+    assert_eq!(incidents.body, json!({ "incidents": [] }));
+
+    let report = d
+        .send(
+            "GET",
+            "/api/v1/health/report?range=24h",
+            Some(&session),
+            &[],
+            None,
+        )
+        .await;
+    assert_eq!(report.status, StatusCode::OK);
+    assert_eq!(
+        report.headers.get("content-disposition").unwrap(),
+        "attachment; filename=\"sentinal-health-24h.json\""
+    );
+    let text = report.body.to_string();
+    assert!(text.contains("\"Machine 1\""));
+    assert!(
+        !text.contains(control),
+        "an anonymous report has no Machine ID"
+    );
+    assert!(!text.contains("\"Control\""), "nor the display name");
+    let named = d
+        .send(
+            "GET",
+            "/api/v1/health/report?range=24h&names=real",
+            Some(&session),
+            &[],
+            None,
+        )
+        .await;
+    assert_eq!(named.body["machines"][0]["name"], "Control");
+    assert_eq!(
+        d.send(
+            "GET",
+            "/api/v1/health/summary?range=2y",
+            Some(&session),
+            &[],
+            None
+        )
+        .await
+        .status,
+        StatusCode::BAD_REQUEST
+    );
+}
