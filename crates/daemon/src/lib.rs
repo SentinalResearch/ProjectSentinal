@@ -27,6 +27,7 @@ pub mod log_discovery;
 pub mod log_tail;
 pub mod login_env;
 pub mod metrics;
+pub mod nodelay;
 pub mod notifications;
 pub mod origin;
 pub mod osc;

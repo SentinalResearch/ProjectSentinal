@@ -13,7 +13,7 @@ use std::{
 };
 use tokio::io::AsyncWriteExt;
 use tokio_tungstenite::{
-    connect_async,
+    connect_async_with_config,
     tungstenite::{
         client::IntoClientRequest,
         http::{header::AUTHORIZATION, HeaderValue},
@@ -165,7 +165,8 @@ impl DaemonClient {
             }
         })?;
         request.headers_mut().insert(AUTHORIZATION, header);
-        let (socket, _) = connect_async(request).await?;
+        // Nagle off: keystrokes and their echo are tiny writes.
+        let (socket, _) = connect_async_with_config(request, None, true).await?;
         Ok(DaemonClient { socket })
     }
 

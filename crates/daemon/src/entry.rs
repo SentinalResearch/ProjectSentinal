@@ -507,7 +507,7 @@ pub async fn run() -> Result<(), DaemonError> {
         })?;
     tracing::info!(address = %config.bind, config = %config_path.display(), "daemon listening");
     let main_server = axum::serve(
-        listener,
+        crate::nodelay::listener(listener),
         router(state).into_make_service_with_connect_info::<SocketAddr>(),
     )
     .with_graceful_shutdown(wait_for_shutdown(server_shutdown_rx))

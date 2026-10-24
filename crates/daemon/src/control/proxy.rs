@@ -22,13 +22,10 @@ use protocol::{
     MachineId,
 };
 use std::time::Duration;
-use tokio_tungstenite::{
-    connect_async,
-    tungstenite::{
-        client::IntoClientRequest,
-        http::{header::AUTHORIZATION, HeaderValue},
-        Message as UpstreamMessage,
-    },
+use tokio_tungstenite::tungstenite::{
+    client::IntoClientRequest,
+    http::{header::AUTHORIZATION, HeaderValue},
+    Message as UpstreamMessage,
 };
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -163,11 +160,14 @@ async fn routed_websocket(
             Err(error) => return failure_response(unreachable_worker(error)),
         };
     request.headers_mut().insert(AUTHORIZATION, bearer);
-    let upstream = match tokio::time::timeout(CONNECT_TIMEOUT, connect_async(request)).await {
-        Ok(Ok((socket, _))) => socket,
-        Ok(Err(error)) => return failure_response(unreachable_worker(error)),
-        Err(error) => return failure_response(unreachable_worker(error)),
-    };
+    let upstream =
+        match tokio::time::timeout(CONNECT_TIMEOUT, crate::nodelay::connect_websocket(request))
+            .await
+        {
+            Ok(Ok((socket, _))) => socket,
+            Ok(Err(error)) => return failure_response(unreachable_worker(error)),
+            Err(error) => return failure_response(unreachable_worker(error)),
+        };
     upgrade
         .on_upgrade(move |browser| proxy_socket(browser, upstream, state.auth, owner_token))
         .into_response()
