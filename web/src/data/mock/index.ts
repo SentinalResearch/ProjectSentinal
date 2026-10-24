@@ -1,3 +1,4 @@
+import { mockHealth } from "./health";
 import { config } from "../config";
 import { RegistryError, type DataAdapter, type HistoryFilters, type LiveEvent } from "../adapter";
 import { previewTemplate } from "../recipeTemplate";
@@ -292,6 +293,8 @@ export const mockAdapter: DataAdapter = {
     details: mockInsight,
     metrics: mockMetrics,
   },
+
+  health: mockHealth,
 
   diagnostics: {
     async ping(machineId, samples = 5) {

@@ -9,6 +9,8 @@ import type { Health } from "../../protocol/Health";
 import type { Machine as WireMachine } from "../../protocol/Machine";
 import type { MachineDetails as WireMachineDetails } from "../../protocol/MachineDetails";
 import type { MachineMetricPoint } from "../../protocol/MachineMetricPoint";
+import type { HealthIncidents } from "../../protocol/HealthIncidents";
+import type { HealthSummary } from "../../protocol/HealthSummary";
 import type { MachinePing } from "../../protocol/MachinePing";
 import type { Recipe as WireRecipe } from "../../protocol/Recipe";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
@@ -927,6 +929,20 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     },
   };
 
+  const healthGet = async <T>(path: string): Promise<T> => {
+    const response = await fetcher(`${authBaseUrl}/health/${path}`, { credentials: "same-origin", cache: "no-store" });
+    if (!response.ok) {
+      let message = `health request failed with status ${response.status}`;
+      try {
+        message = ((await response.json()) as { message?: string }).message ?? message;
+      } catch {
+        // Keep the status-only message.
+      }
+      throw daemonError(message);
+    }
+    return (await response.json()) as T;
+  };
+
   const adapter: DataAdapter = {
     getMachines,
     getSessions,
@@ -1148,6 +1164,17 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
         (reply) => isFullSessionUpdate(reply, local) && reply.type === "SESSION_UPDATED" &&
           reply.session.machine_id === connection.id,
       );
+    },
+    health: {
+      async summary(range) {
+        return healthGet<HealthSummary>(`summary?range=${range}`);
+      },
+      async incidents(range) {
+        return healthGet<HealthIncidents>(`incidents?range=${range}`);
+      },
+      reportUrl(range, names) {
+        return `${authBaseUrl}/health/report?range=${range}&names=${names}`;
+      },
     },
     diagnostics: {
       async ping(machineId, samples = 5) {
@@ -1392,7 +1419,11 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       }).catch(() => undefined);
     });
     const collector = options.health;
+    // In-app navigation unloads nothing; these catch closing or hiding the tab.
     window.addEventListener("pagehide", () => collector.flush(true));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") collector.flush(true);
+    });
   }
   return adapter;
 }

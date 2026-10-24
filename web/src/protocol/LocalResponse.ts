@@ -66,6 +66,16 @@ export type LocalResponse = {
    */
   workers: Array<WorkerHandoff>;
 } | {
+  "type": "HEALTH_REPORT_WRITTEN";
+  /**
+   * Absolute path of the report.
+   */
+  path: string;
+  /**
+   * Its size.
+   */
+  bytes: number;
+} | {
   "type": "ERROR";
   /**
    * Stable error category.

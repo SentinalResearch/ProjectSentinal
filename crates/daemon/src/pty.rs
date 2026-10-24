@@ -231,17 +231,29 @@ pub struct FakePtyOperationCounts {
     pub kills: usize,
 }
 
+type FakeSessions = Arc<Mutex<HashMap<SessionId, FakeControl>>>;
+
 /// Deterministic PTY backend controlled directly by tests.
 #[derive(Debug, Default)]
 pub struct FakePty {
-    sessions: Arc<Mutex<HashMap<SessionId, FakeControl>>>,
+    sessions: FakeSessions,
     login_env: Mutex<Option<Vec<(String, String)>>>,
+    echo: bool,
 }
 
 impl FakePty {
     /// Create an empty fake backend.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A fake whose PTYs echo input back as output, like a terminal in echo
+    /// mode (`TA_FAKE_PTY=echo`), so browser tests can time keystroke echoes.
+    pub fn echoing() -> Self {
+        FakePty {
+            echo: true,
+            ..Self::default()
+        }
     }
 
     /// Pretend the user's login shell provides `env`.
@@ -455,6 +467,7 @@ impl PtyBackend for FakePty {
                 input,
                 closed,
                 writes,
+                echo: self.echo.then(|| (self.sessions.clone(), session_id)),
             }))),
             resize,
             kill,
@@ -484,6 +497,8 @@ struct FakeWriter {
     input: Arc<Mutex<Vec<u8>>>,
     closed: Arc<AtomicBool>,
     writes: Arc<AtomicUsize>,
+    /// Echo through the Session's live output channel (none after a kill).
+    echo: Option<(FakeSessions, SessionId)>,
 }
 
 impl Write for FakeWriter {
@@ -499,6 +514,15 @@ impl Write for FakeWriter {
             .lock()
             .map_err(|_| std::io::Error::other("fake PTY input lock poisoned"))?
             .extend_from_slice(buffer);
+        if let Some((sessions, session_id)) = &self.echo {
+            if let Some(output) = sessions.lock().ok().and_then(|sessions| {
+                sessions
+                    .get(session_id)
+                    .and_then(|control| control.output.clone())
+            }) {
+                let _ = output.send(buffer.to_vec());
+            }
+        }
         Ok(buffer.len())
     }
 

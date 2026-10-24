@@ -351,6 +351,13 @@ pub enum LocalRequest {
         /// Only list the workers that would be moved.
         dry_run: bool,
     },
+    /// On a control: write the 4.H health report to the data directory.
+    WriteHealthReport {
+        /// Range covered.
+        range: crate::health_report::HealthRange,
+        /// Whether Machines are named.
+        names: crate::health_report::ReportNames,
+    },
 }
 
 impl LocalRequest {
@@ -439,7 +446,8 @@ impl LocalRequest {
             LocalRequest::GetIdentity
             | LocalRequest::ConnectionStatus
             | LocalRequest::DisconnectControl
-            | LocalRequest::ResetIdentity => Ok(()),
+            | LocalRequest::ResetIdentity
+            | LocalRequest::WriteHealthReport { .. } => Ok(()),
         }
     }
 }
@@ -520,6 +528,13 @@ pub enum LocalResponse {
     Handoff {
         /// One entry per active worker.
         workers: Vec<crate::pairing::WorkerHandoff>,
+    },
+    /// The health report was written (owner-only file in the data directory).
+    HealthReportWritten {
+        /// Absolute path of the report.
+        path: String,
+        /// Its size.
+        bytes: u64,
     },
     /// Request failed without stopping the listener.
     Error {

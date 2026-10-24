@@ -189,3 +189,43 @@ impl ControlService {
         })
     }
 }
+
+/// Largest report written for `sentinal doctor --report`.
+pub const MAX_REPORT_BYTES: usize = 1024 * 1024;
+
+impl ControlService {
+    /// Write the report to `<dir>/health-report-<range>.json` (mode 0600) for
+    /// `sentinal doctor --report`; returns the path and size.
+    pub fn write_health_report(
+        &self,
+        dir: &std::path::Path,
+        range: HealthRange,
+        names: ReportNames,
+    ) -> Result<(std::path::PathBuf, u64), String> {
+        use std::io::Write;
+        let report = self
+            .health_report(range, names)
+            .map_err(|failure| failure.failure.message)?;
+        let bytes = serde_json::to_vec_pretty(&report).map_err(|error| error.to_string())?;
+        if bytes.len() > MAX_REPORT_BYTES {
+            return Err(format!(
+                "the report is larger than {MAX_REPORT_BYTES} bytes"
+            ));
+        }
+        let suffix = serde_json::to_value(range)
+            .ok()
+            .and_then(|value| value.as_str().map(str::to_string))
+            .unwrap_or_else(|| "report".into());
+        let path = dir.join(format!("health-report-{suffix}.json"));
+        let temporary = dir.join(format!("health-report-{suffix}.json.tmp"));
+        let _ = std::fs::remove_file(&temporary);
+        let mut file = crate::private_fs::private_file_options()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)
+            .map_err(|error| error.to_string())?;
+        file.write_all(&bytes).map_err(|error| error.to_string())?;
+        std::fs::rename(&temporary, &path).map_err(|error| error.to_string())?;
+        Ok((path, bytes.len() as u64))
+    }
+}

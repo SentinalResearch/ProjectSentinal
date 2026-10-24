@@ -99,9 +99,19 @@ async fn dispatch(
     // Hook commands never use the WebSocket API and need no token.
     let cli = match cli.command {
         Command::Doctor {
+            report: true,
+            range,
+            names,
+            output,
+            ..
+        } => {
+            return Ok(crate::doctor_report::run(range, names, output, out, err));
+        }
+        Command::Doctor {
             prefix,
             config_dir,
             pilot,
+            ..
         } => {
             return Ok(crate::doctor::run(prefix, config_dir, pilot, out));
         }

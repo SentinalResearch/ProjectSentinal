@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { dataAdapter } from "../../data";
 import { loadTimeline, type LoadTiming } from "../../data/load-timing";
+import { HealthPanel } from "./HealthPanel";
 import { useLiveData } from "../../data/LiveDataContext";
 import { machineStatusLabel } from "../../data/machine-status";
 import type { ControlPingResult, Machine, PingResult } from "../../data/types";
@@ -129,6 +130,8 @@ export function DiagnosticsTab() {
           {running ? "Testing…" : "Run network test"}
         </button>
       </header>
+
+      <HealthPanel />
 
       <div className={settings.tableScroll}>
         <table className={styles.table} aria-label="Network test">

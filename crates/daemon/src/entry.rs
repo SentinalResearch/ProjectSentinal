@@ -229,9 +229,13 @@ pub async fn run() -> Result<(), DaemonError> {
             "marked restart-orphaned sessions interrupted"
         );
     }
-    let backend: Arc<dyn PtyBackend> = if std::env::var_os("TA_FAKE_PTY").is_some() {
+    let backend: Arc<dyn PtyBackend> = if let Some(mode) = std::env::var_os("TA_FAKE_PTY") {
         tracing::warn!("using fake PTY backend");
-        Arc::new(FakePty::new())
+        if mode == "echo" {
+            Arc::new(FakePty::echoing())
+        } else {
+            Arc::new(FakePty::new())
+        }
     } else {
         Arc::new(RealPty)
     };
@@ -283,12 +287,32 @@ pub async fn run() -> Result<(), DaemonError> {
     let handler_sessions = sessions.clone();
     let handler_link = link.clone();
     let handler_control = control.clone();
+    let handler_data_dir = config.data_dir.clone();
     let handler: LocalHandler = Arc::new(move |request| {
         let sessions = handler_sessions.clone();
         let link = handler_link.clone();
         let control = handler_control.clone();
+        let data_dir = handler_data_dir.clone();
         Box::pin(async move {
             match request {
+                LocalRequest::WriteHealthReport { range, names } => {
+                    let Some(control) = control else {
+                        return protocol::LocalResponse::Error {
+                            code: protocol::LocalErrorCode::InvalidRequest,
+                            message: "health reports come from the control".into(),
+                        };
+                    };
+                    match control.write_health_report(&data_dir, range, names) {
+                        Ok((path, bytes)) => protocol::LocalResponse::HealthReportWritten {
+                            path: path.display().to_string(),
+                            bytes,
+                        },
+                        Err(message) => protocol::LocalResponse::Error {
+                            code: protocol::LocalErrorCode::Internal,
+                            message,
+                        },
+                    }
+                }
                 LocalRequest::HandoffWorkers { target, dry_run } => {
                     let Some(control) = control else {
                         return protocol::LocalResponse::Error {

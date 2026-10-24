@@ -232,6 +232,7 @@ fn kind_of(response: &LocalResponse) -> String {
         LocalResponse::ApprovalRequested { .. } => "APPROVAL_REQUESTED".into(),
         LocalResponse::ApprovalState { .. } => "APPROVAL_STATE".into(),
         LocalResponse::Handoff { .. } => "HANDOFF".into(),
+        LocalResponse::HealthReportWritten { .. } => "HEALTH_REPORT_WRITTEN".into(),
         LocalResponse::Error { code, .. } => format!("ERROR {code:?}"),
     }
 }

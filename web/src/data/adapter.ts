@@ -149,6 +149,17 @@ export interface DataAdapter {
     controlPing(machineId: string): Promise<import("./types").ControlPingResult>;
   };
 
+  /** Settings → Diagnostics health page (4.H): what the control has measured. */
+  health: {
+    summary(range: import("../protocol/HealthRange").HealthRange): Promise<import("../protocol/HealthSummary").HealthSummary>;
+    incidents(range: import("../protocol/HealthRange").HealthRange): Promise<import("../protocol/HealthIncidents").HealthIncidents>;
+    /** Same-origin download link for the shareable report, or undefined without a control. */
+    reportUrl(
+      range: import("../protocol/HealthRange").HealthRange,
+      names: import("../protocol/ReportNames").ReportNames,
+    ): string | undefined;
+  };
+
   notifications: {
     getRules(): Promise<NotificationRules>;
     setRule(sessionId: string, rules: NotificationRuleSet): Promise<void>;

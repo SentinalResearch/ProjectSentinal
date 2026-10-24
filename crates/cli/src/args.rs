@@ -64,6 +64,18 @@ pub enum Command {
         /// Funnel, HTTPS, the published release, and backup age.
         #[arg(long)]
         pilot: bool,
+        /// On the control: save the health report (Settings → Diagnostics) to a file.
+        #[arg(long)]
+        report: bool,
+        /// Report range: 1h, 24h (default), 7d, or 30d.
+        #[arg(long, requires = "report")]
+        range: Option<String>,
+        /// Machine names in the report: anonymous (default) or real.
+        #[arg(long, requires = "report")]
+        names: Option<String>,
+        /// Where to save it; defaults to ./sentinal-health-<range>.json.
+        #[arg(long, requires = "report")]
+        output: Option<PathBuf>,
     },
     /// Make this Machine a control, or connect it to one, after a preview.
     ///

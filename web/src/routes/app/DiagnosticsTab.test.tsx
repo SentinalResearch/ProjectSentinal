@@ -39,6 +39,27 @@ describe("Diagnostics", () => {
     expect(settingsTabs(true).map((tab) => tab.key)).toContain("diagnostics");
   });
 
+  it("shows each Machine's health with highlighted problems, incidents, and ranges", async () => {
+    renderDiagnostics();
+    const far = await screen.findByRole("group", { name: "RTX-PC health" }, { timeout: 5000 });
+    expect(within(far).getByText("126 ms")).toBeInTheDocument();
+    expect(within(far).getByText(/Typing feels late: 126 ms per key/)).toBeInTheDocument();
+    const near = screen.getByRole("group", { name: "Mac Mini health" });
+    expect(within(near).getByText("Control")).toBeInTheDocument();
+    expect(within(near).getByText("13 ms")).toBeInTheDocument();
+    const offline = screen.getByRole("group", { name: "MacBook health" });
+    expect(within(offline).getByText(/^No data yet/)).toBeInTheDocument();
+
+    const incidents = screen.getByRole("list", { name: "Incidents" });
+    expect(within(incidents).getByText(/^MacBook offline 14 min at .* \(ongoing\)$/)).toBeInTheDocument();
+    expect(within(incidents).getByText(/^RTX-PC relayed through fra/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Typing delay on Mac Mini/ })).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "7 d" }));
+    expect(screen.getByRole("button", { name: "7 d" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/Reports download from a real control/)).toBeInTheDocument();
+  });
+
   it("shows when each step of the last page load happened", async () => {
     resetLoadTiming();
     const now = vi.spyOn(performance, "now");

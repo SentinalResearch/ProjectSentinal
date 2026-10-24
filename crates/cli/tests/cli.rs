@@ -51,10 +51,24 @@ fn parses_doctor_with_optional_install_paths() {
 
     assert!(matches!(
         cli.command,
-        Command::Doctor { prefix: Some(prefix), config_dir: Some(config_dir), pilot: false }
+        Command::Doctor { prefix: Some(prefix), config_dir: Some(config_dir), pilot: false, report: false, .. }
             if prefix == Path::new("/opt/sentinal")
                 && config_dir == Path::new("/private/sentinal-config")
     ));
+}
+
+#[test]
+fn parses_doctor_report_options_only_with_report() {
+    let cli = Cli::try_parse_from([
+        "sentinal", "doctor", "--report", "--range", "7d", "--output", "r.json",
+    ])
+    .unwrap();
+    assert!(matches!(
+        cli.command,
+        Command::Doctor { report: true, range: Some(range), names: None, output: Some(output), .. }
+            if range == "7d" && output == Path::new("r.json")
+    ));
+    assert!(Cli::try_parse_from(["sentinal", "doctor", "--range", "7d"]).is_err());
 }
 
 #[test]

@@ -14,6 +14,7 @@ pub mod detach;
 pub mod discovery;
 pub mod doctor;
 mod doctor_pilot;
+pub mod doctor_report;
 mod doctor_storage;
 pub mod frame;
 pub mod hook_command;

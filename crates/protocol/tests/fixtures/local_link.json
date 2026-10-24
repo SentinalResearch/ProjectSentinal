@@ -81,9 +81,21 @@
         "target": null,
         "dry_run": true
       }
+    },
+    {
+      "version": 1,
+      "payload": { "type": "WRITE_HEALTH_REPORT", "range": "24h", "names": "anonymous" }
     }
   ],
   "responses": [
+    {
+      "version": 1,
+      "payload": {
+        "type": "HEALTH_REPORT_WRITTEN",
+        "path": "/home/me/.local/share/terminal-agent/health-report-24h.json",
+        "bytes": 4096
+      }
+    },
     {
       "version": 1,
       "payload": {

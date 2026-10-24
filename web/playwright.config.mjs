@@ -50,7 +50,7 @@ function daemon(name, port, extra, nativePush = false) {
   return {
     root,
     socket: join(root, "run", "sentinald.sock"),
-    command: `${nativePush ? `SENTINAL_E2E_ACCEPT_PUSH=1 SENTINAL_E2E_VAPID_KEY_FILE=${join(root, "push-vapid.json")} ` : ""}TA_CONFIG=${config} TA_AUTH_FILE=${auth} TA_FAKE_PTY=1 cargo run -p daemon ${nativePush ? "--features e2e-test-support " : ""}--bin sentinald`,
+    command: `${nativePush ? `SENTINAL_E2E_ACCEPT_PUSH=1 SENTINAL_E2E_VAPID_KEY_FILE=${join(root, "push-vapid.json")} ` : ""}TA_CONFIG=${config} TA_AUTH_FILE=${auth} TA_FAKE_PTY=echo cargo run -p daemon ${nativePush ? "--features e2e-test-support " : ""}--bin sentinald`,
     health: `http://127.0.0.1:${port}/api/v1/health`,
   };
 }

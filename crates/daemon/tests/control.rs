@@ -1371,3 +1371,22 @@ async fn the_monitor_stops_on_shutdown() {
         .expect("monitor exits after shutdown")
         .unwrap();
 }
+
+#[test]
+fn the_doctor_report_is_an_owner_only_anonymous_file() {
+    use protocol::health_report::{HealthRange, ReportNames};
+    use std::os::unix::fs::PermissionsExt;
+    let h = harness();
+    h.pair(WORKER_A, "Secret Name A");
+    let (path, bytes) = h
+        .control
+        .write_health_report(&h.dir, HealthRange::Day, ReportNames::Anonymous)
+        .unwrap();
+    assert_eq!(path, h.dir.join("health-report-24h.json"));
+    let metadata = fs::metadata(&path).unwrap();
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+    assert_eq!(metadata.len(), bytes);
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains("Machine 2"));
+    assert!(!text.contains("Secret Name A") && !text.contains(WORKER_A));
+}
