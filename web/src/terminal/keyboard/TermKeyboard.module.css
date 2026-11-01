@@ -1,0 +1,173 @@
+/* MOBILE_GLASS_SPEC §4: panel, rows, keys. Terminal chrome, so fixed colours in both themes. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 6px 4px calc(6px + var(--safe-bottom, 0px));
+  background: rgba(22, 22, 26, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: #f2f2f0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.row {
+  display: flex;
+  gap: 5px;
+}
+
+/* The second letter row sits half a key in, like any phone keyboard. */
+.row[data-inset] {
+  padding: 0 5%;
+}
+
+.key {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 0;
+  height: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.11);
+  color: inherit;
+  font: inherit;
+  font-size: 17px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.key:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.key:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 1px;
+}
+
+.label {
+  line-height: 1;
+}
+
+.sub {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  line-height: 1;
+  color: rgba(242, 242, 240, 0.55);
+}
+
+/* Accessory and modifier keys: quieter, with a 1 px edge. */
+.mod {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+}
+
+.row[aria-label="Terminal keys"] .key {
+  height: 38px;
+}
+
+.mod[data-state="latched"],
+.mod[data-state="locked"] {
+  background: var(--accent);
+  box-shadow: none;
+  color: #fff;
+}
+
+.mod[data-state="locked"] {
+  box-shadow: inset 0 -3px 0 #fff;
+}
+
+.wide {
+  flex-grow: 1.5;
+}
+
+.space {
+  flex-grow: 3.4;
+  font-size: 13px;
+}
+
+.enter {
+  background: var(--accent);
+  color: #fff;
+}
+
+.snippet {
+  background: color-mix(in srgb, var(--accent) 28%, rgba(255, 255, 255, 0.05));
+  font-size: 13px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 0;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.chip[data-accent] {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.ctrlGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.ctrlKey {
+  height: 50px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.danger {
+  background: color-mix(in srgb, var(--s-failed) 30%, rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--s-failed) 70%, transparent);
+  color: #ff6b61;
+}
+
+.notice {
+  align-self: flex-start;
+  margin: 0 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+}
+
+.hint {
+  margin: 2px 0;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(242, 242, 240, 0.6);
+}
+
+.panel[data-compact] {
+  padding-top: 6px;
+}
