@@ -53,6 +53,12 @@ export function AddMachineDialog({ onClose, onConnected, pollMs = 2000 }: AddMac
     void create();
   }, [create]);
 
+  // The latest callback, read by the poll: a parent re-render must not restart the timer.
+  const connected = useRef(onConnected);
+  useEffect(() => {
+    connected.current = onConnected;
+  }, [onConnected]);
+
   // Poll the code's state; the code itself is never returned again.
   useEffect(() => {
     if (phase.kind !== "waiting") return;
@@ -64,7 +70,7 @@ export function AddMachineDialog({ onClose, onConnected, pollMs = 2000 }: AddMac
           if (status.state === "CONNECTED") {
             outstanding.current = null;
             setPhase({ kind: "connected", machineId: status.machine_id ?? "" });
-            onConnected();
+            connected.current();
           } else if (status.state === "EXPIRED" || status.state === "CANCELLED") {
             outstanding.current = null;
             setPhase({ kind: "expired" });
@@ -74,7 +80,7 @@ export function AddMachineDialog({ onClose, onConnected, pollMs = 2000 }: AddMac
       );
     }, pollMs);
     return () => clearInterval(timer);
-  }, [phase, pollMs, onConnected]);
+  }, [phase, pollMs]);
 
   const close = useCallback(() => {
     const codeId = outstanding.current;

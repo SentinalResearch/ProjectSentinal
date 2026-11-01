@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { memo, useEffect, useState, type CSSProperties } from "react";
 import { useLocation, useNavigate, useNavigationType, useRoutes } from "react-router-dom";
 
 import { useLiveData } from "../../../data/LiveDataContext";
@@ -110,8 +110,11 @@ export function SheetStage() {
   );
 }
 
-/** One page rendered for its own location; hidden and inert while it is a sheet. */
-function Frame({ frame, current, raised }: { frame: PageFrame; current: boolean; raised: boolean }) {
+/**
+ * One page rendered for its own location; hidden and inert while it is a sheet.
+ * Memoised: live-data changes re-render the stage, never every mounted page.
+ */
+const Frame = memo(function Frame({ frame, current, raised }: { frame: PageFrame; current: boolean; raised: boolean }) {
   const page = useRoutes(APP_PAGES, {
     pathname: frame.pathname,
     search: frame.search,
@@ -130,5 +133,5 @@ function Frame({ frame, current, raised }: { frame: PageFrame; current: boolean;
       {page}
     </div>
   );
-}
+});
 
