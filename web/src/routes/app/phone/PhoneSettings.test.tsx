@@ -34,7 +34,7 @@ describe("E2–E4 · phone settings", () => {
     const setRule = vi.spyOn(dataAdapter.notifications, "setRule").mockRejectedValueOnce(new Error("Machine offline"));
     renderAt("/app/settings/notifications", routes);
     const user = userEvent.setup();
-    expect(await screen.findByRole("button", { name: "‹ Settings" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Back to Settings" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Enable notifications on this device" })).toBeInTheDocument();
     const row = await screen.findByRole("group", { name: "Qwen Training on RTX-PC" }, { timeout: 5000 });
     expect(within(row).getAllByRole("button").map((chip) => chip.textContent)).toEqual([
@@ -66,7 +66,7 @@ describe("E2–E4 · phone settings", () => {
 
   it("E4: password change and sign-out on this browser", async () => {
     renderAt("/app/settings/account", routes);
-    expect(await screen.findByRole("button", { name: "‹ Settings" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Back to Settings" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Account" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Current password/i)).toBeInTheDocument();
   });

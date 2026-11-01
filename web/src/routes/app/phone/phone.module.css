@@ -1,21 +1,69 @@
 /* Phone layout primitives (MOBILE_SPEC.md). Square, Swiss: no border radius. */
 
 .shell {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   height: 100dvh;
-  padding-top: var(--safe-top);
-  background: var(--bg-0);
+  background: var(--bg-app);
   color: var(--text-1);
   font-variant-numeric: tabular-nums;
 }
 
+/* Content clears the island (112 px) and the prompt pill (110 px), plus safe areas. */
 .main {
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  padding-top: calc(var(--safe-top) + 112px);
+  padding-bottom: calc(var(--safe-bottom) + 110px);
+}
+
+/* MOBILE_GLASS_SPEC §1: 56 px glass pill, 16 px insets, bottom = safe area + 30 px. */
+.promptPill {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 30px);
+  z-index: 40;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border: 0;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-edge), var(--glass-shadow);
+  border-radius: 28px;
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+}
+
+.promptPill:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+.promptCaret {
+  color: var(--accent-fg);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.promptPlaceholder {
+  font-size: 15px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* Top bar on top-level screens: logo · needs-you count · search. No tab bar. */

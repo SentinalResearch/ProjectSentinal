@@ -123,7 +123,7 @@ export function GlassDashboard() {
 }
 
 /** How a lane names a Machine that is not online. */
-const STATUS_WORD: Record<Machine["status"], string> = {
+export const STATUS_WORD: Record<Machine["status"], string> = {
   ONLINE: "Online",
   OFFLINE: "Offline",
   DISCONNECTED: "Disconnected",
@@ -132,7 +132,7 @@ const STATUS_WORD: Record<Machine["status"], string> = {
 };
 
 /** Lanes show live work and failures; finished runs live in History. */
-function onLane(session: Session): boolean {
+export function onLane(session: Session): boolean {
   return session.state !== "COMPLETED" && session.state !== "INTERRUPTED";
 }
 
@@ -312,7 +312,7 @@ function LaneCard({ session, samples, onOpen }: { session: Session; samples?: Ar
 }
 
 /** Wall clock for the header, every 30 s. */
-function useClock(): number {
+export function useClock(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
@@ -339,7 +339,7 @@ function useSparkHistory(sessions: Session[]): SparkHistory {
 }
 
 /** Each online Machine's most recent load sample, refreshed every 30 s. */
-function useMachineLoad(machines: Machine[]): Record<string, MachineMetricSample | undefined> {
+export function useMachineLoad(machines: Machine[]): Record<string, MachineMetricSample | undefined> {
   const [load, setLoad] = useState<Record<string, MachineMetricSample | undefined>>({});
   const ids = machines
     .filter((machine) => machine.status === "ONLINE")

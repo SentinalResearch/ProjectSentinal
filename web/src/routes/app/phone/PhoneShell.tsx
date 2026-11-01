@@ -1,53 +1,60 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Outlet } from "react-router-dom";
 
-import { needsAttention } from "../../../data/format";
-import { useLiveData } from "../../../data/LiveDataContext";
-import { isTopLevel } from "./menuSearch";
-import { PhoneMenu } from "./PhoneMenu";
-import { PhoneMenuContext } from "./PhoneMenuContext";
-import { TopBar } from "./TopBar";
+import { PromptBar } from "../shell/PromptBar";
+import type { PromptSuggestion } from "../shell/promptGrammar";
+import { ShellContext, type ShellValue } from "../shell/ShellContext";
+import { usePromptActions } from "../shell/usePromptActions";
+import { IslandBackContext, type IslandBack } from "./islandBack";
+import { MobileIsland } from "./MobileIsland";
 import styles from "./phone.module.css";
 
 /**
- * Phones have no tab bar (MOBILE_SPEC.md → Navigation): top-level screens get
- * the 48 px top bar and a title that switches pages through the Menu; detail
- * screens get a back bar instead.
+ * The glass phone shell (MOBILE_GLASS_SPEC §1): an island on top, a prompt
+ * pill at the bottom, no tab bar, menu, or sidebar. Detail screens put ‹ back
+ * in the island; the prompt does everything the menu used to.
  */
 export function PhoneShell() {
-  const { pathname, search } = useLocation();
-  const { terminals: sessions } = useLiveData();
-  const needsYou = sessions.filter(needsAttention).length;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const opener = useRef<HTMLElement | null>(null);
+  const [back, setBack] = useState<IslandBack | null>(null);
+  const [prompt, setPrompt] = useState<{ text: string } | null>(null);
+  const { perform, dialogs } = usePromptActions();
+  const pill = useRef<HTMLButtonElement>(null);
 
-  const controls = useMemo(
-    () => ({
-      openMenu: (element?: HTMLElement | null) => {
-        opener.current = element ?? null;
-        setMenuOpen(true);
-      },
-    }),
-    [],
-  );
+  const openPrompt = useCallback((prefill = "") => setPrompt({ text: prefill }), []);
+  const shell = useMemo<ShellValue>(() => ({ openPrompt }), [openPrompt]);
 
-  // Any navigation (a picked page, result, or browser back) closes the menu.
-  useEffect(() => setMenuOpen(false), [pathname, search]);
-
-  function close(restoreFocus: boolean) {
-    setMenuOpen(false);
-    if (restoreFocus && opener.current?.isConnected) opener.current.focus();
+  function choose(suggestion: PromptSuggestion, options: { split: boolean }) {
+    setPrompt(null);
+    if (perform(suggestion, options) === "keep-focus") pill.current?.focus();
   }
 
   return (
-    <PhoneMenuContext.Provider value={controls}>
-      <div className={styles.shell}>
-        {isTopLevel(pathname) && <TopBar needsYou={needsYou} />}
-        <main className={styles.main}>
-          <Outlet />
-        </main>
-      </div>
-      {menuOpen && <PhoneMenu needsYou={needsYou} onClose={close} />}
-    </PhoneMenuContext.Provider>
+    <ShellContext.Provider value={shell}>
+      <IslandBackContext.Provider value={setBack}>
+        <div className={styles.shell}>
+          <MobileIsland back={back} />
+          <main className={styles.main} inert={prompt ? true : undefined}>
+            <Outlet />
+          </main>
+          <button ref={pill} type="button" className={styles.promptPill} onClick={() => openPrompt()} aria-label="Open the prompt">
+            <span className={styles.promptCaret} aria-hidden="true">
+              ❯
+            </span>
+            <span className={styles.promptPlaceholder}>go, run, find, y / n…</span>
+          </button>
+          {prompt && (
+            <PromptBar
+              initialText={prompt.text}
+              onClose={() => {
+                setPrompt(null);
+                pill.current?.focus();
+              }}
+              onChoose={choose}
+            />
+          )}
+          {dialogs}
+        </div>
+      </IslandBackContext.Provider>
+    </ShellContext.Provider>
   );
 }

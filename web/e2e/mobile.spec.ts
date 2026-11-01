@@ -14,7 +14,7 @@ async function signIn(page: Page) {
   await shot(page, "b1-sign-in");
   await field.fill(password);
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Dashboard" })).toBeVisible();
 }
 
 /** Nothing scrolls sideways except the deliberate chip rows and key bar, which scroll inside themselves. */
@@ -26,13 +26,16 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBe(false);
 }
 
-/** Switch top-level pages the phone way: the title (or ⌕) opens the Menu. */
-async function goTo(page: Page, label: "Overview" | "Terminals" | "History" | "Recipes" | "Settings") {
-  await page.getByRole("button", { name: "Search" }).click();
-  const menu = page.getByRole("dialog", { name: "Menu" });
-  await menu.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: new RegExp(`^${label}`) }).click();
-  await expect(menu).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: label })).toBeVisible();
+const PLACE = { Overview: "dashboard", Terminals: "terminals", History: "history", Recipes: "recipes", Settings: "settings" } as const;
+const PATH = { Overview: /\/app\/overview$/, Terminals: /\/app\/split$/, History: /\/app\/history/, Recipes: /\/app\/recipes$/, Settings: /\/app\/settings$/ };
+
+/** Switch top-level pages the phone way: the prompt pill's `go` (MOBILE_GLASS_SPEC §1). */
+async function goTo(page: Page, label: keyof typeof PLACE) {
+  await page.getByRole("button", { name: "Open the prompt" }).click();
+  await page.getByRole("combobox", { name: "Command" }).fill(`go ${PLACE[label]}`);
+  await expect(page.getByRole("option", { selected: true })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(PATH[label]);
 }
 
 /** A synthetic left-edge swipe (Chromium with touch). */
@@ -54,37 +57,34 @@ async function expectNoBrowserCredential(page: Page) {
 test.describe("phone 390×844", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("top bar, menu, search, Session, terminal, and Ctrl-C sheet on the production build", async ({ page }) => {
+  test("island, prompt pill, Session, terminal, and Ctrl-C sheet on the production build", async ({ page }) => {
     test.setTimeout(120_000);
     // Time keeps flowing; installing the clock only lets the test jump ahead.
     await page.clock.install();
     await signIn(page);
 
-    // No tab bar: a top bar (logo · needs-you · ⌕) and a title that switches pages.
+    // No tab bar or menu: a glass island on top and a prompt pill at the bottom.
+    const island = page.getByRole("navigation", { name: "Sentinal" });
     await expect(page.getByRole("navigation", { name: "Tabs" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Search history/ })).toHaveCount(0);
-    await expect(page.getByRole("banner").getByRole("button", { name: "Search" })).toBeVisible();
+    await expect(island.getByRole("link", { name: "Dashboard" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open the prompt" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    await shot(page, "b2-overview");
+    await shot(page, "m1-dashboard");
 
-    await page.getByRole("button", { name: "Overview" }).click();
-    const menu = page.getByRole("dialog", { name: "Menu" });
-    await expect(menu.getByRole("searchbox", { name: "Search" })).toBeFocused();
-    await expect(menu.getByRole("navigation", { name: "Pages" }).getByRole("link")).toHaveCount(5);
-    await expect(menu.getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
-    await shot(page, "n1-menu");
-    await menu.getByRole("searchbox", { name: "Search" }).fill("Watched");
-    await expect(menu.getByRole("list", { name: "Sessions" })).toBeVisible();
-    await shot(page, "n2-search");
+    // The prompt does what the menu's search did.
+    await page.getByRole("button", { name: "Open the prompt" }).click();
+    await page.getByRole("combobox", { name: "Command" }).fill("Watched");
+    await expect(page.getByRole("option", { name: /Watched job|watched-job/ }).first()).toBeVisible();
+    await shot(page, "m2-prompt");
     await page.keyboard.press("Escape");
-    await expect(menu).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Prompt" })).toHaveCount(0);
 
-    const needs = page.getByRole("banner").getByRole("link", { name: /need you$/ });
+    const needs = island.getByRole("link", { name: /need you$/ });
     if (await needs.count()) {
       await needs.click();
       await expect(page).toHaveURL(/\/app\/overview\?needs=1$/);
-      await shot(page, "b2-needs-you");
-      await page.getByRole("group", { name: "Machines" }).getByRole("button", { name: "All" }).click();
+      await shot(page, "m1-needs-you");
+      await page.getByRole("button", { name: "Show all" }).click();
     }
 
     // A Session row: badge and duration on their own line, then the title.
@@ -96,14 +96,14 @@ test.describe("phone 390×844", () => {
     const row = page.locator("main a[href^='/app/sessions/']", { hasText: "Watched job" }).first();
     await expect(row).toBeVisible();
     await row.click();
-    await expect(page.getByRole("button", { name: "‹ Overview" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Back to Overview" })).toBeVisible();
     await expect(page.getByRole("list", { name: "Metrics" })).toBeVisible();
     await shot(page, "b3-session");
 
-    // A swipe from the left edge goes back, like ‹ Overview.
+    // A swipe from the left edge goes back, like the island's ‹.
     const sessionUrl = page.url();
     await swipeFromLeftEdge(page);
-    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Dashboard" })).toBeVisible();
     await page.goto(sessionUrl);
     await expect(page.getByRole("list", { name: "Metrics" })).toBeVisible();
 
@@ -141,8 +141,8 @@ test.describe("phone 390×844", () => {
     await page.goto(`/app/sessions/${encodeURIComponent(`${machine}:999999`)}`);
     await expect(page.getByText(/Session missing/)).toBeVisible();
     await shot(page, "b3-missing");
-    await page.getByRole("button", { name: "‹ Overview" }).click();
-    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await page.getByRole("button", { name: "Back to Overview" }).click();
+    await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Dashboard" })).toBeVisible();
   });
 
   test("Terminals, History filters, Recipes, Settings, and theme", async ({ page }) => {
@@ -176,30 +176,30 @@ test.describe("phone 390×844", () => {
     const runButton = page.getByRole("button", { name: /^Run on / });
     await expect(runButton).toBeEnabled();
     await runButton.click();
-    await expect(page.getByRole("button", { name: "‹ Overview" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Back to Overview" })).toBeVisible({ timeout: 10_000 });
     expect(decodeURIComponent(new URL(page.url()).pathname)).toMatch(new RegExp(`^/app/sessions/${owner}:\\d+$`));
     await shot(page, "d4-recipe-session");
 
     // Back returns along in-app history: Session → Run Recipe → Recipes.
-    await page.getByRole("button", { name: "‹ Overview" }).click();
-    await page.getByRole("button", { name: "‹ Recipes" }).click();
+    await page.getByRole("button", { name: "Back to Overview" }).click();
+    await page.getByRole("button", { name: "Back to Recipes" }).click();
     await goTo(page, "Settings");
     await expect(page.getByRole("region", { name: "Machines" })).toBeVisible();
     await shot(page, "e1-settings");
     await page.getByRole("link", { name: /Notifications/ }).click();
-    await expect(page.getByRole("button", { name: "‹ Settings" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Back to Settings" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Enable notifications on this device" })).toBeVisible();
     await shot(page, "e3-notifications");
-    await page.getByRole("button", { name: "‹ Settings" }).click();
+    await page.getByRole("button", { name: "Back to Settings" }).click();
     await page.getByRole("link", { name: /Machines & tokens/ }).click();
     await expect(page.locator("main article").first()).toBeVisible();
     await shot(page, "e2-machines");
-    await page.getByRole("button", { name: "‹ Settings" }).click();
+    await page.getByRole("button", { name: "Back to Settings" }).click();
     await page.getByRole("link", { name: /Account/ }).click();
     await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
     await shot(page, "e4-account");
 
-    await page.getByRole("button", { name: "‹ Settings" }).click();
+    await page.getByRole("button", { name: "Back to Settings" }).click();
     await page.getByRole("radio", { name: "Light" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await goTo(page, "Overview");

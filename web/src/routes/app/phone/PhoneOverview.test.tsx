@@ -11,7 +11,7 @@ import { renderAt } from "./harness";
 
 const routes = [{ path: "overview", element: <OverviewPage /> }];
 
-describe("B2 · phone Overview", () => {
+describe("M1 · phone dashboard (MOBILE_GLASS_SPEC §2)", () => {
   beforeEach(() => {
     resetSimulation();
     setViewport(390);
@@ -21,85 +21,52 @@ describe("B2 · phone Overview", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows the title, a new-Session button, Machine chips, and a Needs-you count", async () => {
+  it("leads with how many need you, a full-width waiting card, then a lane per Machine", async () => {
     renderAt("/app/overview", routes);
-    expect(await screen.findByRole("heading", { name: "Overview" }, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
-    const chips = screen.getByRole("group", { name: "Machines" });
-    expect(within(chips).getByRole("button", { name: /RTX-PC/ })).toBeInTheDocument();
+    expect(await screen.findByText(/^\d+ needs? you\.$/, {}, { timeout: 5000 })).toBeInTheDocument();
     const needs = screen.getByRole("region", { name: "Needs you" });
-    const count = Number(/(\d+)/.exec(within(needs).getByRole("heading").textContent ?? "")?.[1]);
-    expect(count).toBeGreaterThan(0);
-    expect(within(needs).getAllByRole("article")).toHaveLength(count);
+    const waiting = within(needs).getByRole("article", { name: "npm install" });
+    expect(within(waiting).getByRole("button", { name: "Answer y to npm install" })).toBeInTheDocument();
+    expect(within(needs).getByRole("link", { name: /pytest/ })).toHaveAttribute("href", "/app/sessions/pytest");
+    const rtx = screen.getByRole("region", { name: "RTX-PC" });
+    expect(within(rtx).getByRole("link", { name: /Qwen Training/ })).toHaveTextContent("68 %");
+    expect(screen.getByRole("region", { name: "MacBook" })).toHaveAttribute("data-offline", "true");
   });
 
   it("shows a delayed Machine as online with its last update", async () => {
-    Object.assign(store.machines.find((machine) => machine.id === "mini")!, {
-      freshness: "STALE",
-      syncedAt: Date.now() - 14_400,
-    });
+    const mini = store.machines.find((machine) => machine.id === "mini")!;
+    Object.assign(mini, { freshness: "STALE", syncedAt: Date.now() - 14_400 });
     renderAt("/app/overview", routes);
-    const group = await screen.findByRole("region", { name: "Mac Mini" }, { timeout: 5000 });
-    expect(within(group).getByText("online · updated 14 s ago")).toBeInTheDocument();
-    const chip = within(screen.getByRole("group", { name: "Machines" })).getByRole("button", { name: /Mac Mini/ });
-    expect(chip.querySelector("[data-delayed='true']")).not.toBeNull();
-  });
-
-  it("asks which online Machine a new Session starts on", async () => {
-    const create = vi.spyOn(dataAdapter, "createSession");
-    const user = userEvent.setup();
-    renderAt("/app/overview", routes);
-    await user.click(await screen.findByRole("button", { name: "New session" }, { timeout: 5000 }));
-    const sheet = screen.getByRole("dialog", { name: "Start a Session on" });
-    expect(within(sheet).getByRole("button", { name: /Mac Mini/ })).toBeInTheDocument();
-    expect(within(sheet).queryByRole("button", { name: /MacBook/ })).not.toBeInTheDocument();
-    await user.click(within(sheet).getByRole("button", { name: /RTX-PC/ }));
-    expect(create).toHaveBeenCalledWith({ machineId: "rtx" });
-    expect(await screen.findByTestId("where")).toHaveTextContent(/^\/app\/sessions\/.+\/terminal$/);
-  });
-
-  it("starts a new Session on the Machine the Overview is filtered to", async () => {
-    const create = vi.spyOn(dataAdapter, "createSession");
-    renderAt("/app/overview?machine=mini", routes);
-    await userEvent.setup().click(await screen.findByRole("button", { name: "New session" }, { timeout: 5000 }));
-    expect(create).toHaveBeenCalledWith({ machineId: "mini" });
-    expect(screen.queryByRole("dialog", { name: "Start a Session on" })).not.toBeInTheDocument();
-  });
-
-  it("puts the state badge and duration above the title, never on the title line", async () => {
-    renderAt("/app/overview", routes);
-    const row = await screen.findByRole("link", { name: /Qwen Training/ }, { timeout: 5000 });
-    const [status, title, command] = Array.from(row.children);
-    expect(status).toHaveTextContent(/RUNNING/);
-    expect(status).toHaveTextContent("1h31m");
-    expect(title).toHaveTextContent("Qwen Training");
-    expect(title).not.toHaveTextContent(/RUNNING/);
-    expect(command).toHaveTextContent("python train.py --config moe.yaml");
+    const lane = await screen.findByRole("region", { name: "Mac Mini" }, { timeout: 5000 });
+    expect(within(lane).getByText("online · updated 14 s ago")).toBeInTheDocument();
   });
 
   it("answers a waiting prompt from its card with the key and Enter", async () => {
-    const sendInput = vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
+    const send = vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
     renderAt("/app/overview", routes);
-    const card = await screen.findByRole("article", { name: /npm install/ }, { timeout: 5000 });
-    expect(within(card).getByText("Continue? [y/N]")).toBeInTheDocument();
-    await userEvent.setup().click(within(card).getByRole("button", { name: "y" }));
-    expect(sendInput).toHaveBeenCalledWith("npm", "y\r");
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Answer y to npm install" }, { timeout: 5000 }));
+    expect(send).toHaveBeenCalledWith("npm", "y\r");
   });
 
   it("offers no y/n on a waiting Session whose capture cannot send input", async () => {
     renderAt("/app/overview", routes);
-    const card = await screen.findByRole("article", { name: /Tailed fine-tune/ }, { timeout: 5000 });
-    expect(within(card).queryByRole("button", { name: "y" })).not.toBeInTheDocument();
+    const needs = await screen.findByRole("region", { name: "Needs you" }, { timeout: 5000 });
+    expect(within(needs).getByRole("link", { name: /Tailed fine-tune/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Answer y to Tailed fine-tune/ })).not.toBeInTheDocument();
   });
 
-  it("filters to the Sessions that need you from the top bar's count, with a way back to all", async () => {
+  it("filters to what needs you from the island's count, with a way back to all", async () => {
     renderAt("/app/overview?needs=1", routes);
-    const needs = await screen.findByRole("region", { name: "Needs you" }, { timeout: 5000 });
-    const count = within(needs).getAllByRole("article").length;
+    expect(await screen.findByRole("region", { name: "Needs you" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "RTX-PC" })).not.toBeInTheDocument();
-    const chips = screen.getByRole("group", { name: "Machines" });
-    expect(within(chips).getByRole("button", { name: `Needs you ${count}` })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.setup().click(within(chips).getByRole("button", { name: "All" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show all" }));
     expect(await screen.findByRole("region", { name: "RTX-PC" })).toBeInTheDocument();
+  });
+
+  it("narrows to one Machine for `go <machine>`", async () => {
+    renderAt("/app/overview?machine=mini", routes);
+    expect(await screen.findByRole("region", { name: "Mac Mini" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "RTX-PC" })).not.toBeInTheDocument();
+    expect(screen.getByText(/^Mac Mini ·/)).toBeInTheDocument();
   });
 });

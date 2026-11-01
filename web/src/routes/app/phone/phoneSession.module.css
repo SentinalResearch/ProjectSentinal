@@ -371,12 +371,13 @@
 }
 
 .stickyActions {
+  /* Above the prompt pill (MOBILE_GLASS_SPEC §1). */
   position: sticky;
-  bottom: 0;
+  bottom: calc(var(--safe-bottom) + 94px);
   display: flex;
   gap: 12px;
   margin-top: auto;
-  padding: 12px 20px calc(12px + var(--safe-bottom));
+  padding: 12px 20px;
   border-top: 1px solid var(--line);
   background: var(--bg-0);
 }

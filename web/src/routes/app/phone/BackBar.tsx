@@ -1,12 +1,12 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import styles from "./phone.module.css";
+import { useIslandBackRegistrar } from "./islandBack";
 
 export interface BackBarProps {
   parentLabel: string;
   parentPath: string;
-  /** Optional trailing control, e.g. a ⋯ menu button. */
+  /** Optional trailing control, e.g. a ⋯ menu button, shown in the island. */
   trailing?: ReactNode;
 }
 
@@ -18,16 +18,23 @@ const MIN_TRAVEL_PX = 72;
 const MAX_DRIFT_PX = 48;
 
 /**
- * The 44 px detail-screen bar. Back returns to the previous in-app screen, or
- * to the parent after a deep link (a tapped push has no in-app history), so it
- * never leaves the app. A swipe from the left edge does the same.
+ * Declares a detail screen: the phone island shows ‹ back (MOBILE_GLASS_SPEC
+ * §1). Back returns to the previous in-app screen, or to the parent after a
+ * deep link (a tapped push has no in-app history), so it never leaves the
+ * app. A swipe from the left edge does the same. Renders nothing itself.
  */
 export function BackBar({ parentLabel, parentPath, trailing }: BackBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const register = useIslandBackRegistrar();
   const hasInAppHistory = location.key !== "default";
   const goBack = useRef<() => void>(() => undefined);
   goBack.current = () => (hasInAppHistory ? navigate(-1) : navigate(parentPath, { replace: true }));
+
+  useEffect(() => {
+    register?.({ parentLabel, parentPath, trailing });
+  }, [register, parentLabel, parentPath, trailing]);
+  useEffect(() => () => register?.(null), [register]);
 
   useEffect(() => {
     let start: { x: number; y: number } | null = null;
@@ -50,12 +57,5 @@ export function BackBar({ parentLabel, parentPath, trailing }: BackBarProps) {
     };
   }, []);
 
-  return (
-    <div className={styles.backBar}>
-      <button type="button" className={styles.backButton} onClick={() => goBack.current()}>
-        ‹ {parentLabel}
-      </button>
-      {trailing}
-    </div>
-  );
+  return null;
 }

@@ -33,7 +33,8 @@ describe("phone lists", () => {
     const card = screen.getByRole("link", { name: /Qwen Training/ });
     expect(card).toHaveAttribute("href", "/app/sessions/qwen/terminal");
     expect(card).toHaveAttribute("data-focused", "true");
-    expect(screen.queryByRole("link", { name: /pytest/ })).not.toBeInTheDocument();
+    // Only live terminals are stacked (the island's ticker may still name pytest).
+    expect(within(screen.getByRole("main")).queryByRole("link", { name: /pytest/ })).not.toBeInTheDocument();
     expect(screen.getByText(/open · tap one to go full screen/)).toBeInTheDocument();
   });
 

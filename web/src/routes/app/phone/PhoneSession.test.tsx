@@ -89,7 +89,7 @@ describe("B3/B4/B5 · phone Session screens", () => {
   it("keeps a missing Session on its own Machine and offers a way back", async () => {
     renderAt("/app/sessions/rtx:999", routes);
     expect(await screen.findByText(/RTX-PC · Session missing/, {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "‹ Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to Overview" })).toBeInTheDocument();
   });
 
   it("says when a deep link's Machine is offline or no longer enrolled", async () => {

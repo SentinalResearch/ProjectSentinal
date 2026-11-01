@@ -40,11 +40,10 @@ describe("Settings (E1, formerly More)", () => {
     localStorage.clear();
   });
 
-  it("is titled Settings, opens the menu from its title, and old /app/more links land here", async () => {
+  it("is titled Settings, and old /app/more links land here", async () => {
     setViewport(390);
     renderSettings("/app/more");
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-haspopup", "dialog");
   });
 
   it("links to Machines, Notifications, and Account", async () => {

@@ -4,7 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useTheme, type ThemePreference } from "../../../context/ThemeContext";
 import { useLiveData } from "../../../data/LiveDataContext";
 import { machineStatusText } from "../../../data/machine-status";
-import { projectsOf } from "./menuSearch";
+import { projectsOf } from "./projects";
 import { PageTitle } from "./PageTitle";
 import styles from "./phone.module.css";
 
