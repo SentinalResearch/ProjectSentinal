@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
-import { AppShell } from "./AppShell";
+import { PageShell } from "../../test-shell";
 import { SessionDetailPage } from "./SessionDetailPage";
 
 function renderSession(path: string) {
@@ -14,7 +14,7 @@ function renderSession(path: string) {
       <ThemeProvider>
         <AuthProvider>
           <Routes>
-            <Route path="/app" element={<AppShell />}>
+            <Route path="/app" element={<PageShell />}>
               <Route path="sessions/:id" element={<SessionDetailPage />} />
             </Route>
           </Routes>

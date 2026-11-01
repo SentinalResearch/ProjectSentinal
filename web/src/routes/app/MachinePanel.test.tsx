@@ -7,7 +7,7 @@ import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
 import { dataAdapter } from "../../data";
 import { resetSimulation } from "../../data/mock/simulation";
-import { AppShell } from "./AppShell";
+import { PageShell } from "../../test-shell";
 import { OverviewPage } from "./OverviewPage";
 
 function renderMachine(id: string) {
@@ -16,7 +16,7 @@ function renderMachine(id: string) {
       <ThemeProvider>
         <AuthProvider>
           <Routes>
-            <Route path="/app" element={<AppShell />}>
+            <Route path="/app" element={<PageShell />}>
               <Route path="overview" element={<OverviewPage />} />
             </Route>
           </Routes>
@@ -81,7 +81,7 @@ describe("Machine view", () => {
         <ThemeProvider>
           <AuthProvider>
             <Routes>
-              <Route path="/app" element={<AppShell />}>
+              <Route path="/app" element={<PageShell />}>
                 <Route path="overview" element={<OverviewPage />} />
               </Route>
             </Routes>

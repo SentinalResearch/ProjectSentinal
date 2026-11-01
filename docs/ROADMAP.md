@@ -316,7 +316,7 @@ glass mobile shell and built-in terminal keyboard (4.I mobile, below).
 - [x] Session page: full-height terminal left, details right, fitted with a ResizeObserver
 - [ ] Every page reachable from the prompt; `/`, `y`, `↵` answers a WAITING Session from any page; accessibility audit ≥ 95
 
-- [ ] 768–1023 px uses the desktop glass shell (START_HERE.md), dashboard right column stacked
+- [x] 768–1023 px uses the desktop glass shell (START_HERE.md), dashboard right column stacked
 - [ ] Phone shell: `MobileIsland` on top, `PromptPill` at the bottom; top bar and menu removed
 - [ ] Phone dashboard (MOBILE_GLASS_SPEC §2)
 - [ ] `TermKeyboard`: chip strip, accessory row, letters / symbols / Ctrl layers, latch and lock, repeat, space-swipe

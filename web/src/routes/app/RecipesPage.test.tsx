@@ -6,7 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
 import { dataAdapter } from "../../data";
-import { AppShell } from "./AppShell";
+import { PageShell } from "../../test-shell";
 import { RecipesPage } from "./RecipesPage";
 
 function renderRecipes(path: string) {
@@ -15,7 +15,7 @@ function renderRecipes(path: string) {
       <ThemeProvider>
         <AuthProvider>
           <Routes>
-            <Route path="/app" element={<AppShell />}>
+            <Route path="/app" element={<PageShell />}>
               <Route path="recipes" element={<RecipesPage />} />
               <Route path="recipes/:id" element={<RecipesPage />} />
               <Route path="sessions/:id" element={<div>session opened</div>} />

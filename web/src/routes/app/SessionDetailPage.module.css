@@ -433,6 +433,8 @@
 .split[data-glass] {
   height: 100%;
   min-height: 0;
+  /* One row exactly the frame's height, so the details column scrolls inside it. */
+  grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
 }
 
@@ -447,6 +449,7 @@
 
 .split[data-glass] .details {
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--shell-top) 40px 32px;
   gap: 20px;

@@ -57,17 +57,14 @@ describe("phone shell (MOBILE_SPEC.md → Navigation)", () => {
     expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-haspopup", "dialog");
   });
 
-  it("keeps the sidebar and no phone top bar from 768 px to 1023 px", () => {
+  it("uses the glass island, never the phone top bar, from 768 px (START_HERE.md)", () => {
     setViewport(900);
     renderShell("/app/overview");
     expect(screen.queryByRole("button", { name: "Search" })).not.toBeInTheDocument();
-    // Below 1200 px the sidebar starts as its icon rail; the icons still have names.
-    expect(screen.getByRole("button", { name: "Search history" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
-    expect(screen.queryByRole("navigation", { name: "Sentinal" })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Sentinal" })).toBeInTheDocument();
   });
 
-  it("replaces the sidebar with the glass island at 1024 px and wider (GLASS_SPEC.md)", () => {
+  it("has the glass island and prompt at 1440 px (GLASS_SPEC.md)", () => {
     setViewport(1440);
     renderShell("/app/overview");
     expect(screen.queryByRole("button", { name: "Search" })).not.toBeInTheDocument();

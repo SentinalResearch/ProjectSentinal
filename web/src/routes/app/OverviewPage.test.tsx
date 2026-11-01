@@ -7,7 +7,7 @@ import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
 import { resetSimulation } from "../../data/mock/simulation";
 import { store } from "../../data/mock/store";
-import { AppShell } from "./AppShell";
+import { PageShell } from "../../test-shell";
 import { OverviewPage } from "./OverviewPage";
 
 function renderOverview() {
@@ -16,7 +16,7 @@ function renderOverview() {
       <ThemeProvider>
         <AuthProvider>
           <Routes>
-            <Route path="/app" element={<AppShell />}>
+            <Route path="/app" element={<PageShell />}>
               <Route path="overview" element={<OverviewPage />} />
             </Route>
           </Routes>
@@ -28,21 +28,18 @@ function renderOverview() {
 
 describe("OverviewPage", () => {
   beforeAll(() => {
-    // AppShell auto-collapses the sidebar under 1200px; jsdom defaults to 1024px.
     Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 1440 });
   });
 
-  it("renders the shell, needs-you grid, and machine groups from the mock adapter", async () => {
+  it("renders the needs-you grid and machine groups from the mock adapter", async () => {
     renderOverview();
 
-    // Sidebar wordmark confirms AppShell rendered around the page.
-    expect(await screen.findByText("Sentinal")).toBeInTheDocument();
     // Running session, only in its machine's table (not in Needs you).
     expect(await screen.findByText("Qwen Training")).toBeInTheDocument();
     expect(screen.getByText("Needs you")).toBeInTheDocument();
     expect(screen.getAllByText("Waiting for input")).toHaveLength(2);
-    // Machine name appears once in the sidebar and once as a group heading.
-    expect((await screen.findAllByText("MacBook")).length).toBeGreaterThanOrEqual(2);
+    // The offline Machine keeps its group heading.
+    expect(await screen.findByText("MacBook")).toBeInTheDocument();
   });
 
   it("shows a delayed Machine as online with its last update", async () => {
@@ -51,8 +48,6 @@ describe("OverviewPage", () => {
     try {
       renderOverview();
       expect(await screen.findByText("Online · updated 14 s ago")).toBeInTheDocument();
-      // Sidebar row: an amber dot and the same words on hover.
-      expect(screen.getByTitle("Mac Mini · online · updated 14 s ago")).toBeInTheDocument();
     } finally {
       resetSimulation();
     }
