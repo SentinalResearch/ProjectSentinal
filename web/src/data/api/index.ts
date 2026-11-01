@@ -52,6 +52,8 @@ const PROTOCOL_VERSION = 1;
 const SOCKET_OPEN = 1;
 const INTEGRITY_INTERVAL_MS = 60_000;
 const QUERY_CONCURRENCY = 3;
+/** Most completions one request returns (the daemon's MAX_COMPLETE_LIMIT). */
+const COMPLETE_LIMIT = 20;
 /** Most hits one search returns (the daemon's MAX_SEARCH_LIMIT). */
 const SEARCH_LIMIT = 50;
 const encoder = new TextEncoder();
@@ -1134,6 +1136,23 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       }) as HistoryResults;
       if (unavailable.length > 0) results.unavailableMachines = unavailable;
       return results;
+    },
+    async complete(sessionId, prefix, limit = COMPLETE_LIMIT) {
+      await ensureInitialized();
+      const connection = owner(sessionId);
+      const message = await connection.transport.request(
+        {
+          type: "COMPLETE",
+          session_id: localId(sessionId),
+          prefix,
+          cwd: null,
+          include_failed: false,
+          limit: Math.min(limit, COMPLETE_LIMIT),
+        },
+        (reply) => reply.type === "COMPLETIONS",
+      );
+      if (message.type !== "COMPLETIONS") throw daemonError(`Machine '${connection.id}' returned no completions`);
+      return message.completions;
     },
     async search(query) {
       await ensureInitialized();

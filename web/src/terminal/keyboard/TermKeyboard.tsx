@@ -23,14 +23,14 @@ import styles from "./TermKeyboard.module.css";
 export interface KeyboardChip {
   label: string;
   text: string;
-  /** Recent commands are tinted with the accent. */
+  /** Completions are tinted with the accent. */
   accent?: boolean;
 }
 
 export interface TermKeyboardProps {
   /** Every key press as the bytes a terminal expects. */
   onBytes: (bytes: string) => void;
-  /** Chips on the letters layer (y / n, recent commands, clear, exit). */
+  /** Chips on the letters layer (y / n, completions for the line, clear, exit). */
   chips?: KeyboardChip[];
   /** Chips on the symbols layer (tokens from recent output). */
   symbolChips?: KeyboardChip[];

@@ -78,3 +78,23 @@ export function mockSearch(query: SearchQuery, now: number = Date.now()): Search
   }
   return mergeResults([results], limit);
 }
+
+/** Mock completion (5.A): fixture history lines that start with the prefix, most used first. */
+export function mockComplete(prefix: string, limit = 20): import("../../protocol/Completion").Completion[] {
+  const counts = new Map<string, number>();
+  for (const entry of store.history) {
+    if (entry.ok !== false && entry.command.startsWith(prefix) && entry.command !== prefix && !entry.command.includes("\n")) {
+      counts.set(entry.command, (counts.get(entry.command) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts, ([text, count]) => ({
+    text,
+    source: "HISTORY" as const,
+    count,
+    last_at: null,
+    last_exit: 0,
+    score: count,
+  }))
+    .sort((left, right) => right.score - left.score || left.text.localeCompare(right.text))
+    .slice(0, limit);
+}

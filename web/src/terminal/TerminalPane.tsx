@@ -75,6 +75,8 @@ export interface TerminalPaneProps {
     /** A hardware keyboard is attached: show only the accessory row. */
     hardware: boolean;
     chips?: KeyboardChip[];
+    /** Every byte the built-in keyboard sends, for line-aware chips (5.A). */
+    onTyped?: (bytes: string) => void;
   };
 }
 
@@ -284,6 +286,7 @@ export function TerminalPane({
 
   /** Built-in keyboard bytes: ^C asks first (§5), the rest goes to the PTY. */
   function typed(bytes: string) {
+    keyboard?.onTyped?.(bytes);
     if (bytes === "\x03" && onRequestInterrupt) {
       onRequestInterrupt();
       return;

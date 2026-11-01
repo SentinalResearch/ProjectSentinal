@@ -232,7 +232,11 @@ function foundRows(index: PromptIndex, query: string): PromptSuggestion[] {
       .filter(Boolean)
       .join(" · "),
     action: { kind: "navigate", to: result.to },
-    completion: `find ${query}`,
+    // A Command that starts with the query completes to itself (5.A).
+    completion:
+      result.kind === "COMMANDS" && result.title.toLowerCase().startsWith(query.toLowerCase())
+        ? `find ${result.title}`
+        : `find ${query}`,
     sessionId: result.sessionId,
   }));
 }
@@ -360,6 +364,15 @@ function empty(index: PromptIndex): PromptSuggestion[] {
 }
 
 // ── Entry point ─────────────────────────────────────────────────────────────
+
+/**
+ * Ghost text (5.A): the rest of `suggestion`'s completion after what is
+ * typed, when it extends the input exactly; Tab accepts it.
+ */
+export function ghostText(input: string, suggestion: PromptSuggestion | undefined): string {
+  if (!suggestion || !input || !suggestion.completion.startsWith(input)) return "";
+  return suggestion.completion.slice(input.length);
+}
 
 /** Shortest text worth asking every Machine about. */
 const MIN_SEARCH = 2;

@@ -8,6 +8,7 @@ import { useLiveData } from "../../../data/LiveDataContext";
 import { useIsPhone } from "../../../hooks/useViewport";
 import type { KeyboardChip } from "../../../terminal/keyboard/TermKeyboard";
 import { TerminalPane } from "../../../terminal/TerminalPane";
+import { nextTypedLine } from "../../../terminal/keyboard/typedLine";
 import { BackBar } from "./BackBar";
 import { ConfirmSignalSheet } from "./ConfirmSignalSheet";
 import { needsInterruptConfirm } from "./interrupt";
@@ -19,24 +20,32 @@ export function SessionTerminalRoute() {
   return useIsPhone() ? <PhoneTerminal /> : <Navigate to={`/app/sessions/${id}`} replace />;
 }
 
-/** The most recent distinct Commands of a Session, newest first. */
-function useRecentCommands(sessionId: string): string[] {
-  const [commands, setCommands] = useState<string[]>([]);
+/** Typing pauses this long before the Machine is asked. */
+const COMPLETE_DEBOUNCE_MS = 150;
+const COMPLETION_CHIPS = 3;
+
+/**
+ * Completions for the line being typed, from the Session's own Machine
+ * (5.A). An empty line gets its recent habits; an unknown line (after arrows
+ * or Tab) gets none.
+ */
+function useCompletions(sessionId: string, line: string | null): string[] {
+  const [found, setFound] = useState<{ line: string; texts: string[] }>();
   useEffect(() => {
+    if (line === null) return;
     let live = true;
-    dataAdapter
-      .getHistory({ sessionId })
-      .then((results) => {
-        if (!live) return;
-        const texts = results.map((entry) => entry.command).filter(Boolean);
-        setCommands(Array.from(new Set(texts)).slice(0, 3));
-      })
-      .catch(() => undefined);
+    const timer = setTimeout(() => {
+      dataAdapter
+        .complete(sessionId, line, COMPLETION_CHIPS)
+        .then((completions) => live && setFound({ line, texts: completions.map((completion) => completion.text) }))
+        .catch(() => live && setFound({ line, texts: [] }));
+    }, COMPLETE_DEBOUNCE_MS);
     return () => {
       live = false;
+      clearTimeout(timer);
     };
-  }, [sessionId]);
-  return commands;
+  }, [sessionId, line]);
+  return found !== undefined && found.line === line ? found.texts : [];
 }
 
 /** A physical key press means a hardware keyboard (MOBILE_GLASS_SPEC §4). */
@@ -58,16 +67,21 @@ export function PhoneTerminal() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [keyboardShown, setKeyboardShown] = useState(true);
   const hardware = useHardwareKeyboard();
-  const recent = useRecentCommands(id);
+  // Assume a fresh prompt when the terminal opens.
+  const [line, setLine] = useState<string | null>("");
+  const completions = useCompletions(id, line);
   const session = sessions.find((candidate) => candidate.id === id);
   const machineName = machines.find((candidate) => candidate.id === session?.machine)?.name ?? session?.machine ?? "";
 
-  const chips: KeyboardChip[] = [
+  const offered: KeyboardChip[] = [
     ...(session && canAnswer(session) ? [{ label: "y", text: "y" }, { label: "n", text: "n" }] : []),
-    ...recent.map((command) => ({ label: `↑ ${command}`, text: command, accent: true })),
+    // A chip adds only what is missing: the completion starts with the line.
+    ...completions.map((text) => ({ label: text, text: text.slice(line?.length ?? 0), accent: true })),
     { label: "clear", text: "clear" },
     { label: "exit", text: "exit" },
   ];
+  // A completion such as `clear` would repeat a fixed chip.
+  const chips = offered.filter((chip, index) => offered.findIndex((other) => other.label === chip.label) === index);
 
   const trailing = session ? (
     <span className={styles.islandTools}>
@@ -95,7 +109,12 @@ export function PhoneTerminal() {
           sessionId={session.id}
           session={session}
           height="fill"
-          keyboard={{ visible: keyboardShown, hardware, chips }}
+          keyboard={{
+            visible: keyboardShown,
+            hardware,
+            chips,
+            onTyped: (bytes) => setLine((current) => nextTypedLine(current, bytes)),
+          }}
           onRequestInterrupt={() => {
             if (needsInterruptConfirm(session)) setSheetOpen(true);
             else void dataAdapter.sendSignal(session.id, "SIGINT");

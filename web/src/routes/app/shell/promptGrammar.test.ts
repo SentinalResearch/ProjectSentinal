@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Machine, Recipe, Session } from "../../../data/types";
 import { settingsTabs } from "../settings-tabs";
 import type { SearchResult } from "../../../data/search";
-import { matchScore, parseRun, searchText, suggest, type PromptIndex } from "./promptGrammar";
+import { ghostText, matchScore, parseRun, searchText, suggest, type PromptIndex } from "./promptGrammar";
 
 const machines: Machine[] = [
   { id: "rtx", name: "RTX-PC", os: "Linux", hardware: "", status: "ONLINE" },
@@ -174,6 +174,16 @@ describe("prompt grammar", () => {
     it("adds found results to bare text, and ignores results for older text", () => {
       expect(suggest("oom", found("oom", [oom])).some((row) => row.id === "found:rtx:EVENTS:9")).toBe(true);
       expect(suggest("oomx", found("oom", [oom])).some((row) => row.id === "found:rtx:EVENTS:9")).toBe(false);
+    });
+
+    it("Tab completes find to a Command that starts with what was typed (5.A)", () => {
+      const rows = suggest("find python t", found("python t", [train, oom])).filter((row) => row.group === "FIND");
+      expect(rows[0].completion).toBe("find python train.py");
+      // A hit that only contains the text keeps the query as typed.
+      expect(rows[1].completion).toBe("find python t");
+      expect(ghostText("find python t", rows[0])).toBe("rain.py");
+      expect(ghostText("find python t", rows[1])).toBe("");
+      expect(ghostText("go hist", undefined)).toBe("");
     });
 
     it("uses the ranking shared with the daemon, initials included", () => {

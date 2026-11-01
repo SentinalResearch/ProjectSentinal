@@ -267,6 +267,11 @@ class FakeSocket implements ApiSocket {
       payload = { type: "SESSION_UPDATED", session: { ...ownedSession, state: "INTERRUPTED" } };
     } else if (request.type === "GET_HISTORY" || request.type === "SEARCH_COMMANDS") {
       payload = { type: "HISTORY", commands: [ownedCommand] };
+    } else if (request.type === "COMPLETE") {
+      payload = {
+        type: "COMPLETIONS",
+        completions: [{ text: `${request.prefix}thon train.py`, source: "HISTORY", count: 31, last_at: 1, last_exit: 0, score: 33 }],
+      };
     } else if (request.type === "SEARCH") {
       // The worker's hit scores higher, so merging must put it first.
       const worker = this.machineId !== machine.id;
@@ -1049,6 +1054,25 @@ describe("apiAdapter multi-Machine routing", () => {
     }
     expect(names.length).toBeGreaterThan(0);
     expect(new Set(names)).toEqual(new Set(["Mac-Mini"]));
+  });
+
+  it("completes a Session's line on the Machine that owns it (5.A)", async () => {
+    const { adapter, server, sockets } = setup();
+    server.registryMachines = [workerRegistry()];
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getSessions();
+
+    const completions = await adapter.complete("worker-machine:1", "py", 3);
+    expect(completions.map((completion) => completion.text)).toEqual(["python train.py"]);
+    const worker = sockets.find((socket) => socket.machineId === "worker-machine");
+    expect(worker?.requests).toContainEqual({
+      type: "COMPLETE",
+      session_id: 1,
+      prefix: "py",
+      cwd: null,
+      include_failed: false,
+      limit: 3,
+    });
   });
 
   it("searches every Machine and merges their hits best first (5.S)", async () => {

@@ -127,10 +127,14 @@ Goal: the command you want, in fewer keystrokes, wherever you type. Folds in `pr
       environment, never argv); press again to cycle; never replaces the
       shell's own Tab completion. Verified in real zsh and fish; bash 4+ not
       yet run on real hardware (macOS has bash 3.2, where it is skipped)
-- [ ] Prompt: `run`, `new`, and `find` complete Commands and recipe
-      parameters inline (ghost text, Tab to accept)
-- [ ] Phone keyboard: the chip strip shows the top completions for what is
-      on the current line, replacing the static "recent commands" chips
+- [x] Prompt: ghost text shows the rest of the chosen suggestion after the
+      caret and Tab accepts it (`go`, `run` Recipe names, `split`, …); `find`
+      completes to a found Command that starts with the query. Still open:
+      Recipe *parameters* inline, and `new` (the prompt has no shell line)
+- [x] Phone keyboard: the chip strip shows the top completions for what is
+      on the current line (tracked from the built-in keyboard; unknown after
+      arrows or Tab), from the Session's own Machine; a chip adds only the
+      missing part. Replaces the static "recent commands" chips
 - [x] Projects (`prompts/06` §1): `projects.toml` (`docs/SETUP.md`);
       Sessions created, registered, or adopted join the project holding
       their cwd (longest root, symlinks resolved); completion ranks the

@@ -8,7 +8,7 @@ import { TermKeyboard } from "../../../terminal/keyboard/TermKeyboard";
 import type { Recipe } from "../../../data/types";
 import { settingsTabs } from "../settings-tabs";
 import { parseFind, type SearchResult } from "../../../data/search";
-import { searchText, suggest, type PromptGroup, type PromptSuggestion } from "./promptGrammar";
+import { ghostText, searchText, suggest, type PromptGroup, type PromptSuggestion } from "./promptGrammar";
 import styles from "./PromptBar.module.css";
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -106,6 +106,7 @@ export function PromptBar({
     [text, terminals, machines, recipes, theme, found],
   );
   const current = suggestions[Math.min(selected, suggestions.length - 1)];
+  const ghost = ghostText(text, current);
 
   function choose(suggestion: PromptSuggestion | undefined, split = false) {
     if (!suggestion) return;
@@ -218,27 +219,36 @@ export function PromptBar({
           <span className={styles.caret} aria-hidden="true">
             ❯
           </span>
-          <input
-            ref={input}
-            className={styles.input}
-            value={text}
-            onChange={(event) => {
-              setText(event.target.value);
-              setSelected(0);
-            }}
-            onKeyDown={onKeyDown}
-            role="combobox"
-            aria-label="Command"
-            aria-expanded={suggestions.length > 0}
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-activedescendant={current ? optionId(suggestions.indexOf(current)) : undefined}
-            spellCheck={false}
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            inputMode={sheet ? "none" : undefined}
-          />
+          <span className={styles.field}>
+            <input
+              ref={input}
+              className={styles.input}
+              value={text}
+              onChange={(event) => {
+                setText(event.target.value);
+                setSelected(0);
+              }}
+              onKeyDown={onKeyDown}
+              role="combobox"
+              aria-label="Command"
+              aria-expanded={suggestions.length > 0}
+              aria-controls={listId}
+              aria-autocomplete="list"
+              aria-activedescendant={current ? optionId(suggestions.indexOf(current)) : undefined}
+              spellCheck={false}
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              inputMode={sheet ? "none" : undefined}
+            />
+            {ghost && (
+              // What Tab would add, drawn after the typed text (5.A).
+              <span className={styles.ghost} aria-hidden="true" data-testid="prompt-ghost">
+                <span className={styles.ghostTyped}>{text}</span>
+                {ghost}
+              </span>
+            )}
+          </span>
           {sheet ? (
             <button type="button" className={styles.cancel} onClick={onClose}>
               Cancel

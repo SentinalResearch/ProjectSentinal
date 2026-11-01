@@ -2,6 +2,7 @@ import type { LinkFailureCode } from "../protocol/LinkFailureCode";
 import type { PairingCode } from "../protocol/PairingCode";
 import type { PairingCodeStatus } from "../protocol/PairingCodeStatus";
 import type { RegistryMachine } from "../protocol/RegistryMachine";
+import type { Completion } from "../protocol/Completion";
 import type { SearchQuery, SearchResults } from "./search";
 import type {
   AuthState,
@@ -93,6 +94,8 @@ export interface DataAdapter {
   ): Promise<OutputReplayResult>;
   getRecipes(): Promise<Recipe[]>;
   getHistory(filters?: HistoryFilters): Promise<HistoryResults>;
+  /** Completions for the line typed in a Session, from its own Machine (5.A). */
+  complete(sessionId: string, prefix: string, limit?: number): Promise<Completion[]>;
   /** Search every Machine (or `query.machine` only) and merge the hits best first (5.S). */
   search(query: SearchQuery): Promise<SearchResults>;
 

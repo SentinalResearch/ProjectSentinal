@@ -157,6 +157,28 @@ describe("C1/C2 · phone terminal", () => {
     expect(screen.getByRole("button", { name: "Ctrl" })).toBeInTheDocument();
   });
 
+  it("offers completions for the line being typed and a chip adds only what is missing (5.A)", async () => {
+    setViewport(390);
+    const complete = vi.spyOn(dataAdapter, "complete").mockImplementation(async (_session, prefix) =>
+      prefix === "py"
+        ? [{ text: "python train.py", source: "HISTORY", count: 31, last_at: 1, last_exit: 0, score: 33 }]
+        : [{ text: "nvidia-smi", source: "HISTORY", count: 4, last_at: 1, last_exit: 0, score: 5 }]);
+    const sendInput = vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
+    renderAt("/app/sessions/qwen/terminal", routes);
+    const user = userEvent.setup();
+    // An empty line offers recent habits instead of a fixed list.
+    const suggestions = await screen.findByRole("group", { name: "Suggestions" }, { timeout: 5000 });
+    expect(await within(suggestions).findByRole("button", { name: "nvidia-smi" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "p" }));
+    await user.click(screen.getByRole("button", { name: "y" }));
+    const chip = await within(suggestions).findByRole("button", { name: "python train.py" });
+    expect(complete).toHaveBeenLastCalledWith("qwen", "py", expect.any(Number));
+    await user.click(chip);
+    await user.click(screen.getByRole("button", { name: "Enter" }));
+    expect(sendInput).toHaveBeenCalledWith("qwen", "python train.py");
+  });
+
   it("shows no keys for a read-only Session", async () => {
     setViewport(390);
     renderAt("/app/sessions/pytest/terminal", routes);

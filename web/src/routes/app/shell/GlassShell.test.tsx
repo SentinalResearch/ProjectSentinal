@@ -144,6 +144,18 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
     // Real pages (split view mounts terminals) render slowly under jsdom.
   }, 20_000);
 
+  it("shows the rest of the chosen suggestion as ghost text; Tab accepts it (5.A)", async () => {
+    renderShell("/app/overview");
+    await islandReady();
+    const user = userEvent.setup();
+    await user.keyboard("/");
+    await user.keyboard("go hist");
+    expect(screen.getByTestId("prompt-ghost")).toHaveTextContent("ory");
+    await user.keyboard("{Tab}");
+    expect(screen.getByRole("combobox", { name: "Command" })).toHaveValue("go history");
+    expect(screen.queryByTestId("prompt-ghost")).not.toBeInTheDocument();
+  });
+
   it("searches every Machine for what is typed and opens the hit (5.S)", async () => {
     const search = vi.spyOn(dataAdapter, "search").mockImplementation(async (query) =>
       query.text === "oom"
