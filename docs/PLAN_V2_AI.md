@@ -96,9 +96,14 @@ Goal: one search, fast and ranked on the daemon, used by the prompt, History, an
       memory") > subsequence; recency (15, halving daily) and needs-you (30)
       boosts; one table (`crates/protocol/tests/fixtures/search_ranking.json`)
       tested in Rust and in the browser
-- [ ] The prompt calls `SEARCH` for bare text and `find`, so results include
-      Machines that are not loaded in the browser yet
-- [ ] Filters as prompt grammar: `find failed pytest on rtx-pc since yesterday`
+- [x] The prompt calls `SEARCH` for bare text and `find` (after 150 ms of
+      quiet, stale replies dropped), on desktop and in the phone sheet, so
+      results include Sessions and Commands the browser has not loaded
+      (`web/src/data/search.ts`, `PromptBar.tsx`). History still uses
+      `SEARCH_COMMANDS`
+- [x] Filters as prompt grammar: `find failed pytest on rtx-pc since yesterday`
+      (`failed` / `passed` / `running`, `on <machine>` asks only that
+      Machine, `since today|yesterday|week|3h|2d`)
 - [ ] Output search, **opt-in per Session** (FULL capture only): search the
       saved log with secret-pattern redaction in results; never indexed by default
 - [x] Budget: p95 < 50 ms on 100 000 Commands and 500 000 Events (timed

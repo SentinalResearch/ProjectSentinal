@@ -5,6 +5,7 @@ import { previewTemplate } from "../recipeTemplate";
 import type { AuthState, NotificationRuleSet, Session } from "../types";
 import { mockInsight, mockMetrics } from "./insights";
 import { acquireLiveUpdates, resolvePrompt } from "./live";
+import { mockSearch } from "./search";
 import { delay, emit, findSession, store, subscribe as subscribeStore, updateSession, appendEvent } from "./store";
 
 let passwordHash: string | null = null;
@@ -111,6 +112,10 @@ export const mockAdapter: DataAdapter = {
       entries = entries.filter((h) => h.command.toLowerCase().includes(q));
     }
     return delay(entries.map((e) => ({ ...e })));
+  },
+
+  async search(query) {
+    return delay(mockSearch(query));
   },
 
   subscribe(listener: (event: LiveEvent) => void) {

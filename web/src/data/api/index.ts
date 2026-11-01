@@ -44,6 +44,7 @@ import { applyProjectionMessage, projectionView, type ProjectionView } from "./p
 import { health, type createHealthCollector } from "../health";
 import { formatEventTime, sessionElapsedMs } from "../format";
 import { markLoad } from "../load-timing";
+import { mergeResults, resultFromHit, type SearchResult, type SearchResults } from "../search";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
 
@@ -51,6 +52,8 @@ const PROTOCOL_VERSION = 1;
 const SOCKET_OPEN = 1;
 const INTEGRITY_INTERVAL_MS = 60_000;
 const QUERY_CONCURRENCY = 3;
+/** Most hits one search returns (the daemon's MAX_SEARCH_LIMIT). */
+const SEARCH_LIMIT = 50;
 const encoder = new TextEncoder();
 
 export function defaultDaemonUrl(): string {
@@ -1129,6 +1132,34 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
         if (filters.result === "running") return entry.ok === null;
         return filters.result === "ok" ? entry.ok === true : entry.ok === false;
       }) as HistoryResults;
+      if (unavailable.length > 0) results.unavailableMachines = unavailable;
+      return results;
+    },
+    async search(query) {
+      await ensureInitialized();
+      const limit = Math.min(query.limit ?? SEARCH_LIMIT, SEARCH_LIMIT);
+      const targets = query.machine === undefined
+        ? [...connections.values()].filter(queryEligible)
+        : [connections.get(query.machine)].filter((connection): connection is MachineConnection => connection !== undefined);
+      const request: ClientRequest = {
+        type: "SEARCH",
+        query: query.text,
+        scopes: query.scopes ?? [],
+        filters: { since: query.since ?? null, outcome: query.outcome ?? null },
+        limit,
+      };
+      const settled = await mapConcurrent(targets, QUERY_CONCURRENCY, async (connection) => {
+        try {
+          const message = await connection.transport.request(request, (reply) => reply.type === "SEARCH_RESULTS");
+          if (message.type !== "SEARCH_RESULTS") throw daemonError(`Machine '${connection.id}' returned no search results`);
+          return { connection, results: message.hits.map((hit) => resultFromHit(connection.id, hit)), failed: false };
+        } catch {
+          markFailure(connection);
+          return { connection, results: [] as SearchResult[], failed: true };
+        }
+      });
+      const results: SearchResults = mergeResults(settled.map((result) => result.results), limit);
+      const unavailable = settled.filter((result) => result.failed).map((result) => result.connection.id);
       if (unavailable.length > 0) results.unavailableMachines = unavailable;
       return results;
     },

@@ -7,7 +7,8 @@ import { useLiveData } from "../../../data/LiveDataContext";
 import { TermKeyboard } from "../../../terminal/keyboard/TermKeyboard";
 import type { Recipe } from "../../../data/types";
 import { settingsTabs } from "../settings-tabs";
-import { suggest, type PromptGroup, type PromptSuggestion } from "./promptGrammar";
+import { parseFind, type SearchResult } from "../../../data/search";
+import { searchText, suggest, type PromptGroup, type PromptSuggestion } from "./promptGrammar";
 import styles from "./PromptBar.module.css";
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -20,6 +21,11 @@ function loadRecipes(): Promise<Recipe[]> {
   });
   return recipeCache;
 }
+
+/** Typing pauses this long before every Machine is asked. */
+const SEARCH_DEBOUNCE_MS = 150;
+/** Found rows the prompt can show. */
+const SEARCH_LIMIT = 8;
 
 const GROUP_LABEL: Record<PromptGroup, string> = {
   ANSWER: "Answer",
@@ -51,8 +57,26 @@ export function PromptBar({
   const [text, setText] = useState(initialText);
   const [selected, setSelected] = useState(0);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [found, setFound] = useState<{ query: string; results: SearchResult[] }>();
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
+
+  // Search every Machine once typing settles; a reply for older text is dropped.
+  const query = searchText(text);
+  useEffect(() => {
+    if (query === undefined) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      dataAdapter
+        .search({ ...parseFind(query, machines), limit: SEARCH_LIMIT })
+        .then((results) => live && setFound({ query, results }))
+        .catch(() => live && setFound({ query, results: [] }));
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [query, machines]);
 
   useEffect(() => {
     let live = true;
@@ -77,8 +101,9 @@ export function PromptBar({
         recipes,
         settingsTabs: settingsTabs(isMockData),
         theme: theme === "light" ? "light" : "dark",
+        found,
       }),
-    [text, terminals, machines, recipes, theme],
+    [text, terminals, machines, recipes, theme, found],
   );
   const current = suggestions[Math.min(selected, suggestions.length - 1)];
 

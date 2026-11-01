@@ -2,6 +2,7 @@ import type { LinkFailureCode } from "../protocol/LinkFailureCode";
 import type { PairingCode } from "../protocol/PairingCode";
 import type { PairingCodeStatus } from "../protocol/PairingCodeStatus";
 import type { RegistryMachine } from "../protocol/RegistryMachine";
+import type { SearchQuery, SearchResults } from "./search";
 import type {
   AuthState,
   HistoryResults,
@@ -92,6 +93,8 @@ export interface DataAdapter {
   ): Promise<OutputReplayResult>;
   getRecipes(): Promise<Recipe[]>;
   getHistory(filters?: HistoryFilters): Promise<HistoryResults>;
+  /** Search every Machine (or `query.machine` only) and merge the hits best first (5.S). */
+  search(query: SearchQuery): Promise<SearchResults>;
 
   /** Resolve a browser composite Session ID to its owning Machine route. */
   resolveTerminal(sessionId: string): TerminalRoute;

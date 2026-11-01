@@ -267,6 +267,20 @@ class FakeSocket implements ApiSocket {
       payload = { type: "SESSION_UPDATED", session: { ...ownedSession, state: "INTERRUPTED" } };
     } else if (request.type === "GET_HISTORY" || request.type === "SEARCH_COMMANDS") {
       payload = { type: "HISTORY", commands: [ownedCommand] };
+    } else if (request.type === "SEARCH") {
+      // The worker's hit scores higher, so merging must put it first.
+      const worker = this.machineId !== machine.id;
+      payload = {
+        type: "SEARCH_RESULTS",
+        hits: [{
+          kind: "COMMANDS",
+          title: `${request.query} on ${this.machineId}`,
+          detail: "exit 0 · /work",
+          target: { type: "COMMAND", session_id: 1, command_id: worker ? 7 : 3 },
+          at: 1_700_000_000_000,
+          score: worker ? 95 : 80,
+        }],
+      };
     } else if (request.type === "GET_EVENTS") {
       payload = { type: "EVENTS", events: [watcherEvent] };
     } else if (request.type === "LIST_RECIPES" || request.type === "SAVE_RECIPE") {
@@ -1035,6 +1049,34 @@ describe("apiAdapter multi-Machine routing", () => {
     }
     expect(names.length).toBeGreaterThan(0);
     expect(new Set(names)).toEqual(new Set(["Mac-Mini"]));
+  });
+
+  it("searches every Machine and merges their hits best first (5.S)", async () => {
+    const { adapter, server, sockets } = setup();
+    server.registryMachines = [workerRegistry()];
+    await adapter.auth.login("correct horse battery staple");
+    await adapter.getSessions();
+
+    const results = await adapter.search({ text: "train", outcome: "FAILED", since: 5, limit: 10 });
+    expect(results.map((result) => [result.title, result.sessionId, result.to])).toEqual([
+      ["train on worker-machine", "worker-machine:1", "/app/sessions/worker-machine%3A1"],
+      ["train on test-machine", "test-machine:1", "/app/sessions/test-machine%3A1"],
+    ]);
+    const worker = sockets.find((socket) => socket.machineId === "worker-machine");
+    expect(worker?.requests).toContainEqual({
+      type: "SEARCH",
+      query: "train",
+      scopes: [],
+      filters: { since: 5, outcome: "FAILED" },
+      limit: 10,
+    });
+
+    // `on <machine>` asks only that Machine.
+    const control = sockets.find((socket) => socket.machineId === "test-machine");
+    const before = control?.requests.length ?? 0;
+    const narrowed = await adapter.search({ text: "train", machine: "worker-machine" });
+    expect(narrowed.map((result) => result.machineId)).toEqual(["worker-machine"]);
+    expect(control?.requests).toHaveLength(before);
   });
 
   it("keeps equal daemon-local IDs separate and routes every operation to its owner", async () => {

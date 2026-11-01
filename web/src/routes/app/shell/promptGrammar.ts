@@ -6,6 +6,7 @@
  */
 import { canAnswer, canInterrupt } from "../../../data/actions";
 import { needsAttention, slugifyProject } from "../../../data/format";
+import { matchScore, type SearchResult } from "../../../data/search";
 import type { Machine, Recipe, Session } from "../../../data/types";
 import type { SettingsTab } from "../settings-tabs";
 
@@ -39,6 +40,8 @@ export interface PromptIndex {
   settingsTabs: readonly SettingsTab[];
   /** Light or dark: the theme action says which it switches to. */
   theme: "light" | "dark";
+  /** What the Machines found for `query` (5.S); ignored once the text moves on. */
+  found?: { query: string; results: SearchResult[] };
 }
 
 const PER_GROUP = 5;
@@ -58,37 +61,7 @@ export function sessionPath(index: PromptIndex, session: Session): string {
   return `${slug(machineOf(index, session)?.name ?? session.machine)}/${slug(session.name)}`;
 }
 
-/**
- * How well `query` matches any of `haystacks` (0 = not at all). Every word
- * must match: as a substring (best at a word start), else as a subsequence.
- */
-export function matchScore(query: string, haystacks: string[]): number {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return 1;
-  const hays = haystacks.map((hay) => hay.toLowerCase());
-  let total = 0;
-  for (const word of words) {
-    let best = 0;
-    for (const hay of hays) {
-      const at = hay.indexOf(word);
-      if (at === 0) best = Math.max(best, 100);
-      else if (at > 0) best = Math.max(best, /[^a-z0-9]/.test(hay[at - 1]) ? 80 : 60);
-      else if (isSubsequence(word, hay)) best = Math.max(best, 20);
-    }
-    if (best === 0) return 0;
-    total += best;
-  }
-  return total / words.length;
-}
-
-function isSubsequence(needle: string, hay: string): boolean {
-  let at = 0;
-  for (const char of hay) {
-    if (char === needle[at]) at += 1;
-    if (at === needle.length) return true;
-  }
-  return false;
-}
+export { matchScore };
 
 function ranked<T>(items: T[], query: string, keys: (item: T) => string[]): T[] {
   return items
@@ -239,9 +212,35 @@ function run(index: PromptIndex, argument: string): PromptSuggestion[] {
 
 // ── FIND ────────────────────────────────────────────────────────────────────
 
-function find(text: string): PromptSuggestion[] {
+const KIND_WORD: Record<SearchResult["kind"], string> = {
+  SESSIONS: "Session",
+  COMMANDS: "Command",
+  EVENTS: "Event",
+  RECIPES: "Recipe",
+  MACHINES: "Machine",
+  PAGES: "Page",
+};
+
+/** What the Machines found for exactly this text, as Find rows. */
+function foundRows(index: PromptIndex, query: string): PromptSuggestion[] {
+  if (!index.found || index.found.query !== query) return [];
+  return index.found.results.map((result) => ({
+    id: `found:${result.id}`,
+    group: "FIND",
+    command: result.title,
+    detail: [KIND_WORD[result.kind], index.machines.find((machine) => machine.id === result.machineId)?.name, result.detail]
+      .filter(Boolean)
+      .join(" · "),
+    action: { kind: "navigate", to: result.to },
+    completion: `find ${query}`,
+    sessionId: result.sessionId,
+  }));
+}
+
+function find(index: PromptIndex, text: string): PromptSuggestion[] {
   const query = text.trim();
   return [
+    ...foundRows(index, query),
     {
       id: `find:${query}`,
       group: "FIND",
@@ -353,14 +352,35 @@ function bare(index: PromptIndex, text: string): PromptSuggestion[] {
   // Every typed word starts a word of the action's name (score ≥ 80).
   const named = scored.filter((entry) => entry.score >= 80).map((entry) => entry.suggestion);
   const loose = scored.filter((entry) => entry.score > 0 && entry.score < 80).map((entry) => entry.suggestion);
-  return [...named, ...go(index, text), ...run(index, text), ...find(text), ...loose];
+  return [...named, ...go(index, text), ...run(index, text), ...find(index, text), ...loose];
 }
 
 function empty(index: PromptIndex): PromptSuggestion[] {
-  return [...answers(index, "y", ""), ...go(index, ""), ...find("")];
+  return [...answers(index, "y", ""), ...go(index, ""), ...find(index, "")];
 }
 
 // ── Entry point ─────────────────────────────────────────────────────────────
+
+/** Shortest text worth asking every Machine about. */
+const MIN_SEARCH = 2;
+
+/**
+ * The text to search every Machine for: a `find` argument or bare text, never
+ * another command (`go`, `run`, `y`, `split`, …), and not a single character.
+ */
+export function searchText(input: string): string | undefined {
+  const text = input.trim();
+  const head = text.split(/\s+/)[0]?.toLowerCase() ?? "";
+  const hasArgument = /\s/.test(text);
+  const argument = text.slice(head.length).trim();
+  let query: string;
+  if (head === "find") query = argument;
+  else if ((head === "y" || head === "n") && (hasArgument || text.length === 1)) return undefined;
+  else if (["go", "run", "kill"].includes(head) && hasArgument) return undefined;
+  else if (head === "split") return undefined;
+  else query = text;
+  return query.length >= MIN_SEARCH ? query : undefined;
+}
 
 /** Suggestions for what has been typed, grouped in display order and capped. */
 export function suggest(input: string, index: PromptIndex): PromptSuggestion[] {
@@ -373,7 +393,7 @@ export function suggest(input: string, index: PromptIndex): PromptSuggestion[] {
   else if ((head === "y" || head === "n") && (hasArgument || text.length === 1)) all = answers(index, head, argument);
   else if (head === "go" && hasArgument) all = go(index, argument);
   else if (head === "run" && hasArgument) all = run(index, argument);
-  else if (head === "find" && hasArgument) all = find(argument);
+  else if (head === "find" && hasArgument) all = find(index, argument);
   else if (head === "split" && (hasArgument || text === "split")) all = split(index, text.slice(5).replace(/^\s+/, ""));
   else if (head === "kill" && hasArgument) all = kill(index, argument);
   else all = bare(index, text.trim());

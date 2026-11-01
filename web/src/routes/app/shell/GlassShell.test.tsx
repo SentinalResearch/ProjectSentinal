@@ -143,4 +143,33 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
     expect(await screen.findByRole("button", { name: /You are on History/ })).toBeInTheDocument();
     // Real pages (split view mounts terminals) render slowly under jsdom.
   }, 20_000);
+
+  it("searches every Machine for what is typed and opens the hit (5.S)", async () => {
+    const search = vi.spyOn(dataAdapter, "search").mockImplementation(async (query) =>
+      query.text === "oom"
+        ? [{
+            id: "m:EVENTS:1",
+            kind: "EVENTS",
+            title: "Error · Qwen Training",
+            detail: "CUDA out of memory",
+            score: 54,
+            machineId: "rtx-pc",
+            to: "/app/history?q=cuda",
+          }]
+        : []);
+    renderShell("/app/overview");
+    await islandReady();
+    const user = userEvent.setup();
+
+    await user.keyboard("/");
+    await user.keyboard("oom");
+    const hit = await screen.findByRole("option", { name: /Error · Qwen Training/ });
+    // Typed quickly: one search for the settled text, not one per keystroke.
+    expect(search.mock.calls.filter(([query]) => query.text === "o")).toHaveLength(0);
+    expect(search).toHaveBeenLastCalledWith(expect.objectContaining({ text: "oom" }));
+    expect(hit).toHaveTextContent("CUDA out of memory");
+
+    await user.click(hit);
+    expect(await screen.findByRole("button", { name: /You are on History/ })).toBeInTheDocument();
+  });
 });

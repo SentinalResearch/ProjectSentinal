@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Machine, Recipe, Session } from "../../../data/types";
 import { settingsTabs } from "../settings-tabs";
-import { matchScore, parseRun, suggest, type PromptIndex } from "./promptGrammar";
+import type { SearchResult } from "../../../data/search";
+import { matchScore, parseRun, searchText, suggest, type PromptIndex } from "./promptGrammar";
 
 const machines: Machine[] = [
   { id: "rtx", name: "RTX-PC", os: "Linux", hardware: "", status: "ONLINE" },
@@ -125,5 +126,58 @@ describe("prompt grammar", () => {
     expect(matchScore("ins", ["npm install"])).toBeGreaterThan(matchScore("tal", ["npm install"]));
     expect(matchScore("zzz", ["npm install"])).toBe(0);
     expect(matchScore("nmi", ["npm install"])).toBeGreaterThan(0);
+  });
+
+  describe("search everywhere (5.S)", () => {
+    const oom: SearchResult = {
+      id: "rtx:EVENTS:9",
+      kind: "EVENTS",
+      title: "Error · Qwen Training",
+      detail: "CUDA out of memory",
+      score: 54.15,
+      machineId: "rtx",
+      to: "/app/sessions/rtx%3A3",
+      sessionId: "rtx:3",
+    };
+    const train: SearchResult = {
+      id: "rtx:COMMANDS:4",
+      kind: "COMMANDS",
+      title: "python train.py",
+      detail: "exit 1 · ~/ml",
+      score: 34.15,
+      machineId: "rtx",
+      to: "/app/sessions/rtx%3A3",
+      sessionId: "rtx:3",
+    };
+    const found = (query: string, results: SearchResult[]): PromptIndex => ({ ...index, found: { query, results } });
+
+    it("asks the Machines for bare text and for find, never for other commands", () => {
+      expect(searchText("oom")).toBe("oom");
+      expect(searchText("  find failed pytest on rtx-pc ")).toBe("failed pytest on rtx-pc");
+      expect(searchText("o")).toBeUndefined();
+      expect(searchText("find")).toBeUndefined();
+      for (const text of ["go rtx", "run eval", "y npm", "split a b", "kill npm", "n", ""]) {
+        expect(searchText(text), text).toBeUndefined();
+      }
+    });
+
+    it("shows what the Machines found under Find, each leading to its Session", () => {
+      const rows = suggest("find oom", found("oom", [oom, train])).filter((row) => row.group === "FIND");
+      expect(rows.map((row) => row.command)).toEqual(["Error · Qwen Training", "python train.py", "find oom"]);
+      expect(rows[0].detail).toBe("Event · RTX-PC · CUDA out of memory");
+      expect(rows[0].action).toEqual({ kind: "navigate", to: "/app/sessions/rtx%3A3" });
+      expect(rows[0].sessionId).toBe("rtx:3");
+      // The last row still opens History with the query.
+      expect(rows[2].action).toEqual({ kind: "navigate", to: "/app/history?q=oom" });
+    });
+
+    it("adds found results to bare text, and ignores results for older text", () => {
+      expect(suggest("oom", found("oom", [oom])).some((row) => row.id === "found:rtx:EVENTS:9")).toBe(true);
+      expect(suggest("oomx", found("oom", [oom])).some((row) => row.id === "found:rtx:EVENTS:9")).toBe(false);
+    });
+
+    it("uses the ranking shared with the daemon, initials included", () => {
+      expect(matchScore("oom", ["CUDA out of memory"])).toBe(40);
+    });
   });
 });
