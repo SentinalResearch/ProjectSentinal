@@ -12,6 +12,11 @@ store.auth.status = "setup";
 
 const CONNECT_DELAY_MS = 5000;
 
+/** Mock only: one agent so Settings → Agents is not empty in the demo. */
+const mockAgents: import("../../protocol/AgentInfo").AgentInfo[] = [
+  { id: "agt_3f9c1a2b4d5e6f70", name: "claude", level: "OBSERVE", created_at: Date.now() - 3 * 86_400_000, last_used_at: Date.now() - 12 * 60_000 },
+];
+
 function nowTime(): string {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -235,6 +240,29 @@ export const mockAdapter: DataAdapter = {
       entry.status = "REVOKED";
       entry.credential = null;
       entry.endpoint = null;
+    },
+  },
+
+  agents: {
+    async list() {
+      return delay(structuredClone(mockAgents));
+    },
+    async create(name, level) {
+      await delay(undefined, 150, 300);
+      if (mockAgents.some((agent) => agent.name === name)) throw new RegistryError("INVALID_REQUEST", `an agent named '${name}' already exists`);
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/.test(name)) {
+        throw new RegistryError("INVALID_REQUEST", "agent name may contain only letters, digits, '.', '_' and '-'");
+      }
+      const hex = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+      const agent = { id: `agt_${hex(16)}`, name, level, created_at: Date.now() };
+      mockAgents.unshift(agent);
+      return { agent: structuredClone(agent), token: `sat_${agent.id}_${hex(64)}` };
+    },
+    async revoke(id) {
+      await delay(undefined, 100, 200);
+      const index = mockAgents.findIndex((agent) => agent.id === id);
+      if (index < 0) throw new RegistryError("NOT_FOUND", "no agent with that ID");
+      mockAgents.splice(index, 1);
     },
   },
 

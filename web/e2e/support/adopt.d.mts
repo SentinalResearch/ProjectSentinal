@@ -13,7 +13,7 @@ export interface SentinalRun {
   stderr: string;
 }
 
-export function sentinal(socket: string, args: string[], input?: string): SentinalRun;
+export function sentinal(socket: string, args: string[], input?: string, extraEnv?: Record<string, string>): SentinalRun;
 
 export function linkSecrets(root: string): string[];
 

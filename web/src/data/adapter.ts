@@ -127,6 +127,19 @@ export interface DataAdapter {
     revoke(machineId: string): Promise<void>;
   };
 
+  /**
+   * AI agent tokens on the control (6.0). Owner only. The token in
+   * `create`'s result is shown once and never stored by the client.
+   */
+  agents: {
+    list(): Promise<import("../protocol/AgentInfo").AgentInfo[]>;
+    create(
+      name: string,
+      level: import("../protocol/AgentLevel").AgentLevel,
+    ): Promise<import("../protocol/CreatedAgent").CreatedAgent>;
+    revoke(id: string): Promise<void>;
+  };
+
   auth: {
     getState(): Promise<AuthState>;
     login(password: string): Promise<AuthState>;

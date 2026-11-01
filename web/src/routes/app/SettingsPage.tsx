@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MockBadge } from "../../components/MockBadge";
 import { isMockData } from "../../data";
 import { AccountTab } from "./AccountTab";
+import { AgentsTab } from "./AgentsTab";
 import { DiagnosticsTab } from "./DiagnosticsTab";
 import { MachinesTab } from "./MachinesTab";
 import { NotificationsTab } from "./NotificationsTab";
@@ -13,6 +14,7 @@ import styles from "./SettingsPage.module.css";
 import { useIsPhone } from "../../hooks/useViewport";
 import { BackBar } from "./phone/BackBar";
 import { PhoneSettingsHome } from "./phone/SettingsHome";
+import { PageTitle } from "./phone/PageTitle";
 import phone from "./phone/phone.module.css";
 
 const TABS = settingsTabs(isMockData);
@@ -36,7 +38,9 @@ export function SettingsPage() {
       <>
         <BackBar parentLabel="Settings" parentPath="/app/settings" />
         <div className={phone.page}>
+          <PageTitle>Settings</PageTitle>
           {active === "machines" && <MachinesTab />}
+          {active === "agents" && <AgentsTab />}
           {active === "notifications" && <NotificationsTab />}
           {active === "diagnostics" && <DiagnosticsTab />}
           {active === "account" && <AccountTab />}
@@ -76,6 +80,7 @@ export function SettingsPage() {
         <div className={styles.mainInner}>
           <MockBadge />
           {active === "machines" && <MachinesTab />}
+          {active === "agents" && <AgentsTab />}
           {active === "notifications" && <NotificationsTab />}
           {active === "diagnostics" && <DiagnosticsTab />}
           {active === "account" && <AccountTab />}

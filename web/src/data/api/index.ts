@@ -39,6 +39,7 @@ import {
   mapConcurrent,
 } from "./machine-connections";
 import { createRegistryApi } from "./registry";
+import { createAgentsApi } from "./agents";
 import { applyProjectionMessage, projectionView, type ProjectionView } from "./projection-view";
 import { health, type createHealthCollector } from "../health";
 import { formatEventTime, sessionElapsedMs } from "../format";
@@ -507,6 +508,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   const connections = new Map<string, MachineConnection>();
   const controlTransport = new DaemonTransport(controlSocketUrl, "control", socketFactory, true);
   const baseRegistry = createRegistryApi({ baseUrl: authBaseUrl, fetcher, storage });
+  const agents = createAgentsApi(authBaseUrl, fetcher);
   let controlMachineId: string | null = null;
   let initialization: Promise<void> | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -1272,6 +1274,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       );
     },
     registry,
+    agents,
     auth,
     machineInsights: {
       async details(id) {

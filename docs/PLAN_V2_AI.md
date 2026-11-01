@@ -122,21 +122,21 @@ successful command; the same appears as the first chip on the phone.
 
 Goal: any AI agent can load Sentinal's functions and watch or work with Sessions safely. Folds in `prompts/07` §1.
 
-- [ ] Agent tokens with levels 0–3 (§4), created, listed, and revoked from
-      Settings → Agents and `sentinal agent token`; enforced in the daemon;
-      over-level requests rejected and audited
-- [ ] One tool catalogue generated from Rust types: `docs/agent-tools.json`
-      (JSON Schema), with a test that it is current
-- [ ] **`sentinal mcp`**: an MCP server over stdio (and HTTP on the control)
+- [x] Agent tokens with levels 0–2 (§4, level 3 not offered), created, listed, and revoked from
+      Settings → Agents; enforced in the control; over-level requests rejected and audited
+      (`sentinal agent token` on the command line: not yet)
+- [x] One tool catalogue in Rust (`crates/cli/src/mcp/tools.rs`) published as
+      `docs/agent-tools.json`, with a test that it is current
+- [x] **`sentinal mcp`**: an MCP server over stdio (HTTP on the control: not yet)
       exposing the catalogue, so Claude Code, Claude Desktop, or any MCP
       client loads Sentinal with one line of config
-- [ ] Watching built for agents: `watch { sessions?, kinds?, since_cursor }`
+- [x] Watching built for agents: `watch { sessions?, kinds?, since_cursor }`
       streams Events, and `wait_for { session, until: state | event_kind,
       timeout }` blocks until something happens, so agents never poll screens
 - [ ] `--json` on every CLI read command, with the same shapes as the API
 - [ ] Attribution: the audit log and the UI show "via claude (level 2)" on
       anything an agent touched; a per-agent activity page in Settings
-- [ ] `docs/AGENT_API.md` plus an `llms.txt` at the control's root that
+- [x] `docs/AGENT_API.md` plus an `llms.txt` at the control's root that
       describe the tools in plain language for model context
 
 Initial catalogue (level in brackets):

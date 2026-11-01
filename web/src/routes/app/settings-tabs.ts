@@ -1,4 +1,4 @@
-export type SettingsTabKey = "machines" | "notifications" | "diagnostics" | "account" | "simulation";
+export type SettingsTabKey = "machines" | "agents" | "notifications" | "diagnostics" | "account" | "simulation";
 
 export interface SettingsTab {
   key: SettingsTabKey;
@@ -7,6 +7,7 @@ export interface SettingsTab {
 
 const BASE_TABS: readonly SettingsTab[] = [
   { key: "machines", label: "Machines" },
+  { key: "agents", label: "Agents" },
   { key: "notifications", label: "Notifications" },
   { key: "diagnostics", label: "Diagnostics" },
   { key: "account", label: "Account" },

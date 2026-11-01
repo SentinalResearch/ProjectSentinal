@@ -1,0 +1,119 @@
+/* Settings → Agents (6.0). Reuses SettingsPage.module.css for buttons and inputs. */
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px) auto;
+  align-items: end;
+  gap: 12px;
+  margin: 0 0 24px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.levelHint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.form > [role="alert"] {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-1);
+  vertical-align: middle;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 24px;
+  padding: 16px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.revealTitle,
+.revealNote {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-1);
+}
+
+.revealNote {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.token,
+.command {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-1);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.revealActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .table th:nth-child(3),
+  .table td:nth-child(3) {
+    display: none;
+  }
+}

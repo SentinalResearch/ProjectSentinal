@@ -63,6 +63,11 @@ export function PhoneSettingsHome() {
           </span>
           <span className={styles.chevron} aria-hidden="true">›</span>
         </Link>
+        <Link className={styles.linkRow} to="/app/settings/agents">
+          <span className={styles.rowTitle}>Agents</span>
+          <span className={styles.rowMeta}>AI agent tokens and levels</span>
+          <span className={styles.chevron} aria-hidden="true">›</span>
+        </Link>
         <Link className={styles.linkRow} to="/app/settings/notifications">
           <span className={styles.rowTitle}>Notifications</span>
           <span className={styles.rowMeta}>Push and per-Session rules</span>

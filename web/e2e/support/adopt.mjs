@@ -32,11 +32,11 @@ export function adoptTrainingWriter(title, epochs) {
 }
 
 /** Run a `sentinal` subcommand against one daemon's local socket. */
-export function sentinal(socket, args, input) {
+export function sentinal(socket, args, input, extraEnv = {}) {
   execFileSync("cargo", ["build", "--quiet", "-p", "cli", "--bin", "sentinal"], { cwd: repo, stdio: "inherit" });
   try {
     const stdout = execFileSync(join(repo, "target", "debug", "sentinal"), args, {
-      env: { ...process.env, SENTINAL_SOCKET: socket },
+      env: { ...process.env, SENTINAL_SOCKET: socket, ...extraEnv },
       input,
       encoding: "utf8",
     });
