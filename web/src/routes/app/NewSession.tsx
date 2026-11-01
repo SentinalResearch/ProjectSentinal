@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { BottomSheet } from "../../components/BottomSheet";
 import { dataAdapter } from "../../data";
 import { useLiveData } from "../../data/LiveDataContext";
+import { machineSummary } from "../../data/format";
 import styles from "./NewSession.module.css";
 
 export interface NewSession {
@@ -70,7 +71,7 @@ export function useNewSession(pathFor: (sessionId: string) => string): NewSessio
           onClick={() => void startOn(machine.id)}
         >
           <span className={styles.name}>{machine.name}</span>
-          <span className={styles.detail}>{machine.os} · {machine.hardware}</span>
+          <span className={styles.detail}>{machine.os} · {machineSummary(machine)}</span>
         </button>
       ))}
       <button type="button" className={styles.cancel} onClick={() => setChoosing(false)}>

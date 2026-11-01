@@ -6,7 +6,7 @@ import { CaptureBadge } from "../../components/CaptureBadge";
 import { StateTag } from "../../components/StateTag";
 import { captureCapabilities, captureOf, exitUnknown } from "../../data/capture";
 import { dataAdapter } from "../../data";
-import { formatSessionDuration, formatSessionFact, needsAttention } from "../../data/format";
+import { formatSessionDuration, formatSessionFact, machineSummary, needsAttention } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
 import { isDelayed, machineStatusLabel } from "../../data/machine-status";
 import type { Machine, Session } from "../../data/types";
@@ -73,7 +73,7 @@ function DesktopOverview() {
   const unavailableMachines = machines.filter((m) => m.status !== "ONLINE");
 
   const summary = filteredMachine
-    ? filteredMachine.hardware
+    ? machineSummary(filteredMachine)
     : [
         `${sessions.length} session${sessions.length === 1 ? "" : "s"} on ${onlineCount} machine${onlineCount === 1 ? "" : "s"}`,
         needs.length > 0 ? `${needs.length} need you` : null,
@@ -126,7 +126,12 @@ function DesktopOverview() {
                   <div className={styles.needsCardTop}>
                     <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
                     <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />
-                    <span className={styles.needsMachine}>{machine?.name ?? session.machine}</span>
+                    {/* On a Machine's own page every card is that Machine: don't repeat it. */}
+                    {!filteredMachine && (
+                      <span className={styles.needsMachine} title={machine?.name ?? session.machine}>
+                        {machine?.name ?? session.machine}
+                      </span>
+                    )}
                   </div>
                   <div className={styles.needsBody}>
                     <span className={styles.needsName}>{session.name}</span>
@@ -179,7 +184,7 @@ function DesktopOverview() {
                 />
                 {connectionLabel(machine)}
               </span>
-              <span className={styles.machineHw}>{machine.hardware}</span>
+              <span className={styles.machineHw}>{machineSummary(machine)}</span>
             </div>
 
             {rows.map((session) => (

@@ -41,7 +41,7 @@ import {
 import { createRegistryApi } from "./registry";
 import { applyProjectionMessage, projectionView, type ProjectionView } from "./projection-view";
 import { health, type createHealthCollector } from "../health";
-import { formatEventTime } from "../format";
+import { formatEventTime, sessionElapsedMs } from "../format";
 import { markLoad } from "../load-timing";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
@@ -194,7 +194,9 @@ function mapRegistryMachine(row: RegistryMachine, now: number): Machine {
     id: row.machine_id,
     name: row.display_name,
     os: row.os === "MACOS" ? "macOS" : "Linux",
-    hardware: row.daemon_version ? `Sentinal ${row.daemon_version}` : "Hardware unavailable",
+    // Registry rows carry no hardware facts; never show the version as hardware.
+    hardware: "",
+    daemonVersion: row.daemon_version ?? undefined,
     status: expired ? "AUTH_EXPIRED" : row.status,
     lastSeen: formatLastSeen(row.last_seen, now),
     endpoint,
@@ -211,7 +213,12 @@ export function mapSession(session: WireSession): Session {
     project: session.project_id ?? undefined,
     cwd: session.cwd,
     state: session.state,
-    runningFor: formatDuration(Date.now() - session.created_at),
+    runningFor: formatDuration(
+      sessionElapsedMs(
+        { state: session.state, createdAt: session.created_at, updatedAt: session.updated_at },
+        Date.now(),
+      ),
+    ),
     details: session.shell,
     shell: session.shell,
     events: [],

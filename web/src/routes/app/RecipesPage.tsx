@@ -10,6 +10,7 @@ import type { Recipe } from "../../data/types";
 import { useIsPhone } from "../../hooks/useViewport";
 import { PhoneRecipes, PhoneRunRecipe } from "./phone/PhoneRecipes";
 import { portWarnings, validateParam } from "./recipeRules";
+import { machineSummary } from "../../data/format";
 import styles from "./RecipesPage.module.css";
 
 /** design_handoff_sentinal/design/SentinalRecipes.dc.html */
@@ -206,7 +207,7 @@ function RecipeCatalogView({ id }: { id?: string }) {
                           </span>
                           <span className={styles.machineName}>{m.name}</span>
                         </span>
-                        <span className={styles.machineMeta}>{offline ? `Offline · ${m.lastSeen ?? "—"} ago` : `Online · ${m.hardware}`}</span>
+                        <span className={styles.machineMeta}>{offline ? `Offline · ${m.lastSeen ?? "—"} ago` : `Online · ${machineSummary(m)}`}</span>
                       </button>
                     );
                   })}

@@ -5,6 +5,7 @@ import { dataAdapter } from "../../../data";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { RegistryMachine } from "../../../protocol/RegistryMachine";
 import { MachinePanel } from "../MachinePanel";
+import { machineSummary } from "../../../data/format";
 import styles from "./phoneSettings.module.css";
 
 const STATUS: Record<RegistryMachine["status"], string> = {
@@ -50,7 +51,7 @@ export function PhoneMachineCards({ machines, onChanged }: { machines: RegistryM
               <strong className={styles.cardName}>{machine.display_name}</strong>
               <span className={styles.roleTag}>{machine.role}</span>
             </div>
-            <span className={styles.cardMeta}>{liveMachine?.hardware ?? (machine.os === "LINUX" ? "Linux" : machine.os === "MACOS" ? "macOS" : "—")}</span>
+            <span className={styles.cardMeta}>{(liveMachine ? machineSummary(liveMachine) : undefined) ?? (machine.os === "LINUX" ? "Linux" : machine.os === "MACOS" ? "macOS" : "—")}</span>
             <span className={styles.cardStatus} data-online={machine.status === "ONLINE"}>
               {STATUS[machine.status]}
             </span>

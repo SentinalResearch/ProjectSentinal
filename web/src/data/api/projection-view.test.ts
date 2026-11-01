@@ -65,6 +65,21 @@ describe("control projection view", () => {
     expect(view?.machines.get("machine-1")?.machine.freshness).toBe("STALE");
   });
 
+  it("never reports the daemon version as a Machine's hardware", () => {
+    const machine = projectionView(snapshot(), 1_000)?.machines.get("machine-0")?.machine;
+    expect(machine?.hardware).toBe("");
+    expect(machine?.daemonVersion).toBe("0.4.1");
+  });
+
+  it("stops a finished Session's duration when it ended", () => {
+    const ended = snapshot();
+    const session = ended.machines[0].sessions[0];
+    ended.machines[0].sessions[0] = { ...session, state: "INTERRUPTED", created_at: 0, updated_at: 120_000, finished_at: 60_000 };
+    const now = 900 * 3_600_000;
+    const mapped = projectionView(ended, now)?.machines.get("machine-0")?.sessions[0];
+    expect(mapped?.runningFor).toBe("1m");
+  });
+
   it("applies ordered Machine-scoped deltas and rejects revision gaps", () => {
     const view = projectionView(snapshot(), 1_000)!;
     const events = applyProjectionMessage(view, {

@@ -10,7 +10,10 @@ export interface Machine {
   id: string;
   name: string;
   os: "Linux" | "macOS" | "Windows";
+  /** "Ryzen 9, 64 GB, RTX 4090 24 GB"; empty when the daemon has not reported it. */
   hardware: string;
+  /** Version of the Machine's sentinald, when known. */
+  daemonVersion?: string;
   status: MachineStatus;
   freshness?: ProjectionFreshness;
   syncedAt?: number;

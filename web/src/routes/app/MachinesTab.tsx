@@ -11,6 +11,7 @@ import { PairingRequestsCard } from "./PairingRequestsCard";
 import { WorkerUpdatesCard } from "./WorkerUpdatesCard";
 import { useIsPhone } from "../../hooks/useViewport";
 import { PhoneMachineCards } from "./phone/PhoneMachineCards";
+import { machineSummary } from "../../data/format";
 import styles from "./SettingsPage.module.css";
 
 export interface MachinesTabProps {
@@ -311,7 +312,7 @@ function NotControl() {
               <span className={styles.machineName}>{machine.name}</span>
               <span className={styles.machineOs}>{machine.os}</span>
             </div>
-            <span className={styles.machineHw}>{machine.hardware}</span>
+            <span className={styles.machineHw}>{machineSummary(machine)}</span>
           </div>
         ))}
       </div>

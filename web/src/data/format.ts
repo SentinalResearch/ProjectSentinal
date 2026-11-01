@@ -1,4 +1,4 @@
-import type { Session } from "./types";
+import type { Machine, Session } from "./types";
 
 // QUESTION: fixtures only carry a project name, never an id, and the prototype's own
 // ids ("tim", "maa") don't obviously derive from the names either. See QUESTIONS.md #9 —
@@ -158,4 +158,28 @@ export function confirmConsequence(session: Session, machineName: string): strin
     return `Stops ${session.name} on ${machineName}.${duration ? ` It has produced ${duration}.` : ""}`;
   }
   return `Sends SIGINT to ${session.name} on ${machineName}.`;
+}
+
+/** One-line summary under a Machine's name: its hardware, else its Sentinal version, else its OS. */
+export function machineSummary(machine: Pick<Machine, "hardware" | "daemonVersion" | "os">): string {
+  if (machine.hardware) return machine.hardware;
+  if (machine.daemonVersion) return `Sentinal ${machine.daemonVersion}`;
+  return machine.os;
+}
+
+/** States in which a Session has stopped for good (the daemon's `SessionState::is_finished`). */
+export const FINISHED_STATES: ReadonlySet<string> = new Set(["COMPLETED", "FAILED", "INTERRUPTED"]);
+
+/**
+ * How long a Session ran: until now while it is live, and until it finished
+ * once it has stopped, so an ended Session's duration does not keep growing.
+ * `finishedAt` falls back to `updatedAt`, which a finished Session last
+ * changed when it reached its final state.
+ */
+export function sessionElapsedMs(
+  session: { state: string; createdAt: number; updatedAt: number; finishedAt?: number | null },
+  now: number,
+): number {
+  const end = FINISHED_STATES.has(session.state) ? (session.finishedAt ?? session.updatedAt) : now;
+  return Math.max(0, end - session.createdAt);
 }

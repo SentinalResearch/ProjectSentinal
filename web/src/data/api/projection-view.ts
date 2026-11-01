@@ -8,7 +8,7 @@ import type { ProjectedMetrics } from "../../protocol/ProjectedMetrics";
 import type { ProjectedSession } from "../../protocol/ProjectedSession";
 import type { LiveEvent } from "../adapter";
 import type { Machine, MachineStatus, Session, SessionEvent, SessionHealth, SessionMetrics } from "../types";
-import { formatEventTime } from "../format";
+import { formatEventTime, sessionElapsedMs } from "../format";
 import { compositeId } from "./machine-connections";
 
 /** In-memory privacy-minimized dashboard projection. */
@@ -102,7 +102,17 @@ function mapSession(
     machine: machineId,
     name: session.title ?? `Session ${session.id}`,
     state: session.state,
-    runningFor: duration(now - session.created_at),
+    runningFor: duration(
+      sessionElapsedMs(
+        {
+          state: session.state,
+          createdAt: session.created_at,
+          updatedAt: session.updated_at,
+          finishedAt: session.finished_at,
+        },
+        now,
+      ),
+    ),
     events: relevantEvents,
     health: mapHealth(session.health),
     progress: session.health?.progress === null || session.health?.progress === undefined
@@ -125,7 +135,9 @@ function mapMachine(machine: ControlProjectedMachine, now: number): { machine: M
       id: machine.machine_id,
       name: machine.display_name,
       os: machine.os === "MACOS" ? "macOS" : "Linux",
-      hardware: machine.daemon_version === null ? "Projected state" : `Sentinal ${machine.daemon_version}`,
+      // The projection carries no hardware facts; never show the version as hardware.
+      hardware: "",
+      daemonVersion: machine.daemon_version ?? undefined,
       status: machineStatus(machine),
       freshness: machine.freshness,
       lastSeen,

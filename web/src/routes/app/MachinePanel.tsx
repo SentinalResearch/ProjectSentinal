@@ -114,7 +114,7 @@ export function MachinePanel({ machine, sessions }: { machine: Machine; sessions
             <dt>Kernel</dt>
             <dd>{insight?.kernelVersion ?? "—"}</dd>
             <dt>Hardware</dt>
-            <dd>{machine.hardware}</dd>
+            <dd>{machine.hardware || "—"}</dd>
           </dl>
         </section>
         <section className={styles.card} aria-label="Sentinal daemon">
