@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { AgentBadge } from "../../components/AgentBadge";
 import { CaptureBadge } from "../../components/CaptureBadge";
+import { OutputSearchToggle } from "../../components/OutputSearchToggle";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
@@ -236,6 +237,7 @@ function DesktopSessionDetail() {
               </span>
             )}
             {hint && <span className={styles.logHint}>{hint}</span>}
+            {capture === "FULL" && <OutputSearchToggle key={session.id} session={session} />}
           </div>
           <div className={styles.actions}>
             <button

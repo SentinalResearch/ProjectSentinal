@@ -114,6 +114,11 @@ export const mockAdapter: DataAdapter = {
     return delay(entries.map((e) => ({ ...e })));
   },
 
+  async setOutputSearch(sessionId: string, enabled: boolean) {
+    await delay(undefined, 50, 120);
+    updateSession(sessionId, { outputSearch: enabled });
+  },
+
   async complete(_sessionId: string, prefix: string, limit?: number) {
     return delay(mockComplete(prefix, limit));
   },

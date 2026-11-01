@@ -11,6 +11,7 @@ mod generic;
 mod health;
 mod observation;
 mod pytest;
+pub mod redact;
 mod server;
 pub mod training;
 

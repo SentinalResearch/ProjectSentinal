@@ -1,10 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../../context/AuthContext";
 import { ThemeProvider } from "../../context/ThemeContext";
+import { dataAdapter } from "../../data";
 import { PageShell } from "../../test-shell";
 import { SessionDetailPage } from "./SessionDetailPage";
 
@@ -28,6 +29,7 @@ describe("SessionDetailPage", () => {
   beforeAll(() => {
     Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 1440 });
   });
+  afterEach(() => vi.restoreAllMocks());
 
   it("renders the training top block and terminal for a RUNNING session", async () => {
     renderSession("/app/sessions/qwen");
@@ -173,6 +175,22 @@ describe("SessionDetailPage", () => {
     expect(screen.getByLabelText("Watch fully next time")).toHaveTextContent(
       "cd ~/'Projects/TIM' && sentinal watch -t 'Tailed fine-tune'",
     );
+  });
+
+  it("lets the owner opt a FULL Session's saved output into search, off by default (5.S)", async () => {
+    const set = vi.spyOn(dataAdapter, "setOutputSearch").mockResolvedValue();
+    renderSession("/app/sessions/qwen");
+    const toggle = await screen.findByRole("checkbox", { name: /Searchable output/ });
+    expect(toggle).not.toBeChecked();
+    await userEvent.setup().click(toggle);
+    expect(set).toHaveBeenCalledWith("qwen", true);
+    expect(toggle).toBeChecked();
+  });
+
+  it("offers no output search for a Session without saved output", async () => {
+    renderSession("/app/sessions/hooked-shell");
+    await screen.findByRole("heading", { name: "zsh (hooked)" });
+    expect(screen.queryByRole("checkbox", { name: /Searchable output/ })).not.toBeInTheDocument();
   });
 
   it("replaces the terminal with the Command view for a hooked COMMANDS shell", async () => {

@@ -36,7 +36,58 @@ impl SessionManager {
         request: &crate::search::SearchRequest<'_>,
     ) -> Result<Vec<protocol::search::SearchHit>, SessionManagerError> {
         let now = (self.inner.config.clock)();
-        crate::search::search(self.store()?, recipes, request, now).map_err(Into::into)
+        let mut hits = crate::search::search(self.store()?, recipes, request, now)?;
+        // 5.S: saved output, only of FULL Sessions the owner opted in, and
+        // only unfiltered (output lines have no outcome).
+        if request.wants(protocol::search::SearchScope::Output) && request.filters.outcome.is_none()
+        {
+            let logs = self.inner.config.data_dir.join("sessions");
+            for session in self.list()? {
+                let opted_in = session.output_search && session.capture == CaptureLevel::Full;
+                let recent = request
+                    .filters
+                    .since
+                    .is_none_or(|since| session.updated_at.0 >= since.0);
+                if opted_in && recent {
+                    let path = logs.join(format!("{}.log.zst", session.id.0));
+                    hits.extend(crate::search_output::output_hits(
+                        &session,
+                        &path,
+                        request.query,
+                        now,
+                    ));
+                }
+            }
+        }
+        Ok(crate::search::best_first(hits, request.limit))
+    }
+
+    /// Let search read a FULL Session's saved output, or stop (5.S).
+    pub fn set_output_search(
+        &self,
+        session_id: SessionId,
+        enabled: bool,
+    ) -> Result<protocol::Session, SessionManagerError> {
+        let mut session = self.known_session(session_id)?;
+        if session.capture != CaptureLevel::Full {
+            return Err(SessionManagerError::OutputUnavailable {
+                session_id,
+                capture: session.capture,
+            });
+        }
+        if let Ok(handle) = self.handle(session_id) {
+            let mut live = lock_session(&handle)?;
+            live.output_search = enabled;
+            session = live.clone();
+            drop(live);
+            let _ = handle.structured.send(DaemonMessage::SessionUpdated {
+                session: session.clone(),
+            });
+        } else {
+            session.output_search = enabled;
+        }
+        self.store()?.update_session(&session)?;
+        Ok(session)
     }
 
     /// Rank completions for a Command line from this Machine's history (5.A).

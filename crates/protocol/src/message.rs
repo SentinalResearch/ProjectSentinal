@@ -167,6 +167,13 @@ pub enum ClientRequest {
         /// Most completions, 1 through [`crate::complete::MAX_COMPLETE_LIMIT`].
         limit: u32,
     },
+    /// Let search read a FULL Session's saved output, or stop (5.S). Off by default.
+    SetOutputSearch {
+        /// The Session.
+        session_id: SessionId,
+        /// On or off.
+        enabled: bool,
+    },
     /// Search this Machine's Sessions, Commands, Events, and Recipes (5.S).
     Search {
         /// What the owner typed.

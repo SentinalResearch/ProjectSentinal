@@ -28,6 +28,13 @@ checkbox are complete. The live remediation status is in `AUDIT_TRACKER.md`.
   no credential. A separately named non-Secure cookie exists only when the
   daemon is explicitly in development mode. CLI and Machine clients continue
   to use bearer/link headers, and production rejects query-token auth.
+- Search never reads terminal output unless the owner opts a FULL Session
+  in (*Searchable output*, 5.S). Then the Machine scans that Session's saved
+  log only when searched, indexes nothing, and returns matching lines with
+  secret-shaped values (named secrets, bearer tokens, URL credentials,
+  well-known token formats, private-key headers) replaced by `[redacted]`.
+  Redaction is best effort; keep the opt-in off for Sessions that print
+  secrets in other shapes.
 - Every remote terminal input frame appends timestamp, client address,
   Session ID, and byte count to `audit.jsonl`. The input payload is excluded.
   The record is written before the bytes reach the PTY and input that cannot

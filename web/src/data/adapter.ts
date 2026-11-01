@@ -94,6 +94,8 @@ export interface DataAdapter {
   ): Promise<OutputReplayResult>;
   getRecipes(): Promise<Recipe[]>;
   getHistory(filters?: HistoryFilters): Promise<HistoryResults>;
+  /** Let search read a FULL Session's saved output, or stop (5.S). */
+  setOutputSearch(sessionId: string, enabled: boolean): Promise<void>;
   /** Completions for the line typed in a Session, from its own Machine (5.A). */
   complete(sessionId: string, prefix: string, limit?: number): Promise<Completion[]>;
   /** Search every Machine (or `query.machine` only) and merge the hits best first (5.S). */

@@ -466,3 +466,143 @@ fn search_meets_its_budget_on_a_large_history() {
     eprintln!("p95 {p95:?} over {} searches", timings.len());
     assert!(p95 < std::time::Duration::from_millis(50), "p95 {p95:?}");
 }
+
+/// 5.S output search: opt-in per FULL Session, scanned on demand, redacted.
+mod output_search {
+    use super::*;
+    use daemon::{
+        audit::AuditLog,
+        pty::FakePty,
+        session_manager::{SessionManager, SessionManagerConfig},
+    };
+    use protocol::CaptureLevel;
+    use std::{io::Write, sync::Arc};
+
+    struct Fixture {
+        manager: SessionManager,
+        dir: std::path::PathBuf,
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    /// A finished FULL Session (1) with a saved log, and a COMMANDS-capture Session (2).
+    fn fixture(name: &str) -> Fixture {
+        let dir = std::env::temp_dir().join(format!(
+            "sentinal-output-search-{name}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sessions")).unwrap();
+        let store = Arc::new(Store::open_in_memory().unwrap());
+        let mut full = session(1, "train moe", SessionState::Failed, NOW - HOUR);
+        full.capture = CaptureLevel::Full;
+        store.insert_session(&full).unwrap();
+        let mut hooked = session(2, "laptop shell", SessionState::Idle, NOW - HOUR);
+        hooked.capture = CaptureLevel::Commands;
+        hooked.origin = protocol::SessionOrigin::ShellHook;
+        store.insert_session(&hooked).unwrap();
+        let log = "\x1b[32mepoch 1/40\x1b[0m loss 2.1\r\n\
+                   export WANDB_API_KEY=abc123secretvalue\r\n\
+                   RuntimeError: CUDA out of memory. Tried to allocate 2.00 GiB\r\n\
+                   epoch 2/40 loss 1.9\r\n";
+        let mut encoder = zstd::stream::write::Encoder::new(
+            std::fs::File::create(dir.join("sessions/1.log.zst")).unwrap(),
+            3,
+        )
+        .unwrap();
+        encoder.write_all(log.as_bytes()).unwrap();
+        encoder.finish().unwrap();
+        let manager = SessionManager::with_store(
+            Arc::new(FakePty::new()),
+            SessionManagerConfig {
+                machine_id: MachineId("rtx".into()),
+                data_dir: dir.clone(),
+                scrollback_lines: 10,
+                clock: Arc::new(|| Timestamp(NOW)),
+            },
+            AuditLog::new(&dir),
+            store,
+        )
+        .unwrap();
+        Fixture { manager, dir }
+    }
+
+    fn output(manager: &SessionManager, query: &str) -> Vec<protocol::search::SearchHit> {
+        manager
+            .search(&[], &request(query))
+            .unwrap()
+            .into_iter()
+            .filter(|hit| hit.kind == SearchScope::Output)
+            .collect()
+    }
+
+    #[test]
+    fn output_is_searched_only_after_the_owner_opts_in() {
+        let fixture = fixture("opt-in");
+        let manager = &fixture.manager;
+        assert!(
+            output(manager, "out of memory").is_empty(),
+            "never by default"
+        );
+
+        let session = manager.set_output_search(SessionId(1), true).unwrap();
+        assert!(session.output_search);
+        let hits = output(manager, "out of memory");
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert_eq!(
+            hits[0].title,
+            "RuntimeError: CUDA out of memory. Tried to allocate 2.00 GiB"
+        );
+        assert_eq!(hits[0].detail, "Output · train moe · line 3");
+        assert_eq!(
+            hits[0].target,
+            SearchTarget::Session {
+                session_id: SessionId(1)
+            }
+        );
+        // ANSI is stripped and every word must be in the line.
+        assert_eq!(output(manager, "epoch loss").len(), 2);
+        // An empty query never dumps output.
+        assert!(output(manager, "").is_empty());
+
+        manager.set_output_search(SessionId(1), false).unwrap();
+        assert!(output(manager, "out of memory").is_empty());
+    }
+
+    #[test]
+    fn secrets_in_matching_lines_are_redacted() {
+        let fixture = fixture("redact");
+        fixture
+            .manager
+            .set_output_search(SessionId(1), true)
+            .unwrap();
+        let hits = output(&fixture.manager, "wandb");
+        assert_eq!(hits[0].title, "export WANDB_API_KEY=[redacted]");
+        assert!(output(&fixture.manager, "abc123secretvalue")
+            .iter()
+            .all(|hit| !hit.title.contains("abc123")));
+    }
+
+    #[test]
+    fn only_full_capture_sessions_can_opt_in_and_the_choice_is_kept() {
+        let fixture = fixture("full-only");
+        assert!(fixture
+            .manager
+            .set_output_search(SessionId(2), true)
+            .is_err());
+        fixture
+            .manager
+            .set_output_search(SessionId(1), true)
+            .unwrap();
+        assert!(fixture
+            .manager
+            .list()
+            .unwrap()
+            .iter()
+            .any(|s| s.id == SessionId(1) && s.output_search));
+    }
+}

@@ -104,8 +104,13 @@ Goal: one search, fast and ranked on the daemon, used by the prompt, History, an
 - [x] Filters as prompt grammar: `find failed pytest on rtx-pc since yesterday`
       (`failed` / `passed` / `running`, `on <machine>` asks only that
       Machine, `since today|yesterday|week|3h|2d`)
-- [ ] Output search, **opt-in per Session** (FULL capture only): search the
-      saved log with secret-pattern redaction in results; never indexed by default
+- [x] Output search, **opt-in per Session** (FULL capture only): the owner
+      ticks *Searchable output* on the Session page (`SET_OUTPUT_SEARCH`, off
+      by default, kept with the Session); `SEARCH` then scans that saved log
+      on demand (64 MiB, ANSI removed, every word as a substring, latest 5
+      lines a Session) and returns lines with secret-shaped values redacted
+      (`watcher::redact`); nothing is indexed; an empty query returns none
+      (`daemon/src/search_output.rs`)
 - [x] Budget: p95 < 50 ms on 100 000 Commands and 500 000 Events (timed
       `#[ignore]` test in `crates/daemon/tests/search.rs`; 6.7 ms on an M-series Mac)
 

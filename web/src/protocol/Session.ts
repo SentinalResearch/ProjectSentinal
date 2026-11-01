@@ -89,6 +89,10 @@ export type Session = {
    */
   coding_agent?: CodingAgentSummary | null;
   /**
+   * The owner let search read this Session's saved output (5.S, FULL only).
+   */
+  output_search?: boolean;
+  /**
    * When the session was created.
    */
   created_at: Timestamp;

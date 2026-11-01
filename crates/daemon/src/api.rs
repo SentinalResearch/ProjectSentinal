@@ -291,6 +291,13 @@ impl AppState {
                     Err(error) => error_action(error),
                 }
             }
+            ClientRequest::SetOutputSearch {
+                session_id,
+                enabled,
+            } => match self.sessions.set_output_search(session_id, enabled) {
+                Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),
+                Err(error) => error_action(error),
+            },
             ClientRequest::Search {
                 query,
                 scopes,

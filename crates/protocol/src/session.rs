@@ -287,6 +287,9 @@ pub struct Session {
     /// The AI coding agent running here, if the Command started one (6.1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coding_agent: Option<Box<crate::coding_agent::CodingAgentSummary>>,
+    /// The owner let search read this Session's saved output (5.S, FULL only).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub output_search: bool,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -321,6 +324,7 @@ impl Session {
             health: None,
             training: None,
             coding_agent: None,
+            output_search: false,
             created_at: at,
             updated_at: at,
         }

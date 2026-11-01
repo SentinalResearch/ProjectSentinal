@@ -3,4 +3,9 @@
 /**
  * What a search looks through, and what kind of thing a hit is.
  */
-export type SearchScope = "SESSIONS" | "COMMANDS" | "EVENTS" | "RECIPES";
+export type SearchScope =
+  | "SESSIONS"
+  | "COMMANDS"
+  | "EVENTS"
+  | "RECIPES"
+  | "OUTPUT";

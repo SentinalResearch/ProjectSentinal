@@ -217,6 +217,7 @@ const KIND_WORD: Record<SearchResult["kind"], string> = {
   COMMANDS: "Command",
   EVENTS: "Event",
   RECIPES: "Recipe",
+  OUTPUT: "Output",
   MACHINES: "Machine",
   PAGES: "Page",
 };

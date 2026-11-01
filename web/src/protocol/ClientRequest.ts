@@ -143,6 +143,17 @@ export type ClientRequest =
     limit: number;
   }
   | {
+    "type": "SET_OUTPUT_SEARCH";
+    /**
+     * The Session.
+     */
+    session_id: SessionId;
+    /**
+     * On or off.
+     */
+    enabled: boolean;
+  }
+  | {
     "type": "SEARCH";
     /**
      * What the owner typed.

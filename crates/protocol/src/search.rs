@@ -49,11 +49,20 @@ pub enum SearchScope {
     Events,
     /// Recipes on the Machine.
     Recipes,
+    /// Saved terminal output of Sessions the owner opted in (FULL capture
+    /// only); scanned on demand, never indexed, secrets redacted.
+    Output,
 }
 
 impl SearchScope {
     /// Every scope a Machine searches.
-    pub const ALL: [SearchScope; 4] = [Self::Sessions, Self::Commands, Self::Events, Self::Recipes];
+    pub const ALL: [SearchScope; 5] = [
+        Self::Sessions,
+        Self::Commands,
+        Self::Events,
+        Self::Recipes,
+        Self::Output,
+    ];
 }
 
 /// How a hit ended, for `find failed …`.

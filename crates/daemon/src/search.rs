@@ -27,7 +27,8 @@ pub struct SearchRequest<'a> {
 }
 
 impl SearchRequest<'_> {
-    fn wants(&self, scope: SearchScope) -> bool {
+    /// Whether `scope` is searched.
+    pub fn wants(&self, scope: SearchScope) -> bool {
         self.scopes.is_empty() || self.scopes.contains(&scope)
     }
 }
@@ -77,13 +78,18 @@ pub fn search(
                 .filter_map(|recipe| recipe_hit(recipe, request.query)),
         );
     }
+    Ok(best_first(hits, request.limit))
+}
+
+/// Hits sorted best first, newest first on a tie, cut to `limit`.
+pub fn best_first(mut hits: Vec<SearchHit>, limit: u32) -> Vec<SearchHit> {
     hits.sort_by(|a, b| {
         b.score
             .total_cmp(&a.score)
             .then_with(|| b.at.map(|at| at.0).cmp(&a.at.map(|at| at.0)))
     });
-    hits.truncate(request.limit as usize);
-    Ok(hits)
+    hits.truncate(limit as usize);
+    hits
 }
 
 fn session_name(session: &Session) -> String {

@@ -90,6 +90,8 @@ export interface Session {
   health?: SessionHealth;
   /** Training numbers the watcher read from the run's output. */
   training?: TrainingView;
+  /** Search may read this Session's saved output (5.S, opt-in). */
+  outputSearch?: boolean;
   /** The AI coding agent running here (6.1). */
   codingAgent?: CodingAgentView;
   events?: SessionEvent[];

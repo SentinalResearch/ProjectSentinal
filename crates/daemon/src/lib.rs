@@ -42,6 +42,7 @@ pub mod push;
 pub mod recipes;
 pub mod scrollback;
 pub mod search;
+pub mod search_output;
 pub mod self_health;
 pub mod session_manager;
 pub mod shell;
