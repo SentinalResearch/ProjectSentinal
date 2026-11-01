@@ -26,6 +26,8 @@ const LOCKOUT_MS: i64 = 5 * 60 * 1_000;
 /// Tailscale Serve the per-client key is a header a local process can vary.
 const GLOBAL_MAX_FAILURES: usize = 20;
 const GLOBAL_WINDOW_MS: i64 = 15 * 60 * 1_000;
+/// Budget key for current-password checks made by a signed-in browser.
+const PASSWORD_CHANGE_CLIENT: &str = "password-change";
 
 type Clock = Arc<dyn Fn() -> Timestamp + Send + Sync>;
 
@@ -134,56 +136,104 @@ impl AuthManager {
     /// Verify the owner password and issue a browser session.
     pub async fn login(&self, client: &str, password: &str) -> Result<AuthSession, AuthError> {
         let now = (self.clock)();
-        let hash = {
-            let mut state = self.lock()?;
-            let hash = state
-                .password_hash
-                .clone()
-                .ok_or(AuthError::SetupRequired)?;
-            if let Some(locked_until) = state.global_locked_until {
-                if locked_until.0 > now.0 {
-                    return Err(AuthError::Locked {
-                        retry_at: locked_until,
-                    });
-                }
-                state.global_locked_until = None;
-                state.global_failures.clear();
-            }
-            let expired_lock = if let Some(failure) = state.failures.get(client) {
-                if failure
-                    .locked_until
-                    .is_some_and(|locked_until| locked_until.0 > now.0)
-                {
-                    return Err(AuthError::Locked {
-                        retry_at: failure.locked_until.unwrap_or(now),
-                    });
-                }
-                failure.locked_until.is_some()
-            } else {
-                false
-            };
-            if expired_lock {
-                state.failures.remove(client);
-            }
-            hash
-        };
-
-        let valid = verify_password(hash.clone(), password.to_string()).await?;
+        let hash = self.admit_attempt(client, now)?;
+        let valid = self.verify_admitted(client, now, &hash, password).await?;
         let mut state = self.lock()?;
         if state.password_hash.as_deref() != Some(hash.as_str()) {
             return Err(AuthError::InvalidCredentials {
                 attempts_remaining: 0,
             });
         }
-        if valid {
-            state.failures.remove(client);
-            return self.issue_session(&mut state);
-        }
+        self.settle_attempt(&mut state, client, now, valid)?;
+        self.issue_session(&mut state)
+    }
 
+    /// Reserve one password check for `client` before running it.
+    ///
+    /// The attempt is charged to the per-client and global budgets *before*
+    /// Argon2 runs, so parallel requests cannot all pass the lockout check
+    /// while earlier guesses are still being verified; a correct password
+    /// refunds the charge in [`AuthManager::settle_attempt`]. Because every
+    /// in-flight check holds a global slot, at most [`GLOBAL_MAX_FAILURES`]
+    /// Argon2 verifications run at once.
+    fn admit_attempt(&self, client: &str, now: Timestamp) -> Result<String, AuthError> {
+        let mut state = self.lock()?;
+        let hash = state
+            .password_hash
+            .clone()
+            .ok_or(AuthError::SetupRequired)?;
+        if let Some(locked_until) = state.global_locked_until {
+            if locked_until.0 > now.0 {
+                return Err(AuthError::Locked {
+                    retry_at: locked_until,
+                });
+            }
+            state.global_locked_until = None;
+            state.global_failures.clear();
+        }
+        if let Some(failure) = state.failures.get(client) {
+            if let Some(locked_until) = failure.locked_until {
+                if locked_until.0 > now.0 {
+                    return Err(AuthError::Locked {
+                        retry_at: locked_until,
+                    });
+                }
+                state.failures.remove(client);
+            }
+        }
         state
             .global_failures
             .retain(|at| now.0.saturating_sub(at.0) < GLOBAL_WINDOW_MS);
+        if state.global_failures.len() >= GLOBAL_MAX_FAILURES {
+            // Budget held by checks still in flight: refuse without locking,
+            // the failures themselves set the lock when they settle.
+            return Err(AuthError::Locked {
+                retry_at: Timestamp(now.0.saturating_add(LOCKOUT_MS)),
+            });
+        }
+        let failure = state.failures.entry(client.to_string()).or_default();
+        if failure.attempts >= MAX_LOGIN_ATTEMPTS {
+            return Err(AuthError::Locked {
+                retry_at: Timestamp(now.0.saturating_add(LOCKOUT_MS)),
+            });
+        }
+        failure.attempts += 1;
         state.global_failures.push(now);
+        Ok(hash)
+    }
+
+    /// Run Argon2 for an admitted attempt, refunding it if the check errors.
+    async fn verify_admitted(
+        &self,
+        client: &str,
+        now: Timestamp,
+        hash: &str,
+        password: &str,
+    ) -> Result<bool, AuthError> {
+        match verify_password(hash.to_string(), password.to_string()).await {
+            Ok(valid) => Ok(valid),
+            Err(error) => {
+                if let Ok(mut state) = self.lock() {
+                    refund_attempt(&mut state, client, now);
+                }
+                Err(error)
+            }
+        }
+    }
+
+    /// Settle an admitted attempt: refund it on success, else enforce the lockouts.
+    fn settle_attempt(
+        &self,
+        state: &mut AuthState,
+        client: &str,
+        now: Timestamp,
+        valid: bool,
+    ) -> Result<(), AuthError> {
+        if valid {
+            refund_attempt(state, client, now);
+            state.failures.remove(client);
+            return Ok(());
+        }
         if state.global_failures.len() >= GLOBAL_MAX_FAILURES {
             let retry_at = Timestamp(now.0.saturating_add(LOCKOUT_MS));
             state.global_locked_until = Some(retry_at);
@@ -192,7 +242,6 @@ impl AuthManager {
             return Err(AuthError::Locked { retry_at });
         }
         let failure = state.failures.entry(client.to_string()).or_default();
-        failure.attempts = failure.attempts.saturating_add(1);
         if failure.attempts >= MAX_LOGIN_ATTEMPTS {
             let retry_at = Timestamp(now.0.saturating_add(LOCKOUT_MS));
             failure.locked_until = Some(retry_at);
@@ -261,15 +310,16 @@ impl AuthManager {
     ) -> Result<AuthSession, AuthError> {
         self.session_info(session_token)?;
         validate_password(new_password)?;
-        let old_hash = self
-            .lock()?
-            .password_hash
-            .clone()
-            .ok_or(AuthError::SetupRequired)?;
-        if !verify_password(old_hash.clone(), current_password.to_string()).await? {
-            return Err(AuthError::InvalidCredentials {
-                attempts_remaining: 0,
-            });
+        // The current-password check is a password oracle for anyone holding
+        // a browser Session, so it spends the same budgets as login.
+        let now = (self.clock)();
+        let old_hash = self.admit_attempt(PASSWORD_CHANGE_CLIENT, now)?;
+        let valid = self
+            .verify_admitted(PASSWORD_CHANGE_CLIENT, now, &old_hash, current_password)
+            .await?;
+        {
+            let mut state = self.lock()?;
+            self.settle_attempt(&mut state, PASSWORD_CHANGE_CLIENT, now, valid)?;
         }
         let new_hash = hash_password(new_password.to_string()).await?;
         let mut state = self.lock()?;
@@ -300,6 +350,16 @@ impl AuthManager {
 
     fn lock(&self) -> Result<MutexGuard<'_, AuthState>, AuthError> {
         self.state.lock().map_err(|_| AuthError::StatePoisoned)
+    }
+}
+
+/// Return an admitted attempt's charge to the per-client and global budgets.
+fn refund_attempt(state: &mut AuthState, client: &str, now: Timestamp) {
+    if let Some(index) = state.global_failures.iter().rposition(|at| at.0 == now.0) {
+        state.global_failures.remove(index);
+    }
+    if let Some(failure) = state.failures.get_mut(client) {
+        failure.attempts = failure.attempts.saturating_sub(1);
     }
 }
 

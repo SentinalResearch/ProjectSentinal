@@ -216,6 +216,134 @@ async fn rotating_client_keys_hit_a_global_failure_budget() {
 }
 
 #[tokio::test]
+async fn parallel_guesses_from_one_client_cannot_outrun_the_lockout() {
+    // Lockout used to be checked before Argon2 and counted after it, so
+    // concurrent requests all passed the check: the real password sent as
+    // the 31st parallel guess still signed in.
+    let dir = temp_dir("login-parallel-client");
+    let auth = auth_manager(&dir, Arc::new(AtomicI64::new(1_790_000_000_000)));
+    auth.setup("bootstrap-token", "correct horse battery staple")
+        .await
+        .unwrap();
+
+    let guesses = (0..40).map(|attempt| {
+        let auth = auth.clone();
+        async move {
+            let password = if attempt == 30 {
+                "correct horse battery staple".to_string()
+            } else {
+                format!("wrong guess {attempt}")
+            };
+            auth.login("100.64.0.2", &password).await
+        }
+    });
+    let results = futures_util::future::join_all(guesses).await;
+
+    assert!(
+        matches!(results[30], Err(AuthError::Locked { .. })),
+        "the 31st parallel guess must be refused, got {:?}",
+        results[30]
+    );
+    let checked = results
+        .iter()
+        .filter(|result| matches!(result, Err(AuthError::InvalidCredentials { .. })))
+        .count();
+    assert!(checked <= 4, "{checked} guesses were reported as checked");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
+async fn parallel_guesses_across_rotating_keys_cannot_outrun_the_global_budget() {
+    let dir = temp_dir("login-parallel-global");
+    let auth = auth_manager(&dir, Arc::new(AtomicI64::new(1_790_000_000_000)));
+    auth.setup("bootstrap-token", "correct horse battery staple")
+        .await
+        .unwrap();
+
+    let guesses = (0..40).map(|attempt| {
+        let auth = auth.clone();
+        async move {
+            let password = if attempt == 30 {
+                "correct horse battery staple".to_string()
+            } else {
+                format!("wrong guess {attempt}")
+            };
+            auth.login(&format!("rotating-{attempt}@example"), &password)
+                .await
+        }
+    });
+    let results = futures_util::future::join_all(guesses).await;
+
+    assert!(
+        matches!(results[30], Err(AuthError::Locked { .. })),
+        "a guess past the global budget must be refused, got {:?}",
+        results[30]
+    );
+    assert!(matches!(
+        auth.login("a-fresh-key@example", "correct horse battery staple")
+            .await,
+        Err(AuthError::Locked { .. })
+    ));
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
+async fn wrong_current_passwords_on_password_change_lock_out() {
+    // A browser Session must not become an unlimited password oracle.
+    let dir = temp_dir("password-change-lockout");
+    let now = Arc::new(AtomicI64::new(1_790_000_000_000));
+    let auth = auth_manager(&dir, now.clone());
+    let session = auth
+        .setup("bootstrap-token", "correct horse battery staple")
+        .await
+        .unwrap();
+
+    for remaining in (1..=4).rev() {
+        assert!(matches!(
+            auth.change_password(&session.token, "wrong guess", "a different secure passphrase")
+                .await,
+            Err(AuthError::InvalidCredentials { attempts_remaining })
+                if attempts_remaining == remaining
+        ));
+    }
+    let retry_at = match auth
+        .change_password(
+            &session.token,
+            "wrong guess",
+            "a different secure passphrase",
+        )
+        .await
+    {
+        Err(AuthError::Locked { retry_at }) => retry_at,
+        other => panic!("expected lockout, got {other:?}"),
+    };
+    assert!(matches!(
+        auth.change_password(
+            &session.token,
+            "correct horse battery staple",
+            "a different secure passphrase",
+        )
+        .await,
+        Err(AuthError::Locked { .. })
+    ));
+
+    now.store(retry_at.0 + 1, Ordering::Relaxed);
+    let session = auth
+        .login("100.64.0.2", "correct horse battery staple")
+        .await
+        .unwrap();
+    assert!(auth
+        .change_password(
+            &session.token,
+            "correct horse battery staple",
+            "a different secure passphrase",
+        )
+        .await
+        .is_ok());
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
 async fn browser_session_expires_without_sleeping() {
     let dir = temp_dir("session-expiry");
     let now = Arc::new(AtomicI64::new(1_790_000_000_000));
