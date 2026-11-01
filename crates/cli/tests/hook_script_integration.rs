@@ -188,3 +188,56 @@ async fn hook_script_integration() {
     }
     eprintln!("skipped (not installed): {skipped:?}");
 }
+
+/// Ctrl-Space (NUL) completes the line; pressing it again cycles (5.A).
+fn check_completion(shell: &str) {
+    let fake = FakeSocket::start(Mode::Answer);
+    let mut term = ShellTerm::spawn(
+        shell,
+        sentinal(),
+        &[("SENTINAL_SOCKET", fake.path.display().to_string())],
+    );
+    // A person waits for the suggestion before pressing again or Enter;
+    // keys typed ahead while the widget runs may be dropped by the shell.
+    // Each widget redraws the prompt, so wait for the Command's own output
+    // (upper case, unlike the typed line).
+    let from = term.seen.len();
+    term.type_keys("ech\u{0}");
+    term.type_keys("\r");
+    term.wait_for(from, "SENTINAL-COMPLETED-FIRST");
+    let from = term.seen.len();
+    term.type_keys("ech\u{0}");
+    term.type_keys("\u{0}");
+    term.type_keys("\r");
+    term.wait_for(from, "SENTINAL-COMPLETED-SECOND");
+    let typed = fake
+        .requests()
+        .into_iter()
+        .find_map(|request| match request {
+            LocalRequest::Complete { prefix, .. } => Some(prefix),
+            _ => None,
+        });
+    assert_eq!(typed.as_deref(), Some("ech"));
+    term.exit();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "drives real shells"]
+async fn ctrl_space_completes_from_history_in_every_shell() {
+    for shell in ["zsh", "bash", "fish"] {
+        if find_shell(shell).is_none() {
+            eprintln!("{shell}: not installed, skipped");
+            continue;
+        }
+        if shell == "bash"
+            && support::shell_version(&find_shell("bash").unwrap()).contains("version 3.")
+        {
+            eprintln!("bash 3: no READLINE_LINE, the widget is not installed; skipped");
+            continue;
+        }
+        tokio::task::spawn_blocking(move || check_completion(shell))
+            .await
+            .unwrap();
+        eprintln!("{shell}: Ctrl-Space completes and cycles");
+    }
+}

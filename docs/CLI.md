@@ -444,6 +444,29 @@ limitations, and measurements are in `docs/SHELL_HOOKS.md`.
 Reporting itself runs through a hidden `hook report` subcommand that the
 hook starts in the background; it is always silent.
 
+The same integration binds **Ctrl-Space** to completion (Milestone 5.A): it
+replaces the line with the best `sentinal complete` suggestion, and pressing
+it again on that line shows the next one. Tab completion is untouched. It
+works in zsh, fish, and bash 4 or newer (macOS's bash 3.2 has no
+`READLINE_LINE`, so there the binding is not installed), in ordinary and
+Sentinal terminals alike.
+
+### `complete`
+
+```console
+sentinal complete [PREFIX] [--cwd DIR] [--limit N] [--include-failed] [--json]
+```
+
+Prints the Command lines that start with `PREFIX`, best first, one per line
+(or a JSON array of `Completion` with `--json`), ranked by the daemon's
+frecency formula (`docs/SETUP.md`, *Autocomplete ranking*): this project and
+directory first, Commands that never succeeded left out unless
+`--include-failed`. Without `PREFIX` it reads `SENTINAL_COMPLETE_PREFIX`,
+which is how the shell widget passes the typed line so it never appears in
+`ps`. `--cwd` defaults to the current directory and `--limit` to 9 (at most
+20). It talks only to this Machine's daemon over the private local socket
+and gives up after 1.5 s; an empty answer still exits 0.
+
 ### `auto`
 
 Opt-in auto-wrap of new interactive terminals (details and skip table in

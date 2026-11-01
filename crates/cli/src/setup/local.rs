@@ -9,11 +9,20 @@ use std::time::Duration;
 pub(crate) fn local_socket(
     request: protocol::LocalRequest,
 ) -> Result<protocol::LocalResponse, String> {
+    local_socket_within(request, Duration::from_secs(300))
+}
+
+/// [`local_socket`] that gives up after `deadline` without a reply.
+pub(crate) fn local_socket_within(
+    request: protocol::LocalRequest,
+    deadline: Duration,
+) -> Result<protocol::LocalResponse, String> {
     use std::io::{Read, Write};
     let path = crate::connect_command::default_socket().ok_or("HOME is not set")?;
     let mut stream = std::os::unix::net::UnixStream::connect(&path)
         .map_err(|error| format!("cannot reach sentinald at {}: {error}", path.display()))?;
-    stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
+    stream.set_read_timeout(Some(deadline)).ok();
+    stream.set_write_timeout(Some(deadline)).ok();
     let text = protocol::Envelope::new(request)
         .encode()
         .map_err(|error| error.to_string())?;

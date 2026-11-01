@@ -170,6 +170,27 @@ fn answer(request: &LocalRequest) -> LocalResponse {
             session.pid = Some(*pid);
             LocalResponse::Session { session }
         }
+        // Completion: two harmless lines for any non-empty prefix (5.A).
+        LocalRequest::Complete { prefix, .. } => LocalResponse::Completions {
+            completions: if prefix.is_empty() {
+                Vec::new()
+            } else {
+                [
+                    "echo sentinal-completed-first | tr a-z A-Z",
+                    "echo sentinal-completed-second | tr a-z A-Z",
+                ]
+                .into_iter()
+                .map(|text| protocol::complete::Completion {
+                    text: text.into(),
+                    source: protocol::complete::CompletionSource::History,
+                    count: 3,
+                    last_at: Some(Timestamp(1)),
+                    last_exit: Some(0),
+                    score: 5.0,
+                })
+                .collect()
+            },
+        },
         _ => LocalResponse::Command {
             command: Command::start(
                 CommandId(1),
@@ -441,6 +462,29 @@ impl ShellTerm {
             match self.output.recv_timeout(remaining) {
                 Ok(bytes) => self.seen.push_str(&String::from_utf8_lossy(&bytes)),
                 Err(_) => panic!("fish: no finished Command; saw:\n{}", self.seen),
+            }
+        }
+    }
+
+    /// Type `keys` without Enter, then pause like a person reading the result.
+    pub fn type_keys(&mut self, keys: &str) {
+        self.writer.write_all(keys.as_bytes()).unwrap();
+        self.writer.flush().unwrap();
+        std::thread::sleep(Duration::from_millis(400));
+    }
+
+    /// Read until the terminal has printed `text` after what was seen at `from`.
+    pub fn wait_for(&mut self, from: usize, text: &str) {
+        let deadline = Instant::now() + Duration::from_secs(15);
+        while !self.seen[from..].contains(text) {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            match self.output.recv_timeout(remaining) {
+                Ok(bytes) => self.seen.push_str(&String::from_utf8_lossy(&bytes)),
+                Err(_) => panic!(
+                    "{}: never printed {text:?}; saw:\n{}",
+                    self.name,
+                    &self.seen[from..]
+                ),
             }
         }
     }

@@ -111,6 +111,22 @@ If `SENTINAL_DISABLE=1` is set, all external reporting and auto-wrap are
 disabled. The daemon-owned OSC wrapper may still track the FULL Session that
 the user explicitly entered.
 
+### Ctrl-Space completion
+
+The hook output ends with a separate block that binds Ctrl-Space (the NUL
+key) to `sentinal complete` (Milestone 5.A). It is loaded in every
+interactive shell unless `SENTINAL_DISABLE=1`, including Sentinal's own
+terminals, because it only reads; it never reports anything. The widget
+reads the line being typed only when Ctrl-Space is pressed and passes it in
+`SENTINAL_COMPLETE_PREFIX`, never argv. It replaces the line with the best
+suggestion; pressed again on the line it inserted, it shows the next one
+(zsh prints `sentinal 2/5` under the prompt). Tab completion is not
+touched. zsh rebinds `^@` (emacs `set-mark-command`); fish 4 binds
+`ctrl-space`, older fish `-k nul`; bash needs version 4 or newer and is
+skipped on bash 3.2. Real-shell test: `ctrl_space_completes_from_history_in_every_shell`
+in `crates/cli/tests/hook_script_integration.rs` (ignored; zsh and fish
+verified on macOS, bash 4+ not yet run on real hardware).
+
 ## Install and uninstall contract
 
 - The shell comes from the argument or `$SHELL`; anything else is an error.

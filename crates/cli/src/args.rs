@@ -67,6 +67,26 @@ pub enum Command {
         #[arg(long)]
         development: bool,
     },
+    /// Complete the Command line being typed from this Machine's history (5.A).
+    ///
+    /// The shell widget (Ctrl-Space, from `sentinal hook`) passes the line in
+    /// SENTINAL_COMPLETE_PREFIX so it never appears in `ps`.
+    Complete {
+        /// Text typed so far (else SENTINAL_COMPLETE_PREFIX).
+        prefix: Option<String>,
+        /// Directory being typed in; defaults to the current one.
+        #[arg(long)]
+        cwd: Option<PathBuf>,
+        /// Most completions to print.
+        #[arg(long, default_value_t = 9, value_parser = clap::value_parser!(u32).range(1..=20))]
+        limit: u32,
+        /// Also offer Commands that never succeeded.
+        #[arg(long)]
+        include_failed: bool,
+        /// Print a JSON array of completions instead of one line each.
+        #[arg(long)]
+        json: bool,
+    },
     /// Check the local worker installation without pairing or changing it.
     Doctor {
         /// Installed program prefix; defaults to ~/.local.

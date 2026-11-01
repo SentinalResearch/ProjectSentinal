@@ -8,6 +8,7 @@ pub mod auto_command;
 pub mod auto_wrap;
 pub mod backup;
 pub mod client;
+pub mod complete_command;
 pub mod connect_command;
 pub mod daemon_url;
 pub mod detach;

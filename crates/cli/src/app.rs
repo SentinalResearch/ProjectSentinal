@@ -107,6 +107,16 @@ async fn dispatch(
                 crate::mcp::run_stdio(&control, token_file.as_deref(), development, err).await,
             );
         }
+        Command::Complete {
+            prefix,
+            cwd,
+            limit,
+            include_failed,
+            json,
+        } => {
+            let request = crate::complete_command::request(prefix, cwd, limit, include_failed);
+            return Ok(crate::complete_command::run(request, json, out, err));
+        }
         Command::Doctor {
             report: true,
             range,
@@ -332,6 +342,7 @@ async fn dispatch(
             }
         }
         Command::Watch { .. }
+        | Command::Complete { .. }
         | Command::Doctor { .. }
         | Command::Setup { .. }
         | Command::Backup { .. }

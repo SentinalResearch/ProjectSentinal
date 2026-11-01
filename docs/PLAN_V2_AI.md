@@ -122,8 +122,11 @@ Goal: the command you want, in fewer keystrokes, wherever you type. Folds in `pr
       penalty; weights in `[complete]` (`docs/SETUP.md`); Commands that never
       succeeded are left out by default; Recipes follow history
       (`protocol::complete`, `daemon::complete`, migration 013)
-- [ ] Shell: zsh widget (Ctrl-Space) and bash/fish equivalents through
-      `sentinal hook`; never replaces the shell's own Tab completion
+- [x] Shell: zsh widget (Ctrl-Space) and bash/fish equivalents through
+      `sentinal hook`, calling `sentinal complete` (typed line in the
+      environment, never argv); press again to cycle; never replaces the
+      shell's own Tab completion. Verified in real zsh and fish; bash 4+ not
+      yet run on real hardware (macOS has bash 3.2, where it is skipped)
 - [ ] Prompt: `run`, `new`, and `find` complete Commands and recipe
       parameters inline (ghost text, Tab to accept)
 - [ ] Phone keyboard: the chip strip shows the top completions for what is

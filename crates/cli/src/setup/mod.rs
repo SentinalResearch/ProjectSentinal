@@ -6,7 +6,7 @@
 pub mod config;
 mod control;
 mod local;
-pub(crate) use local::local_socket;
+pub(crate) use local::{local_socket, local_socket_within};
 mod password;
 mod switch;
 mod system;
