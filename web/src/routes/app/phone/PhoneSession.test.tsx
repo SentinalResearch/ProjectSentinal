@@ -89,7 +89,8 @@ describe("B3/B4/B5 · phone Session screens", () => {
   it("keeps a missing Session on its own Machine and offers a way back", async () => {
     renderAt("/app/sessions/rtx:999", routes);
     expect(await screen.findByText(/RTX-PC · Session missing/, {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back to Overview" })).toBeInTheDocument();
+    // The island picks the back target up from the screen after it renders.
+    expect(await screen.findByRole("button", { name: "Back to Overview" })).toBeInTheDocument();
   });
 
   it("says when a deep link's Machine is offline or no longer enrolled", async () => {
@@ -111,29 +112,50 @@ describe("C1/C2 · phone terminal", () => {
     vi.restoreAllMocks();
   });
 
-  it("is full screen with Detach, the Session, and the phone key bar", async () => {
+  it("is full screen with ‹ back in the island and the built-in keyboard, never the OS one (M3)", async () => {
     setViewport(390);
     renderAt("/app/sessions/qwen/terminal", routes);
-    expect(await screen.findByRole("button", { name: "‹ Detach" }, { timeout: 5000 })).toBeInTheDocument();
-    const keys = screen.getByLabelText("Terminal keys");
-    expect(within(keys).getAllByRole("button").map((key) => key.textContent)).toEqual(["Ctrl‑C", "Esc", "Tab", "↑", "↓", "y", "n"]);
+    expect(await screen.findByRole("button", { name: "Back to Session" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Terminal keyboard" })).toBeInTheDocument();
+    const keys = screen.getByRole("group", { name: "Terminal keys" });
+    expect(within(keys).getAllByRole("button").map((key) => key.getAttribute("aria-label") ?? key.textContent)).toEqual([
+      "Ctrl", "Alt", "Esc", "Tab", "Left", "Up", "Down", "Right",
+    ]);
+    // inputmode="none" on xterm's textarea is checked in the browser (e2e/mobile.spec.ts):
+    // jsdom has no xterm textarea.
+    // The keyboard owns the bottom edge: no prompt pill here.
+    expect(screen.queryByRole("button", { name: "Open the prompt" })).not.toBeInTheDocument();
   });
 
-  it("Ctrl-C on a long job opens the confirmation sheet instead of sending", async () => {
+  it("^C on a long job opens the confirmation sheet instead of sending (§5)", async () => {
     setViewport(390);
     const sendSignal = vi.spyOn(dataAdapter, "sendSignal").mockResolvedValue();
     renderAt("/app/sessions/qwen/terminal", routes);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Ctrl‑C" }, { timeout: 5000 }));
+    await user.click(await screen.findByRole("button", { name: "Ctrl" }, { timeout: 5000 }));
+    await user.click(screen.getByRole("button", { name: /Control C, interrupt/ }));
     expect(screen.getByRole("dialog", { name: "Send Ctrl-C to Qwen Training?" })).toBeInTheDocument();
     expect(sendSignal).not.toHaveBeenCalled();
+  });
+
+  it("⌨︎ hides the keyboard and a 'keyboard' chip brings it back; a hardware keyboard leaves only the accessory row", async () => {
+    setViewport(390);
+    renderAt("/app/sessions/qwen/terminal", routes);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Hide keyboard" }, { timeout: 5000 }));
+    expect(screen.queryByRole("group", { name: "Terminal keyboard" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show keyboard" }));
+    expect(screen.getByRole("button", { name: "q" })).toBeInTheDocument();
+    await user.keyboard("a");
+    expect(screen.queryByRole("button", { name: "q" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ctrl" })).toBeInTheDocument();
   });
 
   it("shows no keys for a read-only Session", async () => {
     setViewport(390);
     renderAt("/app/sessions/pytest/terminal", routes);
-    expect(await screen.findByRole("button", { name: "‹ Detach" }, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Terminal keys")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Back to Session" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Terminal keyboard" })).not.toBeInTheDocument();
   });
 
   it("on desktop the terminal route returns to the Session page", async () => {

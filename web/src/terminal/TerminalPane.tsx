@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { dataAdapter, isMockData } from "../data";
 import type { Session, SessionEvent } from "../data/types";
+import { TermKeyboard, type KeyboardChip } from "./keyboard/TermKeyboard";
+import { outputTokens } from "./keyboard/outputTokens";
 import { useRealTerminalSession } from "./useRealTerminalSession";
 import { isReadOnlyTerminalState } from "./lifecycle";
 import styles from "./TerminalPane.module.css";
@@ -64,7 +66,19 @@ export interface TerminalPaneProps {
   /** Maximum decompressed saved bytes this pane may fetch. */
   replayLimitBytes?: number;
   className?: string;
+  /**
+   * Phones: the built-in keyboard (MOBILE_GLASS_SPEC §4) replaces the key bar
+   * and the OS keyboard. ^C from it goes through onRequestInterrupt.
+   */
+  keyboard?: {
+    visible: boolean;
+    /** A hardware keyboard is attached: show only the accessory row. */
+    hardware: boolean;
+    chips?: KeyboardChip[];
+  };
 }
+
+const encoder = new TextEncoder();
 
 const KEYS: [label: string, bytes: number[]][] = [
   ["Esc", [27]],
@@ -98,6 +112,7 @@ export function TerminalPane({
   replayLimitBytes,
   className,
   withAnswerKeys = false,
+  keyboard,
 }: TerminalPaneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -135,6 +150,8 @@ export function TerminalPane({
     } catch (err) {
       console.warn("WebGL terminal renderer is unavailable", err);
     }
+    // The built-in keyboard replaces the OS one: xterm's input never opens it.
+    if (keyboard) term.textarea?.setAttribute("inputmode", "none");
     fit.fit();
     // The first fit may measure the fallback font; refit once the real one loads.
     void document.fonts?.ready.then(() => {
@@ -224,41 +241,66 @@ export function TerminalPane({
 
   // Mock mode: local line buffering — bytes typed into the terminal become one
   // sendInput() call per line (Enter), mirroring how a real shell prompt behaves.
+  const mockInput = useRef<(data: string) => void>(() => undefined);
+  mockInput.current = (data: string) => {
+    const term = terminalRef.current;
+    if (!term) return;
+    for (const ch of data) {
+      const code = ch.charCodeAt(0);
+      if (code === 3) {
+        // QUESTION: a raw Ctrl-C keystroke typed into the terminal passes straight
+        // through as terminal input (normal terminal behavior); only the explicit
+        // key-bar/header "Ctrl-C…" buttons are gated behind the confirm dialog
+        // (rule 5 reads as gating the app's action affordances, not every keystroke
+        // a user can type into an attached terminal). See QUESTIONS.md.
+        term.write(`^C\r\n${promptString(session)}`);
+        inputLineRef.current = "";
+        continue;
+      }
+      if (code === 13) {
+        const line = inputLineRef.current;
+        term.write(`\r\n${promptString(session)}`);
+        inputLineRef.current = "";
+        if (line.length > 0) void dataAdapter.sendInput(sessionId, line);
+        continue;
+      }
+      if (code === 127) {
+        if (inputLineRef.current.length > 0) {
+          inputLineRef.current = inputLineRef.current.slice(0, -1);
+          term.write("\b \b");
+        }
+        continue;
+      }
+      if (code === 27) continue; // no cursor movement in the mock line editor
+      inputLineRef.current += ch;
+      term.write(ch);
+    }
+  };
   useEffect(() => {
     if (!isMockData || !terminal || readOnly) return;
-    const disposable = terminal.onData((data) => {
-      for (const ch of data) {
-        const code = ch.charCodeAt(0);
-        if (code === 3) {
-          // QUESTION: a raw Ctrl-C keystroke typed into the terminal passes straight
-          // through as terminal input (normal terminal behavior); only the explicit
-          // key-bar/header "Ctrl-C…" buttons are gated behind the confirm dialog
-          // (rule 5 reads as gating the app's action affordances, not every keystroke
-          // a user can type into an attached terminal). See QUESTIONS.md.
-          terminal.write(`^C\r\n${promptString(session)}`);
-          inputLineRef.current = "";
-          continue;
-        }
-        if (code === 13) {
-          const line = inputLineRef.current;
-          terminal.write(`\r\n${promptString(session)}`);
-          inputLineRef.current = "";
-          if (line.length > 0) void dataAdapter.sendInput(sessionId, line);
-          continue;
-        }
-        if (code === 127) {
-          if (inputLineRef.current.length > 0) {
-            inputLineRef.current = inputLineRef.current.slice(0, -1);
-            terminal.write("\b \b");
-          }
-          continue;
-        }
-        inputLineRef.current += ch;
-        terminal.write(ch);
-      }
-    });
+    const disposable = terminal.onData((data) => mockInput.current(data));
     return () => disposable.dispose();
   }, [isMockData, readOnly, terminal, sessionId]);
+
+  /** Built-in keyboard bytes: ^C asks first (§5), the rest goes to the PTY. */
+  function typed(bytes: string) {
+    if (bytes === "\x03" && onRequestInterrupt) {
+      onRequestInterrupt();
+      return;
+    }
+    if (isMockData) mockInput.current(bytes);
+    else sendRealBytes(encoder.encode(bytes));
+  }
+
+  // Tokens from recent output for the symbols layer's chips, refreshed while the keyboard shows.
+  const [tokens, setTokens] = useState<KeyboardChip[]>([]);
+  useEffect(() => {
+    if (!keyboard?.visible || !terminal) return;
+    const read = () => setTokens(outputTokens(terminal).map((token) => ({ label: token, text: token })));
+    read();
+    const timer = window.setInterval(read, 3_000);
+    return () => window.clearInterval(timer);
+  }, [keyboard?.visible, terminal]);
 
   function pressKey(label: string, bytes: number[]) {
     if (isMockData) {
@@ -297,7 +339,10 @@ export function TerminalPane({
         </p>
       )}
       {replayError && <p className={styles.replayWarning} role="alert">{replayError}</p>}
-      {showKeyBar && !readOnly && (
+      {keyboard && !readOnly && (keyboard.visible || keyboard.hardware) && (
+        <TermKeyboard onBytes={typed} chips={keyboard.chips} symbolChips={tokens} accessoryOnly={keyboard.hardware} />
+      )}
+      {showKeyBar && !keyboard && !readOnly && (
         <div className={styles.keyBar} aria-label="Terminal keys">
           <button type="button" className={`${styles.key} ${styles.ctrlC}`} onClick={onRequestInterrupt}>
             Ctrl‑C

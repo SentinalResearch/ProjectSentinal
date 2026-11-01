@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 import { PromptBar } from "../shell/PromptBar";
 import type { PromptSuggestion } from "../shell/promptGrammar";
@@ -16,6 +16,7 @@ import styles from "./phone.module.css";
  */
 export function PhoneShell() {
   const [back, setBack] = useState<IslandBack | null>(null);
+  const onTerminal = useLocation().pathname.endsWith("/terminal");
   const [prompt, setPrompt] = useState<{ text: string } | null>(null);
   const { perform, dialogs } = usePromptActions();
   const pill = useRef<HTMLButtonElement>(null);
@@ -36,12 +37,15 @@ export function PhoneShell() {
           <main className={styles.main} inert={prompt ? true : undefined}>
             <Outlet />
           </main>
+          {/* The terminal screen's keyboard owns the bottom edge. */}
+          {!onTerminal && (
           <button ref={pill} type="button" className={styles.promptPill} onClick={() => openPrompt()} aria-label="Open the prompt">
             <span className={styles.promptCaret} aria-hidden="true">
               ❯
             </span>
             <span className={styles.promptPlaceholder}>go, run, find, y / n…</span>
           </button>
+          )}
           {prompt && (
             <PromptBar
               initialText={prompt.text}

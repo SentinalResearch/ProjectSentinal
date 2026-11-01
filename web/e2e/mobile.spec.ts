@@ -108,14 +108,19 @@ test.describe("phone 390×844", () => {
     await expect(page.getByRole("list", { name: "Metrics" })).toBeVisible();
 
     await page.getByRole("link", { name: "Open terminal" }).click();
-    await expect(page.getByRole("button", { name: "‹ Detach" })).toBeVisible();
-    const keys = page.getByLabel("Terminal keys");
-    await expect(keys.getByRole("button")).toHaveText(["Ctrl‑C", "Esc", "Tab", "↑", "↓", "y", "n"]);
-    await shot(page, "c1-terminal");
+    await expect(page.getByRole("button", { name: "Back to Session" })).toBeVisible();
+    // The built-in keyboard replaces the OS one (MOBILE_GLASS_SPEC §4).
+    await expect(page.locator(".xterm-helper-textarea")).toHaveAttribute("inputmode", "none");
+    const keys = page.getByRole("group", { name: "Terminal keys" });
+    await expect(keys.getByRole("button", { name: "Ctrl" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open the prompt" })).toHaveCount(0);
+    await shot(page, "m3-terminal");
 
-    // Make it a long job: five minutes later, Ctrl-C asks first (approved 60 s rule).
+    // Make it a long job: five minutes later, ^C asks first (MOBILE_GLASS_SPEC §5, ≥ 30 s).
     await page.clock.fastForward("05:00");
-    await keys.getByRole("button", { name: "Ctrl‑C" }).click();
+    await keys.getByRole("button", { name: "Ctrl" }).click();
+    await shot(page, "m5-ctrl");
+    await page.getByRole("button", { name: /Control C, interrupt/ }).click();
     const sheet = page.getByRole("dialog", { name: /^Send Ctrl-C to / });
     await expect(sheet).toBeVisible();
     await shot(page, "c2-ctrl-c-sheet");
@@ -124,12 +129,12 @@ test.describe("phone 390×844", () => {
 
     // Rotation keeps the same terminal screen; nothing reloads.
     await page.setViewportSize({ width: 844, height: 390 });
-    await expect(page.getByRole("button", { name: "‹ Detach" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Back to Session" })).toBeVisible();
     await expect(page.getByTestId("terminal-host")).toBeVisible();
     await shot(page, "c1-terminal-landscape");
     await page.setViewportSize({ width: 390, height: 844 });
 
-    await page.getByRole("button", { name: "‹ Detach" }).click();
+    await page.getByRole("button", { name: "Back to Session" }).click();
     await expect(page.getByRole("list", { name: "Metrics" })).toBeVisible();
     await expectNoBrowserCredential(page);
   });

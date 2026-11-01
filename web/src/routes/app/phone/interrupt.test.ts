@@ -11,9 +11,10 @@ describe("Ctrl-C confirmation threshold", () => {
     expect(runningSeconds({} as never, 0)).toBeNull();
   });
 
-  it("confirms after 60 s, and when the running time is unknown", () => {
-    expect(needsInterruptConfirm({ runningFor: "45s" } as never, 0)).toBe(false);
-    expect(needsInterruptConfirm({ runningFor: "61s" } as never, 0)).toBe(true);
+  it("confirms from 30 s (MOBILE_GLASS_SPEC §5), and when the running time is unknown", () => {
+    expect(needsInterruptConfirm({ runningFor: "29s" } as never, 0)).toBe(false);
+    expect(needsInterruptConfirm({ runningFor: "30s" } as never, 0)).toBe(true);
+    expect(needsInterruptConfirm({ runningFor: "1h31m" } as never, 0)).toBe(true);
     expect(needsInterruptConfirm({} as never, 0)).toBe(true);
   });
 });
