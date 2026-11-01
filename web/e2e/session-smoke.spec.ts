@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { daemonRequest, e2eEnv as env } from "./support/adopt.mjs";
+import { currentPage, expectSignedIn, island, runCommand } from "./support/shell";
 
 test("control proxy authenticates to one fake worker and attaches", async ({ page }) => {
   const health = await page.request.get("/api/v1/health");
@@ -13,13 +14,15 @@ test("control proxy authenticates to one fake worker and attaches", async ({ pag
   await page.getByLabel("Confirm password").fill("test-password-for-playwright");
   await page.getByRole("button", { name: "Create password and continue" }).click();
 
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-  await page.getByRole("button", { name: "New session" }).click();
+  await expectSignedIn(page);
+  // Desktop ≥ 1024 px has no sidebar: "new session" is a prompt command there.
+  if (await island(page).isVisible()) await runCommand(page, "new session");
+  else await page.getByRole("button", { name: "New session" }).click();
 
   await expect(page).toHaveURL(/\/app\/sessions\/[^/]+(?:%3A|:)1$/);
   await expect(page.getByRole("heading", { name: "Session 1" })).toBeVisible();
   await expect(page.getByTestId("terminal-host").locator(".xterm")).toBeVisible();
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
@@ -27,7 +30,7 @@ test("a Watch-created FULL session appears and attaches", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Password", { exact: true }).fill("test-password-for-playwright");
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expectSignedIn(page);
 
   // The same CREATE_SESSION request `sentinal watch` sends, with its machine token.
   const response = await daemonRequest(env("SENTINAL_E2E_CONTROL_WS"), "test-token", {
@@ -47,7 +50,7 @@ test("a Watch-created FULL session appears and attaches", async ({ page }) => {
   await page.goto(`/app/sessions/${session.machine_id}:${session.id}`);
   await expect(page.getByRole("heading", { name: "Watched job" })).toBeVisible();
   await expect(page.getByTestId("terminal-host").locator(".xterm")).toBeVisible();
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
@@ -60,7 +63,7 @@ test("three Session generations survive reload with input only on the latest", a
   await page.goto("/login");
   await page.getByLabel("Password", { exact: true }).fill("test-password-for-playwright");
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expectSignedIn(page);
 
   const createdResponse = await daemonRequest(env("SENTINAL_E2E_CONTROL_WS"), "test-token", {
     type: "CREATE_SESSION", shell: "/bin/zsh", cwd: "/tmp", cols: 100, rows: 30,
@@ -92,7 +95,7 @@ test("three Session generations survive reload with input only on the latest", a
   await expect(page.getByRole("heading", { name: "Finished record" })).toBeVisible();
   await expect(page.getByText(/ — resumed at /)).toBeVisible();
   await expect(page.getByText("Part 2 of 2", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
 
   await page.reload();
   await expect(page.getByText(/ — resumed at /)).toBeVisible();

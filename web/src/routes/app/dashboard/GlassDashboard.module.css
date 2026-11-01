@@ -80,9 +80,30 @@
   text-align: left;
 }
 
-.needCard:focus-visible {
+.titleButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+}
+
+.titleButton:focus-visible {
   outline: 2px solid var(--accent-fg);
   outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .needTop {

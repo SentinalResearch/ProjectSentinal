@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { daemonRequest, e2eEnv as env } from "./support/adopt.mjs";
+import { expectSignedIn, switchTheme } from "./support/shell";
 
 // Desktop Session page: the terminal is the left half, full height, sticky;
 // the details scroll on the right. Measured on the production build.
@@ -8,7 +9,7 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password", { exact: true }).fill("test-password-for-playwright");
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expectSignedIn(page);
 }
 
 async function openLiveSession(page: Page) {
@@ -38,7 +39,8 @@ async function measure(page: Page): Promise<Layout> {
       if (!element) throw new Error(`missing ${selector}`);
       return element.getBoundingClientRect();
     };
-    const main = document.querySelector("main") as HTMLElement;
+    // Under the glass shell the page lives in the current frame, beside any sheets.
+    const main = (document.querySelector("main [data-current]") ?? document.querySelector("main")) as HTMLElement;
     const mainRect = main.getBoundingClientRect();
     const terminal = rect('section[aria-label="Terminal"]');
     const details = rect('section[aria-label="Session details"]');
@@ -78,26 +80,24 @@ test("the terminal fills the left half and stays put while the details scroll", 
   await signIn(page);
   await openLiveSession(page);
 
+  // ≥ 1024 px is the glass shell: no sidebar, the island floats above.
   for (const width of [1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const sidebar of ["open", "collapsed"] as const) {
-      // Sidebar starts open at these widths; the second pass collapses it.
-      if (sidebar === "collapsed") await page.getByTitle("Toggle sidebar").click();
-      await expect.poll(async () => (await measure(page)).terminal.height).toBeGreaterThan(0);
-      await page.waitForTimeout(150); // let the fit addon reflow after the width change
-      expectHalves(await measure(page));
-      await page.screenshot({ path: test.info().outputPath(`session-${width}-${sidebar}.png`), animations: "disabled" });
-    }
-    await page.getByTitle("Expand sidebar").click(); // reopen for the next width
+    await expect.poll(async () => (await measure(page)).terminal.height).toBeGreaterThan(0);
+    await page.waitForTimeout(150); // let the fit addon reflow after the width change
+    expectHalves(await measure(page));
+    await page.screenshot({ path: test.info().outputPath(`session-${width}.png`), animations: "disabled" });
   }
 
   // A short window forces the details to scroll; the terminal must not move.
   await page.setViewportSize({ width: 1280, height: 280 });
   await page.waitForTimeout(150);
   const scrolled = await page.evaluate(() => {
-    const main = document.querySelector("main") as HTMLElement;
-    main.scrollTop = main.scrollHeight;
-    return main.scrollTop;
+    // The glass Session page scrolls its details column; the classic one scrolls main.
+    const details = document.querySelector('section[aria-label="Session details"]') as HTMLElement;
+    const scroller = details.scrollHeight > details.clientHeight ? details : (document.querySelector("main") as HTMLElement);
+    scroller.scrollTop = scroller.scrollHeight;
+    return scroller.scrollTop;
   });
   expect(scrolled).toBeGreaterThan(0);
   expectHalves(await measure(page));
@@ -126,7 +126,7 @@ test("the terminal fills the left half and stays put while the details scroll", 
   expectHalves(narrow);
 
   // The terminal chrome stays dark in the light theme.
-  await page.getByRole("button", { name: "Light theme" }).click();
+  await switchTheme(page, "light");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   const colours = await page.evaluate(() => {
     const column = document.querySelector('section[aria-label="Terminal"]') as HTMLElement;
@@ -142,5 +142,5 @@ test("the terminal fills the left half and stays put while the details scroll", 
   expect(colours.key).toBe("rgb(22, 22, 22)");
   expect(colours.page).not.toBe("rgb(12, 12, 12)");
   await page.screenshot({ path: test.info().outputPath("session-1280-light.png"), animations: "disabled" });
-  await page.getByRole("button", { name: "Dark theme" }).click();
+  await switchTheme(page, "dark");
 });

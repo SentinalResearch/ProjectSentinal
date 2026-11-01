@@ -78,15 +78,10 @@
 
 :global([data-glass]) .key {
   border-radius: var(--radius-key);
-  background: #1a1a1c;
-}
-
-:global([data-glass]) .key:hover {
-  background: #242428;
 }
 
 :global([data-glass]) .ctrlC,
 :global([data-glass]) .ctrlC:hover {
-  background: color-mix(in srgb, var(--s-failed) 20%, #1a1a1c);
+  background: color-mix(in srgb, var(--s-failed) 20%, var(--bg-1));
   color: #ff6b61;
 }

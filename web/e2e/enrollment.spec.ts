@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { createWorkerSession, e2eEnv as env, linkSecrets, reportCommand, sentinal } from "./support/adopt.mjs";
+import { currentPage, expectSignedIn, goTo } from "./support/shell";
 
 const password = "test-password-for-playwright";
 // Desktop layout: this spec drives the sidebar and the Machines table. Phone
@@ -11,7 +12,7 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expectSignedIn(page);
 }
 
 /** Add Machine in the UI, then connect one worker with the shown code. */
@@ -99,15 +100,15 @@ test("two workers enroll, rename, and revoke independently with no secret in the
   await expect(page.getByRole("heading", { name: "Notification worker A" })).toBeVisible({ timeout: 10_000 });
   expect(decodeURIComponent(new URL(page.url()).pathname)).toContain(`/app/sessions/${workerSessionA.machine_id}:`);
 
-  await page.getByTitle("Overview").last().click();
-  await expect(page.getByText("Worker A routed session", { exact: true })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("Worker B routed session", { exact: true })).toBeVisible();
-  await page.getByText("Worker A routed session", { exact: true }).click();
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
-  await expect(page.getByText("No events yet.", { exact: true })).toHaveCount(1);
-  await page.getByTitle("Overview").last().click();
-  await page.getByText("Worker B routed session", { exact: true }).click();
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await goTo(page, "dashboard");
+  await expect(currentPage(page).getByText("Worker A routed session", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(currentPage(page).getByText("Worker B routed session", { exact: true })).toBeVisible();
+  await currentPage(page).getByText("Worker A routed session", { exact: true }).click();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
+  await expect(currentPage(page).getByText("No events yet.", { exact: true })).toHaveCount(1);
+  await goTo(page, "dashboard");
+  await currentPage(page).getByText("Worker B routed session", { exact: true }).click();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
 
   // The PWA loads worker-local Recipe catalogs and launches only through the
   // selected catalog owner.
@@ -120,7 +121,7 @@ test("two workers enroll, rename, and revoke independently with no secret in the
   expect([workerSessionA.machine_id, workerSessionB.machine_id]).toContain(recipeOwner);
   await page.getByRole("button", { name: /Run on RTX PC/ }).click();
   await expect(page.getByRole("heading", { name: "cargo test" })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
   // The new Session belongs to the Machine whose catalog entry was chosen.
   expect(decodeURIComponent(new URL(page.url()).pathname)).toContain(`/app/sessions/${recipeOwner}:`);
 
@@ -128,26 +129,26 @@ test("two workers enroll, rename, and revoke independently with no secret in the
   // B keeps attaching, and reconnecting A does not duplicate the Event snapshot.
   const disconnected = sentinal(workerA, ["disconnect"]);
   expect(disconnected.status, disconnected.stderr).toBe(0);
-  await page.getByTitle("Overview").last().click();
-  await expect(page.getByText(/Disconnected · last seen/).first()).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText("Worker A routed session", { exact: true })).toHaveCount(1);
-  await page.getByText("Worker B routed session", { exact: true }).click();
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await goTo(page, "dashboard");
+  await expect(currentPage(page).getByText(/Disconnected · last seen/).first()).toBeVisible({ timeout: 10_000 });
+  await expect(currentPage(page).getByText("Worker A routed session", { exact: true })).toHaveCount(1);
+  await currentPage(page).getByText("Worker B routed session", { exact: true }).click();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
 
-  await page.getByTitle("Settings").click();
+  await goTo(page, "settings");
   await page.getByRole("button", { name: "Machines" }).click();
   await enroll(page, workerA, "RTX PC");
-  await page.getByTitle("Overview").last().click();
-  await expect(page.getByText("Worker A routed session", { exact: true })).toHaveCount(1, { timeout: 10_000 });
-  await page.getByText("Worker A routed session", { exact: true }).click();
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
-  await expect(page.getByText("No events yet.", { exact: true })).toHaveCount(1);
+  await goTo(page, "dashboard");
+  await expect(currentPage(page).getByText("Worker A routed session", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+  await currentPage(page).getByText("Worker A routed session", { exact: true }).click();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
+  await expect(currentPage(page).getByText("No events yet.", { exact: true })).toHaveCount(1);
 
   expect(browserSockets.some((url) => url.includes(`/machines/${workerSessionA.machine_id}/ws`))).toBe(true);
   expect(browserSockets.some((url) => url.includes(`/machines/${workerSessionB.machine_id}/ws`))).toBe(true);
   expect(browserSockets.every((url) => new URL(url).port === "4173")).toBe(true);
 
-  await page.getByTitle("Settings").click();
+  await goTo(page, "settings");
   await page.getByRole("button", { name: "Machines" }).click();
 
   // Rename one; reload shows the control-backed registry.

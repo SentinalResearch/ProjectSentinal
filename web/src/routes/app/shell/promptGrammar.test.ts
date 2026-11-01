@@ -104,6 +104,12 @@ describe("prompt grammar", () => {
     expect(suggest("sign", index).find((s) => s.group === "DO")?.action).toEqual({ kind: "signOut" });
   });
 
+  it("text that names an action selects it first (`new session` must not search history)", () => {
+    expect(suggest("new session", index)[0].action).toEqual({ kind: "newSession" });
+    expect(suggest("theme", index)[0].action).toEqual({ kind: "toggleTheme" });
+    expect(suggest("sign out", index)[0].action).toEqual({ kind: "signOut" });
+  });
+
   it("an empty prompt leads with what needs answering", () => {
     const results = suggest("", index);
     expect(results[0].action.kind).toBe("answer");

@@ -7,6 +7,7 @@ import {
   reportCommand,
   sentinal,
 } from "./support/adopt.mjs";
+import { expectSignedIn } from "./support/shell";
 
 const password = "test-password-for-playwright";
 
@@ -14,7 +15,7 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expectSignedIn(page);
 }
 
 async function reconnectRevokedWorker(page: Page) {

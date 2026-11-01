@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { adoptTrainingWriter } from "./support/adopt.mjs";
+import { expectSignedIn } from "./support/shell";
 
 const password = "test-password-for-playwright";
 
@@ -17,7 +18,7 @@ async function signIn(page: Page) {
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByRole("button", { name: /Sign in/ }).click();
   }
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expectSignedIn(page);
 }
 
 test("an adopted log Session shows progress on a phone with no terminal controls", async ({ page }) => {

@@ -11,8 +11,6 @@ import type { SettingsTab } from "../settings-tabs";
 
 export type PromptGroup = "ANSWER" | "GO" | "RUN" | "FIND" | "DO";
 
-export const GROUP_ORDER: readonly PromptGroup[] = ["ANSWER", "GO", "RUN", "FIND", "DO"];
-
 export type PromptAction =
   | { kind: "navigate"; to: string }
   | { kind: "answer"; sessionId: string; key: "y" | "n" }
@@ -350,10 +348,12 @@ function actions(index: PromptIndex): Array<PromptSuggestion & { keys: string[] 
 }
 
 function bare(index: PromptIndex, text: string): PromptSuggestion[] {
-  const doMatches = actions(index)
-    .filter((action) => matchScore(text, action.keys) > 0)
-    .map(({ keys: _keys, ...suggestion }) => suggestion);
-  return [...go(index, text), ...run(index, text), ...find(text), ...doMatches];
+  const scored = actions(index).map(({ keys, ...suggestion }) => ({ suggestion, score: matchScore(text, keys) }));
+  // Text that names an action ("new session", "theme", "sign out") leads with it.
+  // Every typed word starts a word of the action's name (score ≥ 80).
+  const named = scored.filter((entry) => entry.score >= 80).map((entry) => entry.suggestion);
+  const loose = scored.filter((entry) => entry.score > 0 && entry.score < 80).map((entry) => entry.suggestion);
+  return [...named, ...go(index, text), ...run(index, text), ...find(text), ...loose];
 }
 
 function empty(index: PromptIndex): PromptSuggestion[] {
@@ -380,6 +380,7 @@ export function suggest(input: string, index: PromptIndex): PromptSuggestion[] {
   return capped(all);
 }
 
+/** Groups in the order their best suggestion arrived; at most 5 each and 9 in all. */
 function capped(all: PromptSuggestion[]): PromptSuggestion[] {
   const seen = new Set<string>();
   const byGroup = new Map<PromptGroup, PromptSuggestion[]>();
@@ -390,5 +391,5 @@ function capped(all: PromptSuggestion[]): PromptSuggestion[] {
     if (list.length < PER_GROUP) list.push(suggestion);
     byGroup.set(suggestion.group, list);
   }
-  return GROUP_ORDER.flatMap((group) => byGroup.get(group) ?? []).slice(0, TOTAL);
+  return Array.from(byGroup.values()).flat().slice(0, TOTAL);
 }

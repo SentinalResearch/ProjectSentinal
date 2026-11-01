@@ -147,7 +147,8 @@ function DesktopSessionDetail() {
     try {
       const created = await dataAdapter.continueSession(source.id);
       setContinuing(false);
-      navigate(`/app/sessions/${created.id}`);
+      // Another part of the same terminal: replace, so no stale sheet is left behind.
+      navigate(`/app/sessions/${created.id}`, { replace: true });
     } catch (error) {
       setContinueError(error instanceof Error ? error.message : "Could not resume the terminal.");
       setContinuing(false);
@@ -182,7 +183,7 @@ function DesktopSessionDetail() {
             lineage={lineage}
             selectedId={session.id}
             machineName={machineName}
-            onSelect={(sessionId) => navigate(`/app/sessions/${sessionId}`)}
+            onSelect={(sessionId) => navigate(`/app/sessions/${sessionId}`, { replace: true })}
             onAttachedChange={setAttached}
             onRequestInterrupt={askCtrlC}
           />
@@ -261,7 +262,7 @@ function DesktopSessionDetail() {
               <button
                 type="button"
                 className={styles.continueButton}
-                onClick={() => navigate(`/app/sessions/${latest.id}`)}
+                onClick={() => navigate(`/app/sessions/${latest.id}`, { replace: true })}
               >
                 Go to the live terminal
               </button>

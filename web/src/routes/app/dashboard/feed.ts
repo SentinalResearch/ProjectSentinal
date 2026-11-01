@@ -87,7 +87,7 @@ export function awayFeed(sessions: Session[], machines: Machine[], limit = 10): 
       id: `machine:${machine.id}`,
       time: "",
       square: "var(--s-disconnected-fg)",
-      headline: `${machine.name} went offline`,
+      headline: machine.status === "DISCONNECTED" ? `${machine.name} disconnected` : `${machine.name} went offline`,
       detail: machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "not seen yet",
     }));
   return [...sorted.slice(0, Math.max(0, limit - offline.length)), ...offline];

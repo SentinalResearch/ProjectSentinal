@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { createWorkerSession, e2eEnv as env, linkSecrets, sentinal } from "./support/adopt.mjs";
+import { currentPage, expectSignedIn } from "./support/shell";
 
 // Milestone 4.D.1 acceptance (docs/progress/milestone-4d1.md §10 / docs/ROADMAP.md
 // 4.D.1 "Demo"): one control, two workers, reload while one worker is offline,
@@ -15,7 +16,7 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expectSignedIn(page);
 }
 
 /** Re-pair a worker if an earlier spec left it disconnected/revoked. Mirrors enrollment.spec.ts's `enroll`. */
@@ -112,7 +113,7 @@ test("one control, two workers: offline retention, live delta, routed terminal i
   // --- (7): terminal input is routed only to the authoritative worker, never
   // the control-origin live stream (which only ever pushes, never reads) ---
   await page.getByText("Projection accept session A", { exact: true }).click();
-  await expect(page.getByText("attached", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByTestId("terminal-host").click();
   await page.keyboard.type("acceptance-terminal-input");
 

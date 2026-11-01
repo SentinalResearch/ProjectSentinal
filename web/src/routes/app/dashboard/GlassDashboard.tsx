@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { AttentionCard, GlassPanel } from "../../../components/glass/Glass";
@@ -55,7 +55,10 @@ export function GlassDashboard() {
         </header>
 
         {needs.length > 0 && (
-          <section className={styles.needs} aria-label="Needs you">
+          <section className={styles.needs} aria-labelledby="needs-you-heading">
+            <h2 id="needs-you-heading" className={styles.visuallyHidden}>
+              Needs you
+            </h2>
             {needs.map((session) => (
               <NeedsCard
                 key={session.id}
@@ -119,21 +122,20 @@ export function GlassDashboard() {
   );
 }
 
+/** How a lane names a Machine that is not online. */
+const STATUS_WORD: Record<Machine["status"], string> = {
+  ONLINE: "Online",
+  OFFLINE: "Offline",
+  DISCONNECTED: "Disconnected",
+  AUTH_EXPIRED: "Authentication expired",
+  REVOKED: "Revoked",
+};
+
 /** Lanes show live work and failures; finished runs live in History. */
 function onLane(session: Session): boolean {
   return session.state !== "COMPLETED" && session.state !== "INTERRUPTED";
 }
 
-/** Enter or Space on a card that contains its own buttons. */
-function onActivate(handler: () => void) {
-  return (event: ReactKeyboardEvent) => {
-    if (event.target !== event.currentTarget) return;
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      handler();
-    }
-  };
-}
 
 function NeedsCard({
   session,
@@ -147,22 +149,16 @@ function NeedsCard({
   onInterrupt: () => void;
 }) {
   const navigate = useNavigate();
+  const titleId = `need-${useId()}`;
   const fact = session.state === "FAILED" ? (session.result?.summary ?? formatSessionFact(session)) : formatSessionFact(session);
   const stop = (handler: () => void) => (event: { stopPropagation(): void }) => {
     event.stopPropagation();
     handler();
   };
   return (
-    <AttentionCard
-      as="div"
-      state={session.state}
-      className={styles.needCard}
-      role="button"
-      tabIndex={0}
-      aria-label={`${session.name}, ${session.state.toLowerCase()} on ${machineName}`}
-      onClick={onOpen}
-      onKeyDown={onActivate(onOpen)}
-    >
+    // The title is the card's one "open" control; the rest of the card is a
+    // larger mouse target for it (no button nested in a button).
+    <AttentionCard as="article" state={session.state} className={styles.needCard} aria-labelledby={titleId} onClick={onOpen}>
       <div className={styles.needTop}>
         <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
         <span className={styles.needWhere}>
@@ -170,7 +166,16 @@ function NeedsCard({
           {session.runningFor ? ` · ${session.runningFor}` : ""}
         </span>
       </div>
-      <h3 className={styles.needTitle}>{session.name}</h3>
+      <h3 className={styles.needTitle} id={titleId}>
+        <button
+          type="button"
+          className={styles.titleButton}
+          onClick={stop(onOpen)}
+          aria-label={`${session.name}, ${session.state.toLowerCase()} on ${machineName}`}
+        >
+          {session.name}
+        </button>
+      </h3>
 
       {session.state === "WAITING" && canAnswer(session) ? (
         <div className={styles.answerRow}>
@@ -276,7 +281,8 @@ function MachineLane({
         </div>
       ) : (
         <p className={styles.laneNote}>
-          offline · {machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "not seen yet"} · sessions resume when it reconnects
+          {STATUS_WORD[machine.status]} · {machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "not seen yet"} · sessions
+          resume when it reconnects
         </p>
       )}
     </GlassPanel>

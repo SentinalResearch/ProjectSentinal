@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { daemonRequest, e2eEnv as env, sentinal } from "./support/adopt.mjs";
+import { currentPage, expectSignedIn } from "./support/shell";
 
 // Settings → Diagnostics against the real control and two workers: every
 // Machine gets a measured browser round trip, and each worker also gets a
@@ -13,7 +14,7 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expectSignedIn(page);
 }
 
 /** Re-pair a worker if an earlier spec left it disconnected. Mirrors projection-acceptance.spec.ts. */
@@ -86,7 +87,7 @@ test("the health page shows measured typing and the report is anonymous", async 
     });
   });
   await page.goto(`/app/sessions/${session.machine_id}:${session.id}`);
-  await expect(page.getByText("attached", { exact: true })).toBeVisible();
+  await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
   await page.getByTestId("terminal-host").click();
   // The first key's echo shows the shell is ready (its own timing may be
   // discarded if the shell was still starting).

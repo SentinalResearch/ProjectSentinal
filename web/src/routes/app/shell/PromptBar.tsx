@@ -6,7 +6,7 @@ import { isMockData } from "../../../data/mode";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Recipe } from "../../../data/types";
 import { settingsTabs } from "../settings-tabs";
-import { GROUP_ORDER, suggest, type PromptGroup, type PromptSuggestion } from "./promptGrammar";
+import { suggest, type PromptGroup, type PromptSuggestion } from "./promptGrammar";
 import styles from "./PromptBar.module.css";
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -103,10 +103,12 @@ export function PromptBar({
     }
   }
 
-  const groups = GROUP_ORDER.map((group) => ({
+  // Groups in suggestion order, so the selected first row is drawn first.
+  const order = Array.from(new Set(suggestions.map((suggestion) => suggestion.group)));
+  const groups = order.map((group) => ({
     group,
     items: suggestions.map((suggestion, index) => ({ suggestion, index })).filter(({ suggestion }) => suggestion.group === group),
-  })).filter(({ items }) => items.length > 0);
+  }));
   const optionId = (index: number) => `${listId}-option-${index}`;
 
   return (
