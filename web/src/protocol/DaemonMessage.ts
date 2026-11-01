@@ -10,6 +10,7 @@ import type { NotificationJournalEntry } from "./NotificationJournalEntry";
 import type { NotificationRules } from "./NotificationRules";
 import type { NotificationStatus } from "./NotificationStatus";
 import type { Recipe } from "./Recipe";
+import type { SearchHit } from "./SearchHit";
 import type { Session } from "./Session";
 import type { SessionMetrics } from "./SessionMetrics";
 
@@ -70,6 +71,12 @@ export type DaemonMessage = {
    * Commands matching the history request.
    */
   commands: Array<Command>;
+} | {
+  "type": "SEARCH_RESULTS";
+  /**
+   * Ranked hits from this Machine.
+   */
+  hits: Array<SearchHit>;
 } | {
   "type": "RECIPES";
   /**

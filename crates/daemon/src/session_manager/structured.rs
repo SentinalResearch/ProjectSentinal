@@ -29,6 +29,16 @@ impl SessionManager {
             .map_err(Into::into)
     }
 
+    /// Search this Machine's Sessions, Commands, Events, and `recipes` (5.S).
+    pub fn search(
+        &self,
+        recipes: &[protocol::Recipe],
+        request: &crate::search::SearchRequest<'_>,
+    ) -> Result<Vec<protocol::search::SearchHit>, SessionManagerError> {
+        let now = (self.inner.config.clock)();
+        crate::search::search(self.store()?, recipes, request, now).map_err(Into::into)
+    }
+
     /// Return a bounded persisted Event page.
     pub fn events(
         &self,

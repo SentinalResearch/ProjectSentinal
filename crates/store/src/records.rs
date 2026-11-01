@@ -133,7 +133,7 @@ pub(crate) fn insert_event_on(connection: &Connection, event: &Event) -> Result<
     Ok(())
 }
 
-fn command_from_row(row: &Row<'_>) -> rusqlite::Result<Command> {
+pub(crate) fn command_from_row(row: &Row<'_>) -> rusqlite::Result<Command> {
     let class = row
         .get::<_, Option<String>>(8)?
         .map(|json| serde_json::from_str::<CommandClass>(&json).map_err(json_to_sql))
@@ -151,7 +151,7 @@ fn command_from_row(row: &Row<'_>) -> rusqlite::Result<Command> {
     })
 }
 
-fn event_from_row(row: &Row<'_>) -> rusqlite::Result<Event> {
+pub(crate) fn event_from_row(row: &Row<'_>) -> rusqlite::Result<Event> {
     let kind_json: String = row.get(4)?;
     let kind: EventKind = serde_json::from_str(&kind_json).map_err(json_to_sql)?;
     Ok(Event {

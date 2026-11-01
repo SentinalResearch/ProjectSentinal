@@ -3,6 +3,8 @@ import type { EventId } from "./EventId";
 import type { MetricRange } from "./MetricRange";
 import type { NotificationRuleSet } from "./NotificationRuleSet";
 import type { Recipe } from "./Recipe";
+import type { SearchFilters } from "./SearchFilters";
+import type { SearchScope } from "./SearchScope";
 import type { SessionId } from "./SessionId";
 import type { SessionOrigin } from "./SessionOrigin";
 
@@ -114,6 +116,25 @@ export type ClientRequest =
     after: EventId | null;
     /**
      * Maximum number of Events, from 1 through 500.
+     */
+    limit: number;
+  }
+  | {
+    "type": "SEARCH";
+    /**
+     * What the owner typed.
+     */
+    query: string;
+    /**
+     * Where to look; empty means everywhere.
+     */
+    scopes: Array<SearchScope>;
+    /**
+     * Optional narrowing.
+     */
+    filters: SearchFilters;
+    /**
+     * Most hits to return, 1 through [`crate::search::MAX_SEARCH_LIMIT`].
      */
     limit: number;
   }

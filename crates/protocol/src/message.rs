@@ -151,6 +151,19 @@ pub enum ClientRequest {
         /// Maximum number of Events, from 1 through 500.
         limit: u32,
     },
+    /// Search this Machine's Sessions, Commands, Events, and Recipes (5.S).
+    Search {
+        /// What the owner typed.
+        query: String,
+        /// Where to look; empty means everywhere.
+        #[serde(default)]
+        scopes: Vec<crate::search::SearchScope>,
+        /// Optional narrowing.
+        #[serde(default)]
+        filters: crate::search::SearchFilters,
+        /// Most hits to return, 1 through [`crate::search::MAX_SEARCH_LIMIT`].
+        limit: u32,
+    },
     /// Search command text using the daemon's full-text index.
     SearchCommands {
         /// Full-text query entered by the user.
@@ -249,6 +262,24 @@ impl ClientRequest {
                     field: "events",
                     actual: *limit,
                     maximum: 500,
+                })
+            }
+            ClientRequest::Search { query, .. }
+                if query.len() > crate::search::MAX_SEARCH_QUERY_BYTES =>
+            {
+                Err(ProtocolError::FieldTooLong {
+                    field: "query",
+                    actual: query.len(),
+                    maximum: crate::search::MAX_SEARCH_QUERY_BYTES,
+                })
+            }
+            ClientRequest::Search { limit, .. }
+                if !(1..=crate::search::MAX_SEARCH_LIMIT).contains(limit) =>
+            {
+                Err(ProtocolError::InvalidQueryLimit {
+                    field: "search",
+                    actual: *limit,
+                    maximum: crate::search::MAX_SEARCH_LIMIT,
                 })
             }
             _ => Ok(()),
@@ -669,6 +700,11 @@ pub enum DaemonMessage {
     History {
         /// Commands matching the history request.
         commands: Vec<Command>,
+    },
+    /// Reply to `SEARCH`, best first.
+    SearchResults {
+        /// Ranked hits from this Machine.
+        hits: Vec<crate::search::SearchHit>,
     },
     /// Recipes available on this Machine.
     Recipes {

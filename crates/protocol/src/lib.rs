@@ -21,6 +21,7 @@
 //! - [`local`]    — private local socket location
 //! - [`auth`]     — single-user password authentication over HTTP
 //! - [`link`]     — Machine enrollment, the control registry, and worker links
+//! - [`search`]   — search everywhere and its shared ranking (5.S)
 
 pub mod agent;
 pub mod auth;
@@ -46,6 +47,7 @@ pub mod process;
 pub mod projection;
 pub mod recipe;
 pub mod release;
+pub mod search;
 pub mod session;
 pub mod session_env;
 pub mod session_log;

@@ -11,6 +11,7 @@ pub mod pairing_requests;
 mod projection;
 mod records;
 pub mod registry;
+mod search;
 
 use protocol::{
     CaptureLevel, Event, EventId, EventKind, Machine, Session, SessionId, SessionState, Timestamp,
@@ -32,6 +33,7 @@ pub use native_push::{
 };
 pub use notification_deliveries::{NewNotificationDelivery, NotificationDelivery};
 pub use projection::{ControlProjectionRevision, ControlProjectionState, ProjectionOutboxLimits};
+pub use search::{event_search_text, SearchCandidateQuery, SearchCandidates, RECENT_SEARCH_WINDOW};
 
 const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("../migrations/001_initial.sql")),
@@ -51,6 +53,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
     ),
     (10, include_str!("../migrations/010_pairing_requests.sql")),
     (11, include_str!("../migrations/011_health.sql")),
+    (12, include_str!("../migrations/012_search.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.

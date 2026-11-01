@@ -261,6 +261,23 @@ impl AppState {
                     Err(error) => error_action(error),
                 }
             }
+            ClientRequest::Search {
+                query,
+                scopes,
+                filters,
+                limit,
+            } => {
+                let request = crate::search::SearchRequest {
+                    query: &query,
+                    scopes: &scopes,
+                    filters,
+                    limit,
+                };
+                match self.sessions.search(&self.recipes.list(), &request) {
+                    Ok(hits) => WsAction::Reply(DaemonMessage::SearchResults { hits }),
+                    Err(error) => error_action(error),
+                }
+            }
             ClientRequest::ListRecipes => WsAction::Reply(DaemonMessage::Recipes {
                 recipes: self.recipes.list(),
             }),

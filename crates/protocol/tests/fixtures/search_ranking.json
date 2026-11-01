@@ -1,0 +1,52 @@
+{
+  "comment": "Milestone 5.S ranking, shared by crates/protocol/tests/search.rs and web/src/data/search.test.ts so the daemon and the browser score alike.",
+  "match": [
+    { "query": "", "haystacks": ["anything"], "score": 1 },
+    { "query": "py", "haystacks": ["python train.py"], "score": 100 },
+    { "query": "train", "haystacks": ["python train.py"], "score": 80 },
+    { "query": "rain", "haystacks": ["python train.py"], "score": 60 },
+    { "query": "oom", "haystacks": ["CUDA out of memory"], "score": 40 },
+    { "query": "oom", "haystacks": ["torch.OutOfMemoryError: CUDA out of memory"], "score": 40 },
+    { "query": "oom", "haystacks": ["python train.py --config moe.yaml"], "score": 20 },
+    { "query": "nvsmi", "haystacks": ["nvidia-smi"], "score": 20 },
+    { "query": "xyz", "haystacks": ["python train.py"], "score": 0 },
+    { "query": "PY TRAIN", "haystacks": ["python train.py"], "score": 90 },
+    { "query": "py zzz", "haystacks": ["python train.py"], "score": 0 },
+    { "query": "train", "haystacks": ["no", "train.py"], "score": 100 },
+    { "query": "mem", "haystacks": ["torch.OutOfMemoryError"], "score": 60 },
+    { "query": "memory", "haystacks": ["CUDA out of memory"], "score": 80 },
+    { "query": "été", "haystacks": ["rapport d'été"], "score": 80 }
+  ],
+  "rank": [
+    { "match": 0, "age_ms": 0, "needs_you": true, "score": 0 },
+    { "match": 100, "age_ms": 0, "needs_you": false, "score": 115 },
+    { "match": 100, "age_ms": 86400000, "needs_you": false, "score": 107.5 },
+    { "match": 80, "age_ms": 172800000, "needs_you": false, "score": 83.75 },
+    { "match": 60, "age_ms": 0, "needs_you": true, "score": 105 },
+    { "match": 20, "age_ms": 31536000000, "needs_you": false, "score": 20 },
+    { "match": 100, "age_ms": -5000, "needs_you": false, "score": 115 }
+  ],
+  "order": [
+    {
+      "comment": "prefix > word start > substring > fuzzy, whatever the age",
+      "query": "train",
+      "items": [
+        { "text": "pytrain-old", "age_ms": 0, "needs_you": false },
+        { "text": "python train.py", "age_ms": 0, "needs_you": false },
+        { "text": "train.sh", "age_ms": 604800000, "needs_you": false },
+        { "text": "t-r-a-i-n", "age_ms": 0, "needs_you": false }
+      ],
+      "expected": ["train.sh", "python train.py", "pytrain-old", "t-r-a-i-n"]
+    },
+    {
+      "comment": "within a tier, recent first; needs-you lifts a match above an old better one, not above a fresh one",
+      "query": "eval",
+      "items": [
+        { "text": "eval old", "age_ms": 864000000, "needs_you": false },
+        { "text": "eval new", "age_ms": 60000, "needs_you": false },
+        { "text": "run-eval waiting", "age_ms": 864000000, "needs_you": true }
+      ],
+      "expected": ["eval new", "run-eval waiting", "eval old"]
+    }
+  ]
+}

@@ -79,19 +79,30 @@ and a demo. They follow the roadmap's format and can be pasted into
 
 Goal: one search, fast and ranked on the daemon, used by the prompt, History, and the phone.
 
-- [ ] `SEARCH { query, scopes, limit, cursor }` on the control: Sessions,
-      Commands, Events, recipes, Machines, projects, and Settings pages, as
-      one ranked list with `kind`, `title`, `detail`, `target`, and `score`
-- [ ] FTS5 indexes for Events and Session titles beside the Commands index;
-      the control's read model holds every Machine's results
-- [ ] Ranking: prefix > word start > substring > fuzzy; recency and "needs
-      you" boosts; same formula on desktop and phone (table-driven tests)
+- [x] `SEARCH { query, scopes, filters, limit }` on **every daemon**, over
+      its own Sessions, Commands, Events, and Recipes, as one ranked list
+      with `kind`, `title`, `detail`, `target`, `at`, and `score`
+      (`protocol::search`, `daemon::search`). The browser asks every
+      Machine and merges by score, and ranks Machines, projects and Settings
+      pages itself. *Changed from "on the control":* the control's read model
+      deliberately holds no Command or error text (4.D privacy
+      minimisation), so text stays on its Machine and travels only in a reply
+      to the owner, as History already does. No cursor yet (50 hits a Machine)
+- [x] Trigram FTS5 indexes for Commands and text-bearing Events (errors,
+      warnings, prompts, checkpoints, servers; migration 012) beside the
+      prefix index; recent rows are also matched so fuzzy queries work.
+      Session titles are few and are matched directly
+- [x] Ranking: prefix > word start > substring > initials (`oom` → "out of
+      memory") > subsequence; recency (15, halving daily) and needs-you (30)
+      boosts; one table (`crates/protocol/tests/fixtures/search_ranking.json`)
+      tested in Rust and in the browser
 - [ ] The prompt calls `SEARCH` for bare text and `find`, so results include
       Machines that are not loaded in the browser yet
 - [ ] Filters as prompt grammar: `find failed pytest on rtx-pc since yesterday`
 - [ ] Output search, **opt-in per Session** (FULL capture only): search the
       saved log with secret-pattern redaction in results; never indexed by default
-- [ ] Budget: p95 < 50 ms on 100 000 Commands and 500 000 Events (timed `#[ignore]` test)
+- [x] Budget: p95 < 50 ms on 100 000 Commands and 500 000 Events (timed
+      `#[ignore]` test in `crates/daemon/tests/search.rs`; 6.7 ms on an M-series Mac)
 
 **Demo:** type `oom` in the prompt and see the Session, the Event, and the
 Command where CUDA ran out of memory, across two Machines, in under 50 ms.
