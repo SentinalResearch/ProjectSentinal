@@ -4,6 +4,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import { dataAdapter } from "../../../data";
 import { isMockData } from "../../../data/mode";
 import { useLiveData } from "../../../data/LiveDataContext";
+import { TermKeyboard } from "../../../terminal/keyboard/TermKeyboard";
 import type { Recipe } from "../../../data/types";
 import { settingsTabs } from "../settings-tabs";
 import { suggest, type PromptGroup, type PromptSuggestion } from "./promptGrammar";
@@ -37,10 +38,13 @@ export function PromptBar({
   initialText,
   onClose,
   onChoose,
+  sheet = false,
 }: {
   initialText: string;
   onClose: () => void;
   onChoose: (suggestion: PromptSuggestion, options: { split: boolean }) => void;
+  /** Phones (MOBILE_GLASS_SPEC §3): a bottom sheet typed on the built-in keyboard. */
+  sheet?: boolean;
 }) {
   const { machines, terminals } = useLiveData();
   const { theme } = useTheme();
@@ -83,6 +87,28 @@ export function PromptBar({
     onChoose(suggestion, { split });
   }
 
+  /** Built-in keyboard bytes edit the input at its caret; ⏎ runs the selection. */
+  function typed(bytes: string) {
+    const field = input.current;
+    const start = field?.selectionStart ?? text.length;
+    const end = field?.selectionEnd ?? text.length;
+    const place = (next: string, caret: number) => {
+      setText(next);
+      setSelected(0);
+      requestAnimationFrame(() => field?.setSelectionRange(caret, caret));
+    };
+    if (bytes === "\r") choose(current);
+    else if (bytes === "\x7f") {
+      if (start !== end) place(text.slice(0, start) + text.slice(end), start);
+      else if (start > 0) place(text.slice(0, start - 1) + text.slice(end), start - 1);
+    } else if (bytes === "\x1b[D" || bytes === "\x1b[C") {
+      const caret = Math.max(0, Math.min(text.length, start + (bytes === "\x1b[C" ? 1 : -1)));
+      field?.setSelectionRange(caret, caret);
+    } else if (!bytes.startsWith("\x1b") && !/[\x00-\x1f]/.test(bytes)) {
+      place(text.slice(0, start) + bytes + text.slice(end), start + bytes.length);
+    }
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -112,7 +138,7 @@ export function PromptBar({
   const optionId = (index: number) => `${listId}-option-${index}`;
 
   return (
-    <div className={styles.layer} role="presentation">
+    <div className={styles.layer} role="presentation" data-sheet={sheet || undefined}>
       <div className={styles.scrim} aria-hidden="true" onMouseDown={onClose} />
       <div className={styles.dock} role="dialog" aria-modal="true" aria-label="Prompt">
         {suggestions.length > 0 && (
@@ -153,12 +179,14 @@ export function PromptBar({
                 </div>
               ))}
             </div>
+            {!sheet && (
             <div className={styles.footer} aria-hidden="true">
               <span>↵ run</span>
               <span>tab complete</span>
               <span>{IS_MAC ? "⌘↵" : "Ctrl ↵"} open in split</span>
               <span className={styles.footerEnd}>esc close</span>
             </div>
+            )}
           </div>
         )}
         <label className={styles.inputPill}>
@@ -183,11 +211,20 @@ export function PromptBar({
             spellCheck={false}
             autoComplete="off"
             autoCapitalize="off"
+            autoCorrect="off"
+            inputMode={sheet ? "none" : undefined}
           />
-          <span className={styles.grammar} aria-hidden="true">
-            go · run · find · y · n · split · kill
-          </span>
+          {sheet ? (
+            <button type="button" className={styles.cancel} onClick={onClose}>
+              Cancel
+            </button>
+          ) : (
+            <span className={styles.grammar} aria-hidden="true">
+              go · run · find · y · n · split · kill
+            </span>
+          )}
         </label>
+        {sheet && <TermKeyboard onBytes={typed} accessory={false} />}
       </div>
     </div>
   );

@@ -48,6 +48,7 @@ export function PhoneShell() {
           )}
           {prompt && (
             <PromptBar
+              sheet
               initialText={prompt.text}
               onClose={() => {
                 setPrompt(null);

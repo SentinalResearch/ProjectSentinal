@@ -1,10 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../../../context/AuthContext";
 import { ThemeProvider } from "../../../context/ThemeContext";
+import { dataAdapter } from "../../../data";
 import { resetViewport, setViewport } from "../../../test-viewport";
 import { AppShell } from "../AppShell";
 import { PageTitle } from "./PageTitle";
@@ -43,7 +44,10 @@ function renderShell(path: string) {
 }
 
 describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
-  afterEach(resetViewport);
+  afterEach(() => {
+    resetViewport();
+    vi.restoreAllMocks();
+  });
 
   it("has a glass island (logo, page, one live item, needs-you count) and a prompt pill — no top bar, tab bar, or menu", async () => {
     setViewport(390);
@@ -96,6 +100,24 @@ describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Prompt" })).not.toBeInTheDocument();
     expect(pill).toHaveFocus();
+  });
+
+  it("the prompt sheet is typed on the built-in keyboard: y, ⏎ answers the waiting prompt (M2)", async () => {
+    setViewport(390);
+    const send = vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
+    renderShell("/app/history");
+    const user = userEvent.setup();
+    await screen.findByRole("link", { name: /^\d+ need you$/ });
+    await user.click(screen.getByRole("button", { name: "Open the prompt" }));
+    const command = screen.getByRole("combobox", { name: "Command" });
+    expect(command).toHaveAttribute("inputmode", "none");
+    const keys = screen.getByRole("group", { name: "Terminal keyboard" });
+    expect(within(keys).queryByRole("button", { name: "Ctrl" })).not.toBeInTheDocument();
+    await user.click(within(keys).getByRole("button", { name: "y" }));
+    expect(command).toHaveValue("y");
+    await user.click(within(keys).getByRole("button", { name: "Enter" }));
+    expect(send).toHaveBeenCalledWith(expect.any(String), "y\r");
+    expect(screen.queryByRole("dialog", { name: "Prompt" })).not.toBeInTheDocument();
   });
 
   it("the needs-you count opens Overview filtered to Sessions that need you", async () => {
