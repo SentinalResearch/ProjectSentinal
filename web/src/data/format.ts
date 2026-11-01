@@ -24,6 +24,15 @@ export function formatLearningRate(rate: number): string {
   return rate >= 0.01 ? String(rate) : rate.toExponential();
 }
 
+/** 24-hour HH:mm:ss timestamp for events and logs. */
+export function formatEventTime(at: number | Date): string {
+  const d = typeof at === "number" ? new Date(at) : at;
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const s = String(d.getSeconds()).padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
+
 export function formatSessionFact(session: Session): string {
   const parts: string[] = [];
   if (session.progress) {

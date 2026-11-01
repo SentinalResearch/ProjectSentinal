@@ -41,6 +41,7 @@ import {
 import { createRegistryApi } from "./registry";
 import { applyProjectionMessage, projectionView, type ProjectionView } from "./projection-view";
 import { health, type createHealthCollector } from "../health";
+import { formatEventTime } from "../format";
 import { markLoad } from "../load-timing";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
@@ -265,7 +266,7 @@ function eventDetail(kind: EventKind): string {
 }
 
 export function mapWatcherEvent(observed: WireEvent): SessionEvent {
-  return [new Date(observed.at).toLocaleTimeString(), observed.kind.type, eventDetail(observed.kind)];
+  return [formatEventTime(observed.at), observed.kind.type, eventDetail(observed.kind)];
 }
 
 export function watcherEventPatch(observed: WireEvent): Partial<Session> | undefined {

@@ -8,6 +8,7 @@ import type { ProjectedMetrics } from "../../protocol/ProjectedMetrics";
 import type { ProjectedSession } from "../../protocol/ProjectedSession";
 import type { LiveEvent } from "../adapter";
 import type { Machine, MachineStatus, Session, SessionEvent, SessionHealth, SessionMetrics } from "../types";
+import { formatEventTime } from "../format";
 import { compositeId } from "./machine-connections";
 
 /** In-memory privacy-minimized dashboard projection. */
@@ -66,7 +67,7 @@ function eventDetail(facts: ProjectedEventFacts): string {
 }
 
 function mapEvent(event: ProjectedEventSummary): SessionEvent {
-  return [new Date(event.at).toLocaleTimeString(), event.facts.category, eventDetail(event.facts)];
+  return [formatEventTime(event.at), event.facts.category, eventDetail(event.facts)];
 }
 
 function metricView(metrics: ProjectedMetrics | undefined): SessionMetrics | undefined {
