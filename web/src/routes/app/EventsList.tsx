@@ -1,4 +1,4 @@
-import { eventColor } from "../../data/format";
+import { eventColor, formatEventTime } from "../../data/format";
 import type { SessionEvent } from "../../data/types";
 import styles from "./EventsList.module.css";
 
@@ -14,6 +14,22 @@ export interface EventsListProps {
   title?: string;
   /** False when the parent page already renders its own section heading (e.g. Project's "Event journal"). */
   showHead?: boolean;
+}
+
+function displayTime(time: string): string {
+  if (!time) return "—";
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(time)) {
+    return time;
+  }
+  const asNumber = Number(time);
+  if (!Number.isNaN(asNumber) && asNumber > 1_000_000_000) {
+    return formatEventTime(asNumber);
+  }
+  const date = new Date(time);
+  if (!Number.isNaN(date.getTime()) && time.includes("T")) {
+    return formatEventTime(date);
+  }
+  return time;
 }
 
 /** Newest first — time · color square · TYPE (· session name) · detail (README's Event row spec). */
@@ -35,7 +51,7 @@ export function EventsList({ events, sessionNames, title = "Events", showHead = 
           const color = eventColor(kind);
           return (
             <div key={`${time}-${kind}-${i}`} className={styles.row}>
-              <span className={styles.time}>{time}</span>
+              <span className={styles.time}>{displayTime(time)}</span>
               <span className={styles.square} style={{ background: color.square }} />
               <span className={styles.body}>
                 <span className={styles.typeRow}>
@@ -44,7 +60,7 @@ export function EventsList({ events, sessionNames, title = "Events", showHead = 
                   </span>
                   {sessionName && <span className={styles.who}>{sessionName}</span>}
                 </span>
-                <span className={styles.detail}>{detail}</span>
+                {detail ? <span className={styles.detail}>{detail}</span> : null}
               </span>
             </div>
           );
