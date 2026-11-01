@@ -273,7 +273,7 @@ function eventDetail(kind: EventKind): string {
 }
 
 export function mapWatcherEvent(observed: WireEvent): SessionEvent {
-  return [formatEventTime(observed.at), observed.kind.type, eventDetail(observed.kind)];
+  return [formatEventTime(observed.at), observed.kind.type, eventDetail(observed.kind), observed.at];
 }
 
 export function watcherEventPatch(observed: WireEvent): Partial<Session> | undefined {

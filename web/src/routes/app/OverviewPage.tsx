@@ -13,6 +13,8 @@ import type { Machine, Session } from "../../data/types";
 import { useIsPhone } from "../../hooks/useViewport";
 import { MachinePanel } from "./MachinePanel";
 import { PhoneOverview } from "./phone/PhoneOverview";
+import { GlassDashboard } from "./dashboard/GlassDashboard";
+import { useShell } from "./shell/ShellContext";
 import styles from "./OverviewPage.module.css";
 
 function needsFact(session: Session): string {
@@ -23,10 +25,10 @@ function needsFact(session: Session): string {
 function connectionLabel(machine: Machine): string {
   switch (machine.status) {
     case "ONLINE": return isDelayed(machine) ? machineStatusLabel(machine, Date.now()) : `Online · ${machine.os}`;
-    case "AUTH_EXPIRED": return `Authentication expired · last seen ${machine.lastSeen ?? "never"}`;
-    case "DISCONNECTED": return `Disconnected · last seen ${machine.lastSeen ?? "never"}`;
-    case "REVOKED": return `Revoked · last seen ${machine.lastSeen ?? "never"}`;
-    case "OFFLINE": return `Offline · last seen ${machine.lastSeen ?? "never"}`;
+    case "AUTH_EXPIRED": return `Authentication expired · ${machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "never seen"}`;
+    case "DISCONNECTED": return `Disconnected · ${machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "never seen"}`;
+    case "REVOKED": return `Revoked · ${machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "never seen"}`;
+    case "OFFLINE": return `Offline · ${machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "never seen"}`;
   }
 }
 
@@ -41,7 +43,13 @@ function onActivateKey(handler: () => void) {
 }
 
 export function OverviewPage() {
-  return useIsPhone() ? <PhoneOverview /> : <DesktopOverview />;
+  const isPhone = useIsPhone();
+  const glass = useShell() !== null;
+  const [searchParams] = useSearchParams();
+  if (isPhone) return <PhoneOverview />;
+  // Under the glass shell the dashboard is GLASS_SPEC.md §7; a Machine's page stays as it is.
+  if (glass && !searchParams.get("machine")) return <GlassDashboard />;
+  return <DesktopOverview />;
 }
 
 function DesktopOverview() {

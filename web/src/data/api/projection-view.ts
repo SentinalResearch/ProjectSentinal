@@ -67,7 +67,7 @@ function eventDetail(facts: ProjectedEventFacts): string {
 }
 
 function mapEvent(event: ProjectedEventSummary): SessionEvent {
-  return [formatEventTime(event.at), event.facts.category, eventDetail(event.facts)];
+  return [formatEventTime(event.at), event.facts.category, eventDetail(event.facts), event.at];
 }
 
 function metricView(metrics: ProjectedMetrics | undefined): SessionMetrics | undefined {

@@ -65,8 +65,11 @@ export interface SessionHealth {
   evidence?: string[];
 }
 
-/** [time, event kind, detail] — kind is one of EventKind (see protocol/EventKind.ts) plus free-form ones used only in the mock (e.g. WARNING). */
-export type SessionEvent = [time: string, kind: string, detail: string];
+/**
+ * [time, event kind, detail, at] — kind is one of EventKind (see protocol/EventKind.ts) plus free-form ones
+ * used only in the mock (e.g. WARNING). `at` (Unix ms) orders events across Sessions; fixtures may omit it.
+ */
+export type SessionEvent = [time: string, kind: string, detail: string, at?: number];
 
 export interface Session {
   id: string;

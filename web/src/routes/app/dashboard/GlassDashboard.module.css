@@ -1,0 +1,518 @@
+/* GLASS_SPEC.md §7. The frame already clears the island (92 px). */
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 28px;
+  align-items: start;
+  padding: 0 40px 32px;
+  font-variant-numeric: tabular-nums;
+}
+
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.overline {
+  font-size: 15px;
+  color: var(--text-2);
+}
+
+.heroRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.hero {
+  font-size: 72px;
+  line-height: 64px;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  color: var(--text-1);
+}
+
+.hint {
+  flex: none;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.hint:hover {
+  color: var(--text-2);
+}
+
+.hint kbd {
+  font-family: inherit;
+  color: var(--text-1);
+}
+
+/* ── Needs you ──────────────────────────────────────────── */
+
+.needs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.needCard {
+  min-height: 196px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 18px 16px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.needCard:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+.needTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.needWhere {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.needTitle {
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.needFact {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--text-1);
+}
+
+.answerRow {
+  margin-top: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.well {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  height: 44px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: var(--well);
+  border-radius: var(--radius-key);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-1);
+}
+
+.yes,
+.no {
+  width: 48px;
+  height: 44px;
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-key);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.yes {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+
+.no {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+  color: var(--text-1);
+}
+
+.actions {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip,
+.danger {
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-key);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chip {
+  background: var(--chip);
+  color: var(--text-1);
+}
+
+.chip:hover {
+  background: var(--chip-hover);
+}
+
+.danger {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive-fg) 70%, transparent);
+  color: var(--destructive-fg);
+}
+
+.yes:focus-visible,
+.no:focus-visible,
+.chip:focus-visible,
+.danger:focus-visible,
+.hint:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+/* ── Machine lanes ──────────────────────────────────────── */
+
+.lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lane {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px;
+}
+
+.lane[data-offline] {
+  opacity: 0.5;
+}
+
+.laneInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 2px;
+}
+
+.laneName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 20px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.laneName:hover {
+  text-decoration: underline;
+}
+
+.laneName:focus-visible,
+.laneCard:focus-visible,
+.feedItem:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+.laneSquare {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  box-shadow: inset 0 0 0 1.5px var(--s-disconnected-fg);
+}
+
+.laneSquare[data-online] {
+  background: var(--s-running);
+  box-shadow: none;
+}
+
+.laneHardware {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.meters {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meterLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+}
+
+.meterTrack {
+  width: 56px;
+  height: 3px;
+  background: var(--chip);
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  background: var(--s-running);
+}
+
+.meterFill[data-high] {
+  background: var(--s-waiting);
+}
+
+.laneNote {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.cards {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.laneCard {
+  min-width: 150px;
+  max-width: 280px;
+  flex: 1 1 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--glass-edge-soft);
+  color: var(--text-1);
+  text-align: left;
+}
+
+.laneCard:hover {
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+}
+
+.laneCard[data-focus] {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent-fg) 70%, transparent);
+}
+
+.laneCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.laneCorner {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.laneTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* 20 bars; the colour follows the Session (accent for the focused training run). */
+.spark {
+  --bar: var(--s-idle);
+  height: 22px;
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+}
+
+.spark[data-state="FOCUS"] { --bar: var(--accent); }
+.spark[data-state="RUNNING"] { --bar: color-mix(in srgb, var(--s-idle) 70%, transparent); }
+.spark[data-state="FAILED"] { --bar: color-mix(in srgb, var(--s-failed) 70%, transparent); }
+.spark[data-state="WAITING"] { --bar: color-mix(in srgb, var(--s-waiting) 70%, transparent); }
+.spark[data-state="STALLED"] { --bar: color-mix(in srgb, var(--s-stalled) 75%, transparent); }
+
+.bar {
+  display: block;
+  background: var(--bar);
+}
+
+.dash {
+  display: block;
+  height: 2px;
+  background: color-mix(in srgb, var(--bar) 55%, transparent);
+}
+
+/* ── While you were away ────────────────────────────────── */
+
+.feed {
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - var(--shell-top) - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px 20px 12px;
+}
+
+.feedHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.feedTitle {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.feedSince {
+  flex: none;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.feedEmpty {
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.feedList {
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feedList li + li {
+  border-top: 1px solid var(--glass-edge-soft);
+}
+
+.feedItem {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px 8px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 12px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.feedItem:disabled {
+  cursor: default;
+}
+
+.feedItem:not(:disabled):hover .feedHeadline {
+  text-decoration: underline;
+}
+
+.feedTime {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.feedSquare {
+  width: 8px;
+  height: 8px;
+}
+
+.feedText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.feedHeadline {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.feedDetail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* Narrow desktop (1024–1279): the feed moves under the lanes. */
+@media (max-width: 1279px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .feed {
+    position: static;
+    max-height: none;
+  }
+  .needs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
