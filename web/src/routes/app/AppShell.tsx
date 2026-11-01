@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 
 import { LiveDataProvider } from "../../data/LiveDataContext";
-import { useIsPhone } from "../../hooks/useViewport";
+import { useIsGlassDesktop, useIsPhone } from "../../hooks/useViewport";
+import { GlassShell } from "./shell/GlassShell";
 import { PhoneShell } from "./phone/PhoneShell";
 import { Sidebar } from "./Sidebar";
 import styles from "./AppShell.module.css";
@@ -18,6 +19,7 @@ const COLLAPSE_BREAKPOINT = 1200;
 export function AppShell() {
   const navigate = useNavigate();
   const isPhone = useIsPhone();
+  const isGlass = useIsGlassDesktop();
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < COLLAPSE_BREAKPOINT);
   const narrowRef = useRef(window.innerWidth < COLLAPSE_BREAKPOINT);
 
@@ -34,6 +36,8 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
+    // The glass shell owns ⌘K (it opens the prompt there).
+    if (isGlass) return;
     // QUESTION: navigate-only, per the prototype's actual handler — no command-palette
     // overlay is specified anywhere in the handoff. See QUESTIONS.md #8.
     function onKeyDown(e: KeyboardEvent) {
@@ -44,7 +48,7 @@ export function AppShell() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate]);
+  }, [navigate, isGlass]);
 
   // Phones get the top bar and menu, never the sidebar or its icon rail.
   // LiveDataProvider stays above the switch so rotation keeps live data.
@@ -52,6 +56,17 @@ export function AppShell() {
     return (
       <LiveDataProvider>
         <PhoneShell />
+      </LiveDataProvider>
+    );
+  }
+
+  // Desktop ≥ 1024 px: the island and prompt replace the sidebar.
+  if (isGlass) {
+    return (
+      <LiveDataProvider>
+        <GlassShell>
+          <Outlet />
+        </GlassShell>
       </LiveDataProvider>
     );
   }

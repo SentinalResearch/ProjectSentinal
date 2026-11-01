@@ -23,3 +23,24 @@ function subscribe(onChange: () => void): () => void {
 export function useIsPhone(): boolean {
   return useSyncExternalStore(subscribe, () => window.matchMedia(PHONE_QUERY).matches, () => false);
 }
+
+/** Narrowest viewport (px) that gets the glass shell instead of the sidebar (GLASS_SPEC.md). */
+export const GLASS_MIN_WIDTH = 1024;
+const GLASS_QUERY = `(min-width: ${GLASS_MIN_WIDTH}px)`;
+
+function subscribeGlass(onChange: () => void): () => void {
+  const media = window.matchMedia(GLASS_QUERY);
+  media.addEventListener?.("change", onChange);
+  window.addEventListener("resize", onChange);
+  return () => {
+    media.removeEventListener?.("change", onChange);
+    window.removeEventListener("resize", onChange);
+  };
+}
+
+/** True at 1024 px and wider (and not a phone): the island + prompt shell, no sidebar. */
+export function useIsGlassDesktop(): boolean {
+  const wide = useSyncExternalStore(subscribeGlass, () => window.matchMedia(GLASS_QUERY).matches, () => false);
+  const phone = useIsPhone();
+  return wide && !phone;
+}

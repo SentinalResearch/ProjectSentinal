@@ -1,0 +1,184 @@
+.island {
+  position: fixed;
+  top: var(--island-top);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  height: var(--island-height);
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 6px 0 16px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-edge), var(--glass-shadow);
+  border-radius: var(--radius-glass);
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .island {
+    background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+  }
+}
+
+.island :where(button) {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.island :where(button):focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.logo {
+  display: flex;
+  padding: 4px;
+}
+
+.location {
+  min-width: 0;
+  max-width: 340px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+.machine {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.chevron {
+  color: var(--text-3);
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  flex: none;
+  background: var(--glass-edge);
+}
+
+.ticker {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  display: flex;
+  left: 0;
+  top: 0;
+}
+
+.tickerSlot {
+  display: flex;
+  align-items: center;
+}
+
+.tickerItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  font-size: 13px;
+  color: var(--text-1);
+  animation: enter 200ms var(--ease-out) both;
+}
+
+.tickerItem:hover {
+  text-decoration: underline;
+}
+
+.square {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  background: var(--s-idle);
+}
+
+.tickerItem[data-state="FAILED"] .square { background: var(--s-failed); }
+.tickerItem[data-state="WAITING"] .square { background: var(--s-waiting); }
+.tickerItem[data-state="STALLED"] .square { background: var(--s-stalled); }
+.tickerItem[data-state="RUNNING"] .square { background: var(--s-running); }
+
+/* Only FAILED and WAITING arrive with a fade (§4); the rest just appear. */
+.tickerItem:not([data-state="FAILED"]):not([data-state="WAITING"]) {
+  animation: none;
+}
+
+.dot {
+  color: var(--text-3);
+  padding: 0 2px;
+}
+
+.needChip {
+  height: 24px;
+  padding: 0 8px;
+  background: var(--s-waiting);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+.promptButton {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  background: var(--chip);
+  border-radius: 18px;
+  color: var(--text-2);
+}
+
+.promptButton:hover {
+  background: var(--chip-hover);
+}
+
+.caret {
+  color: var(--accent-fg);
+  font-weight: 700;
+}
+
+.shortcut {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+@keyframes enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tickerItem {
+    animation: none;
+  }
+}

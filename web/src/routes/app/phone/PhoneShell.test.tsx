@@ -57,11 +57,23 @@ describe("phone shell (MOBILE_SPEC.md → Navigation)", () => {
     expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-haspopup", "dialog");
   });
 
-  it("keeps the desktop sidebar and no phone top bar at 768 px and wider", () => {
+  it("keeps the sidebar and no phone top bar from 768 px to 1023 px", () => {
+    setViewport(900);
+    renderShell("/app/overview");
+    expect(screen.queryByRole("button", { name: "Search" })).not.toBeInTheDocument();
+    // Below 1200 px the sidebar starts as its icon rail; the icons still have names.
+    expect(screen.getByRole("button", { name: "Search history" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Sentinal" })).not.toBeInTheDocument();
+  });
+
+  it("replaces the sidebar with the glass island at 1024 px and wider (GLASS_SPEC.md)", () => {
     setViewport(1440);
     renderShell("/app/overview");
     expect(screen.queryByRole("button", { name: "Search" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Search history/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Search history/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Sentinal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open the prompt" })).toBeInTheDocument();
   });
 
   it("keeps the phone layout when a phone turns to landscape, but not for a short desktop window", () => {

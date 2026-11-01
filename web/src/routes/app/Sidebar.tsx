@@ -84,14 +84,20 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
       </div>
 
       <div className={styles.actions}>
-        <button type="button" className={styles.newSession} onClick={startNewSession}>
+        <button type="button" className={styles.newSession} onClick={startNewSession} aria-label="New session" title="New session">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ flex: "none" }}>
             <path d="M8 3v10M3 8h10" />
           </svg>
           {expanded && <span>New session</span>}
         </button>
         {newSession.chooser}
-        <button type="button" className={styles.searchHistory} onClick={() => navigate("/app/history")}>
+        <button
+          type="button"
+          className={styles.searchHistory}
+          onClick={() => navigate("/app/history")}
+          aria-label="Search history"
+          title="Search history"
+        >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ flex: "none" }}>
             <circle cx="7" cy="7" r="4.5" />
             <path d="M10.5 10.5l3 3" />

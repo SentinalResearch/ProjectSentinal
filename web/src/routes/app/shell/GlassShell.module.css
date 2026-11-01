@@ -1,0 +1,23 @@
+.shell {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-app);
+  color: var(--text-1);
+}
+
+/* At most two very soft glows per screen (§3); this is the shell's one. */
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(900px 520px at 12% -8%, var(--glow-accent), transparent 70%);
+}
+
+.main {
+  position: relative;
+  height: 100%;
+  overflow: auto;
+  /* Pages draw their own content; the shell only clears the island. */
+  padding-top: var(--shell-top);
+}
