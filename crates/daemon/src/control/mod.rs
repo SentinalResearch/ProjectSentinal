@@ -17,6 +17,7 @@ mod health_routes;
 mod ping;
 mod proxy;
 mod refresh;
+mod relay;
 mod release;
 pub mod release_actions;
 mod release_routes;

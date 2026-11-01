@@ -8,7 +8,7 @@ use crate::{
 use axum::{
     body::Body,
     extract::{
-        ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade},
+        ws::{WebSocket, WebSocketUpgrade},
         Path, RawQuery, State,
     },
     http::{HeaderMap, HeaderName, StatusCode},
@@ -16,7 +16,7 @@ use axum::{
     routing::{any, get},
     Router,
 };
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 use protocol::{
     link::{LinkFailureCode, LinkIdentity},
     MachineId,
@@ -25,7 +25,6 @@ use std::time::Duration;
 use tokio_tungstenite::tungstenite::{
     client::IntoClientRequest,
     http::{header::AUTHORIZATION, HeaderValue},
-    Message as UpstreamMessage,
 };
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -190,40 +189,29 @@ async fn routed_websocket(
 }
 
 async fn proxy_socket(
-    mut browser: WebSocket,
-    mut upstream: tokio_tungstenite::WebSocketStream<
+    browser: WebSocket,
+    upstream: tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >,
     auth: AuthManager,
     owner_token: String,
 ) {
-    loop {
-        if !matches!(
-            auth.authorize(&owner_token),
-            Ok(Some(CredentialKind::BrowserSession))
-        ) {
-            let _ = browser
-                .send(Message::Close(Some(CloseFrame {
-                    code: 4_001,
-                    reason: "browser session expired".into(),
-                })))
-                .await;
-            break;
-        }
-        tokio::select! {
-            from_browser = browser.recv() => {
-                let Some(message) = from_browser else { break; };
-                let Ok(message) = message else { break; };
-                if upstream.send(to_upstream(message)).await.is_err() { break; }
-            }
-            from_worker = upstream.next() => {
-                let Some(message) = from_worker else { break; };
-                let Ok(message) = message else { break; };
-                if browser.send(to_browser(message)).await.is_err() { break; }
-            }
-        }
-    }
-    let _ = upstream.close(None).await;
+    let (browser_tx, browser_rx) = browser.split();
+    let (upstream_tx, upstream_rx) = upstream.split();
+    super::relay::relay(
+        browser_rx,
+        browser_tx,
+        upstream_rx,
+        upstream_tx,
+        move || {
+            matches!(
+                auth.authorize(&owner_token),
+                Ok(Some(CredentialKind::BrowserSession))
+            )
+        },
+        super::relay::SESSION_RECHECK,
+    )
+    .await;
 }
 
 async fn routed_output(
@@ -284,27 +272,6 @@ pub(super) fn worker_url(target: &RoutingTarget, scheme: &str, path: &str) -> St
         target.endpoint.address.clone()
     };
     format!("{scheme}://{address}:{}{path}", target.endpoint.port)
-}
-
-fn to_upstream(message: Message) -> UpstreamMessage {
-    match message {
-        Message::Text(value) => UpstreamMessage::Text(value.as_str().into()),
-        Message::Binary(value) => UpstreamMessage::Binary(value),
-        Message::Ping(value) => UpstreamMessage::Ping(value),
-        Message::Pong(value) => UpstreamMessage::Pong(value),
-        Message::Close(_) => UpstreamMessage::Close(None),
-    }
-}
-
-fn to_browser(message: UpstreamMessage) -> Message {
-    match message {
-        UpstreamMessage::Text(value) => Message::Text(value.as_str().into()),
-        UpstreamMessage::Binary(value) => Message::Binary(value),
-        UpstreamMessage::Ping(value) => Message::Ping(value),
-        UpstreamMessage::Pong(value) => Message::Pong(value),
-        UpstreamMessage::Close(_) => Message::Close(None),
-        UpstreamMessage::Frame(_) => Message::Close(None),
-    }
 }
 
 fn unauthorized() -> ControlFailure {
