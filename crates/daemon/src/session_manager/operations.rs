@@ -71,7 +71,7 @@ impl SessionManager {
         Ok(())
     }
 
-    /// Write terminal input and audit metadata after a successful PTY write.
+    /// Audit terminal input metadata, then write the input to the PTY.
     pub fn write_input(
         &self,
         session_id: SessionId,
@@ -79,6 +79,14 @@ impl SessionManager {
         client_addr: &str,
     ) -> Result<(), SessionManagerError> {
         let handle = self.operation_handle(session_id, CaptureOperation::Input)?;
+        // Audit first and fail closed: input that cannot be recorded never
+        // reaches the shell. A record therefore means "input was attempted".
+        self.inner.audit.append(&AuditRecord {
+            timestamp: (self.inner.config.clock)(),
+            client_addr: client_addr.to_string(),
+            session_id,
+            byte_count: bytes.len(),
+        })?;
         let mut writer = handle
             .writer
             .lock()
@@ -100,12 +108,6 @@ impl SessionManager {
                 source,
             });
         }
-        self.inner.audit.append(&AuditRecord {
-            timestamp: (self.inner.config.clock)(),
-            client_addr: client_addr.to_string(),
-            session_id,
-            byte_count: bytes.len(),
-        })?;
         Ok(())
     }
 

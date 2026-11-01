@@ -66,3 +66,30 @@ async fn the_default_fake_does_not_echo() {
     );
     fake.exit(session.id, 0).unwrap();
 }
+
+#[tokio::test]
+async fn input_that_cannot_be_audited_never_reaches_the_shell() {
+    // AGENTS.md §5: every remote input is audit-logged. The audit used to be
+    // written after the PTY write, so a failing audit log let input through.
+    let fake = Arc::new(FakePty::echoing());
+    let sessions = manager("audit-fails", fake.clone());
+    let session = sessions.create(request()).await.unwrap();
+    let mut attached = sessions.attach(session.id).unwrap();
+    let dir = std::env::temp_dir().join(format!(
+        "sentinal-fake-pty-audit-fails-{}",
+        std::process::id()
+    ));
+    let audit = dir.join("audit.jsonl");
+    let _ = std::fs::remove_file(&audit);
+    std::fs::create_dir_all(&audit).unwrap();
+
+    assert!(sessions.write_input(session.id, b"a", "test").is_err());
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), attached.output.recv())
+            .await
+            .is_err(),
+        "unaudited input reached the PTY"
+    );
+    fake.exit(session.id, 0).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}
