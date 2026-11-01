@@ -26,6 +26,10 @@ pub(super) fn category(kind: &EventKind) -> Option<NotificationCategory> {
         EventKind::ResourceHigh { .. } => Some(NotificationCategory::ResourceHigh),
         EventKind::CheckpointCreated { .. } => Some(NotificationCategory::Checkpoint),
         EventKind::ProgressUpdated { .. } => Some(NotificationCategory::Progress),
+        // 6.1: an AI coding agent finished a turn of work, under the
+        // "finished" rule. A turn without tool calls was a chat reply.
+        EventKind::AgentTurnFinished { tool_uses: 0 } => None,
+        EventKind::AgentTurnFinished { .. } => Some(NotificationCategory::Completed),
         _ => None,
     }
 }
@@ -68,6 +72,9 @@ fn details(
     category: NotificationCategory,
 ) -> (String, &'static str, &'static str) {
     match (category, kind) {
+        (NotificationCategory::Completed, EventKind::AgentTurnFinished { tool_uses }) => {
+            (agent_finished(*tool_uses), "robot_face", "default")
+        }
         (NotificationCategory::Completed, EventKind::CommandFinished { exit_code, .. }) => (
             format!("completed (exit {exit_code})"),
             "white_check_mark",
@@ -107,6 +114,14 @@ fn details(
             (format!("{unit} {value}"), "chart_with_upwards_trend", "low")
         }
         _ => ("needs attention".into(), "warning", "default"),
+    }
+}
+
+/// "agent finished (4 tool calls)", shared with native Push.
+pub(crate) fn agent_finished(tool_uses: u32) -> String {
+    match tool_uses {
+        1 => "agent finished (1 tool call)".into(),
+        count => format!("agent finished ({count} tool calls)"),
     }
 }
 

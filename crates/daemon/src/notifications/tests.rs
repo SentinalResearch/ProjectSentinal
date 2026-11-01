@@ -313,6 +313,11 @@ fn every_supported_category_has_stable_appearance() {
             "floppy_disk",
         ),
         (
+            EventKind::AgentTurnFinished { tool_uses: 4 },
+            NotificationCategory::Completed,
+            "robot_face",
+        ),
+        (
             EventKind::ProgressUpdated {
                 current: 37,
                 total: Some(100),
@@ -430,4 +435,37 @@ fn only_watch_jobs_and_long_commands_notify_when_they_finish() {
             "{origin:?}: a long build notifies"
         );
     }
+}
+
+#[test]
+fn an_agent_finishing_its_turn_says_so_on_every_channel() {
+    let kind = EventKind::AgentTurnFinished { tool_uses: 4 };
+    let rendered = presentation::render(
+        &kind,
+        "pop-os",
+        Some("refactor"),
+        &MachineId("m".into()),
+        SessionId(1),
+        None,
+    )
+    .unwrap();
+    assert_eq!(rendered.body, "refactor — agent finished (4 tool calls)");
+    let intent = super::notification_intent(&MachineId("m".into()), &event(3, kind), None).unwrap();
+    assert_eq!(
+        intent.facts,
+        NotificationFacts::AgentFinished { tool_uses: 4 }
+    );
+    assert_eq!(intent.facts.category(), NotificationCategory::Completed);
+    // A chat reply (no tools) and activity are recorded but never notify.
+    assert_eq!(
+        presentation::category(&EventKind::AgentTurnFinished { tool_uses: 0 }),
+        None
+    );
+    assert_eq!(
+        presentation::category(&EventKind::AgentActivity {
+            action: protocol::coding_agent::AgentAction::RanTests,
+            detail: "cargo test".into(),
+        }),
+        None
+    );
 }

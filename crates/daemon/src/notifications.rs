@@ -2,7 +2,7 @@
 
 mod config;
 mod delivery;
-mod presentation;
+pub(crate) mod presentation;
 mod runtime;
 
 use config::ConfigSnapshot;
@@ -435,6 +435,9 @@ fn notification_intent(
             percent: *percent,
         },
         EventKind::CheckpointCreated { .. } => NotificationFacts::Checkpoint,
+        EventKind::AgentTurnFinished { tool_uses } => NotificationFacts::AgentFinished {
+            tool_uses: *tool_uses,
+        },
         EventKind::ProgressUpdated {
             current,
             total,

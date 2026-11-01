@@ -90,6 +90,8 @@ export interface Session {
   health?: SessionHealth;
   /** Training numbers the watcher read from the run's output. */
   training?: TrainingView;
+  /** The AI coding agent running here (6.1). */
+  codingAgent?: CodingAgentView;
   events?: SessionEvent[];
   /** How the Session entered Sentinal; absent means UI. */
   origin?: SessionOrigin;
@@ -223,6 +225,15 @@ export interface MachineMetricSample {
   ramPct?: number;
   gpuPct?: number;
   vramPct?: number;
+}
+
+export interface CodingAgentView {
+  agent: "CLAUDE" | "CODEX" | "AIDER" | "GEMINI";
+  /** On a turn now. */
+  working: boolean;
+  toolUses: number;
+  tokens?: number;
+  costUsd?: number;
 }
 
 export interface TrainingView {

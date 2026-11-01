@@ -11,7 +11,7 @@ import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import type { ControlProjectionMessage } from "../../protocol/ControlProjectionMessage";
 import type { ControlProjectionSnapshot } from "../../protocol/ControlProjectionSnapshot";
 import { createHealthCollector } from "../health";
-import { createApiAdapter, mapSession, type ApiSocket } from ".";
+import { createApiAdapter, mapSession, mapWatcherEvent, type ApiSocket } from ".";
 
 const machine: WireMachine = {
   id: "test-machine",
@@ -680,6 +680,20 @@ describe("apiAdapter authentication", () => {
       trend: "IMPROVING",
     });
     expect(mapped.metrics).toBeUndefined();
+  });
+
+  it("maps the AI coding agent and its activity Events (6.1)", () => {
+    const mapped = mapSession({
+      ...session,
+      coding_agent: { agent: "CLAUDE", working: true, tool_uses: 3, tokens: null, cost_usd: 0.4 },
+    });
+    expect(mapped.codingAgent).toEqual({ agent: "CLAUDE", working: true, toolUses: 3, tokens: undefined, costUsd: 0.4 });
+    expect(
+      mapWatcherEvent({ id: 9, session_id: 1, command_id: null, at: 0, kind: { type: "AGENT_ACTIVITY", action: "RAN_TESTS", detail: "cargo test" } })[2],
+    ).toBe("ran tests · cargo test");
+    expect(mapWatcherEvent({ id: 10, session_id: 1, command_id: null, at: 0, kind: { type: "AGENT_TURN_FINISHED", tool_uses: 2 } })[2]).toBe(
+      "agent finished · 2 tool calls",
+    );
   });
 
   it("loads deterministic Health without replaying every Session Event", async () => {

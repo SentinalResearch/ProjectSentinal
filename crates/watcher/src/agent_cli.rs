@@ -34,6 +34,8 @@ pub struct AgentCliState {
     pub prompt: Option<String>,
     /// Whether it is waiting for a person.
     pub waiting: bool,
+    /// Which agent, its activity count, and its usage (6.1).
+    pub summary: Option<protocol::coding_agent::CodingAgentSummary>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,6 +52,7 @@ pub struct AgentCliAdapter {
     last_line_at: Option<Timestamp>,
     emitted: Option<Prompt>,
     lines_since_prompt: usize,
+    turn: crate::agent_activity::AgentTurn,
     state: AgentCliState,
 }
 
@@ -68,6 +71,15 @@ impl AgentCliAdapter {
         let agent = self.state.agent;
         *self = AgentCliAdapter::default();
         self.state.agent = agent;
+        self.refresh_summary();
+    }
+
+    fn refresh_summary(&mut self) {
+        self.state.summary = self
+            .state
+            .agent
+            .and_then(coding_agent)
+            .map(|agent| self.turn.summary(agent));
     }
 
     fn settle(&mut self, at: Timestamp) -> Vec<EventKind> {
@@ -87,6 +99,18 @@ impl AgentCliAdapter {
             }
             _ => Vec::new(),
         }
+    }
+}
+
+/// The protocol's name for an [`agent_of`] result.
+pub fn coding_agent(slug: &str) -> Option<protocol::coding_agent::CodingAgent> {
+    use protocol::coding_agent::CodingAgent;
+    match slug {
+        "claude" => Some(CodingAgent::Claude),
+        "codex" => Some(CodingAgent::Codex),
+        "aider" => Some(CodingAgent::Aider),
+        "gemini" => Some(CodingAgent::Gemini),
+        _ => None,
     }
 }
 
@@ -129,11 +153,13 @@ impl WatcherAdapter for AgentCliAdapter {
     fn observe(&mut self, observation: &Observation) -> Vec<EventKind> {
         match &observation.kind {
             ObservationKind::CommandStarted(command) => {
-                self.reset();
                 self.state.agent = agent_of(&command.text);
+                self.reset();
                 Vec::new()
             }
             ObservationKind::CommandFinished(_) => {
+                // The agent exited: no summary until another one starts.
+                self.state.agent = None;
                 self.reset();
                 Vec::new()
             }
@@ -143,6 +169,8 @@ impl WatcherAdapter for AgentCliAdapter {
                     return Vec::new();
                 }
                 self.last_line_at = Some(observation.at);
+                let activity = self.turn.line(observation.at, &cleaned);
+                self.refresh_summary();
                 self.lines.push_back(cleaned);
                 if self.lines.len() > WINDOW_LINES {
                     self.lines.pop_front();
@@ -160,10 +188,13 @@ impl WatcherAdapter for AgentCliAdapter {
                         }
                     }
                 }
-                Vec::new()
+                activity
             }
             ObservationKind::Tick | ObservationKind::MetricsSample(_) => {
-                self.settle(observation.at)
+                let mut events = self.settle(observation.at);
+                events.extend(self.turn.tick(observation.at, self.emitted.is_some()));
+                self.refresh_summary();
+                events
             }
             ObservationKind::ProcessSample(_) => Vec::new(),
         }

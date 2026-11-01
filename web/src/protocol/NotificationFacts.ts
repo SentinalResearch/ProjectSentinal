@@ -12,6 +12,13 @@ export type NotificationFacts =
      */
     exit_code: number;
   }
+  | {
+    "kind": "AGENT_FINISHED";
+    /**
+     * Tool calls in that turn.
+     */
+    tool_uses: number;
+  }
   | { "kind": "ERROR" }
   | { "kind": "WAITING" }
   | {

@@ -23,9 +23,11 @@
 //! - [`link`]     — Machine enrollment, the control registry, and worker links
 //! - [`search`]   — search everywhere and its shared ranking (5.S)
 //! - [`complete`] — autocomplete and its frecency formula (5.A)
+//! - [`coding_agent`] — AI coding agents running in a Session (6.1)
 
 pub mod agent;
 pub mod auth;
+pub mod coding_agent;
 pub mod command;
 pub mod command_line;
 pub mod complete;

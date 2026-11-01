@@ -1,4 +1,5 @@
-import type { Machine, Session } from "./types";
+import type { AgentAction } from "../protocol/AgentAction";
+import type { CodingAgentView, Machine, Session } from "./types";
 
 // QUESTION: fixtures only carry a project name, never an id, and the prototype's own
 // ids ("tim", "maa") don't obviously derive from the names either. See QUESTIONS.md #9 —
@@ -90,6 +91,7 @@ const EVENT_COLORS: Record<string, EventColor> = {
   PROGRESS: { square: "var(--line-strong)", text: "var(--text-2)" },
   PROGRESS_UPDATED: { square: "var(--line-strong)", text: "var(--text-2)" },
   CHECKPOINT_CREATED: { square: "var(--accent-fg)", text: "var(--accent-fg)" },
+  AGENT_TURN_FINISHED: { square: "var(--accent-fg)", text: "var(--accent-fg)" },
   RESOURCE_HIGH: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
   WARNING: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
   WARNING_DETECTED: { square: "var(--s-waiting)", text: "var(--s-waiting-fg)" },
@@ -104,6 +106,47 @@ const EVENT_COLORS: Record<string, EventColor> = {
 };
 
 const DEFAULT_EVENT_COLOR: EventColor = { square: "var(--line-strong)", text: "var(--text-2)" };
+
+const CODING_AGENT_NAMES: Record<CodingAgentView["agent"], string> = {
+  CLAUDE: "Claude Code",
+  CODEX: "Codex",
+  AIDER: "aider",
+  GEMINI: "Gemini CLI",
+};
+
+/** "Claude Code", "Codex", … (6.1). */
+export function codingAgentName(agent: CodingAgentView["agent"]): string {
+  return CODING_AGENT_NAMES[agent];
+}
+
+const AGENT_ACTION_WORDS: Record<AgentAction, string> = {
+  RAN_COMMAND: "ran",
+  RAN_TESTS: "ran tests",
+  EDITED_FILE: "edited",
+  READ_FILE: "read",
+  SEARCHED: "searched",
+  USED_TOOL: "used a tool",
+};
+
+/** What an agent's tool call did, in a few words. */
+export function agentActionWord(action: AgentAction): string {
+  return AGENT_ACTION_WORDS[action];
+}
+
+/** "agent finished · 4 tool calls" */
+export function agentFinishedText(toolUses: number): string {
+  return `agent finished · ${toolUses} tool call${toolUses === 1 ? "" : "s"}`;
+}
+
+/** "12 tool calls · 120k tokens · $1.25", from what the agent printed. */
+export function agentUsageText(view: CodingAgentView): string {
+  const parts = [`${view.toolUses} tool call${view.toolUses === 1 ? "" : "s"}`];
+  if (view.tokens !== undefined) {
+    parts.push(`${view.tokens >= 1000 ? `${Math.round(view.tokens / 100) / 10}k` : view.tokens} tokens`);
+  }
+  if (view.costUsd !== undefined) parts.push(`$${view.costUsd.toFixed(2)}`);
+  return parts.join(" · ");
+}
 
 /** See SentinalSession.dc.html's `evColor` map — routine events fall back to the neutral pair. */
 export function eventColor(kind: string): EventColor {

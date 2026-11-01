@@ -284,6 +284,9 @@ pub struct Session {
     /// Latest training numbers read from output, if the run looks like training.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub training: Option<crate::TrainingSummary>,
+    /// The AI coding agent running here, if the Command started one (6.1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coding_agent: Option<Box<crate::coding_agent::CodingAgentSummary>>,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -317,6 +320,7 @@ impl Session {
             continued_from: None,
             health: None,
             training: None,
+            coding_agent: None,
             created_at: at,
             updated_at: at,
         }

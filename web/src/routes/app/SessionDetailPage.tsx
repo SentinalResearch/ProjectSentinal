@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { AgentBadge } from "../../components/AgentBadge";
 import { CaptureBadge } from "../../components/CaptureBadge";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
@@ -216,6 +217,7 @@ function DesktopSessionDetail() {
               </span>
               <StateTag state={session.state} exitUnknown={unknownExit} />
               <CaptureBadge capture={capture} origin={session.origin} />
+              {session.codingAgent && <AgentBadge agent={session.codingAgent} usage />}
               {hasHealth && (
                 <span
                   className={styles.healthOutline}

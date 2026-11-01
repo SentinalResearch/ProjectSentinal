@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { formatEventTime, machineSummary, sessionElapsedMs } from "./format";
+import {
+  agentActionWord,
+  agentFinishedText,
+  agentUsageText,
+  codingAgentName,
+  formatEventTime,
+  machineSummary,
+  sessionElapsedMs,
+} from "./format";
 
 describe("Event time", () => {
   it("is 24-hour HH:mm:ss in local time, with zero padding", () => {
@@ -40,5 +48,17 @@ describe("Session elapsed time", () => {
 
   it("is never negative when clocks disagree", () => {
     expect(sessionElapsedMs({ state: "RUNNING", createdAt: now + hour, updatedAt: now + hour }, now)).toBe(0);
+  });
+});
+
+describe("AI coding agents (6.1)", () => {
+  it("names agents and what they did and used", () => {
+    expect(codingAgentName("CLAUDE")).toBe("Claude Code");
+    expect(agentActionWord("RAN_TESTS")).toBe("ran tests");
+    expect(agentFinishedText(1)).toBe("agent finished · 1 tool call");
+    expect(agentUsageText({ agent: "CLAUDE", working: false, toolUses: 12, tokens: 120_000, costUsd: 1.25 })).toBe(
+      "12 tool calls · 120k tokens · $1.25",
+    );
+    expect(agentUsageText({ agent: "AIDER", working: false, toolUses: 1, tokens: 312 })).toBe("1 tool call · 312 tokens");
   });
 });

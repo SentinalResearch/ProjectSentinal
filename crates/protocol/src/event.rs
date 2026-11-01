@@ -125,6 +125,18 @@ pub enum EventKind {
         /// Full URL, if known.
         url: Option<String>,
     },
+    /// An AI coding agent used a tool (6.1).
+    AgentActivity {
+        /// What the tool did.
+        action: crate::coding_agent::AgentAction,
+        /// Its argument as shown, e.g. a command or a path (bounded).
+        detail: String,
+    },
+    /// An AI coding agent finished its turn and waits for its next instruction (6.1).
+    AgentTurnFinished {
+        /// Tool calls in that turn.
+        tool_uses: u32,
+    },
 }
 
 impl EventKind {
@@ -151,7 +163,8 @@ impl EventKind {
             EventKind::CommandFinished { .. }
             | EventKind::ErrorDetected { .. }
             | EventKind::WaitingForInput { .. }
-            | EventKind::PossiblyStalled { .. } => true,
+            | EventKind::PossiblyStalled { .. }
+            | EventKind::AgentTurnFinished { .. } => true,
             EventKind::ResourceHigh { percent, .. } => *percent >= 95.0,
             _ => false,
         }

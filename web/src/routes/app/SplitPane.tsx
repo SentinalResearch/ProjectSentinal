@@ -2,6 +2,7 @@ import type { MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { StateTag } from "../../components/StateTag";
+import { AgentBadge } from "../../components/AgentBadge";
 import { CaptureBadge } from "../../components/CaptureBadge";
 import { captureCapabilities, captureOf, exitUnknown } from "../../data/capture";
 import { formatSessionFact } from "../../data/format";
@@ -43,6 +44,7 @@ export function SplitPane({ session, machine, active, gridRow, onFocus, onClose 
       <div className={styles.head}>
         <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
         <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />
+        {session.codingAgent && <AgentBadge agent={session.codingAgent} />}
         <span className={styles.name}>{session.name}</span>
         <span className={styles.fact}>
           {machine?.name ?? session.machine} · {machine ? machineStatusText(machine, Date.now()) : "offline"} · {formatSessionFact(session)}

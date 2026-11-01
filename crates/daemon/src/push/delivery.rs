@@ -351,6 +351,10 @@ fn facts_text(facts: &NotificationFacts) -> (String, PushPriority) {
         NotificationFacts::CommandFinished { exit_code } => {
             (format!("failed (exit {exit_code})"), PushPriority::High)
         }
+        NotificationFacts::AgentFinished { tool_uses } => (
+            crate::notifications::presentation::agent_finished(*tool_uses),
+            PushPriority::Default,
+        ),
         NotificationFacts::Error => ("error detected".into(), PushPriority::High),
         NotificationFacts::Waiting => ("waiting for input".into(), PushPriority::High),
         NotificationFacts::Stalled { silent_for_ms } => (

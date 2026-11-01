@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { AgentBadge } from "../../../components/AgentBadge";
 import { AttentionCard, GlassPanel } from "../../../components/glass/Glass";
 import { StateTag } from "../../../components/StateTag";
 import { dataAdapter } from "../../../data";
@@ -25,11 +26,14 @@ export function GlassDashboard() {
   const shell = useShell();
   const { machines, terminals, loading } = useLiveData();
   const [interrupting, setInterrupting] = useState<Session | null>(null);
+  // 6.1: show only Sessions running an AI coding agent.
+  const [agentsOnly, setAgentsOnly] = useState(false);
+  const shown = (session: Session) => !agentsOnly || session.codingAgent !== undefined;
   const now = useClock();
   const sparks = useSparkHistory(terminals);
   const load = useMachineLoad(machines);
 
-  const needs = terminals.filter(needsAttention);
+  const needs = terminals.filter((session) => needsAttention(session) && shown(session));
   const online = machines.filter((machine) => machine.status === "ONLINE").length;
   const feed = useMemo(() => awayFeed(terminals, machines), [terminals, machines]);
   const since = feed.filter((item) => item.time).at(-1)?.time.slice(0, 5);
@@ -47,6 +51,15 @@ export function GlassDashboard() {
           </p>
           <div className={styles.heroRow}>
             <h1 className={styles.hero}>{loading ? "Loading…" : needs.length > 0 ? `${needs.length} need${needs.length === 1 ? "s" : ""} you.` : "All quiet."}</h1>
+            <button
+              type="button"
+              className={styles.filter}
+              aria-pressed={agentsOnly}
+              aria-label="AI agents only"
+              onClick={() => setAgentsOnly((only) => !only)}
+            >
+              AI agents
+            </button>
             {shell && (
               <button type="button" className={styles.hint} onClick={() => shell.openPrompt()}>
                 press <kbd>/</kbd> to do anything
@@ -77,7 +90,8 @@ export function GlassDashboard() {
             <MachineLane
               key={machine.id}
               machine={machine}
-              sessions={terminals.filter((session) => session.machine === machine.id && onLane(session))}
+              sessions={terminals.filter((session) => session.machine === machine.id && onLane(session) && shown(session))}
+              emptyNote={agentsOnly ? "No AI agents." : "No Sessions."}
               sparks={sparks}
               load={load[machine.id]}
               onOpen={open}
@@ -162,6 +176,7 @@ function NeedsCard({
     <AttentionCard as="article" state={session.state} className={styles.needCard} aria-labelledby={titleId} onClick={onOpen}>
       <div className={styles.needTop}>
         <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
+        {session.codingAgent && <AgentBadge agent={session.codingAgent} />}
         <span className={styles.needWhere}>
           {machineName}
           {session.runningFor ? ` · ${session.runningFor}` : ""}
@@ -240,6 +255,7 @@ function MachineLane({
   load,
   onOpen,
   onOpenMachine,
+  emptyNote,
 }: {
   machine: Machine;
   sessions: Session[];
@@ -247,6 +263,7 @@ function MachineLane({
   load: MachineMetricSample | undefined;
   onOpen: (id: string) => void;
   onOpenMachine: () => void;
+  emptyNote: string;
 }) {
   const online = machine.status === "ONLINE";
   const bars: Array<[string, number | undefined]> =
@@ -286,7 +303,7 @@ function MachineLane({
             resume when it reconnects
           </p>
         )}
-        {online && sessions.length === 0 && <p className={styles.laneNote}>No Sessions.</p>}
+        {online && sessions.length === 0 && <p className={styles.laneNote}>{emptyNote}</p>}
         {sessions.map((session) => (
           <LaneCard key={session.id} session={session} samples={sparks[session.id]} onOpen={() => onOpen(session.id)} />
         ))}
@@ -308,6 +325,7 @@ function LaneCard({ session, samples, onOpen }: { session: Session; samples?: Ar
         <span className={styles.laneCorner}>{corner}</span>
       </span>
       <span className={styles.laneTitle}>{session.name}</span>
+      {session.codingAgent && <AgentBadge agent={session.codingAgent} />}
       <span className={styles.spark} data-state={training ? "FOCUS" : session.state} aria-hidden="true">
         {bars.map((height, index) => (
           <span key={index} className={height === null ? styles.dash : styles.bar} style={height === null ? undefined : { height: `${Math.round(height * 100)}%` }} />

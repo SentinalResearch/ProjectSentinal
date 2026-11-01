@@ -326,6 +326,11 @@ pub(super) fn apply_observation(
         Some(watcher::AdapterState::Training(state)) => state.summary(),
         _ => None,
     };
+    // 6.1: the AI coding agent running here, gone once its Command ends.
+    let coding_agent = match &update.adapter_state {
+        Some(watcher::AdapterState::AgentCli(state)) => state.summary.clone().map(Box::new),
+        _ => None,
+    };
     let (session, command_id, session_changed, reduced) = match handle.session.lock() {
         Ok(mut session) => {
             let mut session_changed = session.health.as_ref() != Some(&update.health);
@@ -344,6 +349,10 @@ pub(super) fn apply_observation(
             // Keep the last summary once the run stops printing training numbers.
             if training.is_some() && session.training != training {
                 session.training = training;
+                session_changed = true;
+            }
+            if session.coding_agent != coding_agent {
+                session.coding_agent = coding_agent;
                 session_changed = true;
             }
             (

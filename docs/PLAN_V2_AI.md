@@ -207,10 +207,23 @@ Goal: when an AI coding agent runs in a Sentinal terminal, Sentinal knows what i
       browser); the dashboard, phone, and Session page show one button per
       answer. The daemon now moves any Session RUNNING ↔ WAITING on prompts
       (before, WAITING was never set on a real daemon)
-- [ ] Activity (tool calls, files edited, tests run) becomes Events; "agent
-      finished" and "agent errored" become notifications under the usual rules
-- [ ] Cost and token lines, where printed, become metrics
-- [ ] A Session badge "AI agent" and a filter on the dashboard
+- [x] Activity (tool calls, files edited, tests run) becomes Events
+      (`AGENT_ACTIVITY` with a closed action and the bounded argument, once
+      per turn despite redraws); a turn ends when the working line has been
+      gone 3 s and becomes `AGENT_TURN_FINISHED`, which notifies under the
+      "finished" rule when the turn used tools ("agent finished (4 tool
+      calls)" on ntfy and native Push); `API Error:` lines become errors under
+      the "error" rule (`watcher/src/agent_activity.rs`). Wording from the
+      installed Claude Code (`⏺ Name(args)`, `esc to interrupt`) and Gemini
+      CLI (`✓ Name args`, `esc to cancel`) and aider's known lines; Codex
+      still needs a real capture
+- [x] Cost and token lines, where printed (Claude Code `/cost`, aider
+      `Tokens: … Cost: … session`), become the Session's `coding_agent`
+      summary: tool calls, tokens, cost in USD, working or not. Closed codes
+      and numbers only, so it is projected to the control
+- [x] A Session badge naming the agent (a dot while it works; usage on the
+      Session page) on dashboard cards, Needs-you cards, split panes and the
+      Session page, and an "AI agents" filter on the dashboard
 
 **Demo:** Claude Code runs a refactor on pop-os; you get a push "Claude
 Code wants to run `cargo test`, allow?", answer from the lock screen, and

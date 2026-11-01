@@ -42,7 +42,7 @@ import { createRegistryApi } from "./registry";
 import { createAgentsApi } from "./agents";
 import { applyProjectionMessage, projectionView, type ProjectionView } from "./projection-view";
 import { health, type createHealthCollector } from "../health";
-import { formatEventTime, sessionElapsedMs } from "../format";
+import { agentActionWord, agentFinishedText, formatEventTime, sessionElapsedMs } from "../format";
 import { markLoad } from "../load-timing";
 import { mergeResults, resultFromHit, type SearchResult, type SearchResults } from "../search";
 
@@ -238,6 +238,15 @@ export function mapSession(session: WireSession): Session {
           trend: session.training.trend,
         }
       : undefined,
+    codingAgent: session.coding_agent
+      ? {
+          agent: session.coding_agent.agent,
+          working: session.coding_agent.working,
+          toolUses: session.coding_agent.tool_uses,
+          tokens: session.coding_agent.tokens ?? undefined,
+          costUsd: session.coding_agent.cost_usd ?? undefined,
+        }
+      : undefined,
     origin: session.origin,
     capture: session.capture,
     exitCode: session.exit_code,
@@ -275,6 +284,8 @@ function eventDetail(kind: EventKind): string {
     case "POSSIBLY_STALLED": return `quiet for ${formatDuration(kind.silent_for_ms)}`;
     case "CHECKPOINT_CREATED": return kind.path;
     case "SERVER_STARTED": return kind.url ?? (kind.port === null ? "server listening" : `port ${kind.port}`);
+    case "AGENT_ACTIVITY": return `${agentActionWord(kind.action)} · ${kind.detail}`;
+    case "AGENT_TURN_FINISHED": return agentFinishedText(kind.tool_uses);
   }
 }
 

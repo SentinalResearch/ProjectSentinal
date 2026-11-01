@@ -55,4 +55,36 @@ describe("glass dashboard (GLASS_SPEC.md §7)", () => {
     expect(await within(feed).findByText("Checkpoint saved")).toBeInTheDocument();
     expect(within(feed).getByText("MacBook went offline")).toBeInTheDocument();
   });
+
+  it("badges AI coding agents and filters to them (6.1)", async () => {
+    const qwen = store.sessions.find((session) => session.name === "Qwen Training")!;
+    const before = store.sessions.length;
+    store.sessions.push({
+      ...qwen,
+      id: "rtx-agent",
+      name: "refactor",
+      state: "RUNNING",
+      progress: undefined,
+      codingAgent: { agent: "CLAUDE", working: true, toolUses: 12, tokens: 120_000, costUsd: 1.25 },
+    });
+    try {
+      renderDashboard();
+      const user = userEvent.setup();
+      const lane = await screen.findByRole("region", { name: "RTX-PC" });
+      const card = within(lane).getByRole("button", { name: /refactor/ });
+      expect(within(card).getByText("Claude Code")).toBeInTheDocument();
+      expect(within(card).getByLabelText("Claude Code is working")).toBeInTheDocument();
+
+      const filter = screen.getByRole("button", { name: "AI agents only" });
+      expect(filter).toHaveAttribute("aria-pressed", "false");
+      await user.click(filter);
+      expect(filter).toHaveAttribute("aria-pressed", "true");
+      expect(within(lane).getByRole("button", { name: /refactor/ })).toBeInTheDocument();
+      expect(within(lane).queryByRole("button", { name: /Qwen Training/ })).not.toBeInTheDocument();
+      // Lanes without agents say so rather than looking empty.
+      expect(within(screen.getByRole("region", { name: "Mac Mini" })).getByText("No AI agents.")).toBeInTheDocument();
+    } finally {
+      store.sessions.length = before;
+    }
+  });
 });

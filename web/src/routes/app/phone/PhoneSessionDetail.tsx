@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { AgentBadge } from "../../../components/AgentBadge";
 import { CaptureBadge } from "../../../components/CaptureBadge";
 import { StateTag } from "../../../components/StateTag";
 import { dataAdapter } from "../../../data";
@@ -94,6 +95,7 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
           <div className={styles.badges}>
             <StateTag state={session.state} exitUnknown={exitUnknown(session)} />
             <CaptureBadge capture={capture} origin={session.origin} />
+            {session.codingAgent && <AgentBadge agent={session.codingAgent} usage />}
             {session.health && (
               <span className={styles.healthBadge} style={{ color: `var(--s-${healthColorSlug(session.health.overall)}-fg)` }}>
                 {session.health.overall}

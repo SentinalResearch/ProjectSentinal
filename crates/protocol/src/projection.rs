@@ -172,6 +172,9 @@ pub struct ProjectedSession {
     pub finished_at: Option<Timestamp>,
     /// Known shell exit code.
     pub exit_code: Option<i32>,
+    /// The AI coding agent running here: closed codes and numbers only (6.1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coding_agent: Option<crate::coding_agent::CodingAgentSummary>,
 }
 
 impl ProjectedSession {
@@ -195,6 +198,7 @@ impl ProjectedSession {
             updated_at: session.updated_at,
             finished_at: session.state.is_finished().then_some(session.updated_at),
             exit_code: session.exit_code,
+            coding_agent: session.coding_agent.as_deref().cloned(),
         }
     }
 }
@@ -292,6 +296,16 @@ pub enum ProjectedEventFacts {
         /// Listening port when known.
         port: Option<u16>,
     },
+    /// An AI coding agent used a tool; its argument is omitted.
+    AgentActivity {
+        /// What the tool did.
+        action: crate::coding_agent::AgentAction,
+    },
+    /// An AI coding agent finished its turn.
+    AgentTurnFinished {
+        /// Tool calls in that turn.
+        tool_uses: u32,
+    },
 }
 
 /// Bounded Event summary that contains no raw terminal-derived text.
@@ -348,6 +362,12 @@ impl ProjectedEventSummary {
             EventKind::ServerStarted { port, .. } => {
                 ProjectedEventFacts::ServerStarted { port: *port }
             }
+            EventKind::AgentActivity { action, .. } => {
+                ProjectedEventFacts::AgentActivity { action: *action }
+            }
+            EventKind::AgentTurnFinished { tool_uses } => ProjectedEventFacts::AgentTurnFinished {
+                tool_uses: *tool_uses,
+            },
         };
         Self {
             id: event.id,

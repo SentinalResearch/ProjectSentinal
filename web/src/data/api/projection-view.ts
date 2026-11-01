@@ -8,7 +8,7 @@ import type { ProjectedMetrics } from "../../protocol/ProjectedMetrics";
 import type { ProjectedSession } from "../../protocol/ProjectedSession";
 import type { LiveEvent } from "../adapter";
 import type { Machine, MachineStatus, Session, SessionEvent, SessionHealth, SessionMetrics } from "../types";
-import { formatEventTime, sessionElapsedMs } from "../format";
+import { agentActionWord, agentFinishedText, formatEventTime, sessionElapsedMs } from "../format";
 import { compositeId } from "./machine-connections";
 
 /** In-memory privacy-minimized dashboard projection. */
@@ -63,6 +63,8 @@ function eventDetail(facts: ProjectedEventFacts): string {
     case "STALLED": return `quiet for ${duration(facts.silent_for_ms)}`;
     case "CHECKPOINT": return "Checkpoint created";
     case "SERVER_STARTED": return facts.port === null ? "Server started" : `Server started on port ${facts.port}`;
+    case "AGENT_ACTIVITY": return agentActionWord(facts.action);
+    case "AGENT_TURN_FINISHED": return agentFinishedText(facts.tool_uses);
   }
 }
 
@@ -118,6 +120,15 @@ function mapSession(
     progress: session.health?.progress === null || session.health?.progress === undefined
       ? undefined : { current: session.health.progress, total: 100, unit: "%" },
     metrics: metricView(latestMetrics),
+    codingAgent: session.coding_agent
+      ? {
+          agent: session.coding_agent.agent,
+          working: session.coding_agent.working,
+          toolUses: session.coding_agent.tool_uses,
+          tokens: session.coding_agent.tokens ?? undefined,
+          costUsd: session.coding_agent.cost_usd ?? undefined,
+        }
+      : undefined,
     origin: session.origin,
     capture: session.capture,
     exitCode: session.exit_code,

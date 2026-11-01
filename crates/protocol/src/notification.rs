@@ -237,6 +237,11 @@ pub enum NotificationFacts {
         /// Exact shell exit code.
         exit_code: i32,
     },
+    /// An AI coding agent finished its turn (6.1).
+    AgentFinished {
+        /// Tool calls in that turn.
+        tool_uses: u32,
+    },
     /// A deterministic watcher detected an error without copying its line.
     Error,
     /// Work is waiting for owner input without copying the prompt.
@@ -272,6 +277,7 @@ impl NotificationFacts {
         match self {
             NotificationFacts::CommandFinished { exit_code: 0 } => NotificationCategory::Completed,
             NotificationFacts::CommandFinished { .. } => NotificationCategory::Failed,
+            NotificationFacts::AgentFinished { .. } => NotificationCategory::Completed,
             NotificationFacts::Error => NotificationCategory::Error,
             NotificationFacts::Waiting => NotificationCategory::Waiting,
             NotificationFacts::Stalled { .. } => NotificationCategory::Stalled,
