@@ -144,6 +144,8 @@ export interface DataAdapter {
       level: import("../protocol/AgentLevel").AgentLevel,
     ): Promise<import("../protocol/CreatedAgent").CreatedAgent>;
     revoke(id: string): Promise<void>;
+    /** What one agent has done, attributed "via name (level N)" (6.0). */
+    activity(id: string): Promise<import("../protocol/AgentActivity").AgentActivity>;
   };
 
   auth: {

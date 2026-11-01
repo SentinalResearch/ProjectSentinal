@@ -102,7 +102,7 @@ fn command_without_separator_is_rejected() {
 
 #[test]
 fn existing_commands_still_parse_under_the_sentinal_name() {
-    assert!(matches!(parse(&["sentinal", "ls"]), Command::List));
+    assert!(matches!(parse(&["sentinal", "ls"]), Command::List { .. }));
     assert!(matches!(
         parse(&["ta", "attach", "7"]),
         Command::Attach { id: 7 }

@@ -242,3 +242,36 @@ fn long_output_lines_in_events_are_clipped() {
     assert!(line.chars().count() < 90, "{line}");
     assert!(line.ends_with('…'));
 }
+
+#[test]
+fn json_output_uses_the_api_shapes() {
+    let session = training_session();
+    let top: serde_json::Value =
+        serde_json::from_str(&top_json(&snapshot(vec![session.clone()]))).unwrap();
+    assert_eq!(top["machine"]["id"], "pop");
+    assert_eq!(top["sessions"][0]["id"], 12);
+    assert_eq!(top["sessions"][0]["state"], "RUNNING");
+    assert_eq!(top["details"]["daemon_version"], "0.1.12");
+    let events = vec![Event {
+        id: EventId(1),
+        session_id: session.id,
+        command_id: None,
+        at: Timestamp(NOW),
+        kind: EventKind::ProgressUpdated {
+            current: 3,
+            total: Some(10),
+            unit: "epoch".into(),
+        },
+    }];
+    let status: serde_json::Value = serde_json::from_str(&status_json(
+        &snapshot(vec![session.clone()]),
+        &session,
+        &events,
+    ))
+    .unwrap();
+    assert_eq!(status["session"]["id"], 12);
+    assert_eq!(status["events"][0]["kind"]["type"], "PROGRESS_UPDATED");
+    assert_eq!(status["processes"][0]["name"], "python");
+    let list: serde_json::Value = serde_json::from_str(&sessions_json(&[session])).unwrap();
+    assert_eq!(list[0]["id"], 12);
+}

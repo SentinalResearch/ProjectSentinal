@@ -9,6 +9,7 @@ const calls = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
   revoke: vi.fn(),
+  activity: vi.fn(),
 }));
 
 vi.mock("../../data", () => ({
@@ -83,5 +84,28 @@ describe("AgentsTab", () => {
     calls.list.mockRejectedValue(Object.assign(new Error("this daemon is not a control Machine"), { code: "NOT_CONTROL" }));
     render(<AgentsTab />);
     expect(await screen.findByText(/only on the control Machine/i)).toBeInTheDocument();
+  });
+
+  it("shows what an agent did, attributed to it (6.0)", async () => {
+    const user = userEvent.setup();
+    calls.activity.mockResolvedValue({
+      agent: CLAUDE,
+      via: "via claude (level 0)",
+      total_calls: 3,
+      calls: [
+        { at: new Date(2026, 10, 1, 9, 5, 7).getTime(), tool: "snapshot", outcome: "ALLOWED" },
+        { at: new Date(2026, 10, 1, 9, 5, 1).getTime(), tool: "propose_events", outcome: "DENIED" },
+      ],
+    });
+    render(<AgentsTab />);
+    const row = await screen.findByRole("row", { name: /claude/ });
+    await user.click(within(row).getByRole("button", { name: "Activity" }));
+    expect(calls.activity).toHaveBeenCalledWith(CLAUDE.id);
+    const panel = await screen.findByRole("region", { name: "claude activity" });
+    expect(within(panel).getByText("via claude (level 0) · 3 calls")).toBeInTheDocument();
+    const items = within(panel).getAllByRole("listitem").map((item) => item.textContent);
+    expect(items).toEqual(["09:05:07snapshotserved", "09:05:01propose_eventsrefused: level too low"]);
+    await user.click(within(row).getByRole("button", { name: "Hide activity" }));
+    expect(screen.queryByRole("region", { name: "claude activity" })).not.toBeInTheDocument();
   });
 });

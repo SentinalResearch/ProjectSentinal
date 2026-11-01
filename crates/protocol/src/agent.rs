@@ -114,6 +114,56 @@ pub struct AgentIdentity {
     pub level: AgentLevel,
 }
 
+impl AgentIdentity {
+    /// "via claude (level 2)": how audit and the UI name the agent's work.
+    pub fn attribution(&self) -> String {
+        format!("via {} (level {})", self.name, self.level.number())
+    }
+}
+
+/// Calls kept per agent for its activity page (6.0 attribution).
+pub const MAX_AGENT_ACTIVITY: usize = 100;
+
+/// Whether the control served an agent's call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AgentCallOutcome {
+    /// Served.
+    Allowed,
+    /// Refused: the tool needs a higher level.
+    Denied,
+}
+
+/// One call an agent made.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct AgentCall {
+    /// When.
+    pub at: Timestamp,
+    /// The tool (route), e.g. `snapshot`.
+    pub tool: String,
+    /// Served or refused.
+    pub outcome: AgentCallOutcome,
+}
+
+/// What one agent has done, for Settings → Agents.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct AgentActivity {
+    /// The agent.
+    pub agent: AgentInfo,
+    /// "via claude (level 2)".
+    pub via: String,
+    /// Calls since the control started.
+    pub total_calls: u64,
+    /// The latest calls, newest first, at most [`MAX_AGENT_ACTIVITY`].
+    pub calls: Vec<AgentCall>,
+}
+
 /// Longest an agent may wait for a change in one `updates` call.
 pub const MAX_AGENT_WAIT_MS: u64 = 30_000;
 

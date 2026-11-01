@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { dataAdapter } from "../../data";
+import { formatEventTime } from "../../data/format";
+import type { AgentActivity } from "../../protocol/AgentActivity";
 import type { AgentInfo } from "../../protocol/AgentInfo";
 import type { AgentLevel } from "../../protocol/AgentLevel";
 import type { CreatedAgent } from "../../protocol/CreatedAgent";
@@ -270,6 +272,21 @@ function AgentRow({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<AgentActivity | "loading" | null>(null);
+
+  async function toggleActivity() {
+    if (activity !== null) {
+      setActivity(null);
+      return;
+    }
+    setActivity("loading");
+    try {
+      setActivity(await dataAdapter.agents.activity(agent.id));
+    } catch (failure) {
+      setActivity(null);
+      setError(message(failure, "Could not load activity."));
+    }
+  }
 
   async function revoke() {
     setBusy(true);
@@ -283,50 +300,93 @@ function AgentRow({
   }
 
   return (
-    <tr aria-label={agent.name}>
-      <td className="mono">{agent.name}</td>
-      <td>{levelLabel(agent.level)}</td>
-      <td>{when(agent.created_at)}</td>
-      <td>{when(agent.last_used_at)}</td>
-      <td>
-        <div className={own.actions}>
-          {error && (
-            <span className={styles.rowError} role="alert">
-              {error}
-            </span>
-          )}
-          {confirming ? (
-            <>
-              <span className={styles.revokeConfirmLabel}>
-                Revoke {agent.name}?
+    <>
+      <tr aria-label={agent.name}>
+        <td className="mono">{agent.name}</td>
+        <td>{levelLabel(agent.level)}</td>
+        <td>{when(agent.created_at)}</td>
+        <td>{when(agent.last_used_at)}</td>
+        <td>
+          <div className={own.actions}>
+            {error && (
+              <span className={styles.rowError} role="alert">
+                {error}
               </span>
-              <button
-                type="button"
-                className={styles.revokeBtn}
-                disabled={busy}
-                onClick={() => void revoke()}
-              >
-                Revoke
-              </button>
-              <button
-                type="button"
-                className={styles.keepBtn}
-                onClick={() => setConfirming(false)}
-              >
-                Keep
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className={styles.revokeEntry}
-              onClick={() => setConfirming(true)}
-            >
-              Revoke…
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
+            )}
+            {confirming ? (
+              <>
+                <span className={styles.revokeConfirmLabel}>
+                  Revoke {agent.name}?
+                </span>
+                <button
+                  type="button"
+                  className={styles.revokeBtn}
+                  disabled={busy}
+                  onClick={() => void revoke()}
+                >
+                  Revoke
+                </button>
+                <button
+                  type="button"
+                  className={styles.keepBtn}
+                  onClick={() => setConfirming(false)}
+                >
+                  Keep
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className={styles.keepBtn} aria-expanded={activity !== null} onClick={() => void toggleActivity()}>
+                  {activity === null ? "Activity" : "Hide activity"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.revokeEntry}
+                  onClick={() => setConfirming(true)}
+                >
+                  Revoke…
+                </button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+      {activity !== null && (
+        <tr className={own.activityRow}>
+          <td colSpan={5}>
+            {activity === "loading" ? (
+              <p className={own.activityNote}>Loading…</p>
+            ) : (
+              <ActivityPanel activity={activity} />
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/** An agent's latest calls, "via claude (level 0)" (6.0 attribution). */
+function ActivityPanel({ activity }: { activity: AgentActivity }) {
+  const total = Number(activity.total_calls);
+  return (
+    <section className={own.activity} aria-label={`${activity.agent.name} activity`}>
+      <p className={own.activityVia}>
+        {activity.via} · {total} call{total === 1 ? "" : "s"}
+      </p>
+      {activity.calls.length === 0 ? (
+        <p className={own.activityNote}>No calls since the control started.</p>
+      ) : (
+        <ol className={own.activityList}>
+          {activity.calls.slice(0, 20).map((call, index) => (
+            <li key={`${call.at}-${index}`} className={own.activityItem} data-denied={call.outcome === "DENIED" || undefined}>
+              <span className={own.activityTime}>{formatEventTime(call.at)}</span>
+              <span className="mono">{call.tool}</span>
+              <span>{call.outcome === "ALLOWED" ? "served" : "refused: level too low"}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }

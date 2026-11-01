@@ -19,7 +19,9 @@ use daemon::{
     session_manager::{SessionManager, SessionManagerConfig},
 };
 use protocol::{
-    agent::{AgentIdentity, AgentList, AgentUpdates, CreatedAgent},
+    agent::{
+        AgentActivity, AgentCallOutcome, AgentIdentity, AgentList, AgentUpdates, CreatedAgent,
+    },
     link::{LinkEndpoint, LinkExchangeRequest, LinkMachineInfo, MachineCapability},
     CaptureLevel, ControlProjectionSnapshot, Machine, MachineId, MachineStatus, Os,
     ProjectedSession, ProjectionBatch, ProjectionChange, Secret, Session, SessionId, Timestamp,
@@ -513,4 +515,61 @@ async fn llms_txt_describes_the_agent_api_without_any_state() {
     let text = String::from_utf8(body).unwrap();
     assert!(text.starts_with("# Sentinal") && text.contains("sentinal mcp"));
     assert!(!text.contains(CONTROL_ID) && !text.contains("mac-mini"));
+}
+
+#[tokio::test]
+async fn the_owner_sees_each_agents_calls_attributed_to_it() {
+    // 6.0 attribution: every agent request is recorded "via <name> (level N)".
+    let daemon = daemon().await;
+    let claude = daemon.create("claude", "OBSERVE").await;
+    let codex = daemon.create("codex", "OBSERVE").await;
+    for path in ["/api/v1/agent/whoami", "/api/v1/agent/snapshot"] {
+        let (status, _) = daemon
+            .call(Method::GET, path, Some(claude.token.expose()), None)
+            .await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    daemon
+        .call(
+            Method::GET,
+            "/api/v1/agent/whoami",
+            Some(codex.token.expose()),
+            None,
+        )
+        .await;
+
+    let path = format!("/api/v1/agents/{}/activity", claude.agent.id);
+    let (status, body) = daemon
+        .call(Method::GET, &path, Some(&daemon.owner), None)
+        .await;
+    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
+    let activity: AgentActivity = serde_json::from_slice(&body).unwrap();
+    assert_eq!(activity.via, "via claude (level 0)");
+    assert_eq!(activity.total_calls, 2);
+    assert_eq!(
+        activity
+            .calls
+            .iter()
+            .map(|call| (call.tool.as_str(), call.outcome))
+            .collect::<Vec<_>>(),
+        vec![
+            ("snapshot", AgentCallOutcome::Allowed),
+            ("whoami", AgentCallOutcome::Allowed)
+        ]
+    );
+
+    // Only the owner reads it; an agent cannot read even its own.
+    let (status, _) = daemon
+        .call(Method::GET, &path, Some(claude.token.expose()), None)
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, _) = daemon
+        .call(
+            Method::GET,
+            "/api/v1/agents/agt_0000000000000000/activity",
+            Some(&daemon.owner),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }

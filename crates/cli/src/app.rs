@@ -257,7 +257,10 @@ async fn dispatch(
 
     let mut client = DaemonClient::connect(&urls, &token_file).await?;
     match cli.command {
-        Command::List => match client.request(ClientRequest::ListSessions).await? {
+        Command::List { json } => match client.request(ClientRequest::ListSessions).await? {
+            DaemonMessage::Sessions { sessions } if json => {
+                let _ = writeln!(out, "{}", crate::top::sessions_json(&sessions));
+            }
             DaemonMessage::Sessions { sessions } => {
                 for session in sessions {
                     let _ = writeln!(
@@ -290,7 +293,12 @@ async fn dispatch(
         Command::Attach { id } => {
             let _ = client.attach(SessionId(id)).await?;
         }
-        Command::Top { once } => {
+        Command::Top { once, json } => {
+            if json {
+                let snapshot = crate::top::fetch(&mut client, crate::hook_report::now()).await?;
+                let _ = writeln!(out, "{}", crate::top::top_json(&snapshot));
+                return Ok(ExitCode::SUCCESS);
+            }
             let live = !once && std::io::stdout().is_terminal();
             loop {
                 let text = crate::top::render_top(
@@ -315,13 +323,21 @@ async fn dispatch(
                 }
             }
         }
-        Command::Status { id } => {
+        Command::Status { id, json } => {
             let snapshot = crate::top::fetch(&mut client, crate::hook_report::now()).await?;
             let Some(session) = snapshot.sessions.iter().find(|session| session.id.0 == id) else {
                 let _ = writeln!(err, "sentinal: no Session {id} on this Machine");
                 return Ok(ExitCode::FAILURE);
             };
             let events = crate::top::fetch_events(&mut client, session.id).await?;
+            if json {
+                let _ = writeln!(
+                    out,
+                    "{}",
+                    crate::top::status_json(&snapshot, session, &events)
+                );
+                return Ok(ExitCode::SUCCESS);
+            }
             let _ = write!(
                 out,
                 "{}",

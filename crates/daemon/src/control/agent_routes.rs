@@ -22,7 +22,8 @@ use axum::{
 };
 use protocol::{
     agent::{
-        AgentIdentity, AgentLevel, AgentList, AgentUpdates, CreateAgentRequest, MAX_AGENT_WAIT_MS,
+        AgentCallOutcome, AgentIdentity, AgentLevel, AgentList, AgentUpdates, CreateAgentRequest,
+        MAX_AGENT_WAIT_MS,
     },
     link::LinkFailureCode,
     ControlProjectionMessage, ControlSnapshotReason,
@@ -33,6 +34,7 @@ pub(super) fn routes() -> Router<ControlRoutes> {
     Router::new()
         .route("/api/v1/agents", get(list).post(create))
         .route("/api/v1/agents/{agent_id}", delete(revoke))
+        .route("/api/v1/agents/{agent_id}/activity", get(activity))
         .route("/api/v1/agent/whoami", get(whoami))
         .route("/api/v1/agent/snapshot", get(snapshot))
         .route("/api/v1/agent/updates", get(updates))
@@ -84,7 +86,14 @@ pub(super) fn agent<'a>(
             )
         })?;
     if !identity.level.allows(required) {
-        let reason = format!("{tool} needs level {}", required.number());
+        control
+            .agents()
+            .record_call(&identity, tool, AgentCallOutcome::Denied, control.now());
+        let reason = format!(
+            "{tool} needs level {} · {}",
+            required.number(),
+            identity.attribution()
+        );
         control.audit().append(&LinkAuditRecord {
             agent_id: Some(&identity.id),
             reason: Some(&reason),
@@ -96,7 +105,22 @@ pub(super) fn agent<'a>(
             format!("this agent is level {}; {reason}", identity.level.number()),
         ));
     }
+    control
+        .agents()
+        .record_call(&identity, tool, AgentCallOutcome::Allowed, control.now());
     Ok((control, identity))
+}
+
+async fn activity(
+    State(routes): State<ControlRoutes>,
+    headers: HeaderMap,
+    Path(agent_id): Path<String>,
+) -> Response {
+    reply(
+        routes
+            .owner(&headers)
+            .and_then(|control| control.agents().activity(&agent_id).map_err(failure)),
+    )
 }
 
 async fn list(State(routes): State<ControlRoutes>, headers: HeaderMap) -> Response {

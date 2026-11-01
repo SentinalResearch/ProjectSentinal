@@ -117,3 +117,52 @@
     display: none;
   }
 }
+
+/* An agent's latest calls (6.0 attribution). */
+.activityRow td {
+  padding-top: 0;
+}
+
+.activity {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+
+.activityVia {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.activityNote {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.activityList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.activityItem {
+  display: grid;
+  grid-template-columns: max-content minmax(0, max-content) 1fr;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.activityItem[data-denied] {
+  color: var(--s-failed-fg);
+}
+
+.activityTime {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}

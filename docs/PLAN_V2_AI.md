@@ -164,9 +164,14 @@ Goal: any AI agent can load Sentinal's functions and watch or work with Sessions
 - [x] Watching built for agents: `watch { sessions?, kinds?, since_cursor }`
       streams Events, and `wait_for { session, until: state | event_kind,
       timeout }` blocks until something happens, so agents never poll screens
-- [ ] `--json` on every CLI read command, with the same shapes as the API
-- [ ] Attribution: the audit log and the UI show "via claude (level 2)" on
-      anything an agent touched; a per-agent activity page in Settings
+- [x] `--json` on every CLI read command, with the same shapes as the API
+      (`ls`, `status`, `top`, `connection status`, `complete`; `docs/CLI.md`)
+- [x] Attribution: every agent call is recorded "via claude (level 2)"
+      (`AgentIdentity::attribution`); denied calls go to the audit log with
+      it; Settings → Agents → **Activity** shows each agent's latest 100
+      calls and outcomes (`GET /api/v1/agents/{id}/activity`, in memory).
+      Agents cannot change anything yet (levels 1–2 tools are 6.2/6.3), so
+      there is nothing else for them to have touched
 - [x] `docs/AGENT_API.md` plus an `llms.txt` at the control's root that
       describe the tools in plain language for model context
 

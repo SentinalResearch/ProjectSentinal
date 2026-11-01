@@ -1,3 +1,4 @@
+import type { AgentActivity } from "../../protocol/AgentActivity";
 import type { AgentInfo } from "../../protocol/AgentInfo";
 import type { AgentLevel } from "../../protocol/AgentLevel";
 import type { AgentList } from "../../protocol/AgentList";
@@ -42,5 +43,6 @@ export function createAgentsApi(baseUrl: string, fetcher: typeof fetch): DataAda
     create: (name: string, level: AgentLevel) =>
       request<CreatedAgent>("/agents", { method: "POST", body: JSON.stringify({ name, level }) }),
     revoke: (id: string) => request<void>(`/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    activity: (id: string) => request<AgentActivity>(`/agents/${encodeURIComponent(id)}/activity`),
   };
 }

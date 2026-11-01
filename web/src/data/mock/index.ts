@@ -256,6 +256,20 @@ export const mockAdapter: DataAdapter = {
     async list() {
       return delay(structuredClone(mockAgents));
     },
+    async activity(id) {
+      const agent = mockAgents.find((candidate) => candidate.id === id);
+      if (!agent) throw new RegistryError("NOT_FOUND", "no agent with that ID");
+      const at = Date.now();
+      return delay({
+        agent: structuredClone(agent),
+        via: `via ${agent.name} (level ${["OBSERVE", "ANNOTATE", "SUGGEST"].indexOf(agent.level)})`,
+        total_calls: 2,
+        calls: [
+          { at: at - 60_000, tool: "updates", outcome: "ALLOWED" as const },
+          { at: at - 120_000, tool: "snapshot", outcome: "ALLOWED" as const },
+        ],
+      });
+    },
     async create(name, level) {
       await delay(undefined, 150, 300);
       if (mockAgents.some((agent) => agent.name === name)) throw new RegistryError("INVALID_REQUEST", `an agent named '${name}' already exists`);

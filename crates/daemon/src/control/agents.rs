@@ -84,6 +84,7 @@ pub enum AgentError {
 pub struct AgentRegistry {
     path: PathBuf,
     state: Arc<Mutex<Vec<StoredAgent>>>,
+    activity: super::agent_activity::AgentActivityLog,
 }
 
 impl AgentRegistry {
@@ -101,6 +102,7 @@ impl AgentRegistry {
         Ok(AgentRegistry {
             path: path.to_path_buf(),
             state: Arc::new(Mutex::new(agents)),
+            activity: Default::default(),
         })
     }
 
@@ -161,7 +163,35 @@ impl AgentRegistry {
             .ok_or(AgentError::NotFound)?;
         let removed = agents.remove(index);
         self.save(&agents)?;
+        self.activity.forget(&removed.id);
         Ok(removed.info())
+    }
+
+    /// Record a call `identity` made (6.0 attribution).
+    pub fn record_call(
+        &self,
+        identity: &AgentIdentity,
+        tool: &str,
+        outcome: protocol::agent::AgentCallOutcome,
+        at: Timestamp,
+    ) {
+        self.activity.record(&identity.id, tool, outcome, at);
+    }
+
+    /// What agent `id` has done, for the owner.
+    pub fn activity(&self, id: &str) -> Result<protocol::agent::AgentActivity, AgentError> {
+        let agents = self.lock()?;
+        let agent = agents
+            .iter()
+            .find(|agent| agent.id == id)
+            .ok_or(AgentError::NotFound)?;
+        let (total_calls, calls) = self.activity.read(id);
+        Ok(protocol::agent::AgentActivity {
+            agent: agent.info(),
+            via: agent.identity().attribution(),
+            total_calls,
+            calls,
+        })
     }
 
     /// The agent `token` belongs to, if it is a live agent token.

@@ -4,6 +4,7 @@
 //! HMACs. A successful exchange creates one link with two directional
 //! credentials; each side keeps only a hash of the one it verifies.
 
+pub mod agent_activity;
 mod agent_routes;
 pub mod agents;
 mod approval;

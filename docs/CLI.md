@@ -451,6 +451,15 @@ works in zsh, fish, and bash 4 or newer (macOS's bash 3.2 has no
 `READLINE_LINE`, so there the binding is not installed), in ordinary and
 Sentinal terminals alike.
 
+### Machine-readable output
+
+`ls --json`, `status ID --json`, `top --json`, `connection status --json`,
+and `complete --json` print JSON in the API's own shapes: `ls` an array of
+`Session`; `status` an object with `session`, `events` (`Event`), and
+`processes`; `top` one snapshot with `machine`, `details`, `latest`,
+`sessions`, and `now`. The types are in `crates/protocol` and
+`web/src/protocol/*.ts`.
+
 ### `complete`
 
 ```console

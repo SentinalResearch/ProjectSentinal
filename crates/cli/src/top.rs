@@ -14,7 +14,7 @@ mod format;
 use format::*;
 
 /// Everything `top` shows, fetched in one round of requests.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct TopSnapshot {
     /// The daemon's Machine description.
     pub machine: Machine,
@@ -182,6 +182,33 @@ pub fn render_top(snapshot: &TopSnapshot) -> String {
         );
     }
     text
+}
+
+/// `top --json`: the snapshot as the API's own types.
+pub fn top_json(snapshot: &TopSnapshot) -> String {
+    serde_json::to_string_pretty(snapshot).unwrap_or_else(|_| "{}".into())
+}
+
+/// `status --json`: the Session, its Events, and its processes as the API's types.
+pub fn status_json(snapshot: &TopSnapshot, session: &Session, events: &[Event]) -> String {
+    let processes = snapshot
+        .details
+        .processes
+        .iter()
+        .find(|entry| entry.session_id == session.id)
+        .map(|entry| entry.processes.clone())
+        .unwrap_or_default();
+    serde_json::to_string_pretty(&serde_json::json!({
+        "session": session,
+        "events": events,
+        "processes": processes,
+    }))
+    .unwrap_or_else(|_| "{}".into())
+}
+
+/// `ls --json`: every Session as the API's `Session`.
+pub fn sessions_json(sessions: &[Session]) -> String {
+    serde_json::to_string_pretty(sessions).unwrap_or_else(|_| "[]".into())
 }
 
 /// One Session in detail: progress, training, health evidence, processes, Events.

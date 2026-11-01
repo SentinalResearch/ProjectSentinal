@@ -24,17 +24,27 @@ pub struct Cli {
 pub enum Command {
     /// List sessions on the daemon.
     #[command(name = "ls")]
-    List,
+    List {
+        /// Print the API's `Session` objects as JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Live text view of this Machine's load and running Sessions.
     Top {
         /// Print one snapshot and exit (also the default when not on a terminal).
         #[arg(long)]
         once: bool,
+        /// Print one snapshot as JSON (Machine, details, latest sample, Sessions).
+        #[arg(long)]
+        json: bool,
     },
     /// One Session's progress, training numbers, health, processes, and Events.
     Status {
         /// Session ID.
         id: u64,
+        /// Print the Session, its Events, and its processes as JSON.
+        #[arg(long)]
+        json: bool,
     },
     /// Create a new persistent session.
     New {

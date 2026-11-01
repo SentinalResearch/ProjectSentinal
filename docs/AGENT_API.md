@@ -67,10 +67,15 @@ Every request sends `Authorization: Bearer sat_…`. Errors are
 
 Owner routes (browser Session only): `GET /api/v1/agents`,
 `POST /api/v1/agents {"name", "level"}` → `CreatedAgent` (the only time the
-token is shown), `DELETE /api/v1/agents/{id}`.
+token is shown), `DELETE /api/v1/agents/{id}`, and
+`GET /api/v1/agents/{id}/activity` → `AgentActivity`: the agent's latest
+100 calls (tool and outcome, never arguments), newest first, with its
+attribution "via claude (level 0)". Settings → Agents shows it under
+**Activity**. It is kept in memory and starts empty when the control
+restarts; the audit log below is the durable record.
 
 ## Audit
 
 `pairing-audit.jsonl` on the control records `AGENT_CREATED`,
-`AGENT_REVOKED`, and `AGENT_DENIED` (a request above the agent's level), with
-the agent ID and never the token.
+`AGENT_REVOKED`, and `AGENT_DENIED` (a request above the agent's level, with
+"via name (level N)" in its reason), with the agent ID and never the token.
