@@ -7,6 +7,7 @@ import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
 import { answerPrompt, INTERRUPTIBLE } from "../../data/actions";
 import { InterruptConfirm } from "./InterruptConfirm";
+import { useShell } from "./shell/ShellContext";
 import { resolveSessionLineage } from "../../data/lineage";
 import type { Session } from "../../data/types";
 import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../data/capture";
@@ -49,6 +50,7 @@ function DesktopSessionDetail() {
   const navigate = useNavigate();
   const { machines, sessions, loading } = useLiveData();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const glass = useShell() !== null;
   const [attached, setAttached] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
@@ -155,7 +157,7 @@ function DesktopSessionDetail() {
   const sectionLabel = SECTION_LABELS[capture];
 
   return (
-    <div className={styles.split}>
+    <div className={styles.split} data-glass={glass || undefined} data-full-bleed={glass || undefined}>
       <section
         className={styles.terminalColumn}
         aria-label={sectionLabel.charAt(0) + sectionLabel.slice(1).toLowerCase()}
@@ -295,7 +297,8 @@ function DesktopSessionDetail() {
           }}
         />
         {capture !== "COMMANDS" && <SessionCommands sessionId={session.id} />}
-        {capture !== "PROCESS" && <ResourceBars metrics={session.metrics} />}
+        {/* Under glass, a training run's GPU and VRAM are already the tiles above. */}
+        {capture !== "PROCESS" && !(glass && kind === "training") && <ResourceBars metrics={session.metrics} />}
         {session.health && <HealthCard health={session.health} interrupted={interrupted} />}
         <EventsList events={session.events ?? []} />
       </section>

@@ -286,3 +286,57 @@
     line-height: 42px;
   }
 }
+
+/* Glass shell: 104 px progress over a row of three metric tiles (§8). */
+:global([data-glass]) .training {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+:global([data-glass]) .percentCol {
+  grid-column: 1 / -1;
+  gap: 18px;
+}
+
+:global([data-glass]) .percentValue {
+  font-size: 104px;
+  line-height: 88px;
+  letter-spacing: -0.055em;
+}
+
+:global([data-glass]) .percentSign {
+  font-size: inherit;
+  margin-left: 0.2em;
+}
+
+:global([data-glass]) .percentCaption {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+:global([data-glass]) .progressTrack {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--chip);
+}
+
+:global([data-glass]) .progressFill {
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+:global([data-glass]) .progressTicks {
+  display: none;
+}
+
+:global([data-glass]) .metricCol {
+  padding: 14px 14px 12px;
+  border-top: 0;
+  border-radius: var(--radius-tile);
+  background: var(--glass-panel);
+  box-shadow: inset 0 0 0 1px var(--glass-edge-soft);
+}

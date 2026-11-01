@@ -34,3 +34,12 @@
   background: var(--s-running-fg);
   transition: width 180ms ease;
 }
+
+/* Glass shell: this section is a glass panel (GLASS_SPEC.md §3). */
+:global([data-glass]) .bars {
+  overflow: hidden;
+  padding: 16px;
+  border-radius: var(--radius-panel);
+  background: var(--glass-panel);
+  box-shadow: inset 0 0 0 1px var(--glass-edge-soft);
+}

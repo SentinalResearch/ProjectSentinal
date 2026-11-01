@@ -65,3 +65,9 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+/* A page that draws its own top spacing (the Session page) opts out. */
+.frame:has([data-full-bleed]) {
+  padding-top: 0;
+  overflow: hidden;
+}

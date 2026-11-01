@@ -67,3 +67,26 @@
     font-size: 13px;
   }
 }
+
+/* Glass shell: rounded keys on the terminal surface; Ctrl-C tinted red (it still asks first). */
+:global([data-glass]) .keyBar {
+  gap: 6px;
+  padding: 8px 10px 10px;
+  background: transparent;
+  border-top: 0;
+}
+
+:global([data-glass]) .key {
+  border-radius: var(--radius-key);
+  background: #1a1a1c;
+}
+
+:global([data-glass]) .key:hover {
+  background: #242428;
+}
+
+:global([data-glass]) .ctrlC,
+:global([data-glass]) .ctrlC:hover {
+  background: color-mix(in srgb, var(--s-failed) 20%, #1a1a1c);
+  color: #ff6b61;
+}
