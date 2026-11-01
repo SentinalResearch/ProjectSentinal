@@ -210,7 +210,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           );
         })()}
 
-        <button type="button" title="Theme" className={styles.navItem} style={{ color: "var(--text-2)" }} onClick={toggleTheme}>
+        <button type="button" title="Theme" className={`${styles.navItem} ${styles.themeToggle}`} onClick={toggleTheme}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ flex: "none" }}>
             <circle cx="8" cy="8" r="5.5" />
             <path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor" />

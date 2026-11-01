@@ -28,3 +28,14 @@ export function machineStatusLabel(machine: Pick<Machine, "status" | "freshness"
   const text = machineStatusText(machine, now);
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
+/** "last seen 5 min ago" / "3 h ago" / "2 days ago"; the exact time belongs in a tooltip. */
+export function lastSeenText(at: number, now: number): string {
+  const seconds = Math.max(0, Math.floor((now - at) / 1_000));
+  if (seconds < 60) return "last seen just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `last seen ${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `last seen ${hours} h ago`;
+  return `last seen ${Math.floor(hours / 24)} days ago`;
+}

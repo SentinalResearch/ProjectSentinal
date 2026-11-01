@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { dataAdapter } from "../../data";
 import { RegistryError } from "../../data/adapter";
 import { useLiveData } from "../../data/LiveDataContext";
-import { isDelayed, machineStatusLabel } from "../../data/machine-status";
+import { isDelayed, lastSeenText, machineStatusLabel } from "../../data/machine-status";
 import type { RegistryMachine } from "../../protocol/RegistryMachine";
 import { AddMachineDialog } from "./AddMachineDialog";
 import { ControlReleaseCard } from "./ControlReleaseCard";
@@ -134,6 +134,9 @@ function RegistryRow({
   // The registry knows the heartbeat; the live projection knows whether its Sessions are current.
   const projected = useLiveData().machines.find((entry) => entry.id === machine.machine_id);
   const delayed = online && projected !== undefined && isDelayed(projected);
+  const now = Date.now();
+  const status: StatusText =
+    delayed && projected ? { label: machineStatusLabel(projected, now) } : statusLabel(machine, now);
   const canRevoke = machine.role === "WORKER" && machine.status !== "REVOKED";
 
   async function act(action: () => Promise<unknown>) {
@@ -206,9 +209,15 @@ function RegistryRow({
             boxShadow: online ? "none" : "inset 0 0 0 1.5px var(--s-disconnected-fg)",
           }}
         />
-        {delayed && projected ? machineStatusLabel(projected, Date.now()) : statusLabel(machine)}
+        <span className={styles.machineStatusText} title={status.title}>
+          <span>{status.label}</span>
+          {status.detail && <span className={styles.machineStatusDetail}>{status.detail}</span>}
+        </span>
       </span>
-      <span className={`${styles.machineToken} mono`}>
+      <span
+        className={`${styles.machineToken} mono`}
+        title={machine.endpoint ? `${machine.endpoint.address}:${machine.endpoint.port}` : undefined}
+      >
         {machine.endpoint ? `${machine.endpoint.address}:${machine.endpoint.port}` : "—"}
       </span>
       <div className={styles.machineActions}>
@@ -258,21 +267,24 @@ function RegistryRow({
   );
 }
 
-function statusLabel(machine: RegistryMachine): string {
-  if (machine.credential && machine.credential.expires_at <= Date.now()) {
-    return machine.last_seen
-      ? `Authentication expired · last seen ${new Date(machine.last_seen).toLocaleString()}`
-      : "Authentication expired";
+type StatusText = { label: string; detail?: string; title?: string };
+
+function statusLabel(machine: RegistryMachine, now: number): StatusText {
+  const seen = machine.last_seen
+    ? { detail: lastSeenText(machine.last_seen, now), title: new Date(machine.last_seen).toLocaleString() }
+    : {};
+  if (machine.credential && machine.credential.expires_at <= now) {
+    return { label: "Authentication expired", ...seen };
   }
   switch (machine.status) {
     case "ONLINE":
-      return "Online";
+      return { label: "Online" };
     case "OFFLINE":
-      return machine.last_seen ? `Offline · last seen ${new Date(machine.last_seen).toLocaleString()}` : "Offline · never seen";
+      return machine.last_seen ? { label: "Offline", ...seen } : { label: "Offline", detail: "never seen" };
     case "DISCONNECTED":
-      return "Disconnected";
+      return { label: "Disconnected", ...seen };
     case "REVOKED":
-      return "Revoked";
+      return { label: "Revoked" };
   }
 }
 
