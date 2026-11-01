@@ -18,6 +18,8 @@ pub enum AdapterState {
     Cargo(crate::cargo_adapter::CargoState),
     /// Declarative rule match count.
     Declarative(crate::declarative::DeclarativeState),
+    /// AI coding agent and its approval prompt (6.1).
+    AgentCli(crate::agent_cli::AgentCliState),
 }
 
 /// Pure deterministic adapter selected from a structured Command.
@@ -30,4 +32,13 @@ pub trait WatcherAdapter: Send {
     fn observe(&mut self, observation: &Observation) -> Vec<EventKind>;
     /// Return current structured parser state.
     fn state(&self) -> AdapterState;
+    /// Whether the program is waiting for a person right now.
+    fn waiting(&self) -> bool {
+        false
+    }
+    /// Whether this adapter reports prompts itself, so the generic prompt
+    /// guess (which has no answers) is not reported as well.
+    fn owns_prompts(&self) -> bool {
+        false
+    }
 }

@@ -131,7 +131,7 @@ impl HealthTracker {
                     &format!("{name} usage reached {percent:.1}%"),
                 );
             }
-            EventKind::WaitingForInput { prompt } => {
+            EventKind::WaitingForInput { prompt, .. } => {
                 self.health.activity = HealthLevel::Warning;
                 self.warnings = self.warnings.saturating_add(1);
                 self.add_evidence(

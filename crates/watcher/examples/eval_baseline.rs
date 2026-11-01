@@ -74,7 +74,7 @@ fn translate(input: &Value) -> Vec<Value> {
                 EventKind::ErrorDetected { message } => calls.push(json!({"name": "error_detected", "args": {"kind": "other", "summary": message.chars().take(120).collect::<String>()}})),
                 EventKind::WarningDetected { message } => calls.push(json!({"name": "warning_detected", "args": {"summary": message.chars().take(120).collect::<String>()}})),
                 EventKind::ServerStarted { port, url } => calls.push(json!({"name": "server_started", "args": {"port": port, "url": url}})),
-                EventKind::WaitingForInput { prompt: text } => prompt = Some(text.unwrap_or_default()),
+                EventKind::WaitingForInput { prompt: text, .. } => prompt = Some(text.unwrap_or_default()),
                 _ => {}
             }
         }
@@ -90,7 +90,7 @@ fn translate(input: &Value) -> Vec<Value> {
         kind: watcher::ObservationKind::Tick,
     });
     for event in waiting.events {
-        if let EventKind::WaitingForInput { prompt: text } = event {
+        if let EventKind::WaitingForInput { prompt: text, .. } = event {
             prompt = Some(text.unwrap_or_default());
         }
     }

@@ -13,6 +13,11 @@
     "kind": { "type": "WARNING_DETECTED", "message": "VRAM usage high" } },
   { "id": 7, "session_id": 129, "command_id": null, "at": 1790000820000,
     "kind": { "type": "WAITING_FOR_INPUT", "prompt": "Continue? [y/N]" } },
+  { "id": 70, "session_id": 133, "command_id": 9010, "at": 1790000821000,
+    "kind": { "type": "WAITING_FOR_INPUT", "prompt": "Do you want to proceed?", "options": [
+      { "label": "Yes", "keys": "1" },
+      { "label": "Yes, and don't ask again for cargo test commands", "keys": "2" },
+      { "label": "No, and tell Claude what to do differently (esc)", "keys": "\u001b" } ] } },
   { "id": 8, "session_id": 130, "command_id": 9000, "at": 1790000830000,
     "kind": { "type": "POSSIBLY_STALLED", "silent_for_ms": 840000 } },
   { "id": 9, "session_id": 131, "command_id": 9001, "at": 1790000840000,

@@ -203,6 +203,7 @@ fn presentation_never_copies_output_prompt_command_or_checkpoint_path() {
         },
         EventKind::WaitingForInput {
             prompt: Some("Password: top-secret".into()),
+            options: Vec::new(),
         },
         EventKind::CheckpointCreated {
             path: "/private/models/secret.safetensors".into(),
@@ -284,7 +285,10 @@ fn every_supported_category_has_stable_appearance() {
             "rotating_light",
         ),
         (
-            EventKind::WaitingForInput { prompt: None },
+            EventKind::WaitingForInput {
+                prompt: None,
+                options: Vec::new(),
+            },
             NotificationCategory::Waiting,
             "hourglass_flowing_sand",
         ),

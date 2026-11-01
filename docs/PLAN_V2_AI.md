@@ -165,11 +165,17 @@ reports the result. The audit shows every step "via claude".
 
 Goal: when an AI coding agent runs in a Sentinal terminal, Sentinal knows what it is doing and when it needs you.
 
-- [ ] Deterministic watcher adapters for agent CLIs (Claude Code, Codex
+- [x] Deterministic watcher adapter for agent CLIs (Claude Code, Codex
       CLI, aider, Gemini CLI), chosen from the Command like other adapters
-- [ ] Their approval prompts ("Allow this edit?", "Run this command?")
-      become WAITING with the offered answers, so the dashboard card, the
-      island, and a push notification show it, and y / n works from the phone
+      (`crates/watcher/src/agent_cli.rs`). Claude Code's wording is taken from
+      its installed binary; options are read from the screen, so numbered
+      menus and aider's `(Y)es/(N)o` form work without hard-coded text.
+      Codex and Gemini still need a real capture to confirm
+- [x] Their approval prompts become WAITING with the offered answers
+      (`PromptOption`: label + one choice key, validated in Rust and the
+      browser); the dashboard, phone, and Session page show one button per
+      answer. The daemon now moves any Session RUNNING ↔ WAITING on prompts
+      (before, WAITING was never set on a real daemon)
 - [ ] Activity (tool calls, files edited, tests run) becomes Events; "agent
       finished" and "agent errored" become notifications under the usual rules
 - [ ] Cost and token lines, where printed, become metrics

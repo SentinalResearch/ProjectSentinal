@@ -282,7 +282,9 @@ export function watcherEventPatch(observed: WireEvent): Partial<Session> | undef
   if (kind.type === "PROGRESS_UPDATED" && kind.total !== null) {
     return { progress: { current: kind.current, total: kind.total, unit: kind.unit } };
   }
-  if (kind.type === "WAITING_FOR_INPUT") return { prompt: kind.prompt ?? undefined };
+  if (kind.type === "WAITING_FOR_INPUT") {
+    return { prompt: kind.prompt ?? undefined, promptOptions: kind.options?.length ? kind.options : undefined };
+  }
   if (kind.type === "SERVER_STARTED") {
     return { details: kind.url ?? (kind.port === null ? undefined : `Listening on port ${kind.port}`) };
   }

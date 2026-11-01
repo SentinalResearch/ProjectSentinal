@@ -49,6 +49,7 @@ impl GenericAdapter {
                     self.state.waiting = true;
                     events.push(EventKind::WaitingForInput {
                         prompt: Some(prompt.clone()),
+                        options: Vec::new(),
                     });
                 }
             }
@@ -115,6 +116,10 @@ impl WatcherAdapter for GenericAdapter {
 
     fn state(&self) -> AdapterState {
         AdapterState::Generic(self.state.clone())
+    }
+
+    fn waiting(&self) -> bool {
+        self.state.waiting
     }
 }
 

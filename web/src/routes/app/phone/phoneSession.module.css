@@ -130,6 +130,14 @@
   padding: 0 14px 14px;
 }
 
+.choicePad {
+  padding: 0 14px 14px;
+}
+
+.choicePad:empty {
+  display: none;
+}
+
 .promptText {
   flex: 1;
   min-width: 0;

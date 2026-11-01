@@ -1,6 +1,7 @@
 //! Pure deterministic conversion of Session observations into Events and Health.
 
 mod adapter;
+mod agent_cli;
 mod cargo_adapter;
 mod declarative;
 mod engine;
@@ -13,6 +14,7 @@ mod server;
 pub mod training;
 
 pub use adapter::{AdapterState, WatcherAdapter};
+pub use agent_cli::{agent_of, AgentCliAdapter, AgentCliState};
 pub use declarative::{DeclarativeAdapter, DeclarativeError, DeclarativeState};
 pub use engine::{EngineUpdate, EventEngine};
 pub use framing::LineFramer;

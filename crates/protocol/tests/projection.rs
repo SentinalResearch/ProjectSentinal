@@ -132,6 +132,7 @@ fn event_projection_drops_untrusted_text_and_paths() {
             at: Timestamp(12),
             kind: EventKind::WaitingForInput {
                 prompt: Some("PASSWORD_PROMPT".into()),
+                options: Vec::new(),
             },
         },
     ];

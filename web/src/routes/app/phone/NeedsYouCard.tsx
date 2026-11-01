@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 
 import { StateTag } from "../../../components/StateTag";
-import { answerPrompt } from "../../../data/actions";
+import { answerPrompt, offeredChoices } from "../../../data/actions";
+import { PromptChoices } from "../../../components/PromptChoices";
 import { captureCapabilities, captureOf } from "../../../data/capture";
 import type { Machine, Session } from "../../../data/types";
 import styles from "./phoneSession.module.css";
@@ -38,12 +39,17 @@ export function NeedsYouCard({ session, machine }: { session: Session; machine?:
       {session.state === "WAITING" && session.prompt && (
         <div className={styles.promptRow}>
           <span className={`${styles.promptText} mono`}>{session.prompt}</span>
-          {canAnswer && (
+          {canAnswer && offeredChoices(session).length === 0 && (
             <>
               <button type="button" className={styles.answerKey} onClick={() => answer(session.id, "y")}>y</button>
               <button type="button" className={styles.answerKey} onClick={() => answer(session.id, "n")}>n</button>
             </>
           )}
+        </div>
+      )}
+      {session.state === "WAITING" && canAnswer && (
+        <div className={styles.choicePad}>
+          <PromptChoices session={session} />
         </div>
       )}
     </article>

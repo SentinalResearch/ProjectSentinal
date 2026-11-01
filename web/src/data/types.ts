@@ -85,6 +85,8 @@ export interface Session {
   details?: string;
   result?: SessionResult;
   prompt?: string;
+  /** The answers the waiting program offered (6.1), e.g. Claude Code's numbered choices. */
+  promptOptions?: PromptChoice[];
   health?: SessionHealth;
   /** Training numbers the watcher read from the run's output. */
   training?: TrainingView;
@@ -242,4 +244,10 @@ export interface ControlPingResult extends PingResult {
   path: "DIRECT" | "RELAYED" | "UNKNOWN";
   /** DERP region code when relayed. */
   relay?: string;
+}
+
+/** One answer a waiting program offered, and the keys that choose it. */
+export interface PromptChoice {
+  label: string;
+  keys: string;
 }

@@ -60,7 +60,7 @@ pub use auth::{
 pub use command::{Command, CommandClass, CommandStatus};
 pub use command_line::{render_command_line, ShellDialect, MAX_RENDERED_COMMAND_BYTES};
 pub use error::ProtocolError;
-pub use event::{Event, EventKind, Resource, Severity};
+pub use event::{Event, EventKind, PromptOption, Resource, Severity};
 pub use health::{
     Health, HealthLevel, HealthOverall, MAX_HEALTH_EVIDENCE, MAX_HEALTH_EVIDENCE_BYTES,
 };

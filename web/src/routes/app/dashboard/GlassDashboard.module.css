@@ -145,6 +145,14 @@
   gap: 6px;
 }
 
+.choiceColumn {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
 .well {
   min-width: 0;
   flex: 1;

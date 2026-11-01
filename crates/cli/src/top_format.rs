@@ -46,7 +46,7 @@ pub(super) fn describe(kind: &EventKind) -> String {
             "silent {}",
             duration(i64::try_from(silent_for_ms.0).unwrap_or(i64::MAX))
         ),
-        EventKind::WaitingForInput { prompt } => prompt.clone().unwrap_or_default(),
+        EventKind::WaitingForInput { prompt, .. } => prompt.clone().unwrap_or_default(),
         EventKind::ServerStarted { port, url } => url
             .clone()
             .or_else(|| port.map(|port| format!("port {port}")))

@@ -241,3 +241,11 @@
   outline: 2px solid var(--accent-fg);
   outline-offset: 2px;
 }
+
+/* 6.1: a program's own answers (e.g. Claude Code's numbered choices). */
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}

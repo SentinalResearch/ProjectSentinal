@@ -72,7 +72,10 @@ mod tests {
             EventKind::ErrorDetected {
                 message: "e".into(),
             },
-            EventKind::WaitingForInput { prompt: None },
+            EventKind::WaitingForInput {
+                prompt: None,
+                options: Vec::new(),
+            },
             EventKind::PossiblyStalled {
                 silent_for_ms: DurationMs(1),
             },

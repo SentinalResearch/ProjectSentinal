@@ -296,6 +296,19 @@ pub(super) fn finish_output(
     }
 }
 
+/// The state a prompt (or its end) moves a Session to, if any.
+pub(super) fn prompt_transition(
+    state: protocol::SessionState,
+    waiting: bool,
+) -> Option<protocol::SessionState> {
+    use protocol::SessionState::{Running, Waiting};
+    match (state, waiting) {
+        (Running, true) => Some(Waiting),
+        (Waiting, false) => Some(Running),
+        _ => None,
+    }
+}
+
 pub(super) fn apply_observation(
     session_id: SessionId,
     handle: &SessionHandle,
@@ -318,6 +331,15 @@ pub(super) fn apply_observation(
             let mut session_changed = session.health.as_ref() != Some(&update.health);
             if session_changed {
                 session.health = Some(update.health);
+            }
+            // 6.1: a prompt makes a running Session WAITING; work resumes it.
+            if let Some(target) = prompt_transition(session.state, update.waiting) {
+                match session.transition(target, observation.at) {
+                    Ok(()) => session_changed = true,
+                    Err(error) => {
+                        tracing::warn!(session = session_id.0, %error, "prompt state change refused")
+                    }
+                }
             }
             // Keep the last summary once the run stops printing training numbers.
             if training.is_some() && session.training != training {
@@ -524,4 +546,24 @@ fn save(
         Admit::Skip => return Ok(()),
     }
     encoder.flush()
+}
+
+#[cfg(test)]
+mod prompt_state_tests {
+    use super::prompt_transition;
+    use protocol::SessionState::{self, *};
+
+    #[test]
+    fn only_running_and_waiting_swap_on_prompts() {
+        assert_eq!(prompt_transition(Running, true), Some(Waiting));
+        assert_eq!(prompt_transition(Waiting, false), Some(Running));
+        for state in SessionState::ALL {
+            if !matches!(state, Running | Waiting) {
+                assert_eq!(prompt_transition(state, true), None, "{state:?}");
+                assert_eq!(prompt_transition(state, false), None, "{state:?}");
+            }
+        }
+        assert_eq!(prompt_transition(Running, false), None);
+        assert_eq!(prompt_transition(Waiting, true), None);
+    }
 }

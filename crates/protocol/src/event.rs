@@ -104,6 +104,9 @@ pub enum EventKind {
     WaitingForInput {
         /// The prompt text, if recognised, e.g. `"Continue? [y/N]"`.
         prompt: Option<String>,
+        /// The answers the program offered, when it listed them (6.1).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        options: Vec<PromptOption>,
     },
     /// No output and no resource activity for a while.
     PossiblyStalled {
@@ -252,7 +255,10 @@ mod tests {
                 exit_code: 0,
                 duration_ms: DurationMs(1),
             },
-            EventKind::WaitingForInput { prompt: None },
+            EventKind::WaitingForInput {
+                prompt: None,
+                options: Vec::new(),
+            },
             EventKind::PossiblyStalled {
                 silent_for_ms: DurationMs(1),
             },
@@ -280,5 +286,75 @@ mod tests {
         let json = serde_json::to_value(progress(37, Some(100))).unwrap();
         assert_eq!(json["type"], "PROGRESS_UPDATED");
         assert_eq!(json["current"], 37);
+    }
+}
+
+/// Longest prompt-option label kept, in characters.
+pub const MAX_PROMPT_OPTION_LABEL: usize = 80;
+/// Most options one prompt carries.
+pub const MAX_PROMPT_OPTIONS: usize = 6;
+
+/// One answer a waiting program offered, and the keys that choose it.
+///
+/// The label comes from terminal output, so it is display text only. The
+/// keys are restricted to what choosing an option needs: one letter or digit
+/// (optionally followed by Enter), Enter, or Escape. A person still presses
+/// the button; the keys go through the normal, audited input path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+#[serde(try_from = "RawPromptOption")]
+pub struct PromptOption {
+    /// What the program called it, e.g. `"Yes, and don't ask again for cargo test"`.
+    pub label: String,
+    /// What to type to choose it, e.g. `"1"`, `"y\r"`, or `"\u{1b}"`.
+    pub keys: String,
+}
+
+#[derive(Deserialize)]
+struct RawPromptOption {
+    label: String,
+    keys: String,
+}
+
+impl TryFrom<RawPromptOption> for PromptOption {
+    type Error = String;
+
+    fn try_from(raw: RawPromptOption) -> Result<Self, Self::Error> {
+        PromptOption::new(&raw.label, &raw.keys).ok_or_else(|| "invalid prompt option".to_string())
+    }
+}
+
+impl PromptOption {
+    /// A valid option, or `None` when the keys are not an allowed choice key.
+    /// The label loses control characters and is cut to 80 characters.
+    pub fn new(label: &str, keys: &str) -> Option<Self> {
+        if !prompt_keys_allowed(keys) {
+            return None;
+        }
+        let label: String = label
+            .chars()
+            .filter(|c| {
+                !c.is_control()
+                    && !('\u{202a}'..='\u{202e}').contains(c)
+                    && !('\u{2066}'..='\u{2069}').contains(c)
+            })
+            .take(MAX_PROMPT_OPTION_LABEL)
+            .collect();
+        let label = label.trim().to_string();
+        (!label.is_empty()).then(|| PromptOption {
+            label,
+            keys: keys.to_string(),
+        })
+    }
+}
+
+/// One ASCII letter or digit, optionally followed by Enter; or Enter; or Escape.
+pub fn prompt_keys_allowed(keys: &str) -> bool {
+    let bytes = keys.as_bytes();
+    match bytes {
+        [b'\r'] | [0x1b] => true,
+        [key] | [key, b'\r'] => key.is_ascii_alphanumeric(),
+        _ => false,
     }
 }

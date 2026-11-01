@@ -20,6 +20,8 @@ pub struct EngineUpdate {
     pub health: Health,
     /// Current state of the Command-specific adapter, when selected.
     pub adapter_state: Option<AdapterState>,
+    /// Whether the program is waiting for a person (a prompt, 6.1).
+    pub waiting: bool,
 }
 
 /// Pure per-Session engine combining Generic and Command-specific adapters.
@@ -88,7 +90,18 @@ impl EventEngine {
             ObservationKind::MetricsSample(_) | ObservationKind::Tick
         );
         if !(self.command_activity_required && !self.command_active && quiet_timer) {
-            events.extend(self.generic.observe(observation));
+            let owns_prompts = self
+                .selected
+                .as_ref()
+                .is_some_and(|adapter| adapter.owns_prompts());
+            events.extend(
+                self.generic
+                    .observe(observation)
+                    .into_iter()
+                    .filter(|event| {
+                        !(owns_prompts && matches!(event, EventKind::WaitingForInput { .. }))
+                    }),
+            );
         }
         if let Some(adapter) = &mut self.selected {
             events.extend(adapter.observe(observation));
@@ -101,10 +114,15 @@ impl EventEngine {
         let health = self.health.observe(observation, &events);
         let health = bound(capture, health);
         let adapter_state = self.selected.as_ref().map(|adapter| adapter.state());
+        let waiting = match &self.selected {
+            Some(adapter) if adapter.owns_prompts() => adapter.waiting(),
+            _ => self.generic.waiting(),
+        };
         EngineUpdate {
             events,
             health,
             adapter_state,
+            waiting,
         }
     }
 
@@ -166,6 +184,7 @@ impl EventEngine {
             return;
         }
         let builtins: Vec<Box<dyn WatcherAdapter>> = vec![
+            Box::new(crate::AgentCliAdapter::new()),
             Box::new(TrainingAdapter::new()),
             Box::new(PytestAdapter::new()),
             Box::new(ServerAdapter::new()),

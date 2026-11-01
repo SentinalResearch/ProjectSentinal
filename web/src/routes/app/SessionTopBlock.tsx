@@ -1,6 +1,8 @@
 import { Button } from "../../components/Button";
 import { extractPort, formatLearningRate, lossOf, type SessionKind } from "../../data/format";
 import type { Session } from "../../data/types";
+import { PromptChoices } from "../../components/PromptChoices";
+import { offeredChoices } from "../../data/actions";
 import styles from "./SessionTopBlock.module.css";
 
 const TREND = { IMPROVING: "↓ improving", STABLE: "→ stable", WORSENING: "↑ worsening" } as const;
@@ -159,12 +161,15 @@ export function SessionTopBlock({
           </span>
           <span className={styles.waitingPrompt}>{session.prompt}</span>
           <span className={styles.waitingCaption}>
-            {canSendInput
-              ? "Default is N. Your answer is typed into the terminal followed by Enter."
-              : "Sentinal has no terminal input for this Session. Answer where the process runs."}
+            {!canSendInput
+              ? "Sentinal has no terminal input for this Session. Answer where the process runs."
+              : offeredChoices(session).length > 0
+                ? "Each answer types the key the program asked for."
+                : "Default is N. Your answer is typed into the terminal followed by Enter."}
           </span>
+          {canSendInput && <PromptChoices session={session} />}
         </div>
-        {canSendInput && (
+        {canSendInput && offeredChoices(session).length === 0 && (
           <div className={styles.yn}>
             <button type="button" className={styles.ynKey} onClick={() => onAnswer("y")}>
               y

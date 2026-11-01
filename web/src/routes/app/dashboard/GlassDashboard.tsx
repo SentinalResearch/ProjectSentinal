@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { AttentionCard, GlassPanel } from "../../../components/glass/Glass";
 import { StateTag } from "../../../components/StateTag";
 import { dataAdapter } from "../../../data";
-import { answerPrompt, canAnswer, canInterrupt } from "../../../data/actions";
+import { answerPrompt, canAnswer, canInterrupt, offeredChoices } from "../../../data/actions";
+import { PromptChoices } from "../../../components/PromptChoices";
 import { exitUnknown } from "../../../data/capture";
 import { extractPort, formatSessionFact, machineSummary, needsAttention, sessionKind } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
@@ -177,7 +178,12 @@ function NeedsCard({
         </button>
       </h3>
 
-      {session.state === "WAITING" && canAnswer(session) ? (
+      {session.state === "WAITING" && canAnswer(session) && offeredChoices(session).length > 0 ? (
+        <div className={styles.choiceColumn}>
+          <span className={styles.well}>{session.prompt}</span>
+          <PromptChoices session={session} />
+        </div>
+      ) : session.state === "WAITING" && canAnswer(session) ? (
         <div className={styles.answerRow}>
           <span className={styles.well}>{session.prompt}</span>
           <button type="button" className={styles.yes} onClick={stop(() => void answerPrompt(session.id, "y"))} aria-label={`Answer y to ${session.name}`}>

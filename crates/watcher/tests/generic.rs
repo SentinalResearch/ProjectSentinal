@@ -14,7 +14,7 @@ fn prompt_requires_exact_shape_and_two_quiet_seconds() {
         .is_empty());
     assert!(matches!(
         generic.observe(&Observation::tick(Timestamp(2_000))).as_slice(),
-        [EventKind::WaitingForInput { prompt: Some(prompt) }] if prompt == "Continue? [y/N]"
+        [EventKind::WaitingForInput { prompt: Some(prompt), .. }] if prompt == "Continue? [y/N]"
     ));
 
     let mut negative = GenericAdapter::new(DurationMs(600_000));
@@ -40,7 +40,7 @@ fn prompts_with_the_usual_trailing_space_still_wait() {
         assert!(
             matches!(
                 generic.observe(&Observation::tick(Timestamp(2_000))).as_slice(),
-                [EventKind::WaitingForInput { prompt: Some(prompt) }] if prompt == expected
+                [EventKind::WaitingForInput { prompt: Some(prompt), .. }] if prompt == expected
             ),
             "{line:?} should be a waiting prompt"
         );
