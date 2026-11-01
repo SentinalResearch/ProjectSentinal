@@ -39,11 +39,22 @@ describe("back-history sheets", () => {
     expect(stack.sheets).toEqual([]);
   });
 
-  it("a different query on another page is a new page", () => {
+  it("moving within one page updates it in place: Settings tabs, recipe list → form", () => {
     const key = counter();
-    let stack: SheetStack = { current: { key: key(), ...at("/app/overview") }, sheets: [] };
-    stack = nextStack(stack, at("/app/overview", "?machine=rtx"), "PUSH", key);
-    expect(stack.sheets.map((sheet) => sheet.search)).toEqual([""]);
-    expect(stack.current.search).toBe("?machine=rtx");
+    let stack: SheetStack = { current: { key: key(), ...at("/app/settings") }, sheets: [] };
+    stack = nextStack(stack, at("/app/settings/machines"), "PUSH", key);
+    stack = nextStack(stack, at("/app/settings/account"), "PUSH", key);
+    expect(stack).toEqual({ current: { key: "f1", pathname: "/app/settings/account", search: "" }, sheets: [] });
+    stack = nextStack(stack, at("/app/recipes"), "PUSH", key);
+    stack = nextStack(stack, at("/app/recipes/qwen-vllm"), "PUSH", key);
+    expect(stack.sheets.map((sheet) => sheet.pathname)).toEqual(["/app/settings/account"]);
+    expect(stack.current.key).toBe("f2");
+  });
+
+  it("different Sessions are different pages", () => {
+    const key = counter();
+    let stack: SheetStack = { current: { key: key(), ...at("/app/sessions/rtx%3A1") }, sheets: [] };
+    stack = nextStack(stack, at("/app/sessions/rtx%3A2"), "PUSH", key);
+    expect(stack.sheets.map((sheet) => sheet.pathname)).toEqual(["/app/sessions/rtx%3A1"]);
   });
 });
