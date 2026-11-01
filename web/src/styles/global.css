@@ -50,21 +50,15 @@ textarea {
 
 button {
   cursor: pointer;
-  border-radius: var(--radius);
 }
 
 a {
   color: inherit;
 }
 
-/* every component is square — see tokens.css --radius */
-button,
-input,
-select,
-textarea,
-[class*="panel"],
-[class*="card"],
-[class*="sheet"] {
+/* Every base component is square — see tokens.css --radius. Zero specificity
+   (:where) so a component that deliberately rounds (the glass shell) wins. */
+:where(button, input, select, textarea, [class*="panel"], [class*="card"], [class*="sheet"]) {
   border-radius: var(--radius);
 }
 

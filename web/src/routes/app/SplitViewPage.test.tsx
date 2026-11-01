@@ -46,6 +46,15 @@ describe("SplitViewPage", () => {
     expect(screen.getByText("npm install")).toBeInTheDocument();
   });
 
+  it("opens exactly the panes named by ?sessions= (the prompt's `split a b`)", async () => {
+    renderSplit("/app/split?sessions=npm,pytest");
+
+    expect(await screen.findByText("2 of 4 terminals")).toBeInTheDocument();
+    expect(screen.getByText("npm install")).toBeInTheDocument();
+    expect(screen.getByText("pytest")).toBeInTheDocument();
+    expect(screen.queryByText("Qwen Training")).not.toBeInTheDocument();
+  });
+
   it("closing a pane removes it and drops the count", async () => {
     renderSplit("/app/split");
     const user = userEvent.setup();

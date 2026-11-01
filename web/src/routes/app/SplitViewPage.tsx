@@ -25,6 +25,8 @@ export function SplitViewPage() {
 function DesktopSplitView() {
   const [searchParams] = useSearchParams();
   const focus = searchParams.get("focus");
+  // `split a b …` from the prompt names the panes (up to four, in order).
+  const named = searchParams.get("sessions");
   const { machines, terminals: sessions, loading } = useLiveData();
 
   const [pane, setPane] = useState<PaneState>({ ids: [], active: null });
@@ -40,11 +42,14 @@ function DesktopSplitView() {
     initialized.current = true;
     const allIds = sessions.map((s) => s.id);
     let initial = allIds.slice(0, 4);
-    if (focus && allIds.includes(focus)) {
+    const requested = (named ?? "").split(",").filter((id) => allIds.includes(id));
+    if (requested.length > 0) {
+      initial = Array.from(new Set(requested)).slice(0, 4);
+    } else if (focus && allIds.includes(focus)) {
       initial = [focus, ...initial.filter((i) => i !== focus)].slice(0, 4);
     }
     setPane({ ids: initial, active: initial[0] ?? null });
-  }, [loading, sessions, focus]);
+  }, [loading, sessions, focus, named]);
 
   useEffect(() => {
     if (!addOpen) return;

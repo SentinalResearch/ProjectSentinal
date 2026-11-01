@@ -28,6 +28,9 @@ function RecipeCatalog() {
 
 function RecipeCatalogView({ id }: { id?: string }) {
   const navigate = useNavigate();
+  // `run "<recipe>" on <machine>` from the prompt preselects the Machine.
+  const [search] = useSearchParams();
+  const requestedMachine = search.get("machine");
   const { machines, sessions } = useLiveData();
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -47,7 +50,8 @@ function RecipeCatalogView({ id }: { id?: string }) {
   if (recipe && recipe.id !== loadedRecipeId) {
     setLoadedRecipeId(recipe.id);
     setValues(recipe.params);
-    setMachineId(recipe.machineIds?.[0] ?? recipe.machine);
+    const allowed = recipe.machineIds?.length ? recipe.machineIds : [recipe.machine];
+    setMachineId(requestedMachine && allowed.includes(requestedMachine) ? requestedMachine : allowed[0]);
     setRunning(false);
   }
 

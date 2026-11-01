@@ -63,6 +63,22 @@ describe("RecipesPage", () => {
     expect(screen.getByRole("button", { name: /Run on/ })).toBeEnabled();
   });
 
+  it("preselects the Machine named by ?machine= (the prompt's `run … on <machine>`)", async () => {
+    vi.spyOn(dataAdapter, "getRecipes").mockResolvedValue([
+      {
+        id: "qwen-vllm",
+        name: "Qwen vLLM Server",
+        category: "SERVERS",
+        machine: "rtx",
+        machineIds: ["rtx", "mini"],
+        template: "vllm serve {model} --port {port}",
+        params: { model: "Qwen/Qwen3-8B", port: "8000" },
+      },
+    ]);
+    renderRecipes("/app/recipes/qwen-vllm?machine=mini");
+    expect(await screen.findByRole("button", { name: /Run on Mac Mini/ }, { timeout: 5000 })).toBeInTheDocument();
+  });
+
   it("runs the recipe and opens the new session", async () => {
     renderRecipes("/app/recipes");
     const user = userEvent.setup();

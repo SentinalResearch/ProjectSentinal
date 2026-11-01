@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { CaptureBadge } from "../../components/CaptureBadge";
-import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
 import { answerPrompt, INTERRUPTIBLE } from "../../data/actions";
+import { InterruptConfirm } from "./InterruptConfirm";
 import { resolveSessionLineage } from "../../data/lineage";
 import type { Session } from "../../data/types";
 import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../data/capture";
@@ -125,11 +125,6 @@ function DesktopSessionDetail() {
 
   function askCtrlC() {
     if (canInterrupt) setConfirmOpen(true);
-  }
-
-  function confirmCtrlC() {
-    setConfirmOpen(false);
-    void dataAdapter.sendSignal(latest.id, "SIGINT");
   }
 
   function answer(value: "y" | "n") {
@@ -305,14 +300,10 @@ function DesktopSessionDetail() {
         <EventsList events={session.events ?? []} />
       </section>
 
-      <ConfirmDialog
-        open={confirmOpen}
-        overline={`INTERRUPT · ${machineName.toUpperCase()}`}
-        question={`Send Ctrl‑C to ${latest.name}?`}
-        consequence={confirmConsequence(latest, machineName)}
-        confirmLabel="Send Ctrl‑C"
-        onConfirm={confirmCtrlC}
-        onCancel={() => setConfirmOpen(false)}
+      <InterruptConfirm
+        session={confirmOpen ? latest : undefined}
+        machineName={machineName}
+        onClose={() => setConfirmOpen(false)}
       />
     </div>
   );
