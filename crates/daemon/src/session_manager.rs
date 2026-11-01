@@ -173,6 +173,8 @@ struct SessionManagerInner {
     continuation: tokio::sync::Mutex<()>,
     /// Validated user-defined watcher adapters cloned into each Session engine.
     watcher_adapters: Vec<watcher::DeclarativeAdapter>,
+    /// Configured projects; a new Session joins the one holding its cwd.
+    projects: crate::projects::Projects,
     /// Whether adopted log tails poll on a background timer (tests drive them).
     log_tail_polling: bool,
 }
@@ -244,6 +246,7 @@ impl SessionManager {
                 registration: Mutex::new(()),
                 continuation: tokio::sync::Mutex::new(()),
                 watcher_adapters: Vec::new(),
+                projects: crate::projects::Projects::default(),
                 log_tail_polling: true,
             }),
         }
@@ -265,6 +268,28 @@ impl SessionManager {
             None => tracing::error!("watcher adapters must be set before the manager is shared"),
         }
         self
+    }
+
+    /// Assign new Sessions to these projects by directory (5.A).
+    pub fn with_projects(mut self, projects: crate::projects::Projects) -> Self {
+        match Arc::get_mut(&mut self.inner) {
+            Some(inner) => inner.projects = projects,
+            None => tracing::error!("projects must be set before the manager is shared"),
+        }
+        self
+    }
+
+    /// The configured projects.
+    pub fn projects(&self) -> crate::projects::Projects {
+        self.inner.projects.clone()
+    }
+
+    /// The project holding `cwd`, if any.
+    pub(crate) fn project_for(&self, cwd: &str) -> Option<protocol::ProjectId> {
+        self.inner
+            .projects
+            .find(cwd)
+            .map(|project| project.id.clone())
     }
 
     /// Return all sessions ordered by ID.

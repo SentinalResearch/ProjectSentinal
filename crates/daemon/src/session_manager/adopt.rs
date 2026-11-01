@@ -75,6 +75,7 @@ impl SessionManager {
             details.cwd.clone().unwrap_or_default(),
             now,
         );
+        session.project_id = self.project_for(&session.cwd);
         session.origin = SessionOrigin::Adopted;
         session.capture = CaptureLevel::Process;
         session.title = title.or(details.name);

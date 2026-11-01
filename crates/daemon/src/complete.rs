@@ -13,6 +13,7 @@ use store::{CompletionQuery, Store, StoreError};
 #[derive(Debug, Clone, Default)]
 pub struct Completer {
     weights: CompletionWeights,
+    projects: crate::projects::Projects,
 }
 
 /// A `COMPLETE` request from either socket.
@@ -33,7 +34,16 @@ pub struct CompleteArgs<'a> {
 impl Completer {
     /// Use these ranking weights.
     pub fn new(weights: CompletionWeights) -> Self {
-        Completer { weights }
+        Completer {
+            weights,
+            projects: crate::projects::Projects::default(),
+        }
+    }
+
+    /// Give runs inside the current project the project bonus.
+    pub fn with_projects(mut self, projects: crate::projects::Projects) -> Self {
+        self.projects = projects;
+        self
     }
 
     /// Answer `args` from this Machine's history and `recipes`.
@@ -48,13 +58,16 @@ impl Completer {
             _ => None,
         };
         let cwd = args.cwd.or(session_cwd.as_deref());
+        let project_root = cwd
+            .and_then(|cwd| self.projects.find(cwd))
+            .map(|project| project.root.to_string_lossy().into_owned());
         sessions.complete(
             recipes,
             &self.weights,
             &CompleteRequest {
                 prefix: args.prefix,
                 cwd,
-                project_root: None,
+                project_root: project_root.as_deref(),
                 include_failed: args.include_failed,
                 limit: args.limit,
             },

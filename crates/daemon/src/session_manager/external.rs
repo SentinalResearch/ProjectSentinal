@@ -120,6 +120,7 @@ impl SessionManager {
         let id = SessionId(self.inner.next_id.fetch_add(1, Ordering::Relaxed));
         let now = (self.inner.config.clock)();
         let mut session = Session::new(id, self.inner.config.machine_id.clone(), shell, cwd, now);
+        session.project_id = self.project_for(cwd);
         session.origin = SessionOrigin::ShellHook;
         session.capture = CaptureLevel::Commands;
         session.title = title;

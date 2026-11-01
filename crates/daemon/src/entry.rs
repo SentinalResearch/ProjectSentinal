@@ -256,6 +256,11 @@ pub async fn run() -> Result<(), DaemonError> {
         PushGateway::new(store.clone(), settings, Arc::new(now))
     });
     let watcher_adapters = load_adapters(&home.join(".config/terminal-agent/adapters"))?;
+    let (projects, project_problems) =
+        crate::projects::Projects::load(&home.join(".config/terminal-agent/projects.toml"), &home);
+    for problem in project_problems {
+        tracing::warn!(%problem, "projects.toml entry ignored");
+    }
     let sessions = SessionManager::with_store(
         backend,
         SessionManagerConfig::system(
@@ -267,6 +272,7 @@ pub async fn run() -> Result<(), DaemonError> {
         store.clone(),
     )?
     .with_watcher_adapters(watcher_adapters)
+    .with_projects(projects.clone())
     .with_process_probe(ProcessProbe::system(daemon_uid));
     // FULL Sessions were interrupted above; reduced-capture ones are resumed
     // only when their root process identity still matches.
@@ -289,7 +295,7 @@ pub async fn run() -> Result<(), DaemonError> {
     for diagnostic in recipe_diagnostics {
         tracing::warn!(path = %diagnostic.path.display(), reason = %diagnostic.message, "Recipe file ignored or overridden");
     }
-    let completer = crate::complete::Completer::new(config.complete);
+    let completer = crate::complete::Completer::new(config.complete).with_projects(projects);
     let handler_completer = completer.clone();
     let handler_recipes = recipes.clone();
     let handler_sessions = sessions.clone();

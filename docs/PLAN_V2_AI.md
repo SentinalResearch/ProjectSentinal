@@ -121,16 +121,19 @@ Goal: the command you want, in fewer keystrokes, wherever you type. Folds in `pr
       7-day half-life) with project, cwd, and success bonuses and a failure
       penalty; weights in `[complete]` (`docs/SETUP.md`); Commands that never
       succeeded are left out by default; Recipes follow history
-      (`protocol::complete`, `daemon::complete`, migration 013). The project
-      bonus waits for project assignment below
+      (`protocol::complete`, `daemon::complete`, migration 013)
 - [ ] Shell: zsh widget (Ctrl-Space) and bash/fish equivalents through
       `sentinal hook`; never replaces the shell's own Tab completion
 - [ ] Prompt: `run`, `new`, and `find` complete Commands and recipe
       parameters inline (ghost text, Tab to accept)
 - [ ] Phone keyboard: the chip strip shows the top completions for what is
       on the current line, replacing the static "recent commands" chips
-- [ ] Projects (`prompts/06` §1): auto-assign by cwd, so completion ranks
-      the current project first
+- [x] Projects (`prompts/06` §1): `projects.toml` (`docs/SETUP.md`);
+      Sessions created, registered, or adopted join the project holding
+      their cwd (longest root, symlinks resolved); completion ranks the
+      current project first (`daemon::projects`). Still to do from §1:
+      git information, creating projects from the UI, and the project page
+      across Machines
 - [x] Budget: p95 < 20 ms on 100 000 history rows (11.4 ms; ignored timed
       test in `crates/daemon/tests/complete.rs`); the spec example ranks
       `python train.py` (31×) before `python train.py --config…` before the recipe

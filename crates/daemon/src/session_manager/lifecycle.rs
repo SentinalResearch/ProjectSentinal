@@ -234,7 +234,7 @@ impl SessionManager {
             cwd.to_string_lossy(),
             (self.inner.config.clock)(),
         );
-        session.project_id = project_id;
+        session.project_id = project_id.or_else(|| self.project_for(&session.cwd));
         session.origin = request.origin;
         session.capture = CaptureLevel::Full;
         session.title = request.title;

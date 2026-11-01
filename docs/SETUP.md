@@ -712,6 +712,27 @@ recipe = 1.0            # flat score of a matching Recipe
 Commands that never succeeded are not offered unless asked for. Negative
 weights, a zero half-life, and unknown keys are rejected.
 
+### Projects
+
+A Session belongs to a project when its directory is inside the project's
+root. The longest root wins, so projects can nest, and symlinks are resolved.
+Completion ranks the current project's Commands first. List projects in
+`~/.config/terminal-agent/projects.toml` and restart the daemon:
+
+```toml
+[[project]]
+name = "ML Vision"
+root = "~/work/ml/vision"
+
+[[project]]
+name = "Work"
+root = "/srv/work"
+```
+
+The project ID is the name in lower case with dashes (`ml-vision`). Entries
+with an empty name, a relative root, or a repeated name are skipped with a
+warning in the daemon log.
+
 ## Backup and inspection
 
 Stop or quiesce the daemon before a filesystem-level backup, then copy both
