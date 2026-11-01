@@ -291,6 +291,11 @@ impl AppState {
                     Err(error) => error_action(error),
                 }
             }
+            ClientRequest::DismissSession { session_id } => match self.sessions.dismiss(session_id)
+            {
+                Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),
+                Err(error) => error_action(error),
+            },
             ClientRequest::SetOutputSearch {
                 session_id,
                 enabled,

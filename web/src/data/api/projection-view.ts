@@ -120,6 +120,7 @@ function mapSession(
     progress: session.health?.progress === null || session.health?.progress === undefined
       ? undefined : { current: session.health.progress, total: 100, unit: "%" },
     metrics: metricView(latestMetrics),
+    dismissed: session.dismissed_at ? true : undefined,
     codingAgent: session.coding_agent
       ? {
           agent: session.coding_agent.agent,

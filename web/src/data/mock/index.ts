@@ -114,6 +114,11 @@ export const mockAdapter: DataAdapter = {
     return delay(entries.map((e) => ({ ...e })));
   },
 
+  async dismissSession(sessionId: string) {
+    await delay(undefined, 50, 120);
+    updateSession(sessionId, { dismissed: true });
+  },
+
   async setOutputSearch(sessionId: string, enabled: boolean) {
     await delay(undefined, 50, 120);
     updateSession(sessionId, { outputSearch: enabled });

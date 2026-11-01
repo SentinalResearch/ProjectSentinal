@@ -87,4 +87,13 @@ describe("glass dashboard (GLASS_SPEC.md §7)", () => {
       store.sessions.length = before;
     }
   });
+
+  it("dismisses a failed Session from Needs you", async () => {
+    renderDashboard();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Dismiss pytest" }));
+    await waitFor(() =>
+      expect(within(screen.getByRole("region", { name: "Needs you" })).queryByRole("button", { name: /pytest, failed/ })).not.toBeInTheDocument(),
+    );
+  });
 });

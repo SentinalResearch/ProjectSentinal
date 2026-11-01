@@ -167,6 +167,11 @@ pub enum ClientRequest {
         /// Most completions, 1 through [`crate::complete::MAX_COMPLETE_LIMIT`].
         limit: u32,
     },
+    /// Dismiss a failed Session from "Needs you" on every device.
+    DismissSession {
+        /// The failed Session.
+        session_id: SessionId,
+    },
     /// Let search read a FULL Session's saved output, or stop (5.S). Off by default.
     SetOutputSearch {
         /// The Session.

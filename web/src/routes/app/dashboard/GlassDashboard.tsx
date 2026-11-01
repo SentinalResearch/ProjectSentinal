@@ -231,6 +231,16 @@ function NeedsCard({
                 <button type="button" className={styles.chip} onClick={stop(onOpen)}>
                   Open
                 </button>
+                {session.state === "FAILED" && (
+                  <button
+                    type="button"
+                    className={styles.chip}
+                    onClick={stop(() => void dataAdapter.dismissSession(session.id))}
+                    aria-label={`Dismiss ${session.name}`}
+                  >
+                    Dismiss
+                  </button>
+                )}
                 {session.state === "FAILED" && session.command && (
                   <button
                     type="button"

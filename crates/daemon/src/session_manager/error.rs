@@ -68,6 +68,14 @@ pub enum SessionManagerError {
         /// Rejected state.
         state: SessionState,
     },
+    /// Only a failed Session can be dismissed from "Needs you".
+    #[error("Session {session_id} is {state:?}; only a failed Session can be dismissed")]
+    NotDismissable {
+        /// The Session.
+        session_id: SessionId,
+        /// Its state.
+        state: SessionState,
+    },
     /// Persisted safe metadata cannot start a descendant.
     #[error("Session {session_id} has invalid continuation {field}")]
     ContinuationMetadata {

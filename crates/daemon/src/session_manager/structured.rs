@@ -68,24 +68,56 @@ impl SessionManager {
         session_id: SessionId,
         enabled: bool,
     ) -> Result<protocol::Session, SessionManagerError> {
-        let mut session = self.known_session(session_id)?;
+        let session = self.known_session(session_id)?;
         if session.capture != CaptureLevel::Full {
             return Err(SessionManagerError::OutputUnavailable {
                 session_id,
                 capture: session.capture,
             });
         }
-        if let Ok(handle) = self.handle(session_id) {
-            let mut live = lock_session(&handle)?;
-            live.output_search = enabled;
-            session = live.clone();
-            drop(live);
-            let _ = handle.structured.send(DaemonMessage::SessionUpdated {
-                session: session.clone(),
+        self.update_known_session(session_id, |session| session.output_search = enabled)
+    }
+
+    /// Dismiss a failed Session from "Needs you" on every device; kept with it.
+    pub fn dismiss(&self, session_id: SessionId) -> Result<protocol::Session, SessionManagerError> {
+        let session = self.known_session(session_id)?;
+        if session.state != protocol::SessionState::Failed {
+            return Err(SessionManagerError::NotDismissable {
+                session_id,
+                state: session.state,
             });
-        } else {
-            session.output_search = enabled;
         }
+        if session.dismissed_at.is_some() {
+            return Ok(session);
+        }
+        let now = (self.inner.config.clock)();
+        self.update_known_session(session_id, |session| session.dismissed_at = Some(now))
+    }
+
+    /// Change an owner-facing field of a live or finished Session, persist it,
+    /// and tell live viewers.
+    fn update_known_session(
+        &self,
+        session_id: SessionId,
+        change: impl FnOnce(&mut protocol::Session),
+    ) -> Result<protocol::Session, SessionManagerError> {
+        let session = match self.handle(session_id) {
+            Ok(handle) => {
+                let mut live = lock_session(&handle)?;
+                change(&mut live);
+                let session = live.clone();
+                drop(live);
+                let _ = handle.structured.send(DaemonMessage::SessionUpdated {
+                    session: session.clone(),
+                });
+                session
+            }
+            Err(_) => {
+                let mut session = self.known_session(session_id)?;
+                change(&mut session);
+                session
+            }
+        };
         self.store()?.update_session(&session)?;
         Ok(session)
     }

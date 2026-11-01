@@ -143,6 +143,13 @@ export type ClientRequest =
     limit: number;
   }
   | {
+    "type": "DISMISS_SESSION";
+    /**
+     * The failed Session.
+     */
+    session_id: SessionId;
+  }
+  | {
     "type": "SET_OUTPUT_SEARCH";
     /**
      * The Session.

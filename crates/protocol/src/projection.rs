@@ -175,6 +175,9 @@ pub struct ProjectedSession {
     /// The AI coding agent running here: closed codes and numbers only (6.1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coding_agent: Option<crate::coding_agent::CodingAgentSummary>,
+    /// When the owner dismissed this failed Session from "Needs you".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dismissed_at: Option<Timestamp>,
 }
 
 impl ProjectedSession {
@@ -199,6 +202,7 @@ impl ProjectedSession {
             finished_at: session.state.is_finished().then_some(session.updated_at),
             exit_code: session.exit_code,
             coding_agent: session.coding_agent.as_deref().cloned(),
+            dismissed_at: session.dismissed_at,
         }
     }
 }

@@ -290,6 +290,9 @@ pub struct Session {
     /// The owner let search read this Session's saved output (5.S, FULL only).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub output_search: bool,
+    /// When the owner dismissed this failed Session from "Needs you".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dismissed_at: Option<Timestamp>,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -325,6 +328,7 @@ impl Session {
             training: None,
             coding_agent: None,
             output_search: false,
+            dismissed_at: None,
             created_at: at,
             updated_at: at,
         }

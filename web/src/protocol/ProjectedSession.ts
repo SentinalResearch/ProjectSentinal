@@ -64,4 +64,8 @@ export type ProjectedSession = {
    * The AI coding agent running here: closed codes and numbers only (6.1).
    */
   coding_agent?: CodingAgentSummary | null;
+  /**
+   * When the owner dismissed this failed Session from "Needs you".
+   */
+  dismissed_at?: Timestamp | null;
 };

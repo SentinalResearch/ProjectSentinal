@@ -31,7 +31,7 @@ function progressText(session: Session): string | null {
  */
 export function tickerItems(terminals: Session[], limit = 3): TickerItem[] {
   return terminals
-    .filter((session) => session.state in PRIORITY && (session.state !== "RUNNING" || progressText(session) !== null))
+    .filter((session) => session.state in PRIORITY && !session.dismissed && (session.state !== "RUNNING" || progressText(session) !== null))
     .sort(
       (left, right) =>
         (PRIORITY[left.state] ?? 9) - (PRIORITY[right.state] ?? 9) || (right.updatedAt ?? 0) - (left.updatedAt ?? 0),

@@ -90,6 +90,8 @@ export interface Session {
   health?: SessionHealth;
   /** Training numbers the watcher read from the run's output. */
   training?: TrainingView;
+  /** The owner dismissed this failed Session from "Needs you". */
+  dismissed?: boolean;
   /** Search may read this Session's saved output (5.S, opt-in). */
   outputSearch?: boolean;
   /** The AI coding agent running here (6.1). */

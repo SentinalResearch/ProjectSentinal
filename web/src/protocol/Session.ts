@@ -93,6 +93,10 @@ export type Session = {
    */
   output_search?: boolean;
   /**
+   * When the owner dismissed this failed Session from "Needs you".
+   */
+  dismissed_at?: Timestamp | null;
+  /**
    * When the session was created.
    */
   created_at: Timestamp;

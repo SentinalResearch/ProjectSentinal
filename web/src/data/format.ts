@@ -53,7 +53,8 @@ export function formatSessionDuration(session: Session): string {
 
 /** A session that belongs in Overview's "Needs you" grid and the sidebar's Overview badge count. */
 export function needsAttention(session: Session): boolean {
-  return session.state === "WAITING" || session.state === "FAILED" || session.state === "STALLED";
+  if (session.state === "FAILED") return !session.dismissed;
+  return session.state === "WAITING" || session.state === "STALLED";
 }
 
 export type SessionKind = "training" | "failed" | "waiting" | "stalled" | "server" | "idle";

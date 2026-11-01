@@ -239,6 +239,7 @@ export function mapSession(session: WireSession): Session {
         }
       : undefined,
     outputSearch: session.output_search || undefined,
+    dismissed: session.dismissed_at ? true : undefined,
     codingAgent: session.coding_agent
       ? {
           agent: session.coding_agent.agent,
@@ -1148,6 +1149,15 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       }) as HistoryResults;
       if (unavailable.length > 0) results.unavailableMachines = unavailable;
       return results;
+    },
+    async dismissSession(sessionId) {
+      await ensureInitialized();
+      const connection = owner(sessionId);
+      const message = await connection.transport.request(
+        { type: "DISMISS_SESSION", session_id: localId(sessionId) },
+        (reply) => reply.type === "SESSION_UPDATED" || reply.type === "ERROR",
+      );
+      if (message.type === "ERROR") throw daemonError(message.message);
     },
     async setOutputSearch(sessionId, enabled) {
       await ensureInitialized();
