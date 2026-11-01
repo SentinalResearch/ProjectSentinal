@@ -330,7 +330,7 @@ export function TerminalPane({
         className={fill ? `${styles.host} ${styles.hostFill}` : styles.host}
         style={fill ? undefined : { height }}
         data-testid="terminal-host"
-        aria-readonly={readOnly}
+        data-readonly={readOnly}
       />
       {replayWarning && <p className={styles.replayWarning} role="alert">Saved output warning: {replayWarning}</p>}
       {replayTruncated && (

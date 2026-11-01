@@ -406,8 +406,10 @@
   flex: none;
   width: 96px;
   border: 1.5px solid var(--destructive);
+  border-radius: 14px;
   background: transparent;
-  color: var(--destructive);
+  /* Text colour that reaches 4.5:1 on the page in both themes. */
+  color: var(--destructive-fg);
 }
 
 .destructiveButton {

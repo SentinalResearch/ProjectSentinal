@@ -80,7 +80,7 @@ test("three Session generations survive reload with input only on the latest", a
   );
   await page.goto(`/app/sessions/${finished.machine_id}:${finished.id}`);
   await expect(page.getByText(/Session ended — output saved/)).toContainText("INTERRUPTED");
-  await expect(page.getByTestId("terminal-host")).toHaveAttribute("aria-readonly", "true");
+  await expect(page.getByTestId("terminal-host")).toHaveAttribute("data-readonly", "true");
   expect((await replay).status()).toBe(200);
 
   await page.getByTestId("terminal-host").click();
@@ -116,9 +116,9 @@ test("three Session generations survive reload with input only on the latest", a
   await page.reload();
   const terminalHosts = page.getByTestId("terminal-host");
   await expect(terminalHosts).toHaveCount(3);
-  await expect(terminalHosts.nth(0)).toHaveAttribute("aria-readonly", "true");
-  await expect(terminalHosts.nth(1)).toHaveAttribute("aria-readonly", "true");
-  await expect(terminalHosts.nth(2)).toHaveAttribute("aria-readonly", "false");
+  await expect(terminalHosts.nth(0)).toHaveAttribute("data-readonly", "true");
+  await expect(terminalHosts.nth(1)).toHaveAttribute("data-readonly", "true");
+  await expect(terminalHosts.nth(2)).toHaveAttribute("data-readonly", "false");
   await page.screenshot({ path: test.info().outputPath("session-three-generations.png"), animations: "disabled" });
 
   const binaryBeforeHistoricalInput = sentFrames.filter((frame) => typeof frame !== "string").length;

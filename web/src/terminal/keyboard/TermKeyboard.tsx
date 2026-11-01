@@ -166,7 +166,7 @@ export function TermKeyboard({ onBytes, chips = [], symbolChips = [], accessory 
         </>
       ) : layer === "letters" ? (
         <>
-          <div className={styles.row}>
+          <div className={styles.row} data-numbers>
             {NUMBERS.map(([digit, symbol]) => (
               <Key
                 key={digit}

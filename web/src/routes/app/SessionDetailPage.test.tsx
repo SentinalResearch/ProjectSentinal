@@ -107,7 +107,7 @@ describe("SessionDetailPage", () => {
     expect(screen.getByText(/Session ended — output saved/)).toHaveTextContent("saved with this Session");
     expect(screen.queryByRole("button", { name: "Ctrl‑C" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ctrl‑C…" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("terminal-host")).toHaveAttribute("aria-readonly", "true");
+    expect(screen.getByTestId("terminal-host")).toHaveAttribute("data-readonly", "true");
   });
 
   it("continues once into persisted-looking history with isolated read-only output", async () => {
@@ -123,8 +123,8 @@ describe("SessionDetailPage", () => {
     expect(screen.getByText(/^FAILED — resumed at /)).toBeInTheDocument();
     const terminals = screen.getAllByTestId("terminal-host");
     expect(terminals).toHaveLength(2);
-    expect(terminals[0]).toHaveAttribute("aria-readonly", "true");
-    expect(terminals[1]).toHaveAttribute("aria-readonly", "false");
+    expect(terminals[0]).toHaveAttribute("data-readonly", "true");
+    expect(terminals[1]).toHaveAttribute("data-readonly", "false");
   });
 
   it("renders the waiting panel with y/n for a WAITING session", async () => {
