@@ -52,6 +52,21 @@ pub enum Command {
         /// Session ID.
         id: u64,
     },
+    /// Serve Sentinal's agent tools to an MCP client over stdio (Claude Code, Claude Desktop, …).
+    ///
+    /// Needs an agent token from Settings → Agents, in SENTINAL_AGENT_TOKEN
+    /// or a file. The control enforces the agent's level on every call.
+    Mcp {
+        /// The control's origin, e.g. https://sentinal.example-tailnet.ts.net.
+        #[arg(long, env = "SENTINAL_CONTROL_URL")]
+        control: String,
+        /// File holding the agent token (else SENTINAL_AGENT_TOKEN).
+        #[arg(long, env = "SENTINAL_AGENT_TOKEN_FILE")]
+        token_file: Option<PathBuf>,
+        /// Also allow an http:// control on loopback or a Tailscale IP (development).
+        #[arg(long)]
+        development: bool,
+    },
     /// Check the local worker installation without pairing or changing it.
     Doctor {
         /// Installed program prefix; defaults to ~/.local.

@@ -504,3 +504,13 @@ async fn a_waiting_agent_wakes_when_a_machine_reports_a_change() {
     );
     assert!(updates.to_string().contains("Training"));
 }
+
+#[tokio::test]
+async fn llms_txt_describes_the_agent_api_without_any_state() {
+    let daemon = daemon().await;
+    let (status, body) = daemon.call(Method::GET, "/llms.txt", None, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let text = String::from_utf8(body).unwrap();
+    assert!(text.starts_with("# Sentinal") && text.contains("sentinal mcp"));
+    assert!(!text.contains(CONTROL_ID) && !text.contains("mac-mini"));
+}

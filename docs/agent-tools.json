@@ -1,0 +1,167 @@
+{
+  "about": "Sentinal agent tools (Milestone 6.0). Generated from crates/cli/src/mcp/tools.rs; do not edit.",
+  "tools": [
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Who this agent is and what its level allows. [level 0]",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "name": "whoami"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Machines with their connection status and how many Sessions run or need a person. [level 0]",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "name": "list_machines"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Sessions across Machines with state, capture level, health, and timing. Filter by Machine, state, or needs_you (WAITING, STALLED, or FAILED). [level 0]",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "machine": {
+            "description": "Machine ID or display name (case-insensitive).",
+            "type": "string"
+          },
+          "needs_you": {
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "CREATED",
+              "IDLE",
+              "RUNNING",
+              "WAITING",
+              "STALLED",
+              "COMPLETED",
+              "FAILED",
+              "INTERRUPTED",
+              "DISCONNECTED"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_sessions"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "One Session with its recent Events (progress, metrics, checkpoints, errors, prompts) and resource use. Structured facts only; never terminal output. [level 0]",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "machine": {
+            "description": "Machine ID or display name (case-insensitive).",
+            "type": "string"
+          },
+          "session_id": {
+            "description": "Session ID on that Machine.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "machine",
+          "session_id"
+        ],
+        "type": "object"
+      },
+      "name": "get_session"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Changes since a revision. Call without after_revision to get the current one, then pass the returned revision back. Waits up to wait_seconds (max 30) for a change. [level 0]",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "after_revision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "wait_seconds": {
+            "maximum": 30,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "watch"
+    },
+    {
+      "annotations": {
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Block until a Session reaches one of the given states, or the timeout (max 600 s) passes. Use instead of polling. [level 0]",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "machine": {
+            "description": "Machine ID or display name (case-insensitive).",
+            "type": "string"
+          },
+          "session_id": {
+            "description": "Session ID on that Machine.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timeout_seconds": {
+            "maximum": 600,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "until": {
+            "items": {
+              "enum": [
+                "CREATED",
+                "IDLE",
+                "RUNNING",
+                "WAITING",
+                "STALLED",
+                "COMPLETED",
+                "FAILED",
+                "INTERRUPTED",
+                "DISCONNECTED"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "machine",
+          "session_id",
+          "until"
+        ],
+        "type": "object"
+      },
+      "name": "wait_for"
+    }
+  ]
+}

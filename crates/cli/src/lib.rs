@@ -20,6 +20,7 @@ pub mod frame;
 pub mod hook_command;
 pub mod hook_report;
 pub mod hook_script;
+pub mod mcp;
 pub mod rc_file;
 pub mod rc_install;
 pub mod release;

@@ -98,6 +98,15 @@ async fn dispatch(
 ) -> Result<ExitCode, AppError> {
     // Hook commands never use the WebSocket API and need no token.
     let cli = match cli.command {
+        Command::Mcp {
+            control,
+            token_file,
+            development,
+        } => {
+            return Ok(
+                crate::mcp::run_stdio(&control, token_file.as_deref(), development, err).await,
+            );
+        }
         Command::Doctor {
             report: true,
             range,
@@ -334,6 +343,7 @@ async fn dispatch(
         | Command::Connect { .. }
         | Command::Connection { .. }
         | Command::Disconnect
+        | Command::Mcp { .. }
         | Command::Identity { .. } => {}
     }
     Ok(ExitCode::SUCCESS)

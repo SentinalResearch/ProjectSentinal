@@ -36,6 +36,21 @@ pub(super) fn routes() -> Router<ControlRoutes> {
         .route("/api/v1/agent/whoami", get(whoami))
         .route("/api/v1/agent/snapshot", get(snapshot))
         .route("/api/v1/agent/updates", get(updates))
+        .route("/llms.txt", get(llms_txt))
+}
+
+/// Plain-language agent instructions for model context (no secrets, no state).
+const LLMS_TXT: &str = include_str!("../../../../docs/llms.txt");
+
+async fn llms_txt() -> Response {
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
+        LLMS_TXT,
+    )
+        .into_response()
 }
 
 fn failure(error: AgentError) -> ControlFailure {
