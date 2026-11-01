@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sentinal — glass shell</title>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#0E0E10}*{box-sizing:border-box}a{color:#8C9EFF;text-decoration:none}a:hover{text-decoration:underline}</style>
+</helmet>
+<div style="min-height:100vh; background:#0E0E10; padding:64px; display:flex; flex-direction:column; gap:56px; font-family:'Archivo',system-ui,sans-serif; color:#F2F2F0; font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased">
+<header style="display:flex; flex-direction:column; gap:10px; max-width:1040px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#8C9EFF">sentinal · glass shell · island + prompt</span>
+<span style="font-size:52px; line-height:52px; font-weight:800; letter-spacing:-0.045em">Live island on top. Prompt on demand.</span>
+<span style="font-size:17px; line-height:25px; color:#A6A6A2">The island is the only permanent chrome: where you are, what needs you, live progress. ⌘K or <span style="font-family:'JetBrains Mono',monospace">/</span> opens the prompt at the bottom. Pages you leave stack as sheets on the right edge.</span>
+</header>
+
+<div data-screen-label="01 Dashboard" style="display:flex; flex-direction:column; gap:14px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#8A8A86">01 · Dashboard</span>
+<div style="width:1440px; height:900px; position:relative; overflow:hidden; background:#09090B; box-shadow:0 0 0 1px #2E2E33">
+<div style="position:absolute; left:-200px; top:-300px; width:900px; height:700px; background:radial-gradient(closest-side, rgba(61,90,254,.16), transparent); pointer-events:none"></div>
+<div style="position:absolute; right:-200px; top:200px; width:700px; height:600px; background:radial-gradient(closest-side, rgba(255,208,0,.06), transparent); pointer-events:none"></div>
+
+<div style="position:absolute; inset:0; padding:92px 40px 32px; display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:28px">
+<div style="display:flex; flex-direction:column; gap:28px; min-width:0">
+<div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px">
+<div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:15px; color:#A6A6A2">Saturday 14:13 · 6 sessions on 3 machines</span><span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.055em">3 need you.</span></div>
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#8A8A86">press <span style="color:#F2F2F0">/</span> to do anything</span>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px">
+<div style="border-radius:18px; padding:18px; display:flex; flex-direction:column; gap:12px; background:rgba(255,208,0,.07); box-shadow:inset 0 0 0 1px rgba(255,208,0,.35)">
+<div style="display:flex; align-items:center; justify-content:space-between"><span style="height:22px; padding:0 8px; display:flex; align-items:center; background:#FFD000; color:#0A0A0A; font-size:11px; font-weight:700">? WAITING</span><span style="font-size:12px; color:#A6A6A2">Mac Mini · 85m</span></div>
+<span style="font-size:22px; font-weight:800; letter-spacing:-0.02em">npm install</span>
+<div style="display:flex; gap:6px"><span style="flex:1; min-width:0; height:44px; display:flex; align-items:center; padding:0 12px; border-radius:10px; background:rgba(0,0,0,.45); font-family:'JetBrains Mono',monospace; font-size:14px">Continue? [y/N]</span><span style="width:48px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#F2F2F0; color:#0A0A0A; font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:700">y</span><span style="width:48px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px rgba(255,255,255,.25); font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:700">n</span></div>
+</div>
+<div style="border-radius:18px; padding:18px; display:flex; flex-direction:column; gap:12px; background:rgba(255,59,47,.07); box-shadow:inset 0 0 0 1px rgba(255,59,47,.35)">
+<div style="display:flex; align-items:center; justify-content:space-between"><span style="height:22px; padding:0 8px; display:flex; align-items:center; background:#FF3B2F; color:#0A0A0A; font-size:11px; font-weight:700">✕ FAILED</span><span style="font-size:12px; color:#A6A6A2">RTX-PC · 42s</span></div>
+<span style="font-size:22px; font-weight:800; letter-spacing:-0.02em">pytest</span>
+<span style="font-size:14px; line-height:20px; color:#D4D4D0">3 failed, 182 passed · molecule correspondence tests</span>
+<div style="display:flex; gap:6px; margin-top:auto"><span style="height:36px; padding:0 12px; border-radius:10px; display:flex; align-items:center; background:rgba(255,255,255,.1); font-size:13px; font-weight:700">Open</span><span style="height:36px; padding:0 12px; border-radius:10px; display:flex; align-items:center; background:rgba(255,255,255,.1); font-size:13px; font-weight:700">Last passing run</span></div>
+</div>
+<div style="border-radius:18px; padding:18px; display:flex; flex-direction:column; gap:12px; background:rgba(255,138,0,.07); box-shadow:inset 0 0 0 1px rgba(255,138,0,.35)">
+<div style="display:flex; align-items:center; justify-content:space-between"><span style="height:22px; padding:0 8px; display:flex; align-items:center; background:#FF8A00; color:#0A0A0A; font-size:11px; font-weight:700">‖ STALLED</span><span style="font-size:12px; color:#A6A6A2">Mac Mini · 78 % sure</span></div>
+<span style="font-size:22px; font-weight:800; letter-spacing:-0.02em">Compression</span>
+<span style="font-size:14px; line-height:20px; color:#D4D4D0">no output 14m · CPU 0 %</span>
+<div style="display:flex; gap:6px; margin-top:auto"><span style="height:36px; padding:0 12px; border-radius:10px; display:flex; align-items:center; background:rgba(255,255,255,.1); font-size:13px; font-weight:700">Open terminal</span><span style="height:36px; padding:0 12px; border-radius:10px; display:flex; align-items:center; box-shadow:inset 0 0 0 1px rgba(255,59,47,.6); color:#FF6B61; font-size:13px; font-weight:700">Kill…</span></div>
+</div>
+</div>
+
+<div style="display:flex; flex-direction:column; gap:12px">
+<sc-for list="{{ lanes }}" as="m" hint-placeholder-count="3">
+<div style="border-radius:18px; padding:14px 16px; display:grid; grid-template-columns:200px minmax(0,1fr); gap:16px; align-items:center; background:rgba(28,28,32,.55); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); opacity:{{ m.o }}">
+<div style="display:flex; flex-direction:column; gap:6px">
+<span style="display:flex; align-items:center; gap:8px; font-size:20px; font-weight:800; letter-spacing:-0.02em"><span style="width:9px; height:9px; background:{{ m.dot }}; box-shadow:inset 0 0 0 1.5px {{ m.ring }}"></span>{{ m.name }}</span>
+<span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#8A8A86">{{ m.hw }}</span>
+<div style="display:flex; gap:10px"><sc-for list="{{ m.res }}" as="r" hint-placeholder-count="2"><span style="display:flex; flex-direction:column; gap:3px; width:56px"><span style="font-size:10px; font-weight:700; letter-spacing:0.06em; color:#8A8A86">{{ r.l }}</span><span style="height:4px; border-radius:2px; background:rgba(255,255,255,.1)"><span style="display:block; height:100%; width:{{ r.w }}; border-radius:2px; background:{{ r.c }}"></span></span></span></sc-for></div>
+</div>
+<div style="display:flex; gap:10px; min-width:0; overflow:hidden">
+<sc-for list="{{ m.rows }}" as="r" hint-placeholder-count="3"><div style="flex:1 1 0; min-width:150px; max-width:280px; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px; background:rgba(0,0,0,.35); box-shadow:inset 0 0 0 1px {{ r.hb }}">
+<div style="display:flex; align-items:center; justify-content:space-between; gap:6px"><span style="height:18px; padding:0 6px; display:flex; align-items:center; background:{{ r.bg }}; color:#0A0A0A; font-size:10px; font-weight:700">{{ r.g }} {{ r.s }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#A6A6A2">{{ r.d }}</span></div>
+<span style="font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ r.title }}</span>
+<div style="height:22px; display:flex; align-items:flex-end; gap:2px"><sc-for list="{{ r.spark }}" as="h" hint-placeholder-count="20"><span style="flex:1; height:{{ h }}; background:{{ r.sc }}; border-radius:1px"></span></sc-for></div>
+</div></sc-for>
+<sc-if value="{{ m.empty }}" hint-placeholder-val="{{ false }}"><span style="display:flex; align-items:center; font-family:'JetBrains Mono',monospace; font-size:13px; color:#8A8A86">offline · last seen 14m ago · sessions resume when it reconnects</span></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<aside style="border-radius:20px; padding:20px; display:flex; flex-direction:column; gap:14px; background:rgba(28,28,32,.55); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); min-height:0; overflow:hidden">
+<div style="display:flex; align-items:baseline; justify-content:space-between"><span style="font-size:20px; font-weight:800; letter-spacing:-0.02em">While you were away</span><span style="font-size:12px; color:#8A8A86">since 12:40</span></div>
+<div style="display:flex; flex-direction:column">
+<sc-for list="{{ feed }}" as="e" hint-placeholder-count="7"><div style="display:grid; grid-template-columns:44px 10px minmax(0,1fr); gap:10px; align-items:start; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#8A8A86">{{ e.t }}</span><span style="width:8px; height:8px; margin-top:5px; background:{{ e.c }}"></span><span style="display:flex; flex-direction:column; gap:2px"><span style="font-size:14px; font-weight:700">{{ e.h }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#A6A6A2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ e.d }}</span></span></div></sc-for>
+</div>
+</aside>
+</div>
+
+<div style="position:absolute; left:50%; top:16px; transform:translateX(-50%); height:48px; display:flex; align-items:center; gap:14px; padding:0 8px 0 18px; border-radius:24px; background:rgba(30,30,34,.55); backdrop-filter:blur(24px) saturate(1.6); -webkit-backdrop-filter:blur(24px) saturate(1.6); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12), 0 20px 60px -20px rgba(0,0,0,.9)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"></path><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"></circle></svg>
+<span style="font-size:14px; font-weight:800">Dashboard</span>
+<span style="width:1px; height:20px; background:rgba(255,255,255,.15)"></span>
+<span style="display:flex; align-items:center; gap:8px; font-size:13px"><span style="width:8px; height:8px; background:#FFD000"></span>npm waiting<span style="color:#8A8A86">·</span><span style="width:8px; height:8px; background:#FF3B2F"></span>pytest failed<span style="color:#8A8A86">·</span><span style="width:8px; height:8px; background:#29D35F"></span>training 68 %</span>
+<span style="height:34px; padding:0 12px; display:flex; align-items:center; gap:8px; border-radius:17px; background:rgba(255,255,255,.08); font-size:13px; color:#A6A6A2"><span style="font-family:'JetBrains Mono',monospace; color:#8C9EFF">❯</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px">⌘K</span></span>
+</div>
+</div>
+</div>
+
+<div data-screen-label="02 Prompt open" style="display:flex; flex-direction:column; gap:14px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#8A8A86">02 · Prompt open (⌘K or /) · answering from anywhere</span>
+<div style="width:1440px; height:900px; position:relative; overflow:hidden; background:#09090B; box-shadow:0 0 0 1px #2E2E33">
+<div style="position:absolute; left:-200px; top:-300px; width:900px; height:700px; background:radial-gradient(closest-side, rgba(61,90,254,.16), transparent)"></div>
+<div style="position:absolute; inset:0; padding:92px 40px; display:flex; flex-direction:column; gap:24px; opacity:.28; filter:blur(2px)">
+<span style="font-size:72px; line-height:64px; font-weight:800; letter-spacing:-0.055em">3 need you.</span>
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px"><span style="height:170px; border-radius:18px; background:rgba(255,208,0,.12)"></span><span style="height:170px; border-radius:18px; background:rgba(255,59,47,.12)"></span><span style="height:170px; border-radius:18px; background:rgba(255,138,0,.12)"></span></div>
+<span style="height:120px; border-radius:18px; background:rgba(255,255,255,.06)"></span><span style="height:120px; border-radius:18px; background:rgba(255,255,255,.06)"></span>
+</div>
+<div style="position:absolute; left:50%; top:16px; transform:translateX(-50%); height:48px; display:flex; align-items:center; gap:14px; padding:0 18px; border-radius:24px; background:rgba(30,30,34,.55); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"></path><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"></circle></svg>
+<span style="font-size:14px; font-weight:800">Dashboard</span>
+<span style="display:flex; align-items:center; gap:8px; font-size:13px"><span style="width:8px; height:8px; background:#FFD000"></span>npm waiting<span style="color:#8A8A86">·</span><span style="width:8px; height:8px; background:#FF3B2F"></span>pytest failed</span>
+</div>
+<div style="position:absolute; left:50%; bottom:40px; transform:translateX(-50%); width:820px; display:flex; flex-direction:column; gap:10px">
+<div style="display:flex; flex-direction:column; border-radius:18px; overflow:hidden; padding:6px 0; background:rgba(30,30,34,.62); backdrop-filter:blur(28px) saturate(1.6); -webkit-backdrop-filter:blur(28px) saturate(1.6); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12), 0 30px 80px -20px rgba(0,0,0,.9)">
+<sc-for list="{{ promptGroups }}" as="g" hint-placeholder-count="3"><div style="display:flex; flex-direction:column; padding:4px 0"><span style="padding:6px 18px 4px; font-size:10px; font-weight:700; letter-spacing:0.1em; color:#8A8A86">{{ g.l }}</span><sc-for list="{{ g.items }}" as="s" hint-placeholder-count="2"><div style="display:flex; align-items:center; gap:14px; min-height:46px; padding:0 18px; background:{{ s.bg }}; box-shadow:inset 3px 0 0 {{ s.bar }}"><span style="font-family:'JetBrains Mono',monospace; font-size:14px">{{ s.c }}</span><span style="font-size:13px; color:#A6A6A2; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ s.d }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#8A8A86">{{ s.k }}</span></div></sc-for></div></sc-for>
+<div style="display:flex; gap:18px; padding:10px 18px 6px; border-top:1px solid rgba(255,255,255,.08); font-family:'JetBrains Mono',monospace; font-size:11px; color:#8A8A86"><span>↵ run</span><span>tab complete</span><span>⌘↵ open in split</span><span style="margin-left:auto">esc close</span></div>
+</div>
+<div style="height:60px; display:flex; align-items:center; gap:12px; padding:0 20px; border-radius:30px; background:rgba(30,30,34,.62); backdrop-filter:blur(28px) saturate(1.6); -webkit-backdrop-filter:blur(28px) saturate(1.6); box-shadow:inset 0 0 0 1.5px rgba(140,158,255,.6), 0 30px 80px -20px rgba(0,0,0,.9)">
+<span style="font-family:'JetBrains Mono',monospace; font-size:17px"><span style="color:#8C9EFF">❯</span> y npm</span><span style="width:9px; height:22px; background:#8C9EFF"></span>
+<span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:12px; color:#8A8A86">go · run · find · y · n · split · kill</span>
+</div>
+</div>
+</div>
+</div>
+
+<div data-screen-label="03 Session" style="display:flex; flex-direction:column; gap:14px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#8A8A86">03 · Session · the dashboard you came from waits as a sheet on the right</span>
+<div style="width:1440px; height:900px; position:relative; overflow:hidden; background:#060607; box-shadow:0 0 0 1px #2E2E33">
+<div style="position:absolute; top:14px; bottom:14px; right:0; width:120px; border-radius:18px 0 0 18px; background:rgba(26,26,30,.8); box-shadow:inset 0 0 0 1px rgba(255,255,255,.1); padding:20px 0 0 30px"><span style="writing-mode:vertical-rl; font-size:13px; font-weight:800; letter-spacing:0.08em; color:#A6A6A2">DASHBOARD</span></div>
+<div style="position:absolute; left:0; top:0; bottom:0; right:72px; display:grid; grid-template-columns:1fr 1fr; background:#0A0A0A; border-radius:0 18px 18px 0; overflow:hidden; box-shadow:20px 0 60px -10px rgba(0,0,0,.9), inset 0 0 0 1px rgba(255,255,255,.08)">
+<div style="display:flex; flex-direction:column; background:#0C0C0C; border-right:1px solid #262626">
+<div style="height:76px; flex:none"></div>
+<div style="flex:1; padding:0 22px 16px; display:flex; flex-direction:column; justify-content:flex-end; font-family:'JetBrains Mono',monospace; font-size:13px; line-height:21px; color:#D4D4D0"><sc-for list="{{ term }}" as="l" hint-placeholder-count="12"><span style="white-space:pre">{{ l }}</span></sc-for><span style="display:inline-block; width:8px; height:16px; background:#D4D4D0; margin-top:2px"></span></div>
+<div style="height:52px; flex:none; display:flex; gap:6px; padding:0 12px 12px"><span style="flex:1; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(255,59,47,.14); color:#FF6B61; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700">Ctrl‑C</span><span style="flex:1; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.06); font-family:'JetBrains Mono',monospace; font-size:13px">Esc</span><span style="flex:1; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.06); font-family:'JetBrains Mono',monospace; font-size:13px">Tab</span><span style="flex:1; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.06); font-family:'JetBrains Mono',monospace; font-size:13px">↑</span><span style="flex:1; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.06); font-family:'JetBrains Mono',monospace; font-size:13px">↓</span></div>
+</div>
+<div style="padding:92px 40px 32px; display:flex; flex-direction:column; gap:22px; position:relative">
+<div style="position:absolute; right:-160px; top:-200px; width:600px; height:500px; background:radial-gradient(closest-side, rgba(41,211,95,.08), transparent)"></div>
+<span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#8A8A86">RTX-PC / TIM · python train.py --config moe.yaml</span>
+<span style="font-size:48px; line-height:46px; font-weight:800; letter-spacing:-0.05em; margin-top:-10px">Qwen Training</span>
+<div style="display:flex; gap:8px"><span style="height:24px; padding:0 8px; display:flex; align-items:center; background:#29D35F; color:#0A0A0A; font-size:11px; font-weight:700">● RUNNING</span><span style="height:24px; padding:0 8px; display:flex; align-items:center; box-shadow:inset 0 0 0 1.5px #29D35F; color:#29D35F; font-size:11px; font-weight:700">✓ HEALTHY</span><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#A6A6A2; display:flex; align-items:center">1h31m</span></div>
+<div style="display:flex; align-items:baseline; gap:14px"><span style="font-size:104px; line-height:88px; font-weight:800; letter-spacing:-0.055em">68 %</span><span style="font-family:'JetBrains Mono',monospace; font-size:14px; color:#A6A6A2">epoch 68/100 · ~42m left</span></div>
+<span style="height:6px; border-radius:3px; background:rgba(255,255,255,.1); display:block"><span style="display:block; width:68%; height:100%; border-radius:3px; background:#3D5AFE"></span></span>
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px">
+<sc-for list="{{ metrics }}" as="k" hint-placeholder-count="3"><div style="border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:4px; background:rgba(28,28,32,.55); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)"><span style="font-size:10px; font-weight:700; letter-spacing:0.08em; color:#8A8A86">{{ k.l }}</span><span style="font-size:30px; font-weight:800; letter-spacing:-0.03em">{{ k.v }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#A6A6A2">{{ k.f }}</span></div></sc-for>
+</div>
+<div style="border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; background:rgba(28,28,32,.55); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)">
+<span style="font-size:10px; font-weight:700; letter-spacing:0.08em; color:#8A8A86">EVENTS</span>
+<sc-for list="{{ events }}" as="e" hint-placeholder-count="4"><div style="display:flex; gap:12px; font-family:'JetBrains Mono',monospace; font-size:12px"><span style="color:#8A8A86; width:40px">{{ e.t }}</span><span style="color:{{ e.c }}; width:150px">{{ e.k }}</span><span style="color:#D4D4D0">{{ e.d }}</span></div></sc-for>
+</div>
+</div>
+</div>
+<div style="position:absolute; left:50%; top:16px; transform:translateX(-50%); margin-left:-36px; height:48px; display:flex; align-items:center; gap:14px; padding:0 8px 0 18px; border-radius:24px; background:rgba(30,30,34,.55); backdrop-filter:blur(24px) saturate(1.6); -webkit-backdrop-filter:blur(24px) saturate(1.6); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12), 0 20px 60px -20px rgba(0,0,0,.9)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"></path><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"></circle></svg>
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#A6A6A2">RTX-PC <span style="color:#F2F2F0">›</span> <span style="color:#F2F2F0; font-family:'Archivo',sans-serif; font-weight:800; font-size:14px">Qwen Training</span></span>
+<span style="width:1px; height:20px; background:rgba(255,255,255,.15)"></span>
+<span style="display:flex; align-items:center; gap:8px; font-size:13px"><span style="height:20px; padding:0 7px; display:flex; align-items:center; background:#FFD000; color:#0A0A0A; font-size:11px; font-weight:800">2 need you</span></span>
+<span style="height:34px; padding:0 12px; display:flex; align-items:center; gap:8px; border-radius:17px; background:rgba(255,255,255,.08); font-size:13px; color:#A6A6A2"><span style="font-family:'JetBrains Mono',monospace; color:#8C9EFF">❯</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px">⌘K</span></span>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const C = { RUNNING:'#29D35F', WAITING:'#FFD000', STALLED:'#FF8A00', FAILED:'#FF3B2F', IDLE:'#9C9C98' };
+    const G = { RUNNING:'●', WAITING:'?', STALLED:'‖', FAILED:'✕', IDLE:'–' };
+    const sp = (seed, lvl, n = 20) => Array.from({ length: n }, (_, i) => Math.max(8, Math.min(100, Math.round(lvl + Math.sin(i * 0.9 + seed) * 18 + Math.cos(i * 2.3 + seed) * 10))) + '%');
+    const S = (s, o) => Object.assign({ s, bg: C[s], g: G[s], hb: 'rgba(255,255,255,.06)', sc: 'rgba(255,255,255,.22)' }, o);
+    return {
+      lanes: [
+        { name:'RTX-PC', hw:'Ryzen 9 · RTX 4090 24 GB', o:1, dot:'#29D35F', ring:'#29D35F', empty:false,
+          res:[{ l:'GPU', w:'96%', c:'#29D35F' }, { l:'VRAM', w:'89%', c:'#FFD000' }],
+          rows:[S('RUNNING',{ title:'Qwen Training', d:'68 %', spark:sp(1,70), sc:'rgba(61,90,254,.8)', hb:'rgba(140,158,255,.35)' }), S('RUNNING',{ title:'vLLM', d:':8000', spark:sp(3,25) }), S('FAILED',{ title:'pytest', d:'42s', spark:sp(5,40).map((h,i) => i > 16 ? '8%' : h), sc:'rgba(255,59,47,.5)' }), S('IDLE',{ title:'shell', d:'~/TIM', spark:sp(7,8).map(() => '8%') })] },
+        { name:'Mac Mini', hw:'M2 Pro · 32 GB', o:1, dot:'#29D35F', ring:'#29D35F', empty:false,
+          res:[{ l:'CPU', w:'12%', c:'#29D35F' }, { l:'RAM', w:'48%', c:'#29D35F' }],
+          rows:[S('WAITING',{ title:'npm install', d:'85m', spark:sp(2,30).map((h,i) => i > 6 ? '8%' : h), sc:'rgba(255,208,0,.6)' }), S('STALLED',{ title:'Compression', d:'14m', spark:sp(4,60).map((h,i) => i > 13 ? '8%' : h), sc:'rgba(255,138,0,.6)' })] },
+        { name:'MacBook', hw:'M3 · 16 GB', o:0.5, dot:'transparent', ring:'#8A8A86', empty:true, res:[], rows:[] }],
+      feed: [
+        ['14:13','#29D35F','Qwen Training','epoch 68/100 · loss 0.37'],
+        ['14:02','#FFD000','VRAM usage high','RTX-PC · 96.5 %'],
+        ['13:59','#FF8A00','Compression stalled','Mac Mini · no output'],
+        ['13:41','#36C5E8','Checkpoint saved','ckpt/epoch_37.pt'],
+        ['13:31','#FF3B2F','pytest failed','3 failed · 182 passed'],
+        ['12:48','#FFD000','npm install waiting','Continue? [y/N]'],
+        ['12:42','#9C9C98','Training started','python train.py --config moe.yaml'],
+        ['12:40','#8A8A86','MacBook went offline','last seen 14m ago']].map(([t,c,h,d]) => ({ t, c, h, d })),
+      promptGroups: [
+        { l:'ANSWER', items:[{ c:'y → mac-mini/npm-install', d:'Continue? [y/N] · waiting 85m', k:'↵', bg:'rgba(61,90,254,.25)', bar:'#8C9EFF' }] },
+        { l:'GO', items:[{ c:'go mac-mini/npm-install', d:'open the session', k:'', bg:'transparent', bar:'transparent' }, { c:'go rtx-pc/pytest', d:'FAILED · 3 failures', k:'', bg:'transparent', bar:'transparent' }] },
+        { l:'RUN · FIND', items:[{ c:'run "Qwen vLLM Server"', d:'recipe · RTX-PC · 3 parameters', k:'tab', bg:'transparent', bar:'transparent' }, { c:'find npm install', d:'history · 2 previous runs', k:'', bg:'transparent', bar:'transparent' }] }],
+      term: ['$ python train.py --config moe.yaml','epoch 59/100  loss 0.41','epoch 60/100  loss 0.41','epoch 61/100  loss 0.40','epoch 62/100  loss 0.40','epoch 63/100  loss 0.40','saved ckpt/epoch_37.pt','epoch 64/100  loss 0.39','epoch 65/100  loss 0.39','epoch 66/100  loss 0.39','epoch 67/100  loss 0.38','epoch 68/100  loss 0.37'],
+      metrics: [{ l:'LOSS', v:'0.37', f:'from 0.41' }, { l:'GPU', v:'96 %', f:'RTX 4090' }, { l:'VRAM', v:'21.4 GB', f:'of 24 GB' }],
+      events: [['14:13','PROGRESS','epoch 68/100','#A6A6A2'],['14:02','WARNING','VRAM usage high','#FFD000'],['13:58','RESOURCE_HIGH','VRAM 96.5 %','#FFD000'],['13:41','CHECKPOINT','ckpt/epoch_37.pt','#36C5E8']].map(([t,k,d,c]) => ({ t, k, d, c }))
+    };
+  }
+}
+</script>
+</body>
+</html>

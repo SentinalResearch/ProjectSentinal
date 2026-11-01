@@ -303,6 +303,21 @@ apply or roll it back from the exact Machine without exposing credentials.
 exact Machine and Session, answer its prompt or open the full-screen terminal,
 and confirm Ctrl-C from a bottom sheet — with the desktop layout unchanged.
 
+## Milestone 4.I — Glass shell, desktop (v0.3.0)
+Design source: `sentinal-glass-handoff/` (`GLASS_SPEC.md`, `design/Sentinal Glass.dc.html`).
+Desktop ≥ 1024 px only; 768–1023 px keeps the sidebar and phones keep `MOBILE_SPEC.md`.
+- [x] Glass tokens and `GlassPill` / `GlassPanel` / `AttentionCard`, with a no-`backdrop-filter` fallback
+- [ ] Shell: no sidebar on desktop; Live island with the FAILED > WAITING > STALLED > RUNNING ticker
+- [ ] Prompt: ⌘K, `/`, island button; deterministic `go`, `y|n`, `run`, `find`, `split`, `kill`, fuzzy fallback
+- [ ] Sheets: back history of up to 3 pages, ⌘[ to pop, restore keeps scroll and terminal attachment
+- [ ] Dashboard: needs-you cards with inline actions, Machine lanes with sparklines, "While you were away"
+- [ ] Session page: full-height terminal left, details right, fitted with a ResizeObserver
+- [ ] Every page reachable from the prompt; `/`, `y`, `↵` answers a WAITING Session from any page; accessibility audit ≥ 95
+
+**Demo:** with no sidebar, see what needs you in the island, press `/`, `y`,
+`↵` to answer a waiting prompt from any page, and step back through the last
+pages from the sheets on the right.
+
 ## Reliability R1 — Daemon-restart-resilient FULL Sessions
 - [ ] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation
 - [ ] A per-Session owner keeps the PTY and log alive while `sentinald` restarts

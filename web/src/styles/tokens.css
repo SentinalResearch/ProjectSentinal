@@ -45,3 +45,51 @@
   --s-stalled-fg: #9A4B00; --s-completed-fg: #0A6680; --s-failed-fg: #C4210F; --s-interrupted-fg: #B01F6A;
   --s-disconnected-fg: #62625E;
 }
+
+/*
+ * Glass shell (sentinal-glass-handoff/GLASS_SPEC.md §1, §3), desktop ≥ 1024px.
+ * Floating chrome and panels are translucent and rounded; terminal surfaces
+ * never are (a solid --term-bg keeps program colours true).
+ */
+:root, [data-theme="dark"] {
+  --bg-app: #09090B; --bg-deep: #060607;
+  --destructive-fg: #FF6B61;
+  --glass-bg: rgba(30,30,34,.55);
+  --glass-bg-strong: rgba(30,30,34,.62);
+  --glass-panel: rgba(28,28,32,.55);
+  --glass-edge: rgba(255,255,255,.12);
+  --glass-edge-soft: rgba(255,255,255,.08);
+  --glass-shadow: 0 20px 60px -20px rgba(0,0,0,.9);
+  --glass-sheet: rgba(26,26,30,.8);
+  --well: rgba(0,0,0,.35);       /* inset areas inside glass */
+  --chip: rgba(255,255,255,.08); /* quiet buttons on glass */
+  --chip-hover: rgba(255,255,255,.14);
+  --glow-accent: rgba(61,90,254,.16);
+}
+[data-theme="light"] {
+  --bg-app: #F2F1EC; --bg-deep: #E9E8E2;
+  --destructive-fg: #C4210F;
+  --glass-bg: rgba(255,255,255,.62);
+  --glass-bg-strong: rgba(255,255,255,.72);
+  --glass-panel: rgba(255,255,255,.58);
+  --glass-edge: rgba(10,10,10,.12);
+  --glass-edge-soft: rgba(10,10,10,.08);
+  --glass-shadow: 0 20px 60px -24px rgba(10,10,10,.35);
+  --glass-sheet: rgba(255,255,255,.8);
+  --well: rgba(10,10,10,.05);
+  --chip: rgba(10,10,10,.06);
+  --chip-hover: rgba(10,10,10,.11);
+  --glow-accent: rgba(42,68,224,.10);
+}
+:root {
+  --glass-blur: blur(24px) saturate(1.6);
+  --glass-blur-panel: blur(18px) saturate(1.4);
+  --radius-glass: 24px;   /* island, prompt */
+  --radius-panel: 18px;   /* lanes, feed */
+  --radius-tile: 14px;
+  --radius-card: 12px;
+  --radius-key: 10px;     /* buttons and terminal keys on glass */
+  --island-top: 16px;
+  --island-height: 48px;
+  --shell-top: 92px;      /* page padding that clears the island */
+}
