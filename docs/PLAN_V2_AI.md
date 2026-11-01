@@ -35,7 +35,7 @@ waiting for your approval and can say so on your phone.
 | Prompt search | Client-side fuzzy match over what the browser already holds (`promptGrammar.ts`) |
 | Autocomplete | None. Milestone 5 specifies frecency ranking and a shell widget |
 | Agent access | The browser WebSocket API and CLI. No agent tokens, levels, or tool catalogue (Milestone 6 §1 specifies them) |
-| Terminal understanding | Deterministic adapters (`crates/watcher`): pytest, cargo, training, generic. Translator: offline eval only (`docs/progress/v2-translator-eval.md`) |
+| Terminal understanding | Deterministic adapters (`crates/watcher`): pytest, cargo, training, generic. Translator: offline eval (`docs/progress/v2-translator-eval.md`), FunctionGemma training and eval format (`eval/functiongemma.py`), and the guarded translator as a command-line service (`intelligence/`) |
 | Notifications | Rules over stored structured Events only; never raw output (`SECURITY.md`) |
 
 ## 3. Rules that do not change
@@ -183,8 +183,10 @@ see it finish in "While you were away".
 
 Goal: progress, errors, and prompts for tools no adapter knows, turned into the same structured Events and notifications. Builds on `eval/` and `prompts/07` §2–4.
 
-- [ ] `intelligence/` service (Python, `uv`), a separate optional process
-      using an agent token at **level 1**: it reads screens and can only propose Events
+- [ ] `intelligence/` service (Python), a separate optional process
+      using an agent token at **level 1**: it reads screens and can only propose Events.
+      *Started:* sanitising, guards, pacing and a `translate` command line
+      exist and are tested; the agent token and daemon connection wait on 6.0
 - [ ] Runs a local OpenAI-compatible endpoint (the fine-tuned
       `sentinal-qwen3-0.6b` on llama.cpp or vLLM on the owner's GPU); no
       cloud model by default
@@ -235,6 +237,21 @@ Goal: an agent may *request* actions; a person approves each on desktop or phone
       decision is audited
 - [ ] Per-agent policy: which tools, which Machines and projects, daily
       limits; a kill switch that revokes every agent token at once
+
+## 5.1 Models
+
+FunctionGemma 270M (`google/functiongemma-270m-it`) is the default small
+model. It is built for function calling, and at 270M it runs on a Mac or a
+CPU as well as the GPU machine, so every Machine owner can run it locally.
+
+| Job | Milestone | Model | Status |
+|---|---|---|---|
+| Screen → Events (translator) | 6.2 | FunctionGemma 270M fine-tuned, head-to-head with `sentinal-qwen3-0.6b` (F1 0.978 test); whichever passes the gate ships, FunctionGemma preferred on a tie | Format, training and scoring done (`just train-functiongemma`); first run on pop-os next |
+| Natural language → one tool call (`route`): the prompt's fallback when the grammar does not match, e.g. "restart the eval on pop-os" → `suggest_command` | 6.3 | FunctionGemma 270M fine-tuned on the 6.0 catalogue | Needs the 6.0 catalogue; dataset of ≥ 50 hand-written seeds plus a hand-checked frozen test set |
+| Triage ("should this notify?") | 6.3 | Rules first; a model only if rules miss, precision ≥ 0.9 | Later |
+
+Each model is promoted only through its gate on a frozen test split; the
+deterministic path stays the fallback when no model is running.
 
 ## 6. Risks and how the plan handles them
 

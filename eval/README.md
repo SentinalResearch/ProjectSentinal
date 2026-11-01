@@ -87,6 +87,31 @@ The training script:
 
 Choose settings on `dev`, then run `test` once.
 
+### FunctionGemma
+
+`--format functiongemma` ([`functiongemma.py`](functiongemma.py)) trains and
+evaluates `google/functiongemma-270m-it` in its own format: the functions are
+declared through the chat template's `tools` argument with the developer
+prompt, and the reply is FunctionGemma call syntax
+(`<start_function_call>call:NAME{key:<escape>text<escape>,n:3}<end_function_call>`).
+The answer is rendered by the tokenizer's template, never by hand, and
+`--check-template` verifies that every row parses back to its expected calls
+before any training starts. The runner sends `tool_choice: "none"` so the
+server keeps the reply text for this parser.
+
+```sh
+python3 eval/finetune/train_sft.py --format functiongemma --check-template \
+  --train eval/data/train.jsonl --dev eval/data/dev.jsonl --output runs/functiongemma-270m-sft
+python3 eval/finetune/train_sft.py --format functiongemma \
+  --train eval/data/train.jsonl --dev eval/data/dev.jsonl --output runs/functiongemma-270m-sft
+vllm serve runs/functiongemma-270m-sft --served-model-name sentinal-functiongemma --dtype bfloat16 --port 8346
+python3 eval/run_model.py eval/data/dev.jsonl --format functiongemma --concurrency 16 \
+  --base-url http://127.0.0.1:8346 --model sentinal-functiongemma --output fg-dev.jsonl
+```
+
+Defaults for this format: learning rate 5e-5 and max length 4,096 (the
+declarations are in every prompt). Both are starting points to tune on `dev`.
+
 **Measured 2026-10-04** (details in
 [`docs/progress/v2-translator-eval.md`](../docs/progress/v2-translator-eval.md)):
 

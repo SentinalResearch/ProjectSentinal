@@ -131,6 +131,47 @@ class RunModelTest(unittest.TestCase):
         self.assertEqual((result["finish_reason"], result["prompt_tokens"], result["completion_tokens"]), ("stop", 210, 22))
         self.assertNotIn("error", result)
 
+    def _functiongemma(self, message):
+        captured = {}
+
+        def opener(request, timeout):
+            captured["payload"] = json.loads(request.data)
+            return FakeResponse({"choices": [{"finish_reason": "stop", "message": message}]})
+
+        record = {
+            "id": "example-fg",
+            "suite": "translate",
+            "input": {"command": "python train.py", "source": "screen", "screen": "Epoch 3/10"},
+            "expected": [{"secret_answer": True}],
+            "optional": [],
+            "forbidden": [],
+        }
+        result = run_model.evaluate_record(
+            record, "http://model.test/v1", None, "sentinal-functiongemma", [{"unused": True}], 5,
+            opener=opener, clock=iter([0.0, 0.1]).__next__, prompt_format="functiongemma",
+        )
+        return captured["payload"], result
+
+    def test_functiongemma_format_declares_tools_without_letting_the_server_parse_them(self):
+        reply = "<start_function_call>call:progress_updated{current:3,total:10,unit:<escape>epoch<escape>}<end_function_call>"
+        payload, result = self._functiongemma({"content": reply})
+        self.assertEqual(payload["messages"][0]["role"], "developer")
+        self.assertEqual(payload["tool_choice"], "none")
+        self.assertIn("progress_updated", [tool["function"]["name"] for tool in payload["tools"]])
+        self.assertNotIn("secret_answer", json.dumps(payload))
+        self.assertEqual(result["calls"], [{"name": "progress_updated", "args": {"current": 3, "total": 10, "unit": "epoch"}}])
+        self.assertNotIn("error", result)
+
+    def test_functiongemma_format_accepts_calls_a_server_parser_already_extracted(self):
+        message = {"content": "", "tool_calls": [{"function": {"name": "warning_detected", "arguments": '{"summary": "slow"}'}}]}
+        _, result = self._functiongemma(message)
+        self.assertEqual(result["calls"], [{"name": "warning_detected", "args": {"summary": "slow"}}])
+
+    def test_functiongemma_prose_reply_is_an_error_with_no_calls(self):
+        _, result = self._functiongemma({"content": "Training looks fine."})
+        self.assertEqual(result["calls"], [])
+        self.assertEqual(result["error"], "reply has no function call")
+
     def test_an_empty_reply_is_kept_so_zero_calls_can_be_explained(self):
         def opener(request, timeout):
             return FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": "", "tool_calls": None}}], "usage": {"prompt_tokens": 398, "completion_tokens": 1}})

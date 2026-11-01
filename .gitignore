@@ -28,3 +28,6 @@
 
 # Local evaluation runs and model outputs
 /tmp/
+/runs/
+/eval/data/train.jsonl
+__pycache__/

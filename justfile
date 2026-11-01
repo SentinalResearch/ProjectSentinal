@@ -52,6 +52,7 @@ check:
     pnpm -C web check
     pnpm -C web build
     python3 -m unittest discover -s eval -p 'test_*.py'
+    python3 -m unittest discover -s intelligence/tests -p 'test_*.py'
     bash scripts/tests/run-network-test.sh
     bash scripts/tests/run-roles-test.sh
     bash scripts/tests/install-worker-test.sh
@@ -128,6 +129,18 @@ test-e2e:
 
 # Run all fast checks and the isolated browser acceptance suite
 acceptance: check test-e2e
+
+# Fast offline tests for the translator datasets, formats and the intelligence service
+test-intelligence:
+    python3 -m unittest discover -s eval -p 'test_*.py'
+    python3 -m unittest discover -s intelligence/tests -p 'test_*.py'
+
+# On the GPU machine: fine-tune FunctionGemma 270M as the screen translator.
+# Checks the chat template first; set HF_TOKEN after accepting the Gemma licence.
+train-functiongemma output="runs/functiongemma-270m-sft" *args:
+    python3 eval/generate.py --train 5000
+    python3 eval/finetune/train_sft.py --format functiongemma --check-template --train eval/data/train.jsonl --dev eval/data/dev.jsonl --output {{output}}
+    python3 eval/finetune/train_sft.py --format functiongemma --train eval/data/train.jsonl --dev eval/data/dev.jsonl --output {{output}} {{args}}
 
 # Owner only, on your own machine: tag, wait for the build, sign, and publish
 # one release (key from .release.local: key=PATH). Re-run to resume.

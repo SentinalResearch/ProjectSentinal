@@ -345,7 +345,10 @@ pages from the sheets on the right.
 - [x] Synthetic screen-translator eval harness, rules baseline, model runner, and scorer (`eval/`)
 - [ ] Hand-labelled real-screen eval set (100–200 captured screens) as the decision metric
 - [x] First fine-tune: Qwen3-0.6B screen translator, F1 0.978 synthetic test / 0.914 real logs (`docs/progress/v2-translator-eval.md`)
-- [ ] Guarded translator in the product: constrained decoding, grounding, secret/URL cleaning, numeric checks
+- [x] FunctionGemma 270M training and eval format with a template self-check (`eval/functiongemma.py`, `just train-functiongemma`)
+- [ ] First FunctionGemma translator run on pop-os, scored against `sentinal-qwen3-0.6b`
+- [x] Guards in code (`intelligence/`): ANSI and secret cleaning before the model, schema checks, grounding of numbers, paths, URLs and prompts; 0 false rejections on the test split
+- [ ] Guarded translator in the product: daemon trigger, `propose_events`, inferred markers in the UI (needs the agent API)
 - [ ] Fine-tune small model (FunctionGemma 270M / Qwen3-0.6B) for
       NL → tool call routing, then command classification, then triage
 - [ ] Heartbeat, journal, summaries

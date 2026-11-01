@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 import compact  # noqa: E402
+import functiongemma  # noqa: E402
 
 RAW_LIMIT = 2000
 
@@ -114,6 +115,10 @@ def _payload(record, model, tools, prompt_format):
     common = {"model": model, "temperature": 0, "max_tokens": 512, "stream": False, "chat_template_kwargs": {"enable_thinking": False}}
     if prompt_format == "compact":
         return {**common, "messages": compact.messages(record)}
+    if prompt_format == "functiongemma":
+        # Tools go to the chat template; tool_choice "none" keeps a server-side
+        # parser from swallowing the reply, which parse_reply reads instead.
+        return {**common, "messages": functiongemma.messages(record), "tools": functiongemma.tools(), "tool_choice": "none"}
     user_data = {"suite": record["suite"], "input": record["input"]}
     return {
         **common,
@@ -144,6 +149,11 @@ def evaluate_record(record, base_url, api_key, model, tools, timeout, opener=url
         if prompt_format == "compact":
             calls, error = compact.parse_reply(result.get("raw"))
             parse_errors = [error] if error else []
+        elif prompt_format == "functiongemma":
+            calls, parse_errors = _calls_from_response(response)
+            if not calls:
+                calls, error = functiongemma.parse_reply(result.get("raw"))
+                parse_errors = [error] if error else []
         else:
             calls, parse_errors = _calls_from_response(response)
         result["calls"] = calls
@@ -221,8 +231,9 @@ def main():
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--limit", type=int, help="evaluate only the first N records")
     parser.add_argument("--resume", action="store_true", help="keep existing predictions and skip their IDs")
-    parser.add_argument("--format", choices=["tools", "compact"], default="tools",
-                        help="tools: OpenAI tool calls with tools.json; compact: the fine-tuning prompt, JSON array reply")
+    parser.add_argument("--format", choices=["tools", "compact", "functiongemma"], default="tools",
+                        help="tools: OpenAI tool calls with tools.json; compact: the fine-tuning prompt, JSON array reply; "
+                             "functiongemma: FunctionGemma's developer prompt and call syntax")
     args = parser.parse_args()
 
     if not args.base_url:
