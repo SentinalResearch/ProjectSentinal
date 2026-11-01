@@ -39,6 +39,17 @@ impl SessionManager {
         crate::search::search(self.store()?, recipes, request, now).map_err(Into::into)
     }
 
+    /// Rank completions for a Command line from this Machine's history (5.A).
+    pub fn complete(
+        &self,
+        recipes: &[protocol::Recipe],
+        weights: &protocol::complete::CompletionWeights,
+        request: &crate::complete::CompleteRequest<'_>,
+    ) -> Result<Vec<protocol::complete::Completion>, SessionManagerError> {
+        let now = (self.inner.config.clock)();
+        crate::complete::complete(self.store()?, recipes, weights, request, now).map_err(Into::into)
+    }
+
     /// Return a bounded persisted Event page.
     pub fn events(
         &self,

@@ -219,9 +219,8 @@ async fn adopt(
         | LocalResponse::ApprovalRequested { .. }
         | LocalResponse::ApprovalState { .. }
         | LocalResponse::Handoff { .. }
-        | LocalResponse::HealthReportWritten { .. } => {
-            Err("sentinald sent an unexpected reply".into())
-        }
+        | LocalResponse::HealthReportWritten { .. }
+        | LocalResponse::Completions { .. } => Err("sentinald sent an unexpected reply".into()),
     }
 }
 

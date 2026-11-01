@@ -157,4 +157,27 @@ export type LocalRequest =
      * Whether Machines are named.
      */
     names: ReportNames;
+  }
+  | {
+    "type": "COMPLETE";
+    /**
+     * The Session being typed into; its cwd and project apply.
+     */
+    session_id: SessionId | null;
+    /**
+     * What is on the line so far.
+     */
+    prefix: string;
+    /**
+     * The directory being typed in; overrides the Session's.
+     */
+    cwd: string | null;
+    /**
+     * Also offer Commands that never succeeded.
+     */
+    include_failed?: boolean;
+    /**
+     * Most completions, 1 through [`crate::complete::MAX_COMPLETE_LIMIT`].
+     */
+    limit: number;
   };

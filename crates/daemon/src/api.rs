@@ -50,6 +50,7 @@ pub struct AppState {
     behind_tailscale_serve: bool,
     development: bool,
     recipes: RecipeCatalog,
+    completer: crate::complete::Completer,
     notifications: Option<NotificationService>,
     push: Option<PushGateway>,
     release: Option<crate::control::ControlRelease>,
@@ -74,6 +75,7 @@ impl AppState {
             behind_tailscale_serve: false,
             development: false,
             recipes,
+            completer: crate::complete::Completer::default(),
             notifications: None,
             push: None,
             release: None,
@@ -115,6 +117,12 @@ impl AppState {
     /// Enable development-only authentication compatibility such as query tokens.
     pub fn with_development(mut self, enabled: bool) -> Self {
         self.development = enabled;
+        self
+    }
+
+    /// Rank completions with these settings (5.A).
+    pub fn with_completer(mut self, completer: crate::complete::Completer) -> Self {
+        self.completer = completer;
         self
     }
 
@@ -258,6 +266,28 @@ impl AppState {
             ClientRequest::SearchCommands { query, limit } => {
                 match self.sessions.search_commands(&query, limit.min(1_000)) {
                     Ok(commands) => WsAction::Reply(DaemonMessage::History { commands }),
+                    Err(error) => error_action(error),
+                }
+            }
+            ClientRequest::Complete {
+                session_id,
+                prefix,
+                cwd,
+                include_failed,
+                limit,
+            } => {
+                let args = crate::complete::CompleteArgs {
+                    session_id,
+                    prefix: &prefix,
+                    cwd: cwd.as_deref(),
+                    include_failed,
+                    limit,
+                };
+                match self
+                    .completer
+                    .answer(&self.sessions, &self.recipes.list(), &args)
+                {
+                    Ok(completions) => WsAction::Reply(DaemonMessage::Completions { completions }),
                     Err(error) => error_action(error),
                 }
             }

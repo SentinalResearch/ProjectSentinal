@@ -691,6 +691,27 @@ session_log_max_age_days = 90        # finished Sessions' logs older than this g
 
 To free space now, lower a limit and restart the daemon. Zero is rejected.
 
+## Autocomplete ranking
+
+Completion (`COMPLETE`, Milestone 5.A) ranks each distinct Command line that
+starts with what you typed. The formula is in `crates/protocol/src/complete.rs`;
+its weights can be tuned, and the defaults need no config:
+
+```toml
+# daemon.toml (optional)
+[complete]
+frecency_weight = 1.0   # × successful runs × 0.5 ^ (days since last run / half_life_days)
+half_life_days = 7.0
+project_bonus = 10.0    # × share of runs inside the current project
+cwd_bonus = 5.0         # × share of runs in the current directory
+success_bonus = 2.0     # × share of runs that succeeded
+failure_penalty = 10.0  # × share that failed (only when failures are included)
+recipe = 1.0            # flat score of a matching Recipe
+```
+
+Commands that never succeeded are not offered unless asked for. Negative
+weights, a zero half-life, and unknown keys are rejected.
+
 ## Backup and inspection
 
 Stop or quiesce the daemon before a filesystem-level backup, then copy both

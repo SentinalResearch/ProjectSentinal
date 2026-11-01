@@ -368,3 +368,29 @@ fn control_display_name_is_optional_and_must_be_a_safe_name() {
         );
     }
 }
+
+#[test]
+fn completion_weights_default_and_can_be_tuned() {
+    use protocol::complete::CompletionWeights;
+    let home = Path::new("/home/tester");
+    let config = DaemonConfig::from_toml("", home).unwrap();
+    assert_eq!(config.complete, CompletionWeights::default());
+    let tuned = DaemonConfig::from_toml(
+        "[complete]\nproject_bonus = 25\nhalf_life_days = 3.5\n",
+        home,
+    )
+    .unwrap();
+    assert_eq!(tuned.complete.project_bonus, 25.0);
+    assert_eq!(tuned.complete.half_life_days, 3.5);
+    assert_eq!(
+        tuned.complete.cwd_bonus,
+        CompletionWeights::default().cwd_bonus
+    );
+    for bad in [
+        "[complete]\nhalf_life_days = 0\n",
+        "[complete]\ncwd_bonus = -1\n",
+        "[complete]\nnot_a_weight = 1\n",
+    ] {
+        assert!(DaemonConfig::from_toml(bad, home).is_err(), "{bad}");
+    }
+}

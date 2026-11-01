@@ -1,5 +1,6 @@
 //! SQLite persistence for Machines, Sessions, Commands, Events, and Metrics.
 
+mod complete;
 mod error;
 pub mod health;
 mod lineage;
@@ -24,6 +25,7 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
+pub use complete::CompletionQuery;
 pub use error::StoreError;
 pub use log_cursors::StoredLogCursor;
 pub use metrics::{MinuteMetric, RawMetricSample};
@@ -54,6 +56,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
     (10, include_str!("../migrations/010_pairing_requests.sql")),
     (11, include_str!("../migrations/011_health.sql")),
     (12, include_str!("../migrations/012_search.sql")),
+    (13, include_str!("../migrations/013_complete.sql")),
 ];
 
 /// Thread-safe connection to one terminal-agent SQLite database.

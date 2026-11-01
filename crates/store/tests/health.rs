@@ -222,7 +222,7 @@ fn an_existing_database_migrates_to_the_health_tables() {
     let _ = std::fs::remove_file(&path);
     drop(Store::open(&path).unwrap());
     let store = Store::open(&path).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 12);
+    assert_eq!(store.schema_version().unwrap(), 13);
     store.record_health_samples(&[echo(T0, 5.0)]).unwrap();
     drop(store);
     let _ = std::fs::remove_file(&path);

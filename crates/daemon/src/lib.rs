@@ -11,6 +11,7 @@ pub mod adapter_config;
 pub mod api;
 pub mod audit;
 pub mod auth;
+pub mod complete;
 pub mod config;
 pub mod control;
 pub mod entry;

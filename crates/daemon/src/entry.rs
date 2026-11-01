@@ -284,6 +284,14 @@ pub async fn run() -> Result<(), DaemonError> {
     spawn_external_monitor(sessions.clone());
     let local_socket =
         UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
+    let (recipes, recipe_diagnostics) =
+        RecipeCatalog::load(Some(home.join(".config/terminal-agent/recipes")));
+    for diagnostic in recipe_diagnostics {
+        tracing::warn!(path = %diagnostic.path.display(), reason = %diagnostic.message, "Recipe file ignored or overridden");
+    }
+    let completer = crate::complete::Completer::new(config.complete);
+    let handler_completer = completer.clone();
+    let handler_recipes = recipes.clone();
     let handler_sessions = sessions.clone();
     let handler_link = link.clone();
     let handler_control = control.clone();
@@ -293,8 +301,32 @@ pub async fn run() -> Result<(), DaemonError> {
         let link = handler_link.clone();
         let control = handler_control.clone();
         let data_dir = handler_data_dir.clone();
+        let completer = handler_completer.clone();
+        let recipes = handler_recipes.clone();
         Box::pin(async move {
             match request {
+                LocalRequest::Complete {
+                    session_id,
+                    prefix,
+                    cwd,
+                    include_failed,
+                    limit,
+                } => {
+                    let args = crate::complete::CompleteArgs {
+                        session_id,
+                        prefix: &prefix,
+                        cwd: cwd.as_deref(),
+                        include_failed,
+                        limit,
+                    };
+                    match completer.answer(&sessions, &recipes.list(), &args) {
+                        Ok(completions) => protocol::LocalResponse::Completions { completions },
+                        Err(error) => protocol::LocalResponse::Error {
+                            code: protocol::LocalErrorCode::Internal,
+                            message: error.to_string(),
+                        },
+                    }
+                }
                 LocalRequest::WriteHealthReport { range, names } => {
                     let Some(control) = control else {
                         return protocol::LocalResponse::Error {
@@ -341,11 +373,6 @@ pub async fn run() -> Result<(), DaemonError> {
         })
     });
     let shutdown_sessions = sessions.clone();
-    let (recipes, recipe_diagnostics) =
-        RecipeCatalog::load(Some(home.join(".config/terminal-agent/recipes")));
-    for diagnostic in recipe_diagnostics {
-        tracing::warn!(path = %diagnostic.path.display(), reason = %diagnostic.message, "Recipe file ignored or overridden");
-    }
     let configured_control_origin = config
         .control
         .as_ref()
@@ -504,6 +531,7 @@ pub async fn run() -> Result<(), DaemonError> {
         .with_control(control)
         .with_link(link)
         .with_recipes(recipes)
+        .with_completer(completer)
         .with_notifications(notifications)
         .with_push(push)
         .with_release(release)

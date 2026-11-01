@@ -116,9 +116,13 @@ Command where CUDA ran out of memory, across two Machines, in under 50 ms.
 
 Goal: the command you want, in fewer keystrokes, wherever you type. Folds in `prompts/06` §3.
 
-- [ ] `COMPLETE { session_id?, prefix, cwd, project? }` on the daemon and the
-      local socket; frecency ranking (count × 7-day half-life) with project,
-      cwd, and success bonuses and a failure penalty (weights in config)
+- [x] `COMPLETE { session_id?, prefix, cwd?, include_failed?, limit }` on
+      the daemon's WebSocket and the local socket; frecency ranking (count ×
+      7-day half-life) with project, cwd, and success bonuses and a failure
+      penalty; weights in `[complete]` (`docs/SETUP.md`); Commands that never
+      succeeded are left out by default; Recipes follow history
+      (`protocol::complete`, `daemon::complete`, migration 013). The project
+      bonus waits for project assignment below
 - [ ] Shell: zsh widget (Ctrl-Space) and bash/fish equivalents through
       `sentinal hook`; never replaces the shell's own Tab completion
 - [ ] Prompt: `run`, `new`, and `find` complete Commands and recipe
@@ -127,7 +131,8 @@ Goal: the command you want, in fewer keystrokes, wherever you type. Folds in `pr
       on the current line, replacing the static "recent commands" chips
 - [ ] Projects (`prompts/06` §1): auto-assign by cwd, so completion ranks
       the current project first
-- [ ] Budget: p95 < 20 ms on 100 000 history rows; the spec example ranks
+- [x] Budget: p95 < 20 ms on 100 000 history rows (11.4 ms; ignored timed
+      test in `crates/daemon/tests/complete.rs`); the spec example ranks
       `python train.py` (31×) before `python train.py --config…` before the recipe
 
 **Demo:** in a fresh shell, `py` then Ctrl-Space offers `python train.py

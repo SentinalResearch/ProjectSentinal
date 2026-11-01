@@ -151,6 +151,22 @@ pub enum ClientRequest {
         /// Maximum number of Events, from 1 through 500.
         limit: u32,
     },
+    /// Rank Command lines that start with `prefix` (5.A).
+    Complete {
+        /// The Session being typed into; its cwd and project apply.
+        #[serde(default)]
+        session_id: Option<SessionId>,
+        /// What is on the line so far.
+        prefix: String,
+        /// The directory being typed in; overrides the Session's.
+        #[serde(default)]
+        cwd: Option<String>,
+        /// Also offer Commands that never succeeded.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        include_failed: bool,
+        /// Most completions, 1 through [`crate::complete::MAX_COMPLETE_LIMIT`].
+        limit: u32,
+    },
     /// Search this Machine's Sessions, Commands, Events, and Recipes (5.S).
     Search {
         /// What the owner typed.
@@ -264,6 +280,9 @@ impl ClientRequest {
                     maximum: 500,
                 })
             }
+            ClientRequest::Complete {
+                prefix, cwd, limit, ..
+            } => crate::complete::validate_request(prefix, cwd.as_deref(), *limit),
             ClientRequest::Search { query, .. }
                 if query.len() > crate::search::MAX_SEARCH_QUERY_BYTES =>
             {
@@ -389,6 +408,22 @@ pub enum LocalRequest {
         /// Whether Machines are named.
         names: crate::health_report::ReportNames,
     },
+    /// Rank Command lines that start with `prefix` (5.A).
+    Complete {
+        /// The Session being typed into; its cwd and project apply.
+        #[serde(default)]
+        session_id: Option<SessionId>,
+        /// What is on the line so far.
+        prefix: String,
+        /// The directory being typed in; overrides the Session's.
+        #[serde(default)]
+        cwd: Option<String>,
+        /// Also offer Commands that never succeeded.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        include_failed: bool,
+        /// Most completions, 1 through [`crate::complete::MAX_COMPLETE_LIMIT`].
+        limit: u32,
+    },
 }
 
 impl LocalRequest {
@@ -479,6 +514,9 @@ impl LocalRequest {
             | LocalRequest::DisconnectControl
             | LocalRequest::ResetIdentity
             | LocalRequest::WriteHealthReport { .. } => Ok(()),
+            LocalRequest::Complete {
+                prefix, cwd, limit, ..
+            } => crate::complete::validate_request(prefix, cwd.as_deref(), *limit),
         }
     }
 }
@@ -559,6 +597,11 @@ pub enum LocalResponse {
     Handoff {
         /// One entry per active worker.
         workers: Vec<crate::pairing::WorkerHandoff>,
+    },
+    /// Reply to `COMPLETE`, best first.
+    Completions {
+        /// Ranked completions.
+        completions: Vec<crate::complete::Completion>,
     },
     /// The health report was written (owner-only file in the data directory).
     HealthReportWritten {
@@ -700,6 +743,11 @@ pub enum DaemonMessage {
     History {
         /// Commands matching the history request.
         commands: Vec<Command>,
+    },
+    /// Reply to `COMPLETE`, best first.
+    Completions {
+        /// Ranked completions.
+        completions: Vec<crate::complete::Completion>,
     },
     /// Reply to `SEARCH`, best first.
     SearchResults {

@@ -45,7 +45,7 @@ pub struct ControlConfig {
 pub const DEFAULT_HEARTBEAT_INTERVAL_MS: u64 = 30_000;
 
 /// Configuration used to start the daemon.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DaemonConfig {
     /// Localhost or Tailscale address on which the daemon listens.
     pub bind: SocketAddr,
@@ -81,6 +81,8 @@ pub struct DaemonConfig {
     pub control_read_model: bool,
     /// Session-log retention limits (`[storage]`).
     pub storage: crate::storage::StorageLimits,
+    /// Autocomplete ranking weights (`[complete]`, 5.A).
+    pub complete: protocol::complete::CompletionWeights,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -106,6 +108,8 @@ struct RawConfig {
     control_read_model: bool,
     control: Option<RawControlConfig>,
     storage: Option<RawStorageConfig>,
+    #[serde(default)]
+    complete: protocol::complete::CompletionWeights,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -143,6 +147,9 @@ struct RawPackageConfig {
 /// Errors produced while loading daemon configuration.
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
+    /// A `[complete]` weight was negative, not finite, or a zero half-life.
+    #[error("invalid [complete] setting: {0}")]
+    InvalidComplete(String),
     /// A `[storage]` limit was zero.
     #[error("invalid [storage] setting: {0} must be at least 1")]
     InvalidStorage(&'static str),
@@ -296,6 +303,12 @@ impl DaemonConfig {
             control,
             control_read_model: raw.control_read_model,
             storage: parse_storage(raw.storage)?,
+            complete: {
+                raw.complete
+                    .validate()
+                    .map_err(ConfigError::InvalidComplete)?;
+                raw.complete
+            },
         })
     }
 }

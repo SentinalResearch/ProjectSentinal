@@ -22,11 +22,13 @@
 //! - [`auth`]     — single-user password authentication over HTTP
 //! - [`link`]     — Machine enrollment, the control registry, and worker links
 //! - [`search`]   — search everywhere and its shared ranking (5.S)
+//! - [`complete`] — autocomplete and its frecency formula (5.A)
 
 pub mod agent;
 pub mod auth;
 pub mod command;
 pub mod command_line;
+pub mod complete;
 pub mod error;
 pub mod event;
 pub mod evidence;
