@@ -272,19 +272,19 @@ function MachineLane({
           </div>
         )}
       </div>
-      {online ? (
-        <div className={styles.cards}>
-          {sessions.length === 0 && <p className={styles.laneNote}>No Sessions.</p>}
-          {sessions.map((session) => (
-            <LaneCard key={session.id} session={session} samples={sparks[session.id]} onOpen={() => onOpen(session.id)} />
-          ))}
-        </div>
-      ) : (
-        <p className={styles.laneNote}>
-          {STATUS_WORD[machine.status]} · {machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "not seen yet"} · sessions
-          resume when it reconnects
-        </p>
-      )}
+      {/* An unreachable Machine keeps its last snapshot visible (milestone 4.A), dimmed, under one note. */}
+      <div className={styles.cards}>
+        {!online && (
+          <p className={styles.laneNote}>
+            {STATUS_WORD[machine.status]} · {machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "not seen yet"} · sessions
+            resume when it reconnects
+          </p>
+        )}
+        {online && sessions.length === 0 && <p className={styles.laneNote}>No Sessions.</p>}
+        {sessions.map((session) => (
+          <LaneCard key={session.id} session={session} samples={sparks[session.id]} onOpen={() => onOpen(session.id)} />
+        ))}
+      </div>
     </GlassPanel>
   );
 }

@@ -334,6 +334,7 @@
 }
 
 .laneNote {
+  flex-basis: 100%;
   align-self: center;
   font-family: var(--font-mono);
   font-size: 13px;
