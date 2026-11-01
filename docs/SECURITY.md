@@ -30,6 +30,9 @@ checkbox are complete. The live remediation status is in `AUDIT_TRACKER.md`.
   to use bearer/link headers, and production rejects query-token auth.
 - Every remote terminal input frame appends timestamp, client address,
   Session ID, and byte count to `audit.jsonl`. The input payload is excluded.
+  The record is written before the bytes reach the PTY and input that cannot
+  be recorded is refused, so a record means input was attempted (a write that
+  loses a race with the shell exiting is recorded but never delivered).
 - Finished FULL Sessions reject input, resize, signal, and kill before a PTY
   handle or input audit entry is touched. A closed-device race is reconciled
   once and returned as a stable Session error, never a raw OS `EIO`.

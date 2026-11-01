@@ -623,7 +623,12 @@ async fn closed_pty_write_race_reconciles_once_and_returns_a_stable_error() {
     }
     assert!(fake.operation_counts(session.id).unwrap().writes <= 1);
     assert_eq!(fake.input(session.id).unwrap(), b"");
-    assert!(!data_dir.join("audit.jsonl").exists());
+    // Input is audited before the write (fail closed), so the attempt that
+    // lost the race is recorded once; the reconciled retry is refused before
+    // the audit and adds nothing. The payload is never recorded.
+    let audit = fs::read_to_string(data_dir.join("audit.jsonl")).unwrap();
+    assert_eq!(audit.lines().count(), 1, "{audit}");
+    assert!(!audit.contains("secret-race-input"));
     fs::remove_dir_all(data_dir).unwrap();
 }
 
