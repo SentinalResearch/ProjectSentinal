@@ -59,7 +59,7 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][1]).toBe("y\r");
     expect(screen.queryByRole("dialog", { name: "Prompt" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("where")).toHaveTextContent("/app/history");
+    expect(screen.getByRole("button", { name: /You are on History/ })).toBeInTheDocument();
   });
 
   it("⌘K opens it, go navigates, Escape closes and returns focus", async () => {
@@ -71,7 +71,7 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
     await user.keyboard("go history");
     expect(screen.getByRole("option", { selected: true })).toHaveTextContent("go history");
     await user.keyboard("{Enter}");
-    expect(screen.getByTestId("where")).toHaveTextContent("/app/history");
+    expect(await screen.findByRole("button", { name: /You are on History/ })).toBeInTheDocument();
 
     const button = screen.getByRole("button", { name: "Open the prompt" });
     await user.click(button);
@@ -117,4 +117,30 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
     expect(screen.queryByRole("dialog", { name: "Prompt" })).not.toBeInTheDocument();
     field.remove();
   });
+
+  it("keeps the pages you leave as sheets; ⌘[ and a click bring them back", async () => {
+    renderShell("/app/history");
+    await islandReady();
+    const user = userEvent.setup();
+    const go = async (text: string) => {
+      await user.keyboard("/");
+      await user.keyboard(text);
+      await user.keyboard("{Enter}");
+    };
+
+    await go("go recipes");
+    await go("go split");
+    expect(await screen.findByRole("button", { name: /You are on Split view/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Back to/ }).map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Back to Recipes",
+      "Back to History",
+    ]);
+
+    await user.keyboard("{Meta>}[[{/Meta}");
+    expect(await screen.findByRole("button", { name: /You are on Recipes/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Back to History" }));
+    expect(await screen.findByRole("button", { name: /You are on History/ })).toBeInTheDocument();
+    // Real pages (split view mounts terminals) render slowly under jsdom.
+  }, 20_000);
 });

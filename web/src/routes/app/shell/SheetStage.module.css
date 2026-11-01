@@ -1,0 +1,67 @@
+.stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Every page has its own scroll container and clears the island itself. */
+.frame {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: var(--sheets-width);
+  overflow: auto;
+  padding-top: var(--shell-top);
+  visibility: hidden;
+}
+
+.frame[data-current] {
+  visibility: visible;
+  z-index: 10;
+}
+
+/* The current page sits above the sheets: right corners and a shadow (§6). */
+.frame[data-raised] {
+  background: var(--bg-app);
+  border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
+  box-shadow: 20px 0 60px -10px rgba(0, 0, 0, 0.9);
+}
+
+.sliver {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 0 18px;
+  border: 0;
+  background: var(--glass-sheet);
+  border-radius: var(--radius-panel) 0 0 var(--radius-panel);
+  box-shadow: inset 1px 0 0 var(--glass-edge-soft);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.sliver:hover {
+  color: var(--text-1);
+}
+
+.sliver:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: -4px;
+}
+
+.label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  max-height: 60vh;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

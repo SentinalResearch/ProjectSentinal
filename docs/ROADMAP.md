@@ -309,7 +309,7 @@ Desktop ≥ 1024 px only; 768–1023 px keeps the sidebar and phones keep `MOBIL
 - [x] Glass tokens and `GlassPill` / `GlassPanel` / `AttentionCard`, with a no-`backdrop-filter` fallback
 - [x] Shell: no sidebar on desktop; Live island with the FAILED > WAITING > STALLED > RUNNING ticker
 - [x] Prompt: ⌘K, `/`, island button; deterministic `go`, `y|n`, `run`, `find`, `split`, `kill`, fuzzy fallback
-- [ ] Sheets: back history of up to 3 pages, ⌘[ to pop, restore keeps scroll and terminal attachment
+- [x] Sheets: back history of up to 3 pages, ⌘[ to pop, restore keeps scroll and terminal attachment
 - [ ] Dashboard: needs-you cards with inline actions, Machine lanes with sparklines, "While you were away"
 - [ ] Session page: full-height terminal left, details right, fitted with a ResizeObserver
 - [ ] Every page reachable from the prompt; `/`, `y`, `↵` answers a WAITING Session from any page; accessibility audit ≥ 95

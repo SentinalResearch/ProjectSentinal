@@ -64,9 +64,7 @@ export function AppShell() {
   if (isGlass) {
     return (
       <LiveDataProvider>
-        <GlassShell>
-          <Outlet />
-        </GlassShell>
+        <GlassShell />
       </LiveDataProvider>
     );
   }

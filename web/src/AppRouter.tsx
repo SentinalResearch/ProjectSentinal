@@ -3,16 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { SetupPage } from "./routes/auth/SetupPage";
 import { LoginPage } from "./routes/auth/LoginPage";
 import { AppShell } from "./routes/app/AppShell";
-import { OverviewPage } from "./routes/app/OverviewPage";
-import { SessionDetailPage } from "./routes/app/SessionDetailPage";
-import { SplitViewPage } from "./routes/app/SplitViewPage";
-import { ProjectPage } from "./routes/app/ProjectPage";
-import { HistoryPage } from "./routes/app/HistoryPage";
-import { RecipesPage } from "./routes/app/RecipesPage";
-import { SettingsPage } from "./routes/app/SettingsPage";
+import { APP_PAGES } from "./routes/app/pages";
 import { LandingPage } from "./routes/landing/LandingPage";
-import { MoreRedirect } from "./routes/app/phone/SettingsHome";
-import { SessionTerminalRoute } from "./routes/app/phone/PhoneTerminal";
 import { PublicAuthGuard, RequireAuth } from "./routes/guards";
 
 export function AppRouter() {
@@ -27,19 +19,15 @@ export function AppRouter() {
         </Route>
 
         <Route element={<RequireAuth />}>
-          <Route path="/app" element={<AppShell />}>
-            <Route index element={<OverviewPage />} />
-            <Route path="overview" element={<OverviewPage />} />
-            <Route path="sessions/:id" element={<SessionDetailPage />} />
-            <Route path="sessions/:id/terminal" element={<SessionTerminalRoute />} />
-            <Route path="split" element={<SplitViewPage />} />
-            <Route path="projects/:id" element={<ProjectPage />} />
-            <Route path="history" element={<HistoryPage />} />
-            <Route path="recipes" element={<RecipesPage />} />
-            <Route path="recipes/:id" element={<RecipesPage />} />
-            <Route path="more" element={<MoreRedirect />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="settings/:tab" element={<SettingsPage />} />
+          {/* "/*": the glass shell renders its page frames as descendant routes. */}
+          <Route path="/app/*" element={<AppShell />}>
+            {APP_PAGES.map((page) =>
+              page.index ? (
+                <Route key="index" index element={page.element} />
+              ) : (
+                <Route key={page.path} path={page.path} element={page.element} />
+              ),
+            )}
           </Route>
         </Route>
 

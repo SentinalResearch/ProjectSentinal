@@ -7,6 +7,7 @@ import { StateTag } from "../../components/StateTag";
 import { slugifyProject } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
 import { useIsPhone } from "../../hooks/useViewport";
+import { useShell } from "./shell/ShellContext";
 import styles from "./HistoryPage.module.css";
 import { PhoneHistory } from "./phone/PhoneHistory";
 import { DATE_BUCKETS, historyRowState, RESULT_LABEL, RESULTS, useHistoryQuery } from "./useHistoryQuery";
@@ -35,9 +36,12 @@ function DesktopHistory() {
     reset,
   } = useHistoryQuery();
 
+  // Under the glass shell the prompt is the way to search, and "/" must reach
+  // it from every page, so History does not take focus on arrival there.
+  const glass = useShell() !== null;
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (!glass) inputRef.current?.focus();
+  }, [glass]);
 
   function chipStyle(on: boolean) {
     return {

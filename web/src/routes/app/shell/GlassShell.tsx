@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../../context/AuthContext";
@@ -10,17 +10,11 @@ import { InterruptConfirm } from "../InterruptConfirm";
 import { useNewSession } from "../NewSession";
 import { LiveIsland } from "./LiveIsland";
 import { PromptBar } from "./PromptBar";
+import { SheetStage } from "./SheetStage";
+import { typingInto } from "./typing";
 import type { PromptSuggestion } from "./promptGrammar";
 import { ShellContext, type ShellValue } from "./ShellContext";
 import styles from "./GlassShell.module.css";
-
-/** True when a key press is aimed at a text field (so "/" must type, not open the prompt). */
-export function typingInto(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target.closest(".xterm")) return true;
-  return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-}
 
 /**
  * Desktop (≥ 1024 px) shell: the Live island on top, the routed page below,
@@ -28,7 +22,7 @@ export function typingInto(target: EventTarget | null): boolean {
  * the prompt; it only proposes, and this shell performs the chosen action
  * with the app's usual confirmations.
  */
-export function GlassShell({ children }: { children: ReactNode }) {
+export function GlassShell() {
   const navigate = useNavigate();
   const { machines, terminals } = useLiveData();
   const { toggleTheme } = useTheme();
@@ -103,7 +97,7 @@ export function GlassShell({ children }: { children: ReactNode }) {
         <div className={styles.glow} aria-hidden="true" />
         <LiveIsland onOpenPrompt={openPrompt} />
         <main className={styles.main} id="main" inert={prompt ? true : undefined}>
-          {children}
+          <SheetStage />
         </main>
         {prompt && <PromptBar initialText={prompt.text} onClose={closePrompt} onChoose={perform} />}
         <InterruptConfirm

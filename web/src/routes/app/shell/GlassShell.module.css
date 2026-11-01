@@ -14,10 +14,9 @@
   background: radial-gradient(900px 520px at 12% -8%, var(--glow-accent), transparent 70%);
 }
 
+/* Page frames (SheetStage) scroll themselves and clear the island. */
 .main {
   position: relative;
   height: 100%;
-  overflow: auto;
-  /* Pages draw their own content; the shell only clears the island. */
-  padding-top: var(--shell-top);
+  overflow: hidden;
 }
