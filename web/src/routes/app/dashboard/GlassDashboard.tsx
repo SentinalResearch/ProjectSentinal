@@ -46,11 +46,11 @@ export function GlassDashboard() {
     <div className={styles.page}>
       <div className={styles.main}>
         <header className={styles.header}>
-          <p className={styles.overline}>
-            {date} · {terminals.length} session{terminals.length === 1 ? "" : "s"} on {online} machine{online === 1 ? "" : "s"}
-          </p>
-          <div className={styles.heroRow}>
-            <h1 className={styles.hero}>{loading ? "Loading…" : needs.length > 0 ? `${needs.length} need${needs.length === 1 ? "s" : ""} you.` : "All quiet."}</h1>
+          <div className={styles.overlineRow}>
+            <p className={styles.overline}>
+              {date} · {terminals.length} session{terminals.length === 1 ? "" : "s"} on {online} machine{online === 1 ? "" : "s"}
+            </p>
+            {/* A view filter, kept apart from the prompt hint below. */}
             <button
               type="button"
               className={styles.filter}
@@ -60,6 +60,9 @@ export function GlassDashboard() {
             >
               AI agents
             </button>
+          </div>
+          <div className={styles.heroRow}>
+            <h1 className={styles.hero}>{loading ? "Loading…" : needs.length > 0 ? `${needs.length} need${needs.length === 1 ? "s" : ""} you.` : "All quiet."}</h1>
             {shell && (
               <button type="button" className={styles.hint} onClick={() => shell.openPrompt()}>
                 press <kbd>/</kbd> to do anything

@@ -8,13 +8,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Content clears the island (112 px) and the prompt pill (110 px), plus safe areas. */
+/* Content clears the island (7 px + 46 px, plus 23 px air) and the prompt pill (110 px), plus safe areas. */
 .main {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding-top: calc(var(--safe-top) + 112px);
+  padding-top: calc(var(--safe-top) + 76px);
   padding-bottom: calc(var(--safe-bottom) + 110px);
 }
 
