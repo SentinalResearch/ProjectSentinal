@@ -47,7 +47,7 @@ describe("AgentsTab", () => {
     await user.selectOptions(screen.getByLabelText("Level"), "SUGGEST");
     await user.click(screen.getByRole("button", { name: "Create agent" }));
 
-    expect(calls.create).toHaveBeenCalledWith("codex", "SUGGEST");
+    expect(calls.create).toHaveBeenCalledWith("codex", "SUGGEST", false);
     const reveal = await screen.findByRole("region", { name: "New agent token" });
     expect(within(reveal).getByText(TOKEN)).toBeInTheDocument();
     expect(within(reveal).getByText(/sentinal mcp --control/)).toBeInTheDocument();
@@ -56,6 +56,17 @@ describe("AgentsTab", () => {
     await user.click(within(reveal).getByRole("button", { name: "I've saved it" }));
     expect(screen.queryByText(TOKEN)).not.toBeInTheDocument();
     expect(calls.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks for terminal output access only when ticked", async () => {
+    const user = userEvent.setup();
+    calls.create.mockResolvedValue({ agent: { ...CLAUDE, name: "translator", output_access: true }, token: TOKEN });
+    render(<AgentsTab />);
+    await user.type(await screen.findByLabelText("Name"), "translator");
+    await user.selectOptions(screen.getByLabelText("Level"), "ANNOTATE");
+    await user.click(screen.getByRole("checkbox", { name: /Can read terminal output/ }));
+    await user.click(screen.getByRole("button", { name: "Create agent" }));
+    expect(calls.create).toHaveBeenCalledWith("translator", "ANNOTATE", true);
   });
 
   it("checks the name before asking the control", async () => {

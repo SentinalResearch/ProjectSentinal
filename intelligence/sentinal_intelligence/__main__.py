@@ -30,6 +30,17 @@ def parser() -> argparse.ArgumentParser:
     translate.add_argument("--model", default=os.environ.get("SENTINAL_MODEL", "sentinal-functiongemma"))
     translate.add_argument("--format", choices=formats.FORMATS, default="functiongemma")
     translate.add_argument("--timeout", type=float, default=10.0)
+
+    serve = commands.add_parser("serve", help="translate the Sessions the owner allows and propose Events (6.2)")
+    serve.add_argument("--control", default=os.environ.get("SENTINAL_CONTROL_URL"), required="SENTINAL_CONTROL_URL" not in os.environ,
+                       help="the control origin, e.g. https://sentinal.<tailnet>.ts.net")
+    serve.add_argument("--token-file", type=Path, help="agent token file (else SENTINAL_AGENT_TOKEN); the agent needs level 1 and output access")
+    serve.add_argument("--base-url", default=os.environ.get("SENTINAL_MODEL_URL"), required="SENTINAL_MODEL_URL" not in os.environ,
+                       help="the local model server")
+    serve.add_argument("--model", default=os.environ.get("SENTINAL_MODEL", "sentinal-functiongemma"))
+    serve.add_argument("--format", choices=formats.FORMATS, default="functiongemma")
+    serve.add_argument("--timeout", type=float, default=10.0)
+    serve.add_argument("--interval", type=float, default=10.0, help="seconds between passes (and per-Session model calls)")
     return root
 
 
@@ -37,8 +48,20 @@ def _default_model(args: argparse.Namespace):
     return llm.model_client(args.base_url, args.model, args.format, os.environ.get("SENTINAL_MODEL_API_KEY"), args.timeout)
 
 
+def _serve(args: argparse.Namespace) -> int:
+    from .control import AgentApi
+    from .serve import serve_forever
+
+    token = args.token_file.read_text(encoding="utf-8").strip() if args.token_file else os.environ.get("SENTINAL_AGENT_TOKEN", "")
+    api = AgentApi(args.control, token)
+    serve_forever(api, Translator(_default_model(args), min_interval=args.interval), args.interval)
+    return 0
+
+
 def main(argv: list[str] | None = None, model_factory=_default_model) -> int:
     args = parser().parse_args(argv)
+    if args.command_name == "serve":
+        return _serve(args)
     screen = sys.stdin.read() if str(args.screen_file) == "-" else args.screen_file.read_text(encoding="utf-8", errors="replace")
     proposal = Translator(model_factory(args), min_interval=0).propose("cli", args.command, screen)
     if proposal is None:

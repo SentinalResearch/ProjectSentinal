@@ -5,7 +5,9 @@
 //! credentials; each side keeps only a hash of the one it verifies.
 
 mod agent_routes;
+pub mod agent_output;
 pub mod agents;
+mod proposals;
 mod approval;
 mod approval_claim;
 mod approval_routes;
@@ -171,6 +173,8 @@ pub struct ControlService {
     projection_pending: Arc<Mutex<std::collections::HashMap<MachineId, bool>>>,
     /// Agent tokens (Milestone 6.0).
     agents: agents::AgentRegistry,
+    /// Output grants and inferred Events (6.2).
+    agent_output: agent_output::AgentOutput,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -216,8 +220,12 @@ impl ControlService {
         let agents =
             agents::AgentRegistry::open(&settings.secrets_file.with_file_name("agent-tokens.json"))
                 .map_err(|error| ControlError(error.to_string()))?;
+        let agent_output = agent_output::AgentOutput::open(
+            settings.secrets_file.parent().unwrap_or(std::path::Path::new(".")),
+        );
         let service = ControlService {
             agents,
+            agent_output,
             store,
             audit: LinkAudit::new(&settings.audit_dir, "pairing-audit.jsonl"),
             settings: Arc::new(settings),
@@ -242,6 +250,11 @@ impl ControlService {
     /// Agent tokens on this control.
     pub fn agents(&self) -> &agents::AgentRegistry {
         &self.agents
+    }
+
+    /// Output grants and inferred Events (6.2).
+    pub fn agent_output(&self) -> &agent_output::AgentOutput {
+        &self.agent_output
     }
 
     /// The control clock.

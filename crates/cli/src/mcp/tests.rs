@@ -28,6 +28,7 @@ impl Backend for FakeControl {
             id: "agt_3f9c1a2b4d5e6f70".into(),
             name: "claude".into(),
             level: AgentLevel::Observe,
+            output_access: false,
         })
     }
 

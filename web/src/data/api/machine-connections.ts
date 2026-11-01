@@ -18,6 +18,11 @@ function splitComposite(value: string): [string, number] {
   return [machine, local];
 }
 
+/** Machine and Machine-local Session ID from a browser composite identity. */
+export function splitSessionId(value: string): [string, number] {
+  return splitComposite(value);
+}
+
 /** Owning Machine from a browser composite identity. */
 export function machineId(value: string): string {
   return splitComposite(value)[0];

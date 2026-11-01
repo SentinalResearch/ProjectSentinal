@@ -404,6 +404,10 @@ pub fn router(state: AppState) -> Router {
     )
     .with_push(state.push.clone())
     .with_release(state.release.clone())
+    .with_local_screen({
+        let local = state.clone();
+        std::sync::Arc::new(move |session_id| screen_of(&local, session_id))
+    })
     .router();
     let origins = state.origins.clone();
     Router::new()
@@ -412,6 +416,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/pairing/proof/{request_id}", get(pairing_proof))
         .route("/api/v1/link/update", axum::routing::post(link_update))
         .route("/api/v1/link/move", axum::routing::post(link_move))
+        .route("/api/v1/link/screen/{session_id}", get(link_screen))
         .merge(auth_routes::routes())
         .merge(protected)
         .with_state(state)
@@ -420,6 +425,65 @@ pub fn router(state: AppState) -> Router {
             origins,
             crate::origin::enforce,
         ))
+}
+
+/// 6.2: the current screen of one FULL Session, redacted, for the control to
+/// hand to an agent the owner allowed. Only this link's control credential
+/// is accepted; the control enforces the per-agent and per-Session grants.
+async fn link_screen(
+    State(state): State<AppState>,
+    axum::extract::Path(session_id): axum::extract::Path<u64>,
+    request: Request,
+) -> Response {
+    let authorized = state.link.as_ref().is_some_and(|link| {
+        auth_routes::bearer_from_headers(request.headers())
+            .and_then(|bearer| link.verify_control_credential(bearer))
+            .is_some()
+    });
+    if !authorized {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    match screen_of(&state, SessionId(session_id)) {
+        Ok(screen) => Json(screen).into_response(),
+        Err(status) => status.into_response(),
+    }
+}
+
+pub(crate) fn screen_of(
+    state: &AppState,
+    session_id: SessionId,
+) -> Result<protocol::agent::AgentScreen, StatusCode> {
+    let session = state
+        .sessions
+        .session(session_id)
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+    if session.capture != protocol::CaptureLevel::Full {
+        return Err(StatusCode::CONFLICT);
+    }
+    let raw = state
+        .sessions
+        .scrollback(session_id)
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+    let (lines, mut redacted) =
+        watcher::redact::screen_text(&raw, protocol::agent::AGENT_SCREEN_LINES);
+    let command = state
+        .sessions
+        .history(Some(session_id), 1)
+        .ok()
+        .and_then(|commands| commands.into_iter().next())
+        .filter(|command| command.exit_code.is_none())
+        .map(|command| {
+            let (text, count) = watcher::redact::redact(&command.text);
+            redacted += count;
+            text
+        });
+    Ok(protocol::agent::AgentScreen {
+        machine_id: state.machine.id.clone(),
+        session_id,
+        command,
+        lines,
+        redacted,
+    })
 }
 
 /// The control asks this worker to update itself; only the control's

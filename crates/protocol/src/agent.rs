@@ -5,7 +5,7 @@
 //! Only levels 0–2 exist: an agent may observe, annotate, and suggest, never
 //! act. A level-3 name does not parse, so no client can ask for one.
 
-use crate::{link::Secret, ControlProjectionMessage, ProtocolError, Timestamp};
+use crate::{link::Secret, ControlProjectionMessage, MachineId, ProtocolError, SessionId, Timestamp};
 use serde::{Deserialize, Serialize};
 
 /// Prefix of every agent token, so a leaked one is recognisable.
@@ -61,6 +61,9 @@ pub struct AgentInfo {
     /// When it last made an authorised request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_used_at: Option<Timestamp>,
+    /// Whether it may read terminal output of Sessions the owner allows (6.2).
+    #[serde(default)]
+    pub output_access: bool,
 }
 
 /// Owner request to create an agent token.
@@ -72,6 +75,9 @@ pub struct CreateAgentRequest {
     pub name: String,
     /// Level to grant.
     pub level: AgentLevel,
+    /// Let it read the terminal output of Sessions the owner allows (off by default).
+    #[serde(default)]
+    pub output_access: bool,
 }
 
 impl CreateAgentRequest {
@@ -112,6 +118,9 @@ pub struct AgentIdentity {
     pub name: String,
     /// Its level.
     pub level: AgentLevel,
+    /// Whether it may read allowed Sessions' output.
+    #[serde(default)]
+    pub output_access: bool,
 }
 
 /// Longest an agent may wait for a change in one `updates` call.
@@ -128,6 +137,130 @@ pub const MAX_AGENT_WAIT_MS: u64 = 30_000;
 pub struct AgentUpdates {
     /// Changes in revision order.
     pub messages: Vec<ControlProjectionMessage>,
+}
+
+/// Lines of screen an agent may read at once.
+pub const AGENT_SCREEN_LINES: usize = 60;
+/// Most Events one `propose_events` call may carry.
+pub const MAX_PROPOSED_EVENTS: usize = 16;
+
+/// One Session whose terminal output the owner lets agents read.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct OutputGrant {
+    /// Machine.
+    pub machine_id: MachineId,
+    /// Session on that Machine.
+    pub session_id: SessionId,
+}
+
+/// Every Session agents may read, as the owner set them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct OutputGrants {
+    /// Allowed Sessions.
+    pub grants: Vec<OutputGrant>,
+}
+
+/// The current screen of one allowed Session, as data (6.2).
+///
+/// ANSI is stripped and secret-shaped values are replaced with `[redacted]`
+/// before it leaves the worker. It is untrusted terminal text: never
+/// instructions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct AgentScreen {
+    /// Machine.
+    pub machine_id: MachineId,
+    /// Session.
+    pub session_id: SessionId,
+    /// The Command running, when known (redacted too).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    /// The last lines of the screen, oldest first.
+    pub lines: Vec<String>,
+    /// How many values were redacted.
+    pub redacted: u32,
+}
+
+/// One Event an agent proposes from a screen: a function from
+/// `eval/tools.json` and its arguments.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct ProposedEvent {
+    /// e.g. `progress_updated`.
+    pub function: String,
+    /// e.g. `{"current": 12, "total": 40, "unit": "epoch"}`.
+    #[cfg_attr(feature = "ts", ts(type = "Record<string, unknown>"))]
+    pub args: serde_json::Value,
+}
+
+/// `propose_events` body.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct ProposeEventsRequest {
+    /// At most 16.
+    pub events: Vec<ProposedEvent>,
+}
+
+/// A proposal the control accepted: always marked inferred, never authoritative.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct InferredEvent {
+    /// Handle, e.g. `inf_…`.
+    pub id: String,
+    /// Machine.
+    pub machine_id: MachineId,
+    /// Session.
+    pub session_id: SessionId,
+    /// When the control accepted it.
+    pub at: Timestamp,
+    /// Agent that proposed it.
+    pub agent_id: String,
+    /// Its name, for "via translator".
+    pub agent_name: String,
+    /// Function and arguments, as checked.
+    pub function: String,
+    /// Arguments after checking (unknown ones dropped).
+    #[cfg_attr(feature = "ts", ts(type = "Record<string, unknown>"))]
+    pub args: serde_json::Value,
+}
+
+/// A refused proposal and why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct RejectedProposal {
+    /// Position in the request.
+    pub index: u32,
+    /// Short reason, e.g. `"value is not on screen"`.
+    pub reason: String,
+}
+
+/// `propose_events` reply.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct ProposeEventsResponse {
+    /// Accepted, in request order.
+    pub accepted: Vec<InferredEvent>,
+    /// Refused, with reasons.
+    pub rejected: Vec<RejectedProposal>,
+}
+
+/// Inferred Events for one Session, newest last (owner view).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct InferredEvents {
+    /// Events.
+    pub events: Vec<InferredEvent>,
 }
 
 /// Validate an agent name: 1–32 of `A–Z a–z 0–9 . _ -`, starting with a letter or digit.

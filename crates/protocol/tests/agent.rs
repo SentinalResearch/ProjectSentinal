@@ -3,7 +3,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use protocol::agent::{
-    validate_agent_name, AgentLevel, AgentList, CreateAgentRequest, CreatedAgent,
+    validate_agent_name, AgentLevel, AgentList, AgentScreen, CreateAgentRequest, CreatedAgent,
+    OutputGrants, ProposeEventsRequest, ProposeEventsResponse,
 };
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -22,6 +23,20 @@ fn agent_messages_round_trip() {
     assert_eq!(serde_json::to_value(&created).unwrap(), value["created"]);
     let list: AgentList = serde_json::from_value(value["list"].clone()).unwrap();
     assert_eq!(serde_json::to_value(&list).unwrap(), value["list"]);
+    let screen: AgentScreen = serde_json::from_value(value["screen"].clone()).unwrap();
+    assert_eq!(serde_json::to_value(&screen).unwrap(), value["screen"]);
+    let propose: ProposeEventsRequest = serde_json::from_value(value["propose"].clone()).unwrap();
+    assert_eq!(serde_json::to_value(&propose).unwrap(), value["propose"]);
+    let proposed: ProposeEventsResponse = serde_json::from_value(value["proposed"].clone()).unwrap();
+    assert_eq!(serde_json::to_value(&proposed).unwrap(), value["proposed"]);
+    let grants: OutputGrants = serde_json::from_value(value["grants"].clone()).unwrap();
+    assert_eq!(serde_json::to_value(&grants).unwrap(), value["grants"]);
+}
+
+#[test]
+fn output_access_is_off_unless_asked_for() {
+    let request: CreateAgentRequest = serde_json::from_value(json!({ "name": "x", "level": "OBSERVE" })).unwrap();
+    assert!(!request.output_access);
 }
 
 #[test]

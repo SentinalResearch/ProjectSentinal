@@ -50,6 +50,8 @@ pub struct ControlRoutes {
     development: bool,
     push: Option<PushGateway>,
     release: Option<super::ControlRelease>,
+    /// Screens of the control's own Sessions (6.2).
+    pub(super) local_screen: Option<super::agent_output::LocalScreen>,
 }
 
 impl ControlRoutes {
@@ -67,7 +69,14 @@ impl ControlRoutes {
             development,
             push: None,
             release: None,
+            local_screen: None,
         }
+    }
+
+    /// Read the control's own Sessions' screens in-process (6.2).
+    pub fn with_local_screen(mut self, local: super::agent_output::LocalScreen) -> Self {
+        self.local_screen = Some(local);
+        self
     }
 
     /// Attach the optional control-owned native Push gateway.
@@ -137,6 +146,7 @@ impl ControlRoutes {
             .merge(super::worker_update::routes())
             .merge(super::health_routes::routes())
             .merge(super::agent_routes::routes())
+            .merge(super::agent_output::routes())
             .layer(DefaultBodyLimit::max(MAX_LINK_BODY_BYTES));
         let projection_routes = Router::new()
             .route("/api/v1/link/projection", post(projection_batch))

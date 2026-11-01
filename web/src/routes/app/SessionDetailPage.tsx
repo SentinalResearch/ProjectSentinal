@@ -27,6 +27,7 @@ import { HealthCard } from "./HealthCard";
 import { SessionTopBlock } from "./SessionTopBlock";
 import { SessionHistoryTerminals } from "./SessionHistoryTerminals";
 import { SessionCommands } from "./SessionCommands";
+import { AgentAccessPanel } from "./AgentAccessPanel";
 import { ResourceBars } from "./ResourceBars";
 import styles from "./SessionDetailPage.module.css";
 import { useIsPhone } from "../../hooks/useViewport";
@@ -302,6 +303,7 @@ function DesktopSessionDetail() {
         {capture !== "PROCESS" && !(glass && kind === "training") && <ResourceBars metrics={session.metrics} />}
         {session.health && <HealthCard health={session.health} interrupted={interrupted} />}
         <EventsList events={session.events ?? []} />
+        {capture === "FULL" && <AgentAccessPanel sessionId={session.id} />}
       </section>
 
       <InterruptConfirm

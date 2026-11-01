@@ -12,9 +12,26 @@ store.auth.status = "setup";
 
 const CONNECT_DELAY_MS = 5000;
 
+/** Mock only (6.2): Sessions agents may read, and what a translator inferred. */
+const mockOutputGrants = new Set<string>(["qwen"]);
+const mockInferred: Record<string, import("../../protocol/InferredEvent").InferredEvent[]> = {
+  qwen: [
+    {
+      id: "inf_0000000000000001", machine_id: "rtx", session_id: 1, at: Date.now() - 4 * 60_000,
+      agent_id: "agt_00aa11bb22cc33dd", agent_name: "translator",
+      function: "progress_updated", args: { current: 68, total: 100, unit: "epoch" },
+    },
+    {
+      id: "inf_0000000000000002", machine_id: "rtx", session_id: 1, at: Date.now() - 4 * 60_000,
+      agent_id: "agt_00aa11bb22cc33dd", agent_name: "translator",
+      function: "metric_reported", args: { name: "val_loss", value: 0.37 },
+    },
+  ],
+};
+
 /** Mock only: one agent so Settings → Agents is not empty in the demo. */
 const mockAgents: import("../../protocol/AgentInfo").AgentInfo[] = [
-  { id: "agt_3f9c1a2b4d5e6f70", name: "claude", level: "OBSERVE", created_at: Date.now() - 3 * 86_400_000, last_used_at: Date.now() - 12 * 60_000 },
+  { id: "agt_3f9c1a2b4d5e6f70", name: "claude", level: "OBSERVE", created_at: Date.now() - 3 * 86_400_000, last_used_at: Date.now() - 12 * 60_000, output_access: false },
 ];
 
 function nowTime(): string {
@@ -247,14 +264,14 @@ export const mockAdapter: DataAdapter = {
     async list() {
       return delay(structuredClone(mockAgents));
     },
-    async create(name, level) {
+    async create(name, level, outputAccess = false) {
       await delay(undefined, 150, 300);
       if (mockAgents.some((agent) => agent.name === name)) throw new RegistryError("INVALID_REQUEST", `an agent named '${name}' already exists`);
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/.test(name)) {
         throw new RegistryError("INVALID_REQUEST", "agent name may contain only letters, digits, '.', '_' and '-'");
       }
       const hex = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-      const agent = { id: `agt_${hex(16)}`, name, level, created_at: Date.now() };
+      const agent = { id: `agt_${hex(16)}`, name, level, created_at: Date.now(), output_access: outputAccess };
       mockAgents.unshift(agent);
       return { agent: structuredClone(agent), token: `sat_${agent.id}_${hex(64)}` };
     },
@@ -263,6 +280,17 @@ export const mockAdapter: DataAdapter = {
       const index = mockAgents.findIndex((agent) => agent.id === id);
       if (index < 0) throw new RegistryError("NOT_FOUND", "no agent with that ID");
       mockAgents.splice(index, 1);
+    },
+    async outputAllowed(sessionId) {
+      return delay(mockOutputGrants.has(sessionId));
+    },
+    async setOutputAllowed(sessionId, allowed) {
+      await delay(undefined, 80, 150);
+      if (allowed) mockOutputGrants.add(sessionId);
+      else mockOutputGrants.delete(sessionId);
+    },
+    async inferred(sessionId) {
+      return delay(mockOutputGrants.has(sessionId) ? structuredClone(mockInferred[sessionId] ?? []) : []);
     },
   },
 

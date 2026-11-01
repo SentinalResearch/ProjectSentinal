@@ -1,13 +1,24 @@
 {
-  "create": { "name": "claude", "level": "SUGGEST" },
+  "create": { "name": "claude", "level": "SUGGEST", "output_access": false },
   "created": {
-    "agent": { "id": "agt_3f9c1a2b4d5e6f70", "name": "claude", "level": "SUGGEST", "created_at": 1793539400000 },
+    "agent": { "id": "agt_3f9c1a2b4d5e6f70", "name": "claude", "level": "SUGGEST", "created_at": 1793539400000, "output_access": false },
     "token": "sat_agt_3f9c1a2b4d5e6f70_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   },
   "list": {
     "agents": [
-      { "id": "agt_3f9c1a2b4d5e6f70", "name": "claude", "level": "SUGGEST", "created_at": 1793539400000, "last_used_at": 1793539460000 },
-      { "id": "agt_00aa11bb22cc33dd", "name": "codex-ci", "level": "OBSERVE", "created_at": 1793500000000 }
+      { "id": "agt_3f9c1a2b4d5e6f70", "name": "claude", "level": "SUGGEST", "created_at": 1793539400000, "last_used_at": 1793539460000, "output_access": false },
+      { "id": "agt_00aa11bb22cc33dd", "name": "translator", "level": "ANNOTATE", "created_at": 1793500000000, "output_access": true }
     ]
   }
+,
+  "screen": { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "session_id": 7, "command": "python train.py",
+              "lines": ["epoch 12/40 loss=0.81", "export HF_TOKEN=[redacted]"], "redacted": 1 },
+  "propose": { "events": [ { "function": "progress_updated", "args": { "current": 12, "total": 40, "unit": "epoch" } } ] },
+  "proposed": {
+    "accepted": [ { "id": "inf_0000000000000001", "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "session_id": 7,
+                    "at": 1793539500000, "agent_id": "agt_00aa11bb22cc33dd", "agent_name": "translator",
+                    "function": "progress_updated", "args": { "current": 12, "total": 40, "unit": "epoch" } } ],
+    "rejected": [ { "index": 1, "reason": "value is not on screen" } ]
+  },
+  "grants": { "grants": [ { "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA", "session_id": 7 } ] }
 }

@@ -136,8 +136,14 @@ export interface DataAdapter {
     create(
       name: string,
       level: import("../protocol/AgentLevel").AgentLevel,
+      outputAccess?: boolean,
     ): Promise<import("../protocol/CreatedAgent").CreatedAgent>;
     revoke(id: string): Promise<void>;
+    /** 6.2: whether agents with output access may read this Session (composite ID). */
+    outputAllowed(sessionId: string): Promise<boolean>;
+    setOutputAllowed(sessionId: string, allowed: boolean): Promise<void>;
+    /** 6.2: Events agents inferred from this Session's screen, oldest first. */
+    inferred(sessionId: string): Promise<import("../protocol/InferredEvent").InferredEvent[]>;
   };
 
   auth: {

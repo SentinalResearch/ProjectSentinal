@@ -37,6 +37,8 @@ struct StoredAgent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_used_at: Option<Timestamp>,
     token_sha256: String,
+    #[serde(default)]
+    output_access: bool,
 }
 
 impl StoredAgent {
@@ -47,6 +49,7 @@ impl StoredAgent {
             level: self.level,
             created_at: self.created_at,
             last_used_at: self.last_used_at,
+            output_access: self.output_access,
         }
     }
 
@@ -55,6 +58,7 @@ impl StoredAgent {
             id: self.id.clone(),
             name: self.name.clone(),
             level: self.level,
+            output_access: self.output_access,
         }
     }
 }
@@ -142,6 +146,7 @@ impl AgentRegistry {
             created_at: now,
             last_used_at: None,
             token_sha256: sha256_hex(&token),
+            output_access: request.output_access,
         };
         let info = stored.info();
         agents.push(stored);
@@ -263,6 +268,7 @@ mod tests {
         let request = CreateAgentRequest {
             name: name.into(),
             level,
+            output_access: false,
         };
         registry.create(&request, Timestamp(1_000)).unwrap()
     }
@@ -344,11 +350,13 @@ mod tests {
         let again = CreateAgentRequest {
             name: "claude".into(),
             level: AgentLevel::Observe,
+            output_access: false,
         };
         assert!(registry.create(&again, Timestamp(1)).is_err());
         let bad = CreateAgentRequest {
             name: "rm -rf".into(),
             level: AgentLevel::Observe,
+            output_access: false,
         };
         assert!(registry.create(&bad, Timestamp(1)).is_err());
         for index in 1..MAX_AGENTS {
@@ -357,6 +365,7 @@ mod tests {
         let over = CreateAgentRequest {
             name: "one-more".into(),
             level: AgentLevel::Observe,
+            output_access: false,
         };
         assert!(registry.create(&over, Timestamp(1)).is_err());
     }

@@ -61,6 +61,7 @@ export function AgentsTab() {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [name, setName] = useState("");
   const [level, setLevel] = useState<AgentLevel>("OBSERVE");
+  const [outputAccess, setOutputAccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<CreatedAgent | null>(null);
@@ -95,8 +96,9 @@ export function AgentsTab() {
     setBusy(true);
     setFormError(null);
     try {
-      setCreated(await dataAdapter.agents.create(trimmed, level));
+      setCreated(await dataAdapter.agents.create(trimmed, level, outputAccess));
       setName("");
+      setOutputAccess(false);
     } catch (error) {
       setFormError(message(error, "Could not create the agent."));
     } finally {
@@ -285,7 +287,10 @@ function AgentRow({
   return (
     <tr aria-label={agent.name}>
       <td className="mono">{agent.name}</td>
-      <td>{levelLabel(agent.level)}</td>
+      <td>
+        {levelLabel(agent.level)}
+        {agent.output_access && <span className={own.badge}>reads output</span>}
+      </td>
       <td>{when(agent.created_at)}</td>
       <td>{when(agent.last_used_at)}</td>
       <td>
