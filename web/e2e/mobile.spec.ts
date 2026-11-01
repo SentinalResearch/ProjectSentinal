@@ -121,7 +121,7 @@ test.describe("phone 390×844", () => {
     await keys.getByRole("button", { name: "Ctrl" }).click();
     await shot(page, "m5-ctrl");
     await page.getByRole("button", { name: /Control C, interrupt/ }).click();
-    const sheet = page.getByRole("dialog", { name: /^Send Ctrl-C to / });
+    const sheet = page.getByRole("dialog", { name: /^Send \^C to / });
     await expect(sheet).toBeVisible();
     await shot(page, "c2-ctrl-c-sheet");
     await sheet.getByRole("button", { name: "Cancel" }).click();

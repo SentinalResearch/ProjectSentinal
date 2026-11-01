@@ -1,0 +1,39 @@
+.button {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--destructive);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+/* Progress, not decoration: shown even with reduced motion, as a plain fill. */
+.fill {
+  position: absolute;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.button[data-holding] .fill {
+  transform: scaleX(1);
+  transition: transform var(--hold-ms) linear;
+}
+
+.label {
+  position: relative;
+}

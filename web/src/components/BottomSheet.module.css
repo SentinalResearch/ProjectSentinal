@@ -20,10 +20,21 @@
   gap: 12px;
   max-height: 88vh;
   overflow-y: auto;
-  padding: 8px 20px calc(20px + var(--safe-bottom));
-  background: var(--bg-0);
-  border-top: 1px solid var(--line-strong);
+  /* A floating glass card (MOBILE_GLASS_SPEC M6). */
+  margin: 0 10px calc(10px + var(--safe-bottom));
+  padding: 8px 18px 18px;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 0 0 1px var(--glass-edge), var(--glass-shadow);
+  border-radius: 22px;
   color: var(--text-1);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sheet {
+    background: color-mix(in srgb, var(--bg-1) 96%, transparent);
+  }
 }
 
 .sheet:focus {
@@ -35,6 +46,7 @@
   width: 40px;
   height: 5px;
   margin: 4px 0 8px;
+  border-radius: 3px;
   background: var(--line-strong);
   touch-action: none;
 }

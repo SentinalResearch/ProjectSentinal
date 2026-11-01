@@ -322,7 +322,7 @@ glass mobile shell and built-in terminal keyboard (4.I mobile, below).
 - [x] `TermKeyboard`: chip strip, accessory row, letters / symbols / Ctrl layers, latch and lock, repeat, space-swipe
 - [x] Terminal integration: no OS keyboard (`inputmode="none"`), bytes to the PTY, ⌨︎ toggle, hardware-keyboard detection, refit
 - [x] Prompt sheet with the built-in keyboard; same grammar as desktop
-- [ ] ^C confirm: hold-to-send on jobs running ≥ 30 s
+- [x] ^C confirm: hold-to-send on jobs running ≥ 30 s
 
 **Demo:** with no sidebar, see what needs you in the island, press `/`, `y`,
 `↵` to answer a waiting prompt from any page, and step back through the last

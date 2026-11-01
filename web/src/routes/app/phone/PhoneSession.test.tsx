@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,17 +35,23 @@ describe("B3/B4/B5 · phone Session screens", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
   });
 
-  it("B3: Stop on a long job asks first; Cancel sends nothing and Send Ctrl-C interrupts", async () => {
+  it("B3 / M6: Stop on a long job asks first; Cancel and a tap send nothing, a 600 ms hold interrupts", async () => {
     const sendSignal = vi.spyOn(dataAdapter, "sendSignal").mockResolvedValue();
     renderAt("/app/sessions/qwen", routes);
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Stop" }, { timeout: 5000 }));
-    const sheet = screen.getByRole("dialog", { name: "Send Ctrl-C to Qwen Training?" });
-    expect(sheet).toHaveTextContent("1h31m");
+    const sheet = screen.getByRole("dialog", { name: "Send ^C to Qwen Training?" });
+    expect(sheet).toHaveTextContent("Running 1h31m");
+    expect(sheet).toHaveTextContent("Last checkpoint: epoch_37");
+    expect(sheet).toHaveTextContent("Jobs under 30s get ^C immediately.");
     await user.click(within(sheet).getByRole("button", { name: "Cancel" }));
     expect(sendSignal).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Stop" }));
-    await user.click(screen.getByRole("button", { name: "Send Ctrl-C" }));
+    const hold = screen.getByRole("button", { name: "Hold to send ^C" });
+    await user.click(hold);
+    expect(sendSignal).not.toHaveBeenCalled();
+    fireEvent.pointerDown(hold);
+    await new Promise((resolve) => setTimeout(resolve, 650));
     expect(sendSignal).toHaveBeenCalledWith("qwen", "SIGINT");
   });
 
@@ -134,7 +140,7 @@ describe("C1/C2 · phone terminal", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Ctrl" }, { timeout: 5000 }));
     await user.click(screen.getByRole("button", { name: /Control C, interrupt/ }));
-    expect(screen.getByRole("dialog", { name: "Send Ctrl-C to Qwen Training?" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Send ^C to Qwen Training?" })).toBeInTheDocument();
     expect(sendSignal).not.toHaveBeenCalled();
   });
 
