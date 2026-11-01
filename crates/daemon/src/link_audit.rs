@@ -30,6 +30,9 @@ pub struct LinkAuditRecord<'a> {
     /// Link handle.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub link_id: Option<&'a str>,
+    /// Agent handle (Milestone 6.0).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<&'a str>,
     /// Tailscale user or address of the requester.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peer: Option<&'a str>,

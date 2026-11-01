@@ -22,6 +22,7 @@
 //! - [`auth`]     — single-user password authentication over HTTP
 //! - [`link`]     — Machine enrollment, the control registry, and worker links
 
+pub mod agent;
 pub mod auth;
 pub mod command;
 pub mod command_line;

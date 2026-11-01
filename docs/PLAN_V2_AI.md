@@ -271,17 +271,14 @@ deterministic path stays the fallback when no model is running.
 feature uses; 6.1 is the quickest visible AI win (it is deterministic);
 6.2 needs the real-screen labelling done first.
 
-## 8. Decisions needed from you
+## 8. Decisions (owner, 2026-11-01: "go with the recommendations")
 
-1. **Agent levels:** is level 3 (act with approval) in scope at all, or
-   should the plan stop at level 2 (suggest)?
-2. **MCP first, or HTTP/JSON first** for the agent API? (Recommendation: MCP
-   over stdio first, because Claude Code and Claude Desktop load it with
-   one line; the HTTP form follows from the same catalogue.)
-3. **Output access for agents:** allow `get_output_tail` at all? If yes,
-   per Session, per agent, or both? (Recommendation: per agent and per Session, off by default.)
-4. **Where models run:** local GPU only, or allow a cloud model as an
-   explicit owner choice for `ask` and summaries?
-5. **Labelling:** will you capture and label the ≥ 200 real screens for the
-   6.2 gate, or should 6.1 (agent CLIs, deterministic) come before 6.2?
-6. **Output search (5.S):** acceptable as opt-in per Session, or leave it out?
+1. **Agent levels:** stop at level 2 (suggest). Level 3 is not offered; the
+   protocol cannot even name it. Milestone 7.0 needs its own review first.
+2. **MCP first:** `sentinal mcp` over stdio first; HTTP/JSON follows from the
+   same catalogue.
+3. **Output access for agents:** `get_output_tail` is off by default, enabled
+   per agent and per Session, redacted.
+4. **Where models run:** local only. No cloud model.
+5. **Labelling:** 6.1 (agent CLIs, deterministic) comes before 6.2.
+6. **Output search (5.S):** opt-in per Session only.

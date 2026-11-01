@@ -1,0 +1,13 @@
+{
+  "create": { "name": "claude", "level": "SUGGEST" },
+  "created": {
+    "agent": { "id": "agt_3f9c1a2b4d5e6f70", "name": "claude", "level": "SUGGEST", "created_at": 1793539400000 },
+    "token": "sat_agt_3f9c1a2b4d5e6f70_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "list": {
+    "agents": [
+      { "id": "agt_3f9c1a2b4d5e6f70", "name": "claude", "level": "SUGGEST", "created_at": 1793539400000, "last_used_at": 1793539460000 },
+      { "id": "agt_00aa11bb22cc33dd", "name": "codex-ci", "level": "OBSERVE", "created_at": 1793500000000 }
+    ]
+  }
+}

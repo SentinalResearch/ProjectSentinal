@@ -183,6 +183,13 @@ pub enum ProtocolError {
         maximum: u32,
     },
 
+    /// An agent name broke the naming rules.
+    #[error("agent name {reason}")]
+    InvalidAgentName {
+        /// Which rule failed.
+        reason: &'static str,
+    },
+
     /// A Machine display name broke the naming rules.
     #[error("display_name {reason}")]
     InvalidDisplayName {

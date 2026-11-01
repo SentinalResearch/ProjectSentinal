@@ -4,6 +4,8 @@
 //! HMACs. A successful exchange creates one link with two directional
 //! credentials; each side keeps only a hash of the one it verifies.
 
+mod agent_routes;
+pub mod agents;
 mod approval;
 mod approval_claim;
 mod approval_routes;
@@ -167,6 +169,8 @@ pub struct ControlService {
     health_starts: Arc<health::StartCounts>,
     /// Whether each worker's last heartbeat reported changes not yet uploaded.
     projection_pending: Arc<Mutex<std::collections::HashMap<MachineId, bool>>>,
+    /// Agent tokens (Milestone 6.0).
+    agents: agents::AgentRegistry,
 }
 
 /// One authenticated worker destination. The credential must never leave the
@@ -209,7 +213,11 @@ impl ControlService {
             })
             .map_err(|error| ControlError(error.to_string()))?;
         let (projection_updates, _) = tokio::sync::broadcast::channel(256);
+        let agents =
+            agents::AgentRegistry::open(&settings.secrets_file.with_file_name("agent-tokens.json"))
+                .map_err(|error| ControlError(error.to_string()))?;
         let service = ControlService {
+            agents,
             store,
             audit: LinkAudit::new(&settings.audit_dir, "pairing-audit.jsonl"),
             settings: Arc::new(settings),
@@ -229,6 +237,21 @@ impl ControlService {
             .reconcile_refresh()
             .map_err(|failure| ControlError(failure.failure.message))?;
         Ok(service)
+    }
+
+    /// Agent tokens on this control.
+    pub fn agents(&self) -> &agents::AgentRegistry {
+        &self.agents
+    }
+
+    /// The control clock.
+    pub fn now(&self) -> Timestamp {
+        (self.clock)()
+    }
+
+    /// The control's link and agent audit.
+    pub(crate) fn audit(&self) -> &LinkAudit {
+        &self.audit
     }
 
     /// This control's Machine ID.
