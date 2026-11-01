@@ -6,6 +6,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
+import { answerPrompt, INTERRUPTIBLE } from "../../data/actions";
 import { resolveSessionLineage } from "../../data/lineage";
 import type { Session } from "../../data/types";
 import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../data/capture";
@@ -30,7 +31,6 @@ import styles from "./SessionDetailPage.module.css";
 import { useIsPhone } from "../../hooks/useViewport";
 import { PhoneSessionDetail } from "./phone/PhoneSessionDetail";
 
-const INTERRUPTIBLE = new Set(["RUNNING", "WAITING", "STALLED"]);
 /** design_handoff_sentinal/design/SentinalSession.dc.html */
 /** What the main section shows for each capture level. */
 const SECTION_LABELS: Record<CaptureLevel, string> = {
@@ -132,8 +132,8 @@ function DesktopSessionDetail() {
     void dataAdapter.sendSignal(latest.id, "SIGINT");
   }
 
-  function answerPrompt(value: "y" | "n") {
-    void dataAdapter.sendInput(latest.id, value);
+  function answer(value: "y" | "n") {
+    void answerPrompt(latest.id, value);
   }
 
   function rerun() {
@@ -293,7 +293,7 @@ function DesktopSessionDetail() {
           interrupted={interrupted}
           lastCheckpoint={lastCheckpointPath(session)}
           canSendInput={capabilities.canSendInput}
-          onAnswer={answerPrompt}
+          onAnswer={answer}
           onRerun={rerun}
           onShowOutput={() => {
             /* the terminal is always visible in the left half; nothing to scroll to */

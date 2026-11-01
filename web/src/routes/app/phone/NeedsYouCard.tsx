@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 import { StateTag } from "../../../components/StateTag";
-import { dataAdapter } from "../../../data";
+import { answerPrompt } from "../../../data/actions";
 import { captureCapabilities, captureOf } from "../../../data/capture";
 import type { Machine, Session } from "../../../data/types";
 import styles from "./phoneSession.module.css";
@@ -14,7 +14,7 @@ const STATE_LINE: Record<string, string> = {
 
 /** Answer a prompt: the key and Enter, as the design's waiting screens promise. */
 export function answer(sessionId: string, key: "y" | "n") {
-  void dataAdapter.sendInput(sessionId, `${key}\r`);
+  void answerPrompt(sessionId, key);
 }
 
 /** A "Needs you" card with a 3 px top line in the state colour. */

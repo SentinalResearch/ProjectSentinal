@@ -5,7 +5,7 @@ import { MockBadge } from "../../components/MockBadge";
 import { CaptureBadge } from "../../components/CaptureBadge";
 import { StateTag } from "../../components/StateTag";
 import { captureCapabilities, captureOf, exitUnknown } from "../../data/capture";
-import { dataAdapter } from "../../data";
+import { answerPrompt } from "../../data/actions";
 import { formatSessionDuration, formatSessionFact, machineSummary, needsAttention } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
 import { isDelayed, machineStatusLabel } from "../../data/machine-status";
@@ -53,7 +53,7 @@ function DesktopOverview() {
   const open = (id: string) => navigate(`/app/sessions/${id}`);
   const answer = (e: MouseEvent, sessionId: string, value: "y" | "n") => {
     e.stopPropagation();
-    void dataAdapter.sendInput(sessionId, value);
+    void answerPrompt(sessionId, value);
   };
 
   if (loading) {
