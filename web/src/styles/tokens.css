@@ -47,7 +47,7 @@
 }
 
 /*
- * Glass shell (sentinal-glass-handoff/GLASS_SPEC.md §1, §3), desktop ≥ 1024px.
+ * Glass shell (sentinal-glass-handoff/specs/GLASS_SPEC.md §1, §3), desktop ≥ 1024px.
  * Floating chrome and panels are translucent and rounded; terminal surfaces
  * never are (a solid --term-bg keeps program colours true).
  */

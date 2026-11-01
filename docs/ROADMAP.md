@@ -304,8 +304,10 @@ exact Machine and Session, answer its prompt or open the full-screen terminal,
 and confirm Ctrl-C from a bottom sheet — with the desktop layout unchanged.
 
 ## Milestone 4.I — Glass shell, desktop (v0.3.0)
-Design source: `sentinal-glass-handoff/` (`GLASS_SPEC.md`, `design/Sentinal Glass.dc.html`).
-Desktop ≥ 1024 px only; 768–1023 px keeps the sidebar and phones keep `MOBILE_SPEC.md`.
+Design source: `sentinal-glass-handoff/` (`START_HERE.md`, `specs/GLASS_SPEC.md`,
+`specs/MOBILE_GLASS_SPEC.md`, `design/`); spec changes are listed in its `CHANGELOG.md`.
+Desktop shell from 768 px (768–1023 px stacks the dashboard's right column); phones get the
+glass mobile shell and built-in terminal keyboard (4.I mobile, below).
 - [x] Glass tokens and `GlassPill` / `GlassPanel` / `AttentionCard`, with a no-`backdrop-filter` fallback
 - [x] Shell: no sidebar on desktop; Live island with the FAILED > WAITING > STALLED > RUNNING ticker
 - [x] Prompt: ⌘K, `/`, island button; deterministic `go`, `y|n`, `run`, `find`, `split`, `kill`, fuzzy fallback
@@ -313,6 +315,14 @@ Desktop ≥ 1024 px only; 768–1023 px keeps the sidebar and phones keep `MOBIL
 - [x] Dashboard: needs-you cards with inline actions, Machine lanes with sparklines, "While you were away"
 - [x] Session page: full-height terminal left, details right, fitted with a ResizeObserver
 - [ ] Every page reachable from the prompt; `/`, `y`, `↵` answers a WAITING Session from any page; accessibility audit ≥ 95
+
+- [ ] 768–1023 px uses the desktop glass shell (START_HERE.md), dashboard right column stacked
+- [ ] Phone shell: `MobileIsland` on top, `PromptPill` at the bottom; top bar and menu removed
+- [ ] Phone dashboard (MOBILE_GLASS_SPEC §2)
+- [ ] `TermKeyboard`: chip strip, accessory row, letters / symbols / Ctrl layers, latch and lock, repeat, space-swipe
+- [ ] Terminal integration: no OS keyboard (`inputmode="none"`), bytes to the PTY, ⌨︎ toggle, hardware-keyboard detection, refit
+- [ ] Prompt sheet with the built-in keyboard; same grammar as desktop
+- [ ] ^C confirm: hold-to-send on jobs running ≥ 30 s
 
 **Demo:** with no sidebar, see what needs you in the island, press `/`, `y`,
 `↵` to answer a waiting prompt from any page, and step back through the last

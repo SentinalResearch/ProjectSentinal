@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sentinal — glass mobile + terminal keyboard</title>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#0E0E10}*{box-sizing:border-box}a{color:#8C9EFF;text-decoration:none}a:hover{text-decoration:underline}</style>
+</helmet>
+<div style="min-height:100vh; background:#0E0E10; padding:64px; display:flex; flex-direction:column; gap:48px; font-family:'Archivo',system-ui,sans-serif; color:#F2F2F0; font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased">
+<header style="display:flex; flex-direction:column; gap:10px; max-width:1040px">
+<span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#8C9EFF">sentinal · glass mobile · 390 × 844</span>
+<span style="font-size:52px; line-height:52px; font-weight:800; letter-spacing:-0.045em">The glass shell on a phone, with its own keyboard.</span>
+<span style="font-size:17px; line-height:25px; color:#A6A6A2">The island becomes a compact pill; the prompt becomes a bottom sheet. The terminal and the prompt use a built-in keyboard instead of the system one: a number row and terminal keys always visible, a symbols layer with shell snippets, and a Ctrl layer that names each combo. No autocorrect, no capitalisation, no layout jumps.</span>
+</header>
+
+<div style="display:flex; flex-wrap:wrap; gap:48px; align-items:flex-start">
+
+<div data-screen-label="M1 Dashboard" style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#8A8A86">M1 · Dashboard</span>
+<div style="width:390px; height:844px; position:relative; overflow:hidden; border-radius:44px; background:#09090B; box-shadow:0 0 0 1px #3A3A3F, 0 40px 80px -40px rgba(0,0,0,.8)">
+<div style="position:absolute; left:-160px; top:-200px; width:560px; height:480px; background:radial-gradient(closest-side, rgba(61,90,254,.2), transparent)"></div>
+<div style="position:absolute; left:0; right:0; top:0; height:47px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="position:absolute; inset:0; padding:112px 16px 110px; display:flex; flex-direction:column; gap:14px; overflow:hidden">
+<div style="display:flex; flex-direction:column; gap:2px; padding:0 4px"><span style="font-size:13px; color:#A6A6A2">14:13 · 6 sessions · 3 machines</span><span style="font-size:44px; line-height:42px; font-weight:800; letter-spacing:-0.05em">3 need you.</span></div>
+<div style="border-radius:18px; padding:14px; display:flex; flex-direction:column; gap:10px; background:rgba(255,208,0,.08); box-shadow:inset 0 0 0 1px rgba(255,208,0,.38)">
+<div style="display:flex; align-items:center; justify-content:space-between"><span style="height:22px; padding:0 8px; display:flex; align-items:center; background:#FFD000; color:#0A0A0A; font-size:11px; font-weight:700">? WAITING</span><span style="font-size:12px; color:#A6A6A2">Mac Mini · 85m</span></div>
+<span style="font-size:19px; font-weight:800">npm install</span>
+<div style="display:flex; gap:6px"><span style="flex:1; min-width:0; height:48px; display:flex; align-items:center; padding:0 12px; border-radius:12px; background:rgba(0,0,0,.45); font-family:'JetBrains Mono',monospace; font-size:14px">Continue? [y/N]</span><span style="width:52px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:#F2F2F0; color:#0A0A0A; font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700">y</span><span style="width:52px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px rgba(255,255,255,.25); font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700">n</span></div>
+</div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+<div style="border-radius:16px; padding:12px; display:flex; flex-direction:column; gap:6px; background:rgba(255,59,47,.08); box-shadow:inset 0 0 0 1px rgba(255,59,47,.38)"><span style="align-self:flex-start; height:20px; padding:0 6px; display:flex; align-items:center; background:#FF3B2F; color:#0A0A0A; font-size:10px; font-weight:700">✕ FAILED</span><span style="font-size:16px; font-weight:800">pytest</span><span style="font-size:12px; color:#D4D4D0">3 failed · RTX-PC</span></div>
+<div style="border-radius:16px; padding:12px; display:flex; flex-direction:column; gap:6px; background:rgba(255,138,0,.08); box-shadow:inset 0 0 0 1px rgba(255,138,0,.38)"><span style="align-self:flex-start; height:20px; padding:0 6px; display:flex; align-items:center; background:#FF8A00; color:#0A0A0A; font-size:10px; font-weight:700">‖ STALLED</span><span style="font-size:16px; font-weight:800">Compression</span><span style="font-size:12px; color:#D4D4D0">14m · Mac Mini</span></div>
+</div>
+<sc-for list="{{ lanes }}" as="m" hint-placeholder-count="2"><div style="border-radius:18px; padding:12px 14px; display:flex; flex-direction:column; gap:10px; background:rgba(28,28,32,.6); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); opacity:{{ m.o }}">
+<div style="display:flex; align-items:center; gap:8px"><span style="width:8px; height:8px; background:{{ m.dot }}; box-shadow:inset 0 0 0 1.5px {{ m.ring }}"></span><span style="font-size:17px; font-weight:800">{{ m.name }}</span><span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11px; color:#8A8A86">{{ m.meta }}</span></div>
+<sc-for list="{{ m.rows }}" as="r" hint-placeholder-count="2"><div style="display:flex; align-items:center; gap:10px; min-height:44px; padding:0 10px; border-radius:12px; background:rgba(0,0,0,.35)"><span style="height:18px; padding:0 6px; display:flex; align-items:center; background:{{ r.bg }}; color:#0A0A0A; font-size:10px; font-weight:700">{{ r.g }} {{ r.s }}</span><span style="flex:1; min-width:0; font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ r.title }}</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#A6A6A2">{{ r.d }}</span></div></sc-for>
+</div></sc-for>
+</div>
+<div style="position:absolute; left:16px; right:16px; top:54px; height:46px; display:flex; align-items:center; gap:10px; padding:0 6px 0 14px; border-radius:23px; background:rgba(30,30,34,.6); backdrop-filter:blur(24px) saturate(1.6); -webkit-backdrop-filter:blur(24px) saturate(1.6); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12), 0 20px 50px -20px rgba(0,0,0,.9)">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 22L13.5 2" stroke="#F2F2F0" stroke-width="3.4" stroke-linecap="square"></path><circle cx="18" cy="18.5" r="3.4" fill="#3D5AFE"></circle></svg>
+<span style="font-size:14px; font-weight:800">Dashboard</span>
+<span style="display:flex; align-items:center; gap:6px; font-size:12px; color:#D4D4D0; min-width:0; overflow:hidden; white-space:nowrap"><span style="width:7px; height:7px; flex:none; background:#29D35F"></span>training 68 %</span>
+<span style="margin-left:auto; height:22px; padding:0 7px; display:flex; align-items:center; background:#FFD000; color:#0A0A0A; font-size:11px; font-weight:800">3</span>
+</div>
+<div style="position:absolute; left:16px; right:16px; bottom:30px; height:56px; display:flex; align-items:center; gap:10px; padding:0 18px; border-radius:28px; background:rgba(30,30,34,.62); backdrop-filter:blur(28px) saturate(1.6); -webkit-backdrop-filter:blur(28px) saturate(1.6); box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 0 20px 60px -10px rgba(0,0,0,.95)">
+<span style="font-family:'JetBrains Mono',monospace; font-size:16px; color:#8C9EFF">❯</span><span style="font-size:15px; color:#A6A6A2">go, run, find, y / n…</span>
+</div>
+</div></div>
+
+<div data-screen-label="M2 Prompt" style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#8A8A86">M2 · Prompt sheet (built-in keyboard)</span>
+<div style="width:390px; height:844px; position:relative; overflow:hidden; border-radius:44px; background:#09090B; box-shadow:0 0 0 1px #3A3A3F, 0 40px 80px -40px rgba(0,0,0,.8)">
+<div style="position:absolute; inset:0; padding:112px 16px; display:flex; flex-direction:column; gap:14px; opacity:.25; filter:blur(2px)"><span style="font-size:44px; line-height:42px; font-weight:800; letter-spacing:-0.05em">3 need you.</span><span style="height:150px; border-radius:18px; background:rgba(255,208,0,.15)"></span><span style="height:90px; border-radius:16px; background:rgba(255,59,47,.15)"></span></div>
+<div style="position:absolute; left:0; right:0; top:0; height:47px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="position:absolute; left:0; right:0; bottom:0; display:flex; flex-direction:column">
+<div style="margin:0 10px 8px; border-radius:18px; overflow:hidden; padding:4px 0; background:rgba(30,30,34,.66); backdrop-filter:blur(28px) saturate(1.6); -webkit-backdrop-filter:blur(28px) saturate(1.6); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)">
+<sc-for list="{{ promptRows }}" as="s" hint-placeholder-count="4"><div style="display:flex; flex-direction:column; justify-content:center; gap:2px; min-height:52px; padding:0 16px; background:{{ s.bg }}; box-shadow:inset 3px 0 0 {{ s.bar }}"><span style="font-family:'JetBrains Mono',monospace; font-size:14px">{{ s.c }}</span><span style="font-size:12px; color:#A6A6A2">{{ s.d }}</span></div></sc-for>
+</div>
+<div style="margin:0 10px 8px; height:54px; display:flex; align-items:center; gap:10px; padding:0 18px; border-radius:27px; background:rgba(30,30,34,.66); backdrop-filter:blur(28px); -webkit-backdrop-filter:blur(28px); box-shadow:inset 0 0 0 1.5px rgba(140,158,255,.6)">
+<span style="font-family:'JetBrains Mono',monospace; font-size:16px"><span style="color:#8C9EFF">❯</span> y npm</span><span style="width:9px; height:20px; background:#8C9EFF"></span>
+<span style="margin-left:auto; font-size:13px; font-weight:700; color:#A6A6A2">Cancel</span>
+</div>
+<div style="background:rgba(22,22,26,.92); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); border-top:1px solid rgba(255,255,255,.08); padding:8px 4px 28px; display:flex; flex-direction:column; gap:8px">
+<sc-for list="{{ kbPrompt }}" as="row" hint-placeholder-count="5"><div style="display:flex; gap:5px; padding:0 {{ row.pad }}"><sc-for list="{{ row.keys }}" as="k" hint-placeholder-count="10"><span style="flex:{{ k.f }}; min-width:0; height:{{ k.h }}; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; background:{{ k.bg }}; color:{{ k.c }}; box-shadow:inset 0 0 0 1px {{ k.bd }}; font-family:'JetBrains Mono',monospace; font-size:{{ k.fs }}; font-weight:{{ k.fw }}">{{ k.k }}<span style="font-size:9px; font-weight:500; color:#8A8A86; line-height:10px">{{ k.sub }}</span></span></sc-for></div></sc-for>
+</div>
+</div>
+</div></div>
+
+<sc-for list="{{ termScreens }}" as="t" hint-placeholder-count="3">
+<div style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#8A8A86">{{ t.label }}</span>
+<div style="width:390px; height:844px; position:relative; overflow:hidden; border-radius:44px; background:#0C0C0C; box-shadow:0 0 0 1px #3A3A3F, 0 40px 80px -40px rgba(0,0,0,.8); display:flex; flex-direction:column">
+<div style="height:47px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 32px 8px; font-size:15px; font-weight:700"><span>9:41</span><span style="width:24px; height:11px; border:1.5px solid currentColor; border-radius:3px"></span></div>
+<div style="flex:none; margin:4px 10px 0; height:46px; display:flex; align-items:center; gap:8px; padding:0 6px 0 4px; border-radius:23px; background:rgba(30,30,34,.7); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)">
+<span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; font-size:20px; color:#8C9EFF">‹</span>
+<span style="flex:1; min-width:0; display:flex; flex-direction:column"><span style="font-size:14px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">Qwen Training</span><span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8A8A86">RTX-PC · ~/Projects/TIM</span></span>
+<span style="height:20px; padding:0 6px; display:flex; align-items:center; background:#29D35F; color:#0A0A0A; font-size:10px; font-weight:700">● RUNNING</span>
+<span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; font-size:14px; color:#A6A6A2">⌨︎</span>
+</div>
+<div style="flex:1; min-height:0; padding:10px 14px 8px; display:flex; flex-direction:column; justify-content:flex-end; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:18px; color:#D4D4D0">
+<sc-for list="{{ term }}" as="l" hint-placeholder-count="8"><span style="white-space:pre; overflow:hidden">{{ l }}</span></sc-for>
+<span style="white-space:pre"><span style="color:#8C9EFF">~/Projects/TIM $ </span>{{ t.typed }}<span style="display:inline-block; width:7px; height:14px; vertical-align:-2px; background:#D4D4D0"></span></span>
+</div>
+<div style="flex:none; background:rgba(22,22,26,.96); border-top:1px solid rgba(255,255,255,.08); padding:6px 4px 26px; display:flex; flex-direction:column; gap:7px">
+<div style="display:flex; gap:6px; padding:0 4px; overflow:hidden"><sc-for list="{{ t.chips }}" as="c" hint-placeholder-count="4"><span style="flex:none; height:30px; padding:0 10px; border-radius:15px; display:flex; align-items:center; background:{{ c.bg }}; color:{{ c.fg }}; font-family:'JetBrains Mono',monospace; font-size:12px; white-space:nowrap">{{ c.t }}</span></sc-for></div>
+<sc-for list="{{ t.rows }}" as="row" hint-placeholder-count="6"><div style="display:flex; gap:5px; padding:0 {{ row.pad }}"><sc-for list="{{ row.keys }}" as="k" hint-placeholder-count="10"><span style="flex:{{ k.f }}; min-width:0; height:{{ k.h }}; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; background:{{ k.bg }}; color:{{ k.c }}; box-shadow:inset 0 0 0 1px {{ k.bd }}; font-family:'JetBrains Mono',monospace; font-size:{{ k.fs }}; font-weight:{{ k.fw }}; white-space:nowrap">{{ k.k }}<span style="font-family:'Archivo',sans-serif; font-size:9px; font-weight:600; color:{{ k.sc }}; line-height:10px">{{ k.sub }}</span></span></sc-for></div></sc-for>
+</div>
+</div>
+<span style="font-size:13px; line-height:19px; color:#A6A6A2; width:390px">{{ t.note }}</span>
+</div>
+</sc-for>
+
+<div data-screen-label="M6 Ctrl-C confirm" style="display:flex; flex-direction:column; gap:12px"><span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#8A8A86">M6 · ^C on a long job asks first</span>
+<div style="width:390px; height:844px; position:relative; overflow:hidden; border-radius:44px; background:#0C0C0C; box-shadow:0 0 0 1px #3A3A3F, 0 40px 80px -40px rgba(0,0,0,.8)">
+<div style="position:absolute; inset:0; padding:120px 14px; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:18px; color:#D4D4D0; display:flex; flex-direction:column; opacity:.3"><sc-for list="{{ term }}" as="l" hint-placeholder-count="8"><span style="white-space:pre">{{ l }}</span></sc-for></div>
+<div style="position:absolute; inset:0; background:rgba(0,0,0,.45)"></div>
+<div style="position:absolute; left:10px; right:10px; bottom:30px; border-radius:26px; padding:10px 18px 18px; display:flex; flex-direction:column; gap:14px; background:rgba(30,30,34,.75); backdrop-filter:blur(28px) saturate(1.6); -webkit-backdrop-filter:blur(28px) saturate(1.6); box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)">
+<span style="align-self:center; width:40px; height:5px; border-radius:3px; background:rgba(255,255,255,.25)"></span>
+<span style="font-size:22px; line-height:26px; font-weight:800; letter-spacing:-0.02em">Send ^C to Qwen Training?</span>
+<span style="font-size:14px; line-height:21px; color:#A6A6A2">Interrupts <span style="font-family:'JetBrains Mono',monospace; color:#F2F2F0">python train.py</span> on RTX-PC. Running 1h31m, epoch 68/100. Last checkpoint: epoch_37.</span>
+<span style="height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:#D12A20; color:#FFFFFF; font-size:16px; font-weight:700">Hold to send ^C</span>
+<span style="height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.1); font-size:16px; font-weight:700">Cancel</span>
+<span style="font-size:12px; color:#8A8A86; text-align:center">Jobs under 30s get ^C immediately.</span>
+</div>
+</div></div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const K = (k, o = {}) => Object.assign({ k, sub: '', f: 1, h: '42px', bg: 'rgba(255,255,255,.11)', c: '#F2F2F0', bd: 'transparent', fs: '16px', fw: 500, sc: '#8A8A86' }, o);
+    const mod = (k, o = {}) => K(k, Object.assign({ bg: 'rgba(255,255,255,.05)', bd: 'rgba(255,255,255,.08)', fs: '12px', fw: 700, c: '#D4D4D0' }, o));
+    const row = (keys, pad = '0px') => ({ keys, pad });
+    const acc = ctrlOn => row([
+      mod('Ctrl', ctrlOn ? { bg: '#3D5AFE', c: '#FFFFFF', bd: 'transparent', sub: 'latched', sc: '#DDE3FF' } : {}),
+      mod('Alt'), mod('Esc'), mod('Tab'),
+      mod('←', { fs: '15px' }), mod('↑', { fs: '15px' }), mod('↓', { fs: '15px' }), mod('→', { fs: '15px' })
+    ].map(k => Object.assign(k, { h: '38px' })));
+    const nums = row('1234567890'.split('').map((n, i) => K(n, { sub: '!@#$%^&*()'[i], h: '40px' })));
+    const bottom = (left) => row([mod(left, { f: 1.4 }), K('|', { fw: 700 }), K('~', { fw: 700 }), K('/', { fw: 700 }), K('space', { f: 3.2, fs: '12px', c: '#A6A6A2', sub: 'swipe = cursor' }), K('-', { fw: 700 }), mod('⏎', { f: 1.6, bg: '#3D5AFE', c: '#FFFFFF', fs: '17px' })]);
+    const letters = [nums, row('qwertyuiop'.split('').map(c => K(c))), row('asdfghjkl'.split('').map(c => K(c)), '18px'), row([mod('⇧', { f: 1.4, fs: '16px' })].concat('zxcvbnm'.split('').map(c => K(c)), [mod('⌫', { f: 1.4, fs: '16px', sub: 'hold' })])), bottom('#+=')];
+    const symbols = [
+      row('-_=+[]{}\\|'.split('').map(c => K(c, { fw: 700 }))),
+      row(['~','`',';',':',"'",'"',',','.','<','>'].map(c => K(c, { fw: 700 }))),
+      row(['&&','||','$(',  '~/','../','2>&1','| grep'].map(c => K(c, { fs: '13px', fw: 700, bg: 'rgba(61,90,254,.18)', bd: 'rgba(140,158,255,.3)', f: c.length > 3 ? 1.6 : 1 })).concat([mod('⌫', { f: 1.2, fs: '16px' })])),
+      row(['!','@','#','$','%','^','&','*','?'].map(c => K(c, { fw: 700 }))),
+      bottom('abc')];
+    const cc = (k, sub, o = {}) => K(k, Object.assign({ sub, h: '50px', fs: '17px', fw: 700, sc: '#A6A6A2' }, o));
+    const ctrl = [
+      row([cc('^C', 'interrupt', { bg: 'rgba(255,59,47,.2)', bd: 'rgba(255,59,47,.5)', c: '#FF6B61' }), cc('^D', 'EOF / exit'), cc('^Z', 'suspend'), cc('^L', 'clear')]),
+      row([cc('^R', 'search hist'), cc('^A', 'line start'), cc('^E', 'line end'), cc('^U', 'delete line')]),
+      row([cc('^W', 'delete word'), cc('^K', 'kill to end'), cc('^P', 'previous'), cc('^N', 'next')]),
+      row([K('or tap any letter for Ctrl + letter', { f: 1, h: '40px', fs: '12px', c: '#A6A6A2', bg: 'transparent', fw: 500 })]),
+      bottom('abc')];
+    const chips = (list) => list.map(([t, hi]) => ({ t, bg: hi ? 'rgba(61,90,254,.25)' : 'rgba(255,255,255,.07)', fg: hi ? '#DDE3FF' : '#D4D4D0' }));
+    return {
+      lanes: [
+        { name:'RTX-PC', meta:'GPU 96 %', o:1, dot:'#29D35F', ring:'#29D35F', rows:[{ s:'RUNNING', g:'●', bg:'#29D35F', title:'Qwen Training', d:'68 %' }, { s:'RUNNING', g:'●', bg:'#29D35F', title:'vLLM', d:':8000' }] },
+        { name:'MacBook', meta:'offline · 14m', o:0.5, dot:'transparent', ring:'#8A8A86', rows:[] }],
+      promptRows: [
+        { c:'y → mac-mini/npm-install', d:'Continue? [y/N] · waiting 85m', bg:'rgba(61,90,254,.25)', bar:'#8C9EFF' },
+        { c:'go mac-mini/npm-install', d:'open session', bg:'transparent', bar:'transparent' },
+        { c:'find npm install', d:'history · 2 runs', bg:'transparent', bar:'transparent' }],
+      kbPrompt: letters.map(r => ({ pad: r.pad, keys: r.keys.map(k => Object.assign({}, k, { sc: '#8A8A86' })) })),
+      term: ['epoch 63/100  loss 0.40','saved ckpt/epoch_37.pt','epoch 64/100  loss 0.39','epoch 65/100  loss 0.39','epoch 66/100  loss 0.39','epoch 67/100  loss 0.38','epoch 68/100  loss 0.37'],
+      termScreens: [
+        { label:'M3 · Terminal · letters (default)', typed:'nvidia-smi', rows:[acc(false)].concat(letters),
+          chips: chips([['y',0],['n',0],['↑ python train.py --config moe.yaml',1],['clear',0],['exit',0]]),
+          note:'Number row and terminal keys are always visible. Lowercase by default, no autocorrect. The chip strip offers y / n and recent commands from history.' },
+        { label:'M4 · Terminal · symbols + snippets', typed:'tail -f train.log 2>&1 | grep ', rows:[acc(false)].concat(symbols),
+          chips: chips([['loss',1],['epoch',0],['CUDA',0],['error',0]]),
+          note:'#+= swaps to symbols. The blue row holds shell snippets that are awkward to type on glass: && || $( ~/ ../ 2>&1 | grep.' },
+        { label:'M5 · Terminal · Ctrl latched', typed:'', rows:[acc(true)].concat(ctrl),
+          chips: chips([['Ctrl is on: next key is sent with Ctrl',0]]),
+          note:'Tap Ctrl once to latch it for one key; double-tap to lock. The layer names each combo so nobody has to remember them. ^C is red and confirms on long jobs (M6).' }]
+    };
+  }
+}
+</script>
+</body>
+</html>
