@@ -336,6 +336,11 @@ pages from the sheets on the right.
 - [ ] Service upgrade and crash tests prove the process, screen, log, and audit boundary survive
 
 ## V2 — Intelligence
+
+> Proposed expansion (search, autocomplete, agent API, screen translator in
+> the product): see `docs/PLAN_V2_AI.md`. Not approved yet; nothing below
+> changes until it is.
+
 - [ ] Tool API for the agent (same permissions as a user, capped at Level 2)
 - [x] Synthetic screen-translator eval harness, rules baseline, model runner, and scorer (`eval/`)
 - [ ] Hand-labelled real-screen eval set (100–200 captured screens) as the decision metric
