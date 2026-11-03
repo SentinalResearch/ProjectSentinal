@@ -68,6 +68,40 @@ Default installed paths:
 | macOS service | `~/Library/LaunchAgents/dev.sentinal.sentinald.plist` |
 | Linux service | `~/.config/systemd/user/sentinald.service` |
 
+### `sentinal` in every terminal
+
+With the default prefix, the installer adds `~/.local/bin` to `PATH` in a
+marked block (`# >>> sentinal path >>>`) in `~/.zshrc`, `~/.bashrc` (macOS:
+`~/.bash_profile`), `~/.profile` when it exists, and
+`~/.config/fish/conf.d/sentinal.fish`. Each new terminal finds `sentinal`;
+the one you installed from needs `export PATH="$HOME/.local/bin:$PATH"` or a
+restart. Uninstall removes the block. `SENTINAL_NO_MODIFY_PATH=1` skips it.
+
+### macOS: Desktop and Documents permission prompts
+
+macOS asks before any program reads `~/Desktop`, `~/Documents`, or
+`~/Downloads`. A Session that starts in one of them, for example from your
+phone, waits on that dialog until someone clicks Allow at the Mac.
+
+Release binaries are ad-hoc signed, and macOS remembers an ad-hoc program by
+its hash, so every update looked like a new app and asked again. On macOS the
+installer now signs `sentinal` and `sentinald` with a local identity,
+"Sentinal Local Code Signing". It creates that identity in the login keychain
+on the first install, with no prompt. Signed this way, macOS remembers a
+grant across updates. If the keychain is locked, for example during an
+install over SSH, the programs stay ad-hoc signed, and the next install at the
+Mac signs them. `SENTINAL_NO_MACOS_SIGNING=1` turns signing off.
+
+To stop the prompts for good, grant access once, at the Mac:
+
+1. Open System Settings → Privacy & Security → Full Disk Access.
+2. Click **+**, press ⌘⇧G, and enter `~/.local/bin/sentinald`.
+3. Turn it on, then restart the daemon:
+   `launchctl kickstart -k gui/$(id -u)/dev.sentinal.sentinald`.
+
+Check the signature with `codesign -dr - ~/.local/bin/sentinald`. It should
+name `dev.sentinal.sentinald` and a certificate leaf.
+
 ## Private Tailnet package delivery
 
 Milestone 1c.1 supports one owner-selected control Machine serving verified

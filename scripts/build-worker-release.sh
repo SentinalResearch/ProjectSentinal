@@ -67,7 +67,7 @@ fi
 sentinal_validate_source_binary "$bin_dir/sentinal"
 sentinal_validate_source_binary "$bin_dir/sentinald"
 
-for required in LICENSE scripts/install-worker.sh scripts/lib/install-common.sh scripts/lib/launch-common.sh \
+for required in LICENSE scripts/install-worker.sh scripts/lib/install-common.sh scripts/lib/launch-common.sh scripts/lib/shell-path.sh scripts/lib/macos-signing.sh \
   scripts/receive-release.sh scripts/publish-worker-release.sh scripts/apply-release.sh \
   scripts/lib/package-common.sh scripts/lib/release-signature.sh packaging/release-keys/allowed_signers \
   packaging/systemd/sentinald.service packaging/launchd/dev.sentinal.sentinald.plist \
@@ -109,6 +109,8 @@ mv "$root/web/sw.js.tmp" "$root/web/sw.js"
 cp "$source_dir/scripts/install-worker.sh" "$root/scripts/install-worker.sh"
 cp "$source_dir/scripts/lib/install-common.sh" "$root/scripts/lib/install-common.sh"
 cp "$source_dir/scripts/lib/launch-common.sh" "$root/scripts/lib/launch-common.sh"
+cp "$source_dir/scripts/lib/shell-path.sh" "$root/scripts/lib/shell-path.sh"
+cp "$source_dir/scripts/lib/macos-signing.sh" "$root/scripts/lib/macos-signing.sh"
 chmod 755 "$root/scripts/install-worker.sh"
 cp "$source_dir/packaging/systemd/sentinald.service" "$root/packaging/systemd/sentinald.service"
 cp "$source_dir/packaging/launchd/dev.sentinal.sentinald.plist" "$root/packaging/launchd/dev.sentinal.sentinald.plist"

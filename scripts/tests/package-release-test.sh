@@ -190,7 +190,7 @@ cp "$repo_root/LICENSE" "$source_copy/"
 cp -R "$repo_root/shell" "$source_copy/shell"
 cp -R "$repo_root/packaging/systemd" "$repo_root/packaging/launchd" "$source_copy/packaging/"
 cp "$repo_root/scripts/install-worker.sh" "$source_copy/scripts/"
-cp "$repo_root/scripts/lib/install-common.sh" "$repo_root/scripts/lib/launch-common.sh" \
+cp "$repo_root/scripts/lib/install-common.sh" "$repo_root/scripts/lib/launch-common.sh" "$repo_root/scripts/lib/shell-path.sh" "$repo_root/scripts/lib/macos-signing.sh" \
   "$repo_root/scripts/lib/package-common.sh" "$repo_root/scripts/lib/release-signature.sh" "$source_copy/scripts/lib/"
 cp "$repo_root/scripts/receive-release.sh" "$repo_root/scripts/publish-worker-release.sh" \
   "$repo_root/scripts/apply-release.sh" "$source_copy/scripts/"

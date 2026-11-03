@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 
 import { dataAdapter } from "../../data";
+import { useIsPhone } from "../../hooks/useViewport";
 import type { Machine, MachineInsight, MachineMetricSample, MetricRangeKey, Session } from "../../data/types";
 import type { SessionOrigin } from "../../protocol/SessionOrigin";
 import styles from "./MachinePanel.module.css";
 import { MetricsChart } from "./MetricsChart";
+import { useNewSession } from "./NewSession";
 
 const DETAILS_REFRESH_MS = 5_000;
 const HISTORY_REFRESH_MS = 30_000;
@@ -49,6 +51,9 @@ export function MachinePanel({ machine, sessions }: { machine: Machine; sessions
   const [range, setRange] = useState<MetricRangeKey>("HOUR");
   const [samples, setSamples] = useState<{ range: MetricRangeKey; points: MachineMetricSample[] } | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // A bare shell on this Machine, opened straight into its terminal.
+  const isPhone = useIsPhone();
+  const newSession = useNewSession((id) => (isPhone ? `/app/sessions/${id}/terminal` : `/app/sessions/${id}`));
 
   useEffect(() => {
     let cancelled = false;
@@ -94,10 +99,23 @@ export function MachinePanel({ machine, sessions }: { machine: Machine; sessions
   }, [machine.id, range]);
 
   const live = sessions.filter((session) => !FINISHED.has(session.state));
+  const online = machine.status === "ONLINE";
   const processes = (insight?.processes ?? []).filter((entry) => entry.processes.length > 0);
 
   return (
     <div className={styles.panel}>
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={styles.newTerminal}
+          disabled={!online}
+          onClick={() => newSession.start(machine.id)}
+          title={online ? undefined : `${machine.name} is ${machine.status.toLowerCase()}`}
+        >
+          ＋ New terminal on {machine.name}
+        </button>
+        {newSession.chooser}
+      </div>
       {detailsError && !insight && (
         <p className={styles.notice} role="alert">
           {detailsError}

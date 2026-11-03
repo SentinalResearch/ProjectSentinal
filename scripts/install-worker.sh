@@ -6,6 +6,8 @@ readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 readonly SENTINAL_LAUNCH_ROLE="installer"
 source "$SCRIPT_DIR/lib/launch-common.sh"
 source "$SCRIPT_DIR/lib/install-common.sh"
+source "$SCRIPT_DIR/lib/shell-path.sh"
+source "$SCRIPT_DIR/lib/macos-signing.sh"
 
 usage() {
   cat <<'EOF'
@@ -26,6 +28,16 @@ Install options:
   --rollback VERSION     explicitly allow installing this older release
   --control-url URL      verified Tailnet package origin for release metadata
   --artifact-sha SHA256  verified release digest for release metadata
+
+The default prefix also adds its bin directory to PATH in your shell start-up
+files (~/.zshrc, ~/.bashrc or ~/.bash_profile, ~/.profile, fish conf.d), so
+sentinal works in every new terminal; uninstall removes it. Set
+SENTINAL_NO_MODIFY_PATH=1 to skip this.
+
+On macOS the default prefix signs both programs with a local identity
+("Sentinal Local Code Signing", created in the login keychain on first
+install) so privacy permissions survive updates. Set
+SENTINAL_NO_MACOS_SIGNING=1 to keep the release's ad-hoc signature.
 
 Uninstall additionally accepts:
   --delete-data PATH     delete data only when PATH exactly resolves to --data-dir
@@ -99,6 +111,21 @@ else
   service_file="$service_dir/sentinald.service"
 fi
 
+# Start-up files are edited for the default prefix, or for a test home.
+profile_home="${SENTINAL_PROFILE_HOME:-${HOME:-}}"
+modify_path=false
+if [[ -z "${SENTINAL_NO_MODIFY_PATH:-}" && ( "$prefix_explicit" == false || -n "${SENTINAL_PROFILE_HOME:-}" ) ]]; then
+  modify_path=true
+fi
+
+# macOS: a stable signature, so privacy grants survive updates (macos-signing.sh).
+sentinal_sign_program=""
+if [[ "$platform" == macos && -z "${SENTINAL_NO_MACOS_SIGNING:-}" ]] &&
+  [[ "$prefix_explicit" == false || -n "${SENTINAL_SIGNING_KEYCHAIN:-}" ]] &&
+  command -v codesign >/dev/null 2>&1 && command -v security >/dev/null 2>&1; then
+  sentinal_sign_program=sentinal_signing_sign
+fi
+
 if [[ "$command_name" == uninstall ]]; then
   if [[ -n "$delete_data_confirmation" ]]; then
     sentinal_require_safe_path deletion "$delete_data_confirmation"
@@ -114,6 +141,7 @@ if [[ "$command_name" == uninstall ]]; then
   fi
   [[ "$install_service" == false ]] || sentinal_disable_service "$platform"
   rm -f -- "$bin_dir/sentinal" "$bin_dir/sentinald"
+  [[ "$modify_path" == false ]] || sentinal_remove_path_from_profiles "$profile_home"
   if [[ -d "$share_dir" ]]; then
     sentinal_require_safe_path share "$share_dir"
     rm -rf -- "$share_dir"
@@ -198,7 +226,13 @@ fi
 print_path_hint() {
   case ":${PATH:-}:" in
     *":$bin_dir:"*) ;;
-    *) echo "Add $bin_dir to PATH to use the sentinal command, for example: export PATH=\"$bin_dir:\$PATH\"" ;;
+    *)
+      if [[ "$modify_path" == true ]]; then
+        echo "Open a new terminal to use sentinal, or run now: export PATH=\"$bin_dir:\$PATH\""
+      else
+        echo "Add $bin_dir to PATH to use the sentinal command, for example: export PATH=\"$bin_dir:\$PATH\""
+      fi
+      ;;
   esac
 }
 
@@ -207,6 +241,7 @@ if [[ "$dry_run" == true ]]; then
   [[ -z "$build_command" ]] || echo "cd $(printf '%q' "$source_dir") && $build_command"
   echo "Would install: $bin_dir/sentinal"
   echo "Would install: $bin_dir/sentinald"
+  [[ "$modify_path" == false ]] || echo "Would add $bin_dir to PATH in: $(sentinal_path_profiles "$profile_home" "${SHELL:-}" "$platform" | paste -sd ' ' -)"
   echo "Would install shell assets: $share_dir/shell"
   echo "Would install production PWA: $share_dir/web"
   [[ -z "$release_version" ]] || echo "Release metadata: $release_version ($release_target)"
@@ -352,4 +387,7 @@ else
   echo "Service: $service_file"
 fi
 echo "FULL Sessions are interrupted when sentinald restarts until Reliability R1 lands."
+if [[ "$modify_path" == true ]]; then
+  sentinal_add_path_to_profiles "$bin_dir" "$profile_home" "${SHELL:-}" "$platform"
+fi
 print_path_hint

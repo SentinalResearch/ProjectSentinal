@@ -4,6 +4,34 @@
   gap: 24px;
 }
 
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.newTerminal {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 700;
+}
+
+.newTerminal:disabled {
+  opacity: 0.45;
+}
+
+@media (max-width: 640px) {
+  .newTerminal {
+    align-self: stretch;
+  }
+}
+
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

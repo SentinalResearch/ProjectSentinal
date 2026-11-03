@@ -33,6 +33,14 @@ describe("Machine view", () => {
   beforeEach(() => resetSimulation());
   afterEach(() => vi.restoreAllMocks());
 
+  it("starts a bare terminal on this Machine", async () => {
+    const create = vi.spyOn(dataAdapter, "createSession");
+    renderMachine("rtx");
+    const button = await screen.findByRole("button", { name: /New terminal on/ }, { timeout: 5000 });
+    await userEvent.click(button);
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ machineId: "rtx" }));
+  });
+
   it("shows system info, daemon status, and the link", async () => {
     renderMachine("rtx");
     const system = await screen.findByRole("region", { name: "System" }, { timeout: 5000 });

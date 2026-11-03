@@ -339,6 +339,7 @@
   padding: 18px;
   background: #0c0c0c;
   color: #d4d4d0;
+  overscroll-behavior: contain;
 }
 
 .bigPrompt {
@@ -378,16 +379,9 @@
   gap: 8px;
 }
 
-.stickyActions {
-  /* Above the prompt pill (MOBILE_GLASS_SPEC §1). */
-  position: sticky;
-  bottom: calc(var(--safe-bottom) + 94px);
+.actions {
   display: flex;
   gap: 12px;
-  margin-top: auto;
-  padding: 12px 20px;
-  border-top: 1px solid var(--line);
-  background: var(--bg-0);
 }
 
 .primaryButton,
@@ -462,9 +456,10 @@
 /* C1 */
 
 /* Below the island (MOBILE_GLASS_SPEC §1), above the page; the keyboard owns the bottom edge. */
+/* Below the docked island (MobileIsland data-docked), to the bottom edge. */
 .terminalScreen {
   position: fixed;
-  top: calc(var(--safe-top) + 60px);
+  top: calc(var(--safe-top) + 44px);
   left: 0;
   right: 0;
   bottom: 0;

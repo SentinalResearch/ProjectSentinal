@@ -49,6 +49,19 @@ describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
     vi.restoreAllMocks();
   });
 
+  it("over the terminal the island docks to the top edge and the prompt pill steps aside", () => {
+    setViewport(390);
+    renderShell("/app/sessions/qwen/terminal");
+    expect(screen.getByRole("navigation", { name: "Sentinal" })).toHaveAttribute("data-docked", "true");
+    expect(screen.queryByRole("button", { name: "Open the prompt" })).not.toBeInTheDocument();
+  });
+
+  it("elsewhere the island floats", () => {
+    setViewport(390);
+    renderShell("/app/overview");
+    expect(screen.getByRole("navigation", { name: "Sentinal" })).not.toHaveAttribute("data-docked");
+  });
+
   it("has a glass island (logo, page, one live item, needs-you count) and a prompt pill — no top bar, tab bar, or menu", async () => {
     setViewport(390);
     renderShell("/app/overview");

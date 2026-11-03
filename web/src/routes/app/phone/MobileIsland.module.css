@@ -19,6 +19,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Over the terminal: a flat bar on the top edge; the terminal starts below it. */
+.island[data-docked] {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--safe-top) + 44px);
+  padding: var(--safe-top) 8px 0 4px;
+  border-radius: 0;
+  background: #0c0c0c;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .island {
     background: color-mix(in srgb, var(--bg-1) 92%, transparent);

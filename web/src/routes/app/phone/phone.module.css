@@ -13,7 +13,7 @@
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  /* No -webkit-overflow-scrolling: it made this scroller a stacking context on iOS. */
   padding-top: calc(var(--safe-top) + 76px);
   padding-bottom: calc(var(--safe-bottom) + 110px);
 }

@@ -33,7 +33,7 @@ export function PhoneShell() {
     <ShellContext.Provider value={shell}>
       <IslandBackContext.Provider value={setBack}>
         <div className={styles.shell}>
-          <MobileIsland back={back} />
+          <MobileIsland back={back} docked={onTerminal} />
           <main className={styles.main} inert={prompt ? true : undefined}>
             <Outlet />
           </main>

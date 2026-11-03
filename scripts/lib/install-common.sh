@@ -88,10 +88,20 @@ sentinal_validate_source_binary() {
   fi
 }
 
+# Copy a program into place atomically. When $sentinal_sign_program names a
+# function, it signs the copy (path, program name) first; failing to sign
+# keeps the copy as it came.
 sentinal_atomic_install() {
   local source="$1" destination="$2" temporary
   temporary="$destination.tmp.$$"
-  if ! cp "$source" "$temporary" || ! chmod 755 "$temporary" || ! mv -f "$temporary" "$destination"; then
+  if ! cp "$source" "$temporary" || ! chmod 755 "$temporary"; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+  if [[ -n "${sentinal_sign_program:-}" ]]; then
+    "$sentinal_sign_program" "$temporary" "$(basename -- "$destination")" || true
+  fi
+  if ! mv -f "$temporary" "$destination"; then
     rm -f -- "$temporary"
     return 1
   fi

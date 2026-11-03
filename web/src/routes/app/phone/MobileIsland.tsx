@@ -10,9 +10,10 @@ import styles from "./MobileIsland.module.css";
 /**
  * The phone island (MOBILE_GLASS_SPEC §1): logo · page · the one most urgent
  * live item · the needs-you count. On a detail screen: ‹ back, the title, and
- * the screen's own trailing control.
+ * the screen's own trailing control. Over the terminal it is `docked`: a
+ * flat bar above the terminal instead of glass floating on it.
  */
-export function MobileIsland({ back }: { back: IslandBack | null }) {
+export function MobileIsland({ back, docked = false }: { back: IslandBack | null; docked?: boolean }) {
   const navigate = useNavigate();
   const { pathname, search, key } = useLocation();
   const { machines, sessions, terminals } = useLiveData();
@@ -26,7 +27,7 @@ export function MobileIsland({ back }: { back: IslandBack | null }) {
     const subtitle = where.kind === "session" ? [where.machine, session?.cwd].filter(Boolean).join(" · ") : null;
     const goBack = () => (key !== "default" ? navigate(-1) : navigate(back.parentPath, { replace: true }));
     return (
-      <nav className={styles.island} aria-label="Sentinal">
+      <nav className={styles.island} aria-label="Sentinal" data-docked={docked || undefined}>
         <button type="button" className={styles.back} onClick={goBack} aria-label={`Back to ${back.parentLabel}`}>
           <span aria-hidden="true">‹</span>
         </button>
@@ -41,7 +42,7 @@ export function MobileIsland({ back }: { back: IslandBack | null }) {
 
   const name = pathname.startsWith("/app/split") ? "Terminals" : where.kind === "page" ? where.name : where.title;
   return (
-    <nav className={styles.island} aria-label="Sentinal">
+    <nav className={styles.island} aria-label="Sentinal" data-docked={docked || undefined}>
       <Link to="/app/overview" className={styles.logo} aria-label="Dashboard">
         <SentinalMark size={18} />
       </Link>

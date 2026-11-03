@@ -4,10 +4,14 @@
   cursor: text;
 }
 
+/* Full screen: the terminal scrolls itself (touchScroll.ts); the page never moves under it. */
 .hostFill {
   flex: 1;
   min-height: 0;
   height: auto;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .host :global(.xterm) {

@@ -145,5 +145,6 @@ else
 fi
 case ":${PATH:-}:" in
   *":$HOME/.local/bin:"*) ;;
-  *) printf 'Add %s to PATH, for example:\n  export PATH="%s:$PATH"\n' "$HOME/.local/bin" "$HOME/.local/bin" ;;
+  *) grep -h '^Added .* to PATH in ' "$temporary/install.log" || true
+     printf 'Open a new terminal to use sentinal, or run now:\n  export PATH="%s:$PATH"\n' "$HOME/.local/bin" ;;
 esac

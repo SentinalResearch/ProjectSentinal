@@ -20,6 +20,14 @@ function Harness({ onConfirm }: { onConfirm: () => void }) {
 }
 
 describe("BottomSheet", () => {
+  it("renders on <body>, outside the page's scroller, so the prompt pill cannot cover it", async () => {
+    const { container } = render(<Harness onConfirm={() => undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: "Stop" }));
+    const dialog = screen.getByRole("dialog");
+    expect(container.contains(dialog)).toBe(false);
+    expect(document.body.contains(dialog)).toBe(true);
+  });
+
   it("is a named modal dialog that starts on Cancel and traps focus", async () => {
     render(<Harness onConfirm={() => undefined} />);
     const user = userEvent.setup();

@@ -11,6 +11,7 @@ import { outputTokens } from "./keyboard/outputTokens";
 import { useRealTerminalSession } from "./useRealTerminalSession";
 import { isReadOnlyTerminalState } from "./lifecycle";
 import styles from "./TerminalPane.module.css";
+import { attachTouchScroll } from "./touchScroll";
 
 const TERM_BG = "#0C0C0C";
 const TERM_FG = "#D4D4D0";
@@ -195,6 +196,18 @@ export function TerminalPane({
     isMockData || readOnly ? "" : sessionId,
     isMockData || readOnly ? null : terminal,
   );
+
+  // Full-screen on a touch screen: a drag scrolls the scrollback (or sends
+  // arrows to a full-screen program). Small embedded panes leave the drag to the page.
+  const touchKeys = useRef<(bytes: string) => void>(() => undefined);
+  touchKeys.current = (bytes) => {
+    if (!readOnly && !isMockData) sendRealBytes(encoder.encode(bytes));
+  };
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!terminal || !host || height !== "fill") return;
+    return attachTouchScroll(host, terminal, { sendKeys: (bytes) => touchKeys.current(bytes) });
+  }, [terminal, height]);
 
   useEffect(() => {
     onAttachedChange?.(isMockData ? true : realAttached);

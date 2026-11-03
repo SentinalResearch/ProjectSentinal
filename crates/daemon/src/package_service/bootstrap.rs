@@ -207,7 +207,11 @@ esac
 printf 'Sentinal %s is installed.\n' "$release_version"
 case ":${{PATH:-}}:" in
   *":$prefix/bin:"*) ;;
-  *) printf 'Add %s to PATH to use the sentinal command, for example:\n  export PATH="%s:$PATH"\n' "$prefix/bin" "$prefix/bin" ;;
+  *) if [ "$prefix_explicit" = 'false' ]; then
+       printf 'Open a new terminal to use sentinal (it is on PATH there now), or run now:\n  export PATH="%s:$PATH"\n' "$prefix/bin"
+     else
+       printf 'Add %s to PATH to use the sentinal command, for example:\n  export PATH="%s:$PATH"\n' "$prefix/bin" "$prefix/bin"
+     fi ;;
 esac
 "#,
         manifest.release_version,

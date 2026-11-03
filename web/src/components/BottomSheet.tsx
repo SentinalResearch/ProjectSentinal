@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
+import { createPortal } from "react-dom";
+
 import styles from "./BottomSheet.module.css";
 
 export interface BottomSheetProps {
@@ -15,7 +17,8 @@ const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select
  * Phone bottom sheet (MOBILE_SPEC.md C2/D2). Escape, the scrim, and a downward
  * drag on the grabber only close it; anything destructive must be an explicit
  * button inside. Focus starts on Cancel (or the last control), stays inside,
- * and returns to the opener.
+ * and returns to the opener. It renders on <body>, so no page container (a
+ * scroller is its own stacking context on iOS) can put the prompt pill above it.
  */
 export function BottomSheet({ open, title, onClose, children }: BottomSheetProps) {
   const panel = useRef<HTMLDivElement>(null);
@@ -55,7 +58,7 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
     }
   }
 
-  return (
+  return createPortal(
     <div className={styles.layer}>
       <div className={styles.scrim} data-testid="sheet-scrim" onClick={onClose} aria-hidden="true" />
       <div
@@ -81,6 +84,7 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
         <h2 className={styles.title}>{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

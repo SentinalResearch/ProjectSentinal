@@ -112,6 +112,22 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
           {logHint(session) && <p className={styles.muted}>{logHint(session)}</p>}
         </header>
 
+        {/* In the page, not stuck over it: it scrolls away with the header. */}
+        <div className={styles.actions}>
+          {capabilities.canAttach ? (
+            <Link className={styles.primaryButton} to={`/app/sessions/${session.id}/terminal`}>
+              Open terminal
+            </Link>
+          ) : (
+            <span className={styles.muted}>No terminal for this capture</span>
+          )}
+          {canInterrupt && (
+            <button type="button" className={styles.stopButton} onClick={stop}>
+              Stop
+            </button>
+          )}
+        </div>
+
         {waiting ? (
           <WaitingPanel session={session} canAnswer={capabilities.canSendInput} />
         ) : failed ? (
@@ -131,20 +147,6 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
         <EventsList events={session.events ?? []} />
       </div>
 
-      <div className={styles.stickyActions}>
-        {capabilities.canAttach ? (
-          <Link className={styles.primaryButton} to={`/app/sessions/${session.id}/terminal`}>
-            Open terminal
-          </Link>
-        ) : (
-          <span className={styles.muted}>No terminal for this capture</span>
-        )}
-        {canInterrupt && (
-          <button type="button" className={styles.stopButton} onClick={stop}>
-            Stop
-          </button>
-        )}
-      </div>
 
       <ConfirmSignalSheet
         open={sheetOpen}
