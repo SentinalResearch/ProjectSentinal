@@ -69,4 +69,11 @@ describe("M1 · phone dashboard (MOBILE_GLASS_SPEC §2)", () => {
     expect(screen.queryByRole("region", { name: "RTX-PC" })).not.toBeInTheDocument();
     expect(screen.getByText(/^Mac Mini ·/)).toBeInTheDocument();
   });
+
+  it("dismisses a failed Session from Needs you on the phone too", async () => {
+    renderAt("/app/overview", routes);
+    const needs = await screen.findByRole("region", { name: "Needs you" }, { timeout: 5000 });
+    await userEvent.setup().click(within(needs).getByRole("button", { name: "Dismiss pytest" }));
+    await vi.waitFor(() => expect(within(screen.getByRole("region", { name: "Needs you" })).queryByRole("link", { name: /pytest/ })).toBeNull(), { timeout: 3000 });
+  });
 });

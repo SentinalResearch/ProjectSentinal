@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { AttentionCard, GlassPanel } from "../../../components/glass/Glass";
 import { StateTag } from "../../../components/StateTag";
+import { dataAdapter } from "../../../data";
 import { answerPrompt, canAnswer, offeredChoices } from "../../../data/actions";
 import { PromptChoices } from "../../../components/PromptChoices";
 import { exitUnknown } from "../../../data/capture";
@@ -139,25 +140,37 @@ export function PhoneOverview() {
           ))}
           <div className={styles.pairs}>
             {others.map((session) => (
-              <AttentionCard
-                key={session.id}
-                as={Link}
-                to={`/app/sessions/${encodeURIComponent(session.id)}`}
-                state={session.state}
-                className={styles.smallCard}
-              >
-                <StateTag
+              // The card is a link; Dismiss sits beside it, never inside it.
+              <div key={session.id} className={styles.smallCardWrap}>
+                <AttentionCard
+                  as={Link}
+                  to={`/app/sessions/${encodeURIComponent(session.id)}`}
                   state={session.state}
-                  size="sm"
-                  exitUnknown={exitUnknown(session)}
-                />
-                <span className={styles.smallTitle}>{session.name}</span>
-                <span className={styles.smallFact}>
-                  {[shortFact(session), machineName(session.machine)]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </AttentionCard>
+                  className={styles.smallCard}
+                >
+                  <StateTag
+                    state={session.state}
+                    size="sm"
+                    exitUnknown={exitUnknown(session)}
+                  />
+                  <span className={styles.smallTitle}>{session.name}</span>
+                  <span className={styles.smallFact}>
+                    {[shortFact(session), machineName(session.machine)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </AttentionCard>
+                {session.state === "FAILED" && (
+                  <button
+                    type="button"
+                    className={styles.dismiss}
+                    aria-label={`Dismiss ${session.name}`}
+                    onClick={() => void dataAdapter.dismissSession(session.id)}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </section>
