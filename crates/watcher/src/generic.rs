@@ -123,7 +123,7 @@ impl WatcherAdapter for GenericAdapter {
     }
 }
 
-fn prompt_line(line: &str) -> Option<String> {
+pub(crate) fn prompt_line(line: &str) -> Option<String> {
     // Real prompts usually leave the cursor after a space ("Continue? [y/N] ").
     let unterminated = line.trim_end_matches(['\r', '\n']);
     let trimmed = unterminated.trim_end();

@@ -18,3 +18,34 @@ fn split_escape_sequences_and_partial_lines_are_preserved_safely() {
     assert_eq!(framer.pending(), "partial");
     assert_eq!(framer.finish(), Some("partial".into()));
 }
+
+#[test]
+fn a_prompt_waiting_on_the_line_is_offered_once_without_a_newline() {
+    // Real prompts leave the cursor on the line: no newline ever arrives.
+    let mut framer = LineFramer::default();
+    assert!(framer.push(b"Publish the results? [y/N] ").is_empty());
+    assert_eq!(
+        framer.new_pending_prompt().as_deref(),
+        Some("Publish the results? [y/N] ")
+    );
+    assert_eq!(framer.new_pending_prompt(), None, "offered once");
+
+    // The answer's echo is no longer a prompt; the finished line is a normal line.
+    framer.push(b"y");
+    assert_eq!(framer.new_pending_prompt(), None);
+    assert_eq!(framer.push(b"\n"), vec!["Publish the results? [y/N] y"]);
+
+    // The same question later is new again.
+    framer.push(b"Publish the results? [y/N] ");
+    assert!(framer.new_pending_prompt().is_some());
+}
+
+#[test]
+fn ordinary_unfinished_output_is_not_a_prompt() {
+    let mut framer = LineFramer::default();
+    for text in [&b"Downloading 40%"[..], b"$ ", b"building model"] {
+        framer.reset();
+        framer.push(text);
+        assert_eq!(framer.new_pending_prompt(), None);
+    }
+}

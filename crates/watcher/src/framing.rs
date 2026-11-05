@@ -16,6 +16,8 @@ pub struct LineFramer {
     maximum: usize,
     line: Vec<u8>,
     state: EscapeState,
+    /// The unfinished line last returned by [`Self::new_pending_prompt`].
+    offered: Option<String>,
 }
 
 impl Default for LineFramer {
@@ -31,6 +33,7 @@ impl LineFramer {
             maximum,
             line: Vec::new(),
             state: EscapeState::Ground,
+            offered: None,
         }
     }
 
@@ -83,6 +86,19 @@ impl LineFramer {
         truncate_utf8(&String::from_utf8_lossy(&self.line), self.maximum)
     }
 
+    /// The unfinished line, the first time it reads as a prompt. A prompt leaves
+    /// the cursor on its line, so without this no newline would ever report it.
+    pub fn new_pending_prompt(&mut self) -> Option<String> {
+        let pending = self.pending();
+        if crate::generic::prompt_line(&pending).is_none()
+            || self.offered.as_ref() == Some(&pending)
+        {
+            return None;
+        }
+        self.offered = Some(pending.clone());
+        Some(pending)
+    }
+
     /// Consume the current incomplete line at end-of-stream.
     pub fn finish(&mut self) -> Option<String> {
         if self.line.is_empty() {
@@ -90,6 +106,7 @@ impl LineFramer {
         }
         let value = self.pending();
         self.line.clear();
+        self.offered = None;
         Some(value)
     }
 
@@ -97,6 +114,7 @@ impl LineFramer {
     pub fn reset(&mut self) {
         self.line.clear();
         self.state = EscapeState::Ground;
+        self.offered = None;
     }
 
     fn emit(&mut self, lines: &mut Vec<String>) {
@@ -105,5 +123,6 @@ impl LineFramer {
         }
         lines.push(self.pending());
         self.line.clear();
+        self.offered = None;
     }
 }

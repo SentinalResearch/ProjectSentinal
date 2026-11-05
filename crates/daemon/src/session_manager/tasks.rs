@@ -256,14 +256,17 @@ pub(super) fn apply_output(
     bytes: &[u8],
     at: protocol::Timestamp,
 ) {
-    let lines = match handle.line_framer.lock() {
-        Ok(mut framer) => framer.push(bytes),
+    let (lines, prompt) = match handle.line_framer.lock() {
+        Ok(mut framer) => {
+            let lines = framer.push(bytes);
+            (lines, framer.new_pending_prompt())
+        }
         Err(_) => {
             tracing::error!(session = session_id.0, "watcher line-framer lock poisoned");
             return;
         }
     };
-    for line in lines {
+    for line in lines.into_iter().chain(prompt) {
         apply_observation(
             session_id,
             handle,

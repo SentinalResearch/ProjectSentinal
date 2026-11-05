@@ -238,7 +238,11 @@ impl ProjectedProgressUnit {
             "%" | "percent" | "percentage" => Self::Percent,
             "epoch" | "epochs" => Self::Epoch,
             "step" | "steps" => Self::Step,
-            "item" | "items" | "test" | "tests" => Self::Item,
+            "item" | "items" | "test" | "tests" | "task" | "tasks" | "sample" | "samples"
+            | "example" | "examples" | "file" | "files" | "case" | "cases" | "problem"
+            | "problems" | "question" | "questions" | "record" | "records" | "row" | "rows"
+            | "page" | "pages" | "chunk" | "chunks" | "request" | "requests" | "prompt"
+            | "prompts" | "batch" | "batches" | "iter" | "iteration" | "iterations" => Self::Item,
             _ => Self::Unknown,
         }
     }
