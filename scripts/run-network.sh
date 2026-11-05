@@ -81,6 +81,7 @@ main() {
   fi
   # Development control: plain-HTTP browser origin for this UI only.
   sentinal_write_daemon_config "$config_file" "$daemon_host:$daemon_port" "$data_dir" "$token_file" "$auth_file" "$local_socket" \
+    "config_dir = $(sentinal_toml_string "$config_dir")" \
     "development = true" \
     ${serve_lines[@]+"${serve_lines[@]}"} \
     "allowed_origins = [$origins]" \

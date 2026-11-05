@@ -134,7 +134,7 @@ fn release_version(release_json: Option<&str>) -> String {
         .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
         .and_then(|value| value.get("version")?.as_str().map(str::to_owned))
         .filter(|version| !version.is_empty())
-        .unwrap_or_else(|| format!("{} (development build)", env!("CARGO_PKG_VERSION")))
+        .unwrap_or_else(|| format!("{} (development build)", crate::DAEMON_VERSION))
 }
 
 /// The busiest processes, without command lines (they may hold secrets).
@@ -208,7 +208,7 @@ mod tests {
             release_version(Some(r#"{"schema_version":1,"version":"0.1.10"}"#)),
             "0.1.10"
         );
-        let development = format!("{} (development build)", env!("CARGO_PKG_VERSION"));
+        let development = format!("{} (development build)", crate::DAEMON_VERSION);
         assert_eq!(release_version(None), development);
         assert_eq!(release_version(Some("not json")), development);
     }

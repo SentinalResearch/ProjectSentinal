@@ -132,6 +132,7 @@ fn daemon(control: bool) -> Daemon {
         let release = ControlRelease::new(ControlReleaseSettings {
             data_dir: data.clone(),
             config_dir: dir.join("config"),
+            development: false,
             prefix: prefix.clone(),
             cli,
             detach: Detach::ProcessGroup,
@@ -381,4 +382,40 @@ async fn a_worker_has_no_release_routes() {
         .await;
     assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
     assert_eq!(body["code"], "NOT_CONTROL");
+}
+
+#[test]
+fn a_development_build_never_offers_or_starts_a_self_update() {
+    // `just sandbox` must not be able to replace the real installation.
+    let dir = std::env::temp_dir().join(format!("sentinal-dev-release-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("release-watch.json"),
+        r#"{"checked_at":1792000000000,"current":"0.0.1","channel":"stable","available":{"version":"9.9.9","signed":true,"published_at":"2026-01-01T00:00:00Z","notes_url":"https://example.invalid"}}"#,
+    )
+    .unwrap();
+    let release = |development| {
+        ControlRelease::new(ControlReleaseSettings {
+            development,
+            data_dir: dir.clone(),
+            config_dir: dir.join("config"),
+            prefix: dir.join("prefix"),
+            cli: dir.join("no-such-sentinal"),
+            detach: Detach::ProcessGroup,
+            live_full_sessions: Arc::new(|| 0),
+        })
+    };
+    // The same offer is visible to a production build, so this checks the guard.
+    assert_eq!(release(false).view().available.unwrap().version, "9.9.9");
+    let development = release(true);
+    assert_eq!(development.view().available, None);
+    let refused = development
+        .start_update(&protocol::release::ControlUpdateRequest {
+            version: "9.9.9".into(),
+            allow_interrupt: true,
+        })
+        .unwrap_err();
+    assert_eq!(refused.status, 409);
+    let _ = std::fs::remove_dir_all(&dir);
 }

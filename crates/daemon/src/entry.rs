@@ -242,7 +242,7 @@ pub async fn run() -> Result<(), DaemonError> {
     let daemon_uid = current_uid(&config.local_socket)?;
     let push = config.control.as_ref().map(|control| {
         let settings = PushGatewaySettings {
-            key_file: push_key_file(&home),
+            key_file: push_key_file(&config.config_dir),
             subject_origin: control.public_url.clone(),
             owner_uid: daemon_uid,
         };
@@ -255,9 +255,9 @@ pub async fn run() -> Result<(), DaemonError> {
         }
         PushGateway::new(store.clone(), settings, Arc::new(now))
     });
-    let watcher_adapters = load_adapters(&home.join(".config/terminal-agent/adapters"))?;
+    let watcher_adapters = load_adapters(&config.config_dir.join("adapters"))?;
     let (projects, project_problems) =
-        crate::projects::Projects::load(&home.join(".config/terminal-agent/projects.toml"), &home);
+        crate::projects::Projects::load(&config.config_dir.join("projects.toml"), &home);
     for problem in project_problems {
         tracing::warn!(%problem, "projects.toml entry ignored");
     }
@@ -291,7 +291,7 @@ pub async fn run() -> Result<(), DaemonError> {
     let local_socket =
         UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
     let (recipes, recipe_diagnostics) =
-        RecipeCatalog::load(Some(home.join(".config/terminal-agent/recipes")));
+        RecipeCatalog::load(Some(config.config_dir.join("recipes")));
     for diagnostic in recipe_diagnostics {
         tracing::warn!(path = %diagnostic.path.display(), reason = %diagnostic.message, "Recipe file ignored or overridden");
     }
@@ -642,12 +642,12 @@ pub async fn run() -> Result<(), DaemonError> {
     server_result
 }
 
-fn push_key_file(home: &std::path::Path) -> PathBuf {
+fn push_key_file(config_dir: &std::path::Path) -> PathBuf {
     #[cfg(feature = "e2e-test-support")]
     if let Some(path) = std::env::var_os("SENTINAL_E2E_VAPID_KEY_FILE") {
         return PathBuf::from(path);
     }
-    home.join(".config/terminal-agent/push-vapid.json")
+    config_dir.join("push-vapid.json")
 }
 
 /// The `sentinal` CLI binary installed beside this running `sentinald`.
@@ -703,6 +703,7 @@ fn control_release(
         .unwrap_or_default();
     let detach = detach();
     crate::control::ControlRelease::new(crate::control::ControlReleaseSettings {
+        development: config.development,
         data_dir: config.data_dir.clone(),
         config_dir: config_path
             .parent()

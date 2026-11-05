@@ -51,6 +51,10 @@ pub struct DaemonConfig {
     pub bind: SocketAddr,
     /// Directory containing session logs and the audit log.
     pub data_dir: PathBuf,
+    /// Directory of credentials and settings: identity, control link, tokens,
+    /// notification and push keys, recipes. A sandbox sets this to stay off the
+    /// installed Machine's link. Defaults to `~/.config/terminal-agent`.
+    pub config_dir: PathBuf,
     /// Maximum number of terminal lines retained in memory per session.
     pub scrollback_lines: usize,
     /// File containing the bearer token.
@@ -95,6 +99,7 @@ struct RawConfig {
     notify_file: Option<PathBuf>,
     local_socket: Option<PathBuf>,
     packages: Option<RawPackageConfig>,
+    config_dir: Option<PathBuf>,
     identity_file: Option<PathBuf>,
     link_file: Option<PathBuf>,
     control_credentials_file: Option<PathBuf>,
@@ -271,18 +276,19 @@ impl DaemonConfig {
         let packages = parse_package_config(raw.packages)?;
         crate::origin::OriginPolicy::new(&raw.allowed_origins, raw.development)?;
         let control = parse_control_config(raw.control, raw.development)?;
-        let config_dir = home.join(".config/terminal-agent");
+        let config_dir = raw
+            .config_dir
+            .unwrap_or_else(|| home.join(".config/terminal-agent"));
 
         Ok(DaemonConfig {
             bind,
             data_dir,
+            config_dir: config_dir.clone(),
             scrollback_lines: raw.scrollback_lines.unwrap_or(DEFAULT_SCROLLBACK_LINES),
-            token_file: raw
-                .token_file
-                .unwrap_or_else(|| home.join(".config/terminal-agent/token")),
+            token_file: raw.token_file.unwrap_or_else(|| config_dir.join("token")),
             auth_file: raw
                 .auth_file
-                .unwrap_or_else(|| home.join(".config/terminal-agent/auth.json")),
+                .unwrap_or_else(|| config_dir.join("auth.json")),
             notify_file: raw
                 .notify_file
                 .unwrap_or_else(|| config_dir.join("notify.toml")),

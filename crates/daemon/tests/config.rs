@@ -394,3 +394,33 @@ fn completion_weights_default_and_can_be_tuned() {
         assert!(DaemonConfig::from_toml(bad, home).is_err(), "{bad}");
     }
 }
+
+#[test]
+fn config_dir_moves_every_credential_and_settings_file_away_from_home() {
+    // A sandbox shares this Machine's HOME. If any of these stayed under it, the
+    // sandbox would log in to the real control as this Machine.
+    let root = std::env::temp_dir().join(format!("sentinal-config-dir-{}", std::process::id()));
+    let home = root.join("home");
+    let sandbox = root.join("sandbox");
+    let text = format!(
+        "bind = \"127.0.0.1:7520\"\ndata_dir = \"{}\"\nconfig_dir = \"{}\"\n",
+        root.join("data").display(),
+        sandbox.display()
+    );
+    let config = DaemonConfig::from_toml(&text, &home).unwrap();
+    assert_eq!(config.config_dir, sandbox);
+    for path in [
+        &config.token_file,
+        &config.auth_file,
+        &config.notify_file,
+        &config.identity_file,
+        &config.link_file,
+        &config.control_credentials_file,
+    ] {
+        assert!(
+            path.starts_with(&sandbox),
+            "{} escaped config_dir",
+            path.display()
+        );
+    }
+}

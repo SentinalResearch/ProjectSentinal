@@ -134,3 +134,26 @@ isolated daemon processes and a browser. Milestones that change enrollment,
 Machine routing, terminal control, Recipes, notifications, or mobile behavior
 must record both `just check` and `just test-e2e`; `just acceptance` runs that
 combined gate.
+
+## Trying a change before release
+
+Pushing to `main` does not release anything; only a `v*` tag does. Before a tag:
+
+| Step | Command | Proves |
+|---|---|---|
+| Fast checks | `just check` | Formatting, lints, unit and contract tests |
+| Browser suite | `just test-e2e` | The built UI against isolated real daemons |
+| Look and click | `just demo` | Layouts with fake data, nothing real |
+| Use it yourself | `just sandbox` | This checkout, real terminals, separate data |
+
+`just sandbox` runs this checkout on this Machine's Tailscale address (web UI on
+port 5273, daemon on 7520), so a phone on the Tailnet can open it. Its data and
+config are in `~/.local/share/sentinal-sandbox`, and `just sandbox --reset` erases
+them. A new sandbox finishes first-time setup itself and prints a random password
+to sign in with, so there is no Machine token to paste. The installed Sentinal is not touched, and neither are its Sessions.
+
+It isolates Sentinal's data, not the operating system: terminals opened in it run
+real commands as you on this Machine.
+
+Use `just sandbox` rather than plain `just network` when an installed Sentinal is
+on the Machine: `just network` defaults to the installed data directory.

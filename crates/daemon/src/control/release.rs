@@ -44,6 +44,9 @@ pub enum Detach {
 /// Wiring for one control's release service.
 #[derive(Clone)]
 pub struct ControlReleaseSettings {
+    /// A development build (`just sandbox`, `just network`): it never offers or
+    /// starts a self-update, which would act on a real installation.
+    pub development: bool,
     /// Daemon data directory holding the CLI's state files.
     pub data_dir: PathBuf,
     /// Daemon config directory passed to the CLI.
@@ -126,6 +129,7 @@ impl ControlRelease {
         let available = watch
             .available
             .as_ref()
+            .filter(|_| !self.settings.development)
             .filter(|offer| {
                 offer.signed && strict_version(&offer.version) && newer(&offer.version, &current)
             })
@@ -272,6 +276,9 @@ impl ControlRelease {
         previous: &str,
         started_at: Option<i64>,
     ) -> Result<ControlUpdateStarted, ControlFailure> {
+        if self.settings.development {
+            return Err(conflict("a development build does not update itself"));
+        }
         let started_at = started_at.unwrap_or_else(now_ms);
         let update_id = format!("cu_{started_at}");
         let record = UpdateFile {

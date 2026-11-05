@@ -54,6 +54,7 @@ check:
     python3 -m unittest discover -s eval -p 'test_*.py'
     python3 -m unittest discover -s intelligence/tests -p 'test_*.py'
     bash scripts/tests/run-network-test.sh
+    bash scripts/tests/run-sandbox-test.sh
     bash scripts/tests/run-roles-test.sh
     bash scripts/tests/install-worker-test.sh
     bash scripts/tests/shell-path-test.sh
@@ -71,6 +72,14 @@ check:
 # Start the daemon and web UI on this machine's Tailscale IPv4 address
 network *args:
     bash scripts/run-network.sh {{args}}
+
+# Test this checkout with separate data, config and ports; installed Sentinal untouched
+sandbox *args:
+    bash scripts/run-sandbox.sh {{args}}
+
+# Watch an AI agent use the running sandbox: token, a job, progress, a question, revocation
+sandbox-agent *args:
+    python3 scripts/sandbox-agent-demo.py {{args}}
 
 # Start only the worker daemon on this Machine's exact Tailscale address
 agent *args:
