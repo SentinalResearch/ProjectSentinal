@@ -65,7 +65,7 @@ export type ProjectedSession = {
    */
   coding_agent?: CodingAgentSummary | null;
   /**
-   * When the owner dismissed this failed Session from "Needs you".
+   * When the owner hid this finished Session; it stays searchable.
    */
   dismissed_at?: Timestamp | null;
 };

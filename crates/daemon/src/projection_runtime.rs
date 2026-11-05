@@ -37,6 +37,18 @@ pub fn spawn_projection_recorder(
                 _ = scan.tick() => {
                     match sessions.list() {
                         Ok(current) => {
+                            for session_id in removed_sessions(&known_sessions, &current) {
+                                known_sessions.remove(&session_id);
+                                let removed_at = sessions.now();
+                                record(
+                                    &store,
+                                    &machine_id,
+                                    &epoch,
+                                    &control,
+                                    |cursor| ProjectionChange::SessionTombstone { cursor, session_id, removed_at },
+                                    removed_at,
+                                );
+                            }
                             for session in current {
                                 let projected = ProjectedSession::from_session(&session);
                                 if known_sessions.get(&session.id) != Some(&projected) {
@@ -107,6 +119,18 @@ pub fn spawn_projection_recorder(
             }
         }
     });
+}
+
+/// Sessions the control still knows about that no longer exist here.
+fn removed_sessions(
+    known: &HashMap<protocol::SessionId, ProjectedSession>,
+    current: &[protocol::Session],
+) -> Vec<protocol::SessionId> {
+    known
+        .keys()
+        .copied()
+        .filter(|id| !current.iter().any(|session| session.id == *id))
+        .collect()
 }
 
 fn record(
@@ -201,6 +225,28 @@ fn project_session_metrics(metrics: &SessionMetrics) -> ProjectedMetrics {
 mod tests {
     use super::*;
     use protocol::{GpuMetrics, ProcessTotals};
+
+    #[test]
+    fn a_session_gone_from_the_list_is_reported_as_removed() {
+        let session = |id| {
+            protocol::Session::new(
+                protocol::SessionId(id),
+                MachineId("m".into()),
+                "/bin/sh",
+                "/",
+                Timestamp(1),
+            )
+        };
+        let known: HashMap<_, _> = [session(1), session(2)]
+            .iter()
+            .map(|s| (s.id, ProjectedSession::from_session(s)))
+            .collect();
+        assert_eq!(
+            removed_sessions(&known, &[session(2), session(3)]),
+            vec![protocol::SessionId(1)]
+        );
+        assert!(removed_sessions(&HashMap::new(), &[session(1)]).is_empty());
+    }
 
     #[test]
     fn metrics_projection_is_numeric_and_coalescible() {

@@ -1,5 +1,6 @@
 import { Navigate, type RouteObject } from "react-router-dom";
 
+import { HiddenSessionsPage } from "./HiddenSessionsPage";
 import { HistoryPage } from "./HistoryPage";
 import { OverviewPage } from "./OverviewPage";
 import { MoreRedirect } from "./phone/SettingsHome";
@@ -18,6 +19,7 @@ import { SplitViewPage } from "./SplitViewPage";
 export const APP_PAGES: RouteObject[] = [
   { index: true, element: <OverviewPage /> },
   { path: "overview", element: <OverviewPage /> },
+  { path: "sessions/hidden", element: <HiddenSessionsPage /> },
   { path: "sessions/:id", element: <SessionDetailPage /> },
   { path: "sessions/:id/terminal", element: <SessionTerminalRoute /> },
   { path: "split", element: <SplitViewPage /> },

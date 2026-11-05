@@ -13,6 +13,7 @@ mod projection;
 mod records;
 pub mod registry;
 mod search;
+mod session_delete;
 
 use protocol::{
     CaptureLevel, Event, EventId, EventKind, Machine, Session, SessionId, SessionState, Timestamp,
@@ -57,7 +58,12 @@ const MIGRATIONS: &[(u32, &str)] = &[
     (11, include_str!("../migrations/011_health.sql")),
     (12, include_str!("../migrations/012_search.sql")),
     (13, include_str!("../migrations/013_complete.sql")),
+    (14, include_str!("../migrations/014_session_delete.sql")),
 ];
+
+/// The first Event ID never used, even by a deleted Session's Events.
+const NEXT_EVENT_ID: &str = "SELECT MAX(COALESCE((SELECT MAX(id) FROM events), 0),
+            COALESCE((SELECT value FROM id_floors WHERE name='events'), 0)) + 1";
 
 /// Thread-safe connection to one terminal-agent SQLite database.
 pub struct Store {
@@ -242,10 +248,7 @@ impl Store {
                 .collect::<Result<Vec<_>, _>>()?;
             values
         };
-        let mut next_event: u64 =
-            transaction.query_row("SELECT COALESCE(MAX(id), 0) + 1 FROM events", [], |row| {
-                row.get(0)
-            })?;
+        let mut next_event: u64 = transaction.query_row(NEXT_EVENT_ID, [], |row| row.get(0))?;
         let mut events = Vec::with_capacity(json_values.len());
         for (json, predecessor) in json_values {
             let mut session = decode_session(&json, predecessor)?;
@@ -317,9 +320,15 @@ impl Store {
 
     fn next_id(&self, table: &'static str) -> Result<u64, StoreError> {
         let sql = match table {
-            "sessions" => "SELECT COALESCE(MAX(id), 0) + 1 FROM sessions",
-            "commands" => "SELECT COALESCE(MAX(id), 0) + 1 FROM commands",
-            "events" => "SELECT COALESCE(MAX(id), 0) + 1 FROM events",
+            "sessions" => {
+                "SELECT MAX(COALESCE((SELECT MAX(id) FROM sessions), 0),
+                            COALESCE((SELECT value FROM id_floors WHERE name='sessions'), 0)) + 1"
+            }
+            "commands" => {
+                "SELECT MAX(COALESCE((SELECT MAX(id) FROM commands), 0),
+                            COALESCE((SELECT value FROM id_floors WHERE name='commands'), 0)) + 1"
+            }
+            "events" => NEXT_EVENT_ID,
             _ => {
                 return Err(StoreError::Missing {
                     kind: "table",

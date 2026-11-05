@@ -78,20 +78,94 @@ impl SessionManager {
         self.update_known_session(session_id, |session| session.output_search = enabled)
     }
 
-    /// Dismiss a failed Session from "Needs you" on every device; kept with it.
+    /// This manager's current time.
+    pub fn now(&self) -> Timestamp {
+        (self.inner.config.clock)()
+    }
+
+    /// Hide a finished Session and its continuation chain on every device.
+    /// Its history stays searchable, and [`Self::restore`] brings it back.
     pub fn dismiss(&self, session_id: SessionId) -> Result<protocol::Session, SessionManagerError> {
-        let session = self.known_session(session_id)?;
-        if session.state != protocol::SessionState::Failed {
-            return Err(SessionManagerError::NotDismissable {
-                session_id,
-                state: session.state,
-            });
-        }
-        if session.dismissed_at.is_some() {
-            return Ok(session);
-        }
         let now = (self.inner.config.clock)();
-        self.update_known_session(session_id, |session| session.dismissed_at = Some(now))
+        self.set_hidden(session_id, Some(now))
+    }
+
+    /// Show a hidden Session and its continuation chain again.
+    pub fn restore(&self, session_id: SessionId) -> Result<protocol::Session, SessionManagerError> {
+        self.set_hidden(session_id, None)
+    }
+
+    fn set_hidden(
+        &self,
+        session_id: SessionId,
+        at: Option<Timestamp>,
+    ) -> Result<protocol::Session, SessionManagerError> {
+        let mut requested = self.known_session(session_id)?;
+        for session in self.finished_chain(session_id)? {
+            // Hiding again keeps the original time.
+            if session.dismissed_at.is_some() != at.is_some() {
+                let updated =
+                    self.update_known_session(session.id, |session| session.dismissed_at = at)?;
+                if updated.id == session_id {
+                    requested = updated;
+                }
+            }
+        }
+        Ok(requested)
+    }
+
+    /// Permanently erase a finished Session and its continuation chain: stored
+    /// rows and saved output. Returns every erased ID, newest generation first.
+    pub fn delete(&self, session_id: SessionId) -> Result<Vec<SessionId>, SessionManagerError> {
+        let ids: Vec<SessionId> = self
+            .finished_chain(session_id)?
+            .iter()
+            .rev()
+            .map(|session| session.id)
+            .collect();
+        self.store()?.delete_sessions(&ids)?;
+        let log_dir = self.inner.config.data_dir.join("sessions");
+        for id in &ids {
+            if let Ok(mut sessions) = self.inner.sessions.write() {
+                sessions.remove(id);
+            }
+            let path = log_dir.join(format!("{}.log.zst", id.0));
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(source) => {
+                    return Err(SessionManagerError::File {
+                        operation: "delete saved output",
+                        path,
+                        source,
+                    })
+                }
+            }
+            tracing::info!(session = id.0, "Session permanently deleted by the owner");
+        }
+        Ok(ids)
+    }
+
+    /// Every generation of a Session's chain, oldest first; refused while any
+    /// of them is still live.
+    fn finished_chain(
+        &self,
+        session_id: SessionId,
+    ) -> Result<Vec<protocol::Session>, SessionManagerError> {
+        self.known_session(session_id)?;
+        let chain = self
+            .store()?
+            .ordered_lineage(session_id)?
+            .into_iter()
+            .map(|session| self.known_session(session.id))
+            .collect::<Result<Vec<_>, _>>()?;
+        match chain.iter().find(|session| !session.state.is_finished()) {
+            Some(live) => Err(SessionManagerError::NotDismissable {
+                session_id: live.id,
+                state: live.state,
+            }),
+            None => Ok(chain),
+        }
     }
 
     /// Change an owner-facing field of a live or finished Session, persist it,

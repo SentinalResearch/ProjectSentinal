@@ -1152,12 +1152,37 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     },
     async dismissSession(sessionId) {
       await ensureInitialized();
-      const connection = owner(sessionId);
+      const connection = liveOwner(sessionId, "Hide");
       const message = await connection.transport.request(
         { type: "DISMISS_SESSION", session_id: localId(sessionId) },
         (reply) => reply.type === "SESSION_UPDATED" || reply.type === "ERROR",
       );
       if (message.type === "ERROR") throw daemonError(message.message);
+      if (message.type === "SESSION_UPDATED") emit({ type: "SESSION_UPDATED", session: mapSession(message.session) });
+    },
+    async restoreSession(sessionId) {
+      await ensureInitialized();
+      const connection = liveOwner(sessionId, "Restore");
+      const message = await connection.transport.request(
+        { type: "RESTORE_SESSION", session_id: localId(sessionId) },
+        (reply) => reply.type === "SESSION_UPDATED" || reply.type === "ERROR",
+      );
+      if (message.type === "ERROR") throw daemonError(message.message);
+      if (message.type === "SESSION_UPDATED") emit({ type: "SESSION_UPDATED", session: mapSession(message.session) });
+    },
+    async deleteSession(sessionId) {
+      await ensureInitialized();
+      const connection = liveOwner(sessionId, "Delete");
+      const message = await connection.transport.request(
+        { type: "DELETE_SESSION", session_id: localId(sessionId) },
+        (reply) => reply.type === "SESSIONS_DELETED" || reply.type === "ERROR",
+      );
+      if (message.type === "ERROR") throw daemonError(message.message);
+      if (message.type === "SESSIONS_DELETED") {
+        const sessionIds = message.session_ids.map((id) => compositeId(connection.id, id));
+        connection.sessions = connection.sessions.filter((session) => !sessionIds.includes(session.id));
+        emit({ type: "SESSIONS_REMOVED", sessionIds });
+      }
     },
     async setOutputSearch(sessionId, enabled) {
       await ensureInitialized();

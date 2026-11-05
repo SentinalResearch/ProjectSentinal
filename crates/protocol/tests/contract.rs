@@ -233,6 +233,9 @@ fn every_client_request_has_a_fixture() {
         "GET_NOTIFICATION_JOURNAL",
         "GET_MACHINE_DETAILS",
         "GET_MACHINE_METRICS",
+        "DISMISS_SESSION",
+        "RESTORE_SESSION",
+        "DELETE_SESSION",
     ];
     let requests = load("client_requests.json");
     let present: Vec<&str> = requests

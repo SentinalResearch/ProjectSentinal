@@ -17,5 +17,8 @@
   { "version": 1, "payload": { "type": "SET_NOTIFICATION_RULE", "session_id": 128, "rules": { "finished": true, "error": true, "stalled": true, "waiting": true, "checkpoint": false, "progress": false } } },
   { "version": 1, "payload": { "type": "GET_NOTIFICATION_JOURNAL" } },
   { "version": 1, "payload": { "type": "GET_MACHINE_DETAILS" } },
-  { "version": 1, "payload": { "type": "GET_MACHINE_METRICS", "range": "DAY" } }
+  { "version": 1, "payload": { "type": "GET_MACHINE_METRICS", "range": "DAY" } },
+  { "version": 1, "payload": { "type": "DISMISS_SESSION", "session_id": 128 } },
+  { "version": 1, "payload": { "type": "RESTORE_SESSION", "session_id": 128 } },
+  { "version": 1, "payload": { "type": "DELETE_SESSION", "session_id": 128 } }
 ]

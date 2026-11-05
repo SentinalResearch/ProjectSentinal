@@ -1007,6 +1007,10 @@ fn apply_change(
                 "DELETE FROM control_projection_sessions WHERE machine_id=?1 AND session_id=?2",
                 params![machine_id.0, to_sql_id(session_id.0)?],
             )?;
+            transaction.execute(
+                "DELETE FROM control_projection_events WHERE machine_id=?1 AND session_id=?2",
+                params![machine_id.0, to_sql_id(session_id.0)?],
+            )?;
         }
         ProjectionChange::EventAppend { event, .. } => {
             transaction.execute(

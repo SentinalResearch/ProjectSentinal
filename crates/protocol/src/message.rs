@@ -167,9 +167,19 @@ pub enum ClientRequest {
         /// Most completions, 1 through [`crate::complete::MAX_COMPLETE_LIMIT`].
         limit: u32,
     },
-    /// Dismiss a failed Session from "Needs you" on every device.
+    /// Hide a finished Session (and its continuation chain) on every device.
     DismissSession {
-        /// The failed Session.
+        /// The finished Session.
+        session_id: SessionId,
+    },
+    /// Show a hidden Session (and its continuation chain) again.
+    RestoreSession {
+        /// The hidden Session.
+        session_id: SessionId,
+    },
+    /// Permanently erase a finished Session (and its continuation chain).
+    DeleteSession {
+        /// The finished Session.
         session_id: SessionId,
     },
     /// Let search read a FULL Session's saved output, or stop (5.S). Off by default.
@@ -720,6 +730,11 @@ pub enum DaemonMessage {
     Sessions {
         /// All sessions on this machine.
         sessions: Vec<Session>,
+    },
+    /// These Sessions were permanently erased (reply to `DELETE_SESSION`).
+    SessionsDeleted {
+        /// Every erased generation.
+        session_ids: Vec<SessionId>,
     },
     /// A session was created or changed.
     SessionUpdated {

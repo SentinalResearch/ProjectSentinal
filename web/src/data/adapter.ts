@@ -53,6 +53,7 @@ export interface TerminalRoute {
 export type LiveEvent =
   | { type: "DATA_RESET"; machines: Machine[]; sessions: Session[] }
   | { type: "SESSION_UPDATED"; session: Session }
+  | { type: "SESSIONS_REMOVED"; sessionIds: string[] }
   | { type: "COMMAND_UPDATED"; sessionId: string; command: string | undefined }
   | { type: "SESSION_METRICS"; sessionId: string; metrics: Session["metrics"] }
   | { type: "EVENT_APPENDED"; sessionId: string; event: SessionEvent; sessionPatch?: Partial<Session> }
@@ -94,8 +95,12 @@ export interface DataAdapter {
   ): Promise<OutputReplayResult>;
   getRecipes(): Promise<Recipe[]>;
   getHistory(filters?: HistoryFilters): Promise<HistoryResults>;
-  /** Dismiss a failed Session from "Needs you" on every device. */
+  /** Hide a finished Session (and its earlier generations) on every device. */
   dismissSession(sessionId: string): Promise<void>;
+  /** Show a hidden Session again. */
+  restoreSession(sessionId: string): Promise<void>;
+  /** Permanently erase a finished Session (and its earlier generations). */
+  deleteSession(sessionId: string): Promise<void>;
   /** Let search read a FULL Session's saved output, or stop (5.S). */
   setOutputSearch(sessionId: string, enabled: boolean): Promise<void>;
   /** Completions for the line typed in a Session, from its own Machine (5.A). */

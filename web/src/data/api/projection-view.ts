@@ -203,8 +203,9 @@ export function applyProjectionMessage(
       current.sessions = replaceSession(current.sessions, session);
       events.push({ type: "SESSION_UPDATED", session });
     } else if (change.type === "SESSION_TOMBSTONE") {
-      current.sessions = current.sessions.filter((session) =>
-        session.id !== compositeId(message.machine_id as string, change.session_id));
+      const removedId = compositeId(message.machine_id as string, change.session_id);
+      current.sessions = current.sessions.filter((session) => session.id !== removedId);
+      events.push({ type: "SESSIONS_REMOVED", sessionIds: [removedId] });
     } else if (change.type === "EVENT_APPEND") {
       const sessionId = compositeId(message.machine_id, change.event.session_id);
       const event = mapEvent(change.event);

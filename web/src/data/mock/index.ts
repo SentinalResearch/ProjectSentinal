@@ -119,6 +119,17 @@ export const mockAdapter: DataAdapter = {
     updateSession(sessionId, { dismissed: true });
   },
 
+  async restoreSession(sessionId: string) {
+    await delay(undefined, 50, 120);
+    updateSession(sessionId, { dismissed: false });
+  },
+
+  async deleteSession(sessionId: string) {
+    await delay(undefined, 50, 120);
+    store.sessions = store.sessions.filter((session) => session.id !== sessionId);
+    emit({ type: "SESSIONS_REMOVED", sessionIds: [sessionId] });
+  },
+
   async setOutputSearch(sessionId: string, enabled: boolean) {
     await delay(undefined, 50, 120);
     updateSession(sessionId, { outputSearch: enabled });

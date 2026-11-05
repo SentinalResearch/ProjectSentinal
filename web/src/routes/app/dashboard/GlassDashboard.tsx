@@ -12,6 +12,7 @@ import { extractPort, formatSessionFact, machineSummary, needsAttention, session
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Machine, MachineMetricSample, Session } from "../../../data/types";
 import { InterruptConfirm } from "../InterruptConfirm";
+import { useSessionRemoval } from "../useSessionRemoval";
 import { useShell } from "../shell/ShellContext";
 import { awayFeed } from "./feed";
 import { recordSample, sparkBars, type SparkHistory } from "./spark";
@@ -24,7 +25,7 @@ const LOAD_MS = 30_000;
 export function GlassDashboard() {
   const navigate = useNavigate();
   const shell = useShell();
-  const { machines, terminals, loading } = useLiveData();
+  const { machines, terminals, hidden, loading } = useLiveData();
   const [interrupting, setInterrupting] = useState<Session | null>(null);
   // 6.1: show only Sessions running an AI coding agent.
   const [agentsOnly, setAgentsOnly] = useState(false);
@@ -109,6 +110,11 @@ export function GlassDashboard() {
           <h2 className={styles.feedTitle}>While you were away</h2>
           {since && <span className={styles.feedSince}>since {since}</span>}
         </div>
+        {hidden.length > 0 && (
+          <button type="button" className={styles.chip} onClick={() => navigate("/app/sessions/hidden")}>
+            Hidden Sessions ({hidden.length})
+          </button>
+        )}
         {feed.length === 0 && <p className={styles.feedEmpty}>Nothing new.</p>}
         <ol className={styles.feedList}>
           {feed.map((item) => (
@@ -168,6 +174,7 @@ function NeedsCard({
 }) {
   const navigate = useNavigate();
   const titleId = `need-${useId()}`;
+  const removal = useSessionRemoval();
   const fact = session.state === "FAILED" ? (session.result?.summary ?? formatSessionFact(session)) : formatSessionFact(session);
   const stop = (handler: () => void) => (event: { stopPropagation(): void }) => {
     event.stopPropagation();
@@ -235,10 +242,11 @@ function NeedsCard({
                   <button
                     type="button"
                     className={styles.chip}
-                    onClick={stop(() => void dataAdapter.dismissSession(session.id))}
-                    aria-label={`Dismiss ${session.name}`}
+                    disabled={removal.busy}
+                    onClick={stop(() => void removal.hide([session.id]))}
+                    aria-label={`Hide ${session.name}`}
                   >
-                    Dismiss
+                    Hide
                   </button>
                 )}
                 {session.state === "FAILED" && session.command && (
@@ -255,6 +263,11 @@ function NeedsCard({
               </>
             )}
           </div>
+          {removal.error && (
+            <p className={styles.needFact} role="alert">
+              {removal.error}
+            </p>
+          )}
         </>
       )}
     </AttentionCard>

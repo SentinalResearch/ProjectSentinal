@@ -12,6 +12,8 @@ export interface LiveDataValue {
   sessions: Session[];
   /** One entry per terminal (its latest generation): what lists and counts show. */
   terminals: Session[];
+  /** Terminals the owner hid: left out of `terminals`, shown on the Hidden page. */
+  hidden: Session[];
   /** True until the first getMachines()/getSessions() round-trip resolves. */
   loading: boolean;
 }
@@ -63,6 +65,9 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
           };
           return next;
         });
+      } else if (event.type === "SESSIONS_REMOVED") {
+        const removed = new Set(event.sessionIds);
+        setSessions((prev) => prev.filter((session) => !removed.has(session.id)));
       } else if (event.type === "MACHINE_UPDATED") {
         setMachines((prev) => {
           const idx = prev.findIndex((m) => m.id === event.machine.id);
@@ -94,10 +99,12 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const terminals = useMemo(() => latestGenerations(sessions), [sessions]);
+  const latest = useMemo(() => latestGenerations(sessions), [sessions]);
+  const terminals = useMemo(() => latest.filter((session) => !session.dismissed), [latest]);
+  const hidden = useMemo(() => latest.filter((session) => session.dismissed), [latest]);
   const value = useMemo<LiveDataValue>(
-    () => ({ machines, sessions, terminals, loading }),
-    [machines, sessions, terminals, loading],
+    () => ({ machines, sessions, terminals, hidden, loading }),
+    [machines, sessions, terminals, hidden, loading],
   );
 
   return <LiveDataContext.Provider value={value}>{children}</LiveDataContext.Provider>;

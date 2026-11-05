@@ -1,8 +1,8 @@
+import { useSessionRemoval } from "../useSessionRemoval";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { AttentionCard, GlassPanel } from "../../../components/glass/Glass";
 import { StateTag } from "../../../components/StateTag";
-import { dataAdapter } from "../../../data";
 import { answerPrompt, canAnswer, offeredChoices } from "../../../data/actions";
 import { PromptChoices } from "../../../components/PromptChoices";
 import { exitUnknown } from "../../../data/capture";
@@ -29,7 +29,8 @@ import styles from "./PhoneDashboard.module.css";
  */
 export function PhoneOverview() {
   const [params, setParams] = useSearchParams();
-  const { machines, terminals, loading } = useLiveData();
+  const { machines, terminals, hidden, loading } = useLiveData();
+  const removal = useSessionRemoval();
   const now = useClock();
   const load = useMachineLoad(machines);
   const machineFilter = params.get("machine");
@@ -164,8 +165,9 @@ export function PhoneOverview() {
                   <button
                     type="button"
                     className={styles.dismiss}
-                    aria-label={`Dismiss ${session.name}`}
-                    onClick={() => void dataAdapter.dismissSession(session.id)}
+                    aria-label={`Hide ${session.name}`}
+                    disabled={removal.busy}
+                    onClick={() => void removal.hide([session.id])}
                   >
                     ×
                   </button>
@@ -174,6 +176,16 @@ export function PhoneOverview() {
             ))}
           </div>
         </section>
+      )}
+      {removal.error && (
+        <p className={styles.empty} role="alert">
+          {removal.error}
+        </p>
+      )}
+      {!needsOnly && hidden.length > 0 && (
+        <Link className={styles.empty} to="/app/sessions/hidden">
+          Hidden Sessions ({hidden.length})
+        </Link>
       )}
       {needsOnly && needs.length === 0 && (
         <p className={styles.empty}>Nothing needs you right now.</p>

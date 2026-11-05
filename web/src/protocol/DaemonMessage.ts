@@ -13,6 +13,7 @@ import type { NotificationStatus } from "./NotificationStatus";
 import type { Recipe } from "./Recipe";
 import type { SearchHit } from "./SearchHit";
 import type { Session } from "./Session";
+import type { SessionId } from "./SessionId";
 import type { SessionMetrics } from "./SessionMetrics";
 
 /**
@@ -30,6 +31,12 @@ export type DaemonMessage = {
    * All sessions on this machine.
    */
   sessions: Array<Session>;
+} | {
+  "type": "SESSIONS_DELETED";
+  /**
+   * Every erased generation.
+   */
+  session_ids: Array<SessionId>;
 } | {
   "type": "SESSION_UPDATED";
   /**

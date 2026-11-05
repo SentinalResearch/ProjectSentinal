@@ -1,3 +1,5 @@
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { useSessionRemoval } from "./useSessionRemoval";
 import { useEffect, useState } from "react";
 
 import { dataAdapter } from "../../data";
@@ -53,6 +55,8 @@ export function MachinePanel({ machine, sessions }: { machine: Machine; sessions
   const [now, setNow] = useState(() => Date.now());
   // A bare shell on this Machine, opened straight into its terminal.
   const isPhone = useIsPhone();
+  const removal = useSessionRemoval();
+  const [confirmClear, setConfirmClear] = useState(false);
   const newSession = useNewSession((id) => (isPhone ? `/app/sessions/${id}/terminal` : `/app/sessions/${id}`));
 
   useEffect(() => {
@@ -99,6 +103,7 @@ export function MachinePanel({ machine, sessions }: { machine: Machine; sessions
   }, [machine.id, range]);
 
   const live = sessions.filter((session) => !FINISHED.has(session.state));
+  const finished = sessions.filter((session) => FINISHED.has(session.state) && !session.dismissed);
   const online = machine.status === "ONLINE";
   const processes = (insight?.processes ?? []).filter((entry) => entry.processes.length > 0);
 
@@ -115,6 +120,28 @@ export function MachinePanel({ machine, sessions }: { machine: Machine; sessions
           ＋ New terminal on {machine.name}
         </button>
         {newSession.chooser}
+        {finished.length > 0 && (
+          <button type="button" className={styles.clearFinished} disabled={removal.busy} onClick={() => setConfirmClear(true)}>
+            Clear {finished.length} finished…
+          </button>
+        )}
+        {removal.error && (
+          <p className={styles.notice} role="alert">
+            {removal.error}
+          </p>
+        )}
+        <ConfirmDialog
+          open={confirmClear}
+          overline="Clear finished"
+          question={`Hide ${finished.length} finished Session${finished.length === 1 ? "" : "s"} on ${machine.name}?`}
+          consequence="They leave your lists but stay searchable. You can restore or delete them from Hidden Sessions."
+          confirmLabel="Hide them"
+          onConfirm={() => {
+            setConfirmClear(false);
+            void removal.hide(finished.map((session) => session.id));
+          }}
+          onCancel={() => setConfirmClear(false)}
+        />
       </div>
       {detailsError && !insight && (
         <p className={styles.notice} role="alert">

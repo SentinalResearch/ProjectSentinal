@@ -54,7 +54,7 @@ fn command_texts(store: &Store, text: &str) -> Vec<String> {
 #[test]
 fn the_schema_has_the_search_indexes() {
     let store = Store::open_in_memory().unwrap();
-    assert_eq!(store.schema_version().unwrap(), 13);
+    assert_eq!(store.schema_version().unwrap(), 14);
     for table in ["commands_trigram", "events_trigram"] {
         assert!(store.has_table(table).unwrap(), "missing {table}");
     }

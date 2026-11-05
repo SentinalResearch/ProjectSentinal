@@ -28,6 +28,7 @@ import { EventsList } from "./EventsList";
 import { HealthCard } from "./HealthCard";
 import { SessionTopBlock } from "./SessionTopBlock";
 import { SessionHistoryTerminals } from "./SessionHistoryTerminals";
+import { SessionRemoveActions } from "./SessionRemoveActions";
 import { SessionCommands } from "./SessionCommands";
 import { ResourceBars } from "./ResourceBars";
 import styles from "./SessionDetailPage.module.css";
@@ -262,6 +263,7 @@ function DesktopSessionDetail() {
                 {continuing ? "Resuming…" : "Resume terminal"}
               </button>
             )}
+            {session.id === latest.id && <SessionRemoveActions session={session} />}
             {session.id !== latest.id && (
               <button
                 type="button"

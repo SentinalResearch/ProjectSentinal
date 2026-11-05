@@ -145,7 +145,21 @@ export type ClientRequest =
   | {
     "type": "DISMISS_SESSION";
     /**
-     * The failed Session.
+     * The finished Session.
+     */
+    session_id: SessionId;
+  }
+  | {
+    "type": "RESTORE_SESSION";
+    /**
+     * The hidden Session.
+     */
+    session_id: SessionId;
+  }
+  | {
+    "type": "DELETE_SESSION";
+    /**
+     * The finished Session.
      */
     session_id: SessionId;
   }

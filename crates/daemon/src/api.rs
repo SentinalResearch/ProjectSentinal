@@ -296,6 +296,15 @@ impl AppState {
                 Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),
                 Err(error) => error_action(error),
             },
+            ClientRequest::RestoreSession { session_id } => match self.sessions.restore(session_id)
+            {
+                Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),
+                Err(error) => error_action(error),
+            },
+            ClientRequest::DeleteSession { session_id } => match self.sessions.delete(session_id) {
+                Ok(session_ids) => WsAction::Reply(DaemonMessage::SessionsDeleted { session_ids }),
+                Err(error) => error_action(error),
+            },
             ClientRequest::SetOutputSearch {
                 session_id,
                 enabled,

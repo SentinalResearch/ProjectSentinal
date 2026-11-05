@@ -113,6 +113,7 @@ function places(index: PromptIndex): Place[] {
     { name: "dashboard", keys: ["dashboard", "overview", "home"], to: "/app/overview", detail: "everything at a glance" },
     { name: "split", keys: ["split", "split view", "terminals"], to: "/app/split", detail: "terminals side by side" },
     { name: "history", keys: ["history", "commands"], to: "/app/history", detail: "every Command" },
+    { name: "hidden", keys: ["hidden", "hidden sessions"], to: "/app/sessions/hidden", detail: "Sessions you hid" },
     { name: "recipes", keys: ["recipes"], to: "/app/recipes", detail: "saved commands" },
     { name: "settings", keys: ["settings", "preferences"], to: "/app/settings", detail: "Machines, notifications, account" },
     ...index.settingsTabs.map((tab) => ({

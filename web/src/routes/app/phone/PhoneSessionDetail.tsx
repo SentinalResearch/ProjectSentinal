@@ -1,3 +1,4 @@
+import { SessionRemoveActions } from "../SessionRemoveActions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -126,6 +127,7 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
               Stop
             </button>
           )}
+          <SessionRemoveActions session={session} />
         </div>
 
         {waiting ? (

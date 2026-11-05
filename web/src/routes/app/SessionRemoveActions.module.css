@@ -1,0 +1,15 @@
+/* Its own line, so it never squeezes the page's other buttons. */
+.actions {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--err, #d33);
+  font-size: 13px;
+}

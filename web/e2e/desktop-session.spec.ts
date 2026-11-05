@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { daemonRequest, e2eEnv as env } from "./support/adopt.mjs";
-import { expectSignedIn, switchTheme } from "./support/shell";
+import { currentPage, expectSignedIn, switchTheme } from "./support/shell";
 
 // Desktop Session page: the terminal is the left half, full height, sticky;
 // the details scroll on the right. Measured on the production build.
@@ -143,4 +143,46 @@ test("the terminal fills the left half and stays put while the details scroll", 
   expect(colours.page).not.toBe("rgb(12, 12, 12)");
   await page.screenshot({ path: test.info().outputPath("session-1280-light.png"), animations: "disabled" });
   await switchTheme(page, "dark");
+});
+
+test("a finished Session is hidden, restored, and deleted on a real daemon", async ({ page }) => {
+  await signIn(page);
+  const url = env("SENTINAL_E2E_CONTROL_WS");
+  const created = await daemonRequest(url, "test-token", {
+    type: "CREATE_SESSION", shell: "/bin/zsh", cwd: "/tmp", cols: 100, rows: 30,
+    origin: "UI", title: "Remove me", command: null,
+  }, "SESSION_UPDATED");
+  const session = created.session as { id: number; machine_id: string };
+  const list = async () => {
+    const reply = await daemonRequest(url, "test-token", { type: "LIST_SESSIONS" }, "SESSIONS");
+    return reply.sessions as Array<{ id: number; state: string; dismissed_at?: number | null }>;
+  };
+  const stored = async () => (await list()).find((entry) => entry.id === session.id);
+
+  // A live Session offers neither; it must be stopped first.
+  await page.goto(`/app/sessions/${session.machine_id}:${session.id}`);
+  await expect(page.getByRole("heading", { name: "Remove me" })).toBeVisible();
+  await expect(currentPage(page).getByRole("button", { name: "Hide" })).toHaveCount(0);
+
+  await daemonRequest(url, "test-token", { type: "KILL", session_id: session.id }, "SESSION_UPDATED");
+  await expect.poll(async () => ["COMPLETED", "FAILED", "INTERRUPTED"].includes((await stored())?.state ?? "")).toBe(true);
+
+  const hide = currentPage(page).getByRole("button", { name: "Hide" });
+  await expect(hide).toBeVisible();
+  await hide.click();
+  await expect(page).toHaveURL(/\/app\/overview$/);
+  await expect.poll(async () => Boolean((await stored())?.dismissed_at)).toBe(true);
+  await expect(currentPage(page).getByText("Remove me")).toHaveCount(0);
+
+  await page.goto("/app/sessions/hidden");
+  const row = currentPage(page).getByRole("listitem").filter({ hasText: "Remove me" });
+  await row.getByRole("button", { name: "Restore" }).click();
+  await expect.poll(async () => Boolean((await stored())?.dismissed_at)).toBe(false);
+
+  await page.goto(`/app/sessions/${session.machine_id}:${session.id}`);
+  await currentPage(page).getByRole("button", { name: "Delete…" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page).toHaveURL(/\/app\/overview$/);
+  await expect.poll(stored).toBeUndefined();
+  await expect(currentPage(page).getByText("Remove me")).toHaveCount(0);
 });

@@ -90,7 +90,7 @@ export interface Session {
   health?: SessionHealth;
   /** Training numbers the watcher read from the run's output. */
   training?: TrainingView;
-  /** The owner dismissed this failed Session from "Needs you". */
+  /** The owner hid this finished Session from lists. */
   dismissed?: boolean;
   /** Search may read this Session's saved output (5.S, opt-in). */
   outputSearch?: boolean;

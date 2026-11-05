@@ -93,7 +93,7 @@ export type Session = {
    */
   output_search?: boolean;
   /**
-   * When the owner dismissed this failed Session from "Needs you".
+   * When the owner hid this finished Session; it stays searchable.
    */
   dismissed_at?: Timestamp | null;
   /**

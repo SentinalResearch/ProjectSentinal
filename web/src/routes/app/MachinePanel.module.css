@@ -233,3 +233,14 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 }
+
+.clearFinished {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}

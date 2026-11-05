@@ -67,7 +67,7 @@ fn event(cursor: u64, session_id: u64) -> ProjectionChange {
 #[test]
 fn migration_seven_adds_projection_tables_without_resetting_existing_data() {
     let store = Store::open_in_memory().unwrap();
-    assert_eq!(store.schema_version().unwrap(), 13);
+    assert_eq!(store.schema_version().unwrap(), 14);
     for table in [
         "projection_worker_state",
         "projection_outbox",
@@ -240,6 +240,34 @@ fn worker_outbox_keeps_terminal_session_transition() {
             .len(),
         2
     );
+}
+
+#[test]
+fn a_tombstone_removes_the_session_and_its_events_from_the_control() {
+    let store = Store::open_in_memory().unwrap();
+    let machine = MachineId(MACHINE.into());
+    let batch = ProjectionBatch::Delta {
+        schema_version: PROJECTION_SCHEMA_VERSION,
+        machine_id: machine.clone(),
+        source_epoch: EPOCH.into(),
+        base_cursor: 0,
+        through_cursor: 3,
+        sent_at: Timestamp(2),
+        changes: vec![
+            upsert(1, 10),
+            event(2, 10),
+            ProjectionChange::SessionTombstone {
+                cursor: 3,
+                session_id: protocol::SessionId(10),
+                removed_at: Timestamp(2),
+            },
+        ],
+    };
+    store
+        .apply_projection_batch(&machine, &batch, Timestamp(3))
+        .unwrap();
+    assert!(store.projected_sessions(&machine, 10).unwrap().is_empty());
+    assert!(store.projected_events(&machine, 10).unwrap().is_empty());
 }
 
 #[test]

@@ -175,7 +175,7 @@ pub struct ProjectedSession {
     /// The AI coding agent running here: closed codes and numbers only (6.1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coding_agent: Option<crate::coding_agent::CodingAgentSummary>,
-    /// When the owner dismissed this failed Session from "Needs you".
+    /// When the owner hid this finished Session; it stays searchable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dismissed_at: Option<Timestamp>,
 }

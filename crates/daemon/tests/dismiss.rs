@@ -1,4 +1,5 @@
 //! A failed Session can be dismissed from "Needs you", on every device.
+//! Other states are covered in `remove_session.rs`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -73,20 +74,4 @@ fn a_failed_session_is_dismissed_and_stays_dismissed() {
         manager.dismiss(SessionId(1)).unwrap().dismissed_at,
         Some(Timestamp(NOW))
     );
-}
-
-#[test]
-fn only_failed_sessions_can_be_dismissed() {
-    let store = Arc::new(Store::open_in_memory().unwrap());
-    store
-        .insert_session(&session(1, SessionState::Completed))
-        .unwrap();
-    store
-        .insert_session(&session(2, SessionState::Interrupted))
-        .unwrap();
-    let manager = manager(store);
-    // A waiting prompt or a stall still needs a person; only failures are dismissed.
-    assert!(manager.dismiss(SessionId(1)).is_err());
-    assert!(manager.dismiss(SessionId(2)).is_err());
-    assert!(manager.dismiss(SessionId(9)).is_err());
 }
