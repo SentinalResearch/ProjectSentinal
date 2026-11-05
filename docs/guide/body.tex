@@ -1,0 +1,1300 @@
+
+
+\chapter{\texorpdfstring{Overview}{Overview}}
+
+Sentinal turns the terminals on your own machines into persistent, observable Sessions that you can watch and drive from a phone or a desktop browser. It is local-first: every machine runs its own daemon, data stays in SQLite on that machine, and everything travels over your private Tailscale network. Structured state comes first; AI is an optional layer on top that uses the same API as the UI.
+
+This guide explains how the system is designed, how the code is organised, and how to install, run and change it. It reflects the repository at commit \texttt{6b7936e} (3 November 2026): about 57,000 lines of Rust in five crates and 23,000 lines of TypeScript in the web app.
+
+\section{\texorpdfstring{What problem it solves}{What problem it solves}}
+
+Long-running terminal work (model training, test suites, servers, coding agents such as Claude Code) normally lives in a terminal window you have to be sitting in front of. Sentinal keeps that work in Sessions the daemon owns, so you can:
+
+\begin{itemize}
+\item see at a glance what is running, waiting or failed on every machine;
+\item get a push notification when a run fails, finishes, or waits for a \texttt{y/\allowbreak{}n} answer;
+\item open the live terminal on your phone and type into it;
+\item search history, Commands, Events and (opt-in) output across machines;
+\item let an AI agent read state and suggest actions, under permissions the daemon enforces.
+\end{itemize}
+
+\section{\texorpdfstring{Vocabulary}{Vocabulary}}
+
+The code and the docs use these words exactly. Synonyms such as Job, Task or Run are not used.
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.166}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.834}\relax}}
+\toprule
+\textbf{Term} & \textbf{Meaning} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Term} & \textbf{Meaning} \\
+\midrule
+\endhead
+Machine & One computer running \texttt{sentinald}. Identified by an immutable Machine ID; the display name is editable. \\
+Control & The one Machine the owner picks to serve the web app, hold the dashboard read model, route browser traffic to workers, and send push notifications. \\
+Worker & Any Machine enrolled to the control. The control is also a worker for its own Sessions. \\
+Session & A unit of terminal work: a PTY the daemon owns, or an external process it observes. Has a state (Running, Waiting, Idle, Stalled, Completed, Failed, Interrupted). \\
+Capture & How much of a Session Sentinal sees: \texttt{FULL}, \texttt{COMMANDS}, \texttt{PROCESS\_\allowbreak{}LOG} or \texttt{PROCESS}. It is a security capability, not a label. \\
+Origin & How the Session entered Sentinal: \texttt{UI}, \texttt{WATCH}, \texttt{SHELL\_\allowbreak{}HOOK}, \texttt{AUTO\_\allowbreak{}WRAP} or \texttt{ADOPTED}. \\
+Command & One command line run inside a Session, with start, end and exit code, delimited by shell-hook OSC 133 marks. \\
+Event & A typed fact derived from output, such as ErrorDetected, WaitingForInput, CheckpointCreated or ServerStarted. Produced by the deterministic watcher, never by a model. \\
+Metric & A numeric sample: CPU, memory, GPU, VRAM, training loss, progress. \\
+Recipe & A named, parameterised command defined in TOML, runnable from the UI. \\
+Project & A named directory root from \texttt{projects.\allowbreak{}toml}; Sessions and Commands under it are grouped. \\
+Agent & An AI client with its own token and a permission level, using the Agent API or MCP. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Components at a glance}{Components at a glance}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.122}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.267}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.611}\relax}}
+\toprule
+\textbf{Component} & \textbf{Language} & \textbf{Role} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Component} & \textbf{Language} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{sentinald} & Rust (\texttt{crates/\allowbreak{}daemon}) & Per-machine daemon: PTYs, tracking, metrics, storage, HTTP/WebSocket API; also the control role. \\
+\texttt{sentinal} & Rust (\texttt{crates/\allowbreak{}cli}) & Command-line client: \texttt{ls}, \texttt{top}, \texttt{status}, \texttt{watch}, \texttt{attach}, \texttt{connect}, \texttt{setup}, \texttt{doctor}, \texttt{complete}, \texttt{mcp}. \\
+Web app & React + Vite + xterm.js (\texttt{web/\allowbreak{}}) & Installable PWA with a desktop glass shell and a phone shell. \\
+Shell hooks & zsh, bash, fish (\texttt{shell/\allowbreak{}}) & Emit OSC 133 Command marks and power Ctrl-Space completion. \\
+Intelligence & Python (\texttt{intelligence/\allowbreak{}}) & Optional, separate process; suggest-only. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+The compatibility names \texttt{tad} and \texttt{ta} still work for \texttt{sentinald} and \texttt{sentinal}, and some paths still use the older name \texttt{terminal-{}\allowbreak{}agent} (for example \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}config/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}}).
+
+\chapter{\texorpdfstring{Architecture}{Architecture}}
+
+Every Machine runs one \texttt{sentinald}. One of them is the control: the browser and AI agents talk only to it, and it routes each terminal or action to the worker that owns the Session. Workers stay authoritative for everything about their Sessions.
+
+\input{architecture-figure}
+
+Arrows show who starts each connection: workers push summaries and notification intents up, and the control opens terminals and sends actions down to the owning worker.
+
+\section{\texorpdfstring{Layers}{Layers}}
+
+The code is layered bottom to top, and a lower layer never depends on a higher one. Nothing below the intelligence layer may need a model to work.
+
+\begin{enumerate}
+\item \texttt{protocol}: shared wire types, the contract. Everything depends on it.
+\item \texttt{store}: SQLite persistence.
+\item \texttt{watcher}: turns raw output into Events, deterministically.
+\item \texttt{daemon}: PTY Sessions, Command tracking, metrics, the API, and the control role.
+\item \texttt{cli} and \texttt{web}: interfaces.
+\item \texttt{intelligence}: optional, a separate process using the same API as the UI.
+\end{enumerate}
+
+\section{\texorpdfstring{Control and workers}{Control and workers}}
+
+The control is an ordinary Machine that the owner chose to also run the control role. It serves the PWA over Tailscale Serve HTTPS, checks the owner's password, keeps a dashboard read model, sends push notifications, serves verified releases, and hosts the Agent API. Each enrolled worker has its own revocable credential.
+
+Today's link (Link v1) works in two directions:
+
+\begin{itemize}
+\item \textbf{Worker to control:} an HTTPS POST about every second carries a batch of privacy-minimised Session summaries and notification intents; a heartbeat every 30 seconds keeps the Machine marked online. A Machine with no heartbeat for 90 seconds shows as offline.
+\item \textbf{Control to worker:} for each terminal, the control proves its identity over HTTP and opens a WebSocket to the worker's API on port 7420 on its Tailscale address. Actions (input, resize, signal, kill, continue, Recipe runs) take the same route.
+\end{itemize}
+
+Two credentials exist per link, both created at pairing: the worker credential (worker to control) and the control credential (control to worker). \texttt{docs/\allowbreak{}LINK\_\allowbreak{}V2\_\allowbreak{}DESIGN.\allowbreak{}md} proposes replacing this with one persistent WebSocket per worker, opened by the worker, so workers need no inbound port. That design is awaiting owner review and is not implemented.
+
+\section{\texorpdfstring{The read model and privacy}{The read model and privacy}}
+
+The control's SQLite read model holds only summaries: Session names, states, health, progress and timing. It never holds raw terminal bytes, full Command text, cwd, typed input, credentials, environment or log contents. That is why search fans out from the browser to each Machine (Section 11) instead of querying the control. The read model cannot authorise anything: attach, input, resize, signal, kill, continuation and Recipe runs always go to the live owning worker. Setting \texttt{control\_\allowbreak{}read\_\allowbreak{}model\ =\allowbreak{}\ false} turns the read model off, and the PWA falls back to direct queries.
+
+\section{\texorpdfstring{Local clients}{Local clients}}
+
+The CLI and the shell hooks talk to the daemon on their own Machine over a private per-user Unix socket (mode \texttt{0600}, peer UID checked). This keeps shell hooks fast and keeps local control off the network entirely.
+
+\section{\texorpdfstring{Key decisions}{Key decisions}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.205}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.460}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.335}\relax}}
+\toprule
+\textbf{Decision} & \textbf{Choice} & \textbf{Why} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Decision} & \textbf{Choice} & \textbf{Why} \\
+\midrule
+\endhead
+Daemon language & Rust & Always on, small, reliable \\
+Session persistence & Own PTY (\texttt{portable-{}\allowbreak{}pty}) plus a VT parser & Structured state is the product \\
+Command boundaries & Shell hooks emitting OSC 133 & Exact, no guessing from output \\
+Storage & SQLite with WAL and FTS5 & Local-first, zero operations \\
+Wire format & Versioned JSON; binary frames for terminal bytes & Easy to debug \\
+Timestamps & Unix milliseconds (\texttt{i64}) & Same in Rust, TypeScript and Python \\
+Networking & Tailscale only; never bind \texttt{0.\allowbreak{}0.\allowbreak{}0.\allowbreak{}0} & No public exposure \\
+AI & Separate process, permissions enforced by the daemon & Lower layers work without it \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\chapter{\texorpdfstring{Repository tour}{Repository tour}}
+
+The repository is one Cargo workspace with five crates, plus a web app, shell hooks, scripts and an optional Python layer. \texttt{AGENTS.\allowbreak{}md} is the single rulebook for anyone writing code here, human or AI.
+
+\section{\texorpdfstring{Top-level layout}{Top-level layout}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.479}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.521}\relax}}
+\toprule
+\textbf{Path} & \textbf{What it holds} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Path} & \textbf{What it holds} \\
+\midrule
+\endhead
+\texttt{crates/\allowbreak{}protocol} & Shared wire types: the contract. About 8,900 lines in 34 files. \\
+\texttt{crates/\allowbreak{}store} & SQLite persistence and migrations. About 5,300 lines. \\
+\texttt{crates/\allowbreak{}watcher} & Output to Events: detectors, adapters, agent-CLI parsing, redaction. About 2,400 lines. \\
+\texttt{crates/\allowbreak{}daemon} & \texttt{sentinald}: Sessions, PTYs, API, control role, link, push, packages. About 28,900 lines in 115 files. \\
+\texttt{crates/\allowbreak{}cli} & \texttt{sentinal}: the command-line client. About 11,300 lines. \\
+\texttt{web/\allowbreak{}} & React + Vite + xterm.js PWA. About 22,900 lines of TypeScript, plus Playwright tests in \texttt{web/\allowbreak{}e2e}. \\
+\texttt{shell/\allowbreak{}} & \texttt{ta.\allowbreak{}zsh}, \texttt{ta.\allowbreak{}bash}, \texttt{ta.\allowbreak{}fish} (Sentinal-owned Sessions) and \texttt{shell/\allowbreak{}external/\allowbreak{}sentinal.\allowbreak{}*} (hooks for ordinary terminals); \texttt{vendor/\allowbreak{}bash-{}\allowbreak{}preexec.\allowbreak{}sh}. \\
+\texttt{recipes/\allowbreak{}} & Built-in TOML Recipes: \texttt{cargo-{}\allowbreak{}test}, \texttt{pytest}, \texttt{npm-{}\allowbreak{}dev}, \texttt{uvicorn}, \texttt{vllm-{}\allowbreak{}serve}, \texttt{llama-{}\allowbreak{}server}, \texttt{llama-{}\allowbreak{}bench}, \texttt{hf-{}\allowbreak{}download}, \texttt{docker-{}\allowbreak{}compose-{}\allowbreak{}up}. \\
+\texttt{intelligence/\allowbreak{}} & Optional Python service. Today it reads a terminal screen with a small local model and proposes Events (level 1). \\
+\texttt{eval/\allowbreak{}} & Deterministic benchmark for models that turn a screen into protocol calls; standard-library Python only. \\
+\texttt{scripts/\allowbreak{}} & Launchers (\texttt{run-{}\allowbreak{}network.\allowbreak{}sh}, \texttt{run-{}\allowbreak{}control.\allowbreak{}sh}, \texttt{run-{}\allowbreak{}agent.\allowbreak{}sh}), installers, release tools, and shell tests in \texttt{scripts/\allowbreak{}tests/\allowbreak{}}. \\
+\texttt{packaging/\allowbreak{}} & launchd and systemd service templates, the GitHub installer template, and release signing keys (\texttt{allowed\_\allowbreak{}signers}). \\
+\texttt{docs/\allowbreak{}} & Architecture, roadmap, plans, security, setup, testing and design notes (about 5,200 lines). \\
+\texttt{design\_\allowbreak{}handoff\_\allowbreak{}sentinal/\allowbreak{}}, \texttt{sentinal-{}\allowbreak{}glass-{}\allowbreak{}handoff/\allowbreak{}}, \texttt{sentinal-{}\allowbreak{}mobile-{}\allowbreak{}handoff/\allowbreak{}} & Design references the web app implements. \\
+\texttt{marketing/\allowbreak{}} & Reproducible product-film source. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{The \texttt{just} commands}{The just commands}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.469}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.531}\relax}}
+\toprule
+\textbf{Command} & \textbf{What it does} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Command} & \textbf{What it does} \\
+\midrule
+\endhead
+\texttt{just\ check} & The definition of done: fmt, clippy with \texttt{-{}\allowbreak{}D\ warnings}, all Rust tests, TypeScript type generation check, web lint/test/build, Python tests, and every shell test in \texttt{scripts/\allowbreak{}tests/\allowbreak{}}. \\
+\texttt{just\ gen-{}\allowbreak{}ts} & Regenerates TypeScript types from Rust (\texttt{ts-{}\allowbreak{}rs}) into \texttt{web/\allowbreak{}src/\allowbreak{}protocol/\allowbreak{}}. Run it after any protocol change. \\
+\texttt{just\ network} & Runs the daemon and the web UI on this Machine's Tailscale IPv4 address for development. \\
+\texttt{just\ control} / \texttt{just\ agent} & Starts a local control, or a worker against it. \\
+\texttt{just\ install-{}\allowbreak{}worker} / \texttt{just\ uninstall-{}\allowbreak{}worker} & Builds from source and installs into \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}local}. \\
+\texttt{just\ package-{}\allowbreak{}worker}, \texttt{publish-{}\allowbreak{}worker}, \texttt{receive-{}\allowbreak{}release}, \texttt{rollback-{}\allowbreak{}worker} & Release packaging and delivery (Section 13). \\
+\texttt{just\ ship\ \textless{}version\textgreater{}} & Builds, signs and publishes a release locally. \\
+\texttt{just\ test-{}\allowbreak{}e2e}, \texttt{just\ acceptance} & Playwright browser tests; acceptance runs check plus e2e. \\
+\texttt{just\ demo}, \texttt{just\ user-{}\allowbreak{}test} & Mock-data demos for design and user testing. \\
+\texttt{just\ eval}, \texttt{just\ train-{}\allowbreak{}functiongemma} & Model evaluation and fine-tuning. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Rules every change follows}{Rules every change follows}}
+
+\begin{itemize}
+\item Find the milestone in \texttt{docs/\allowbreak{}ROADMAP.\allowbreak{}md} or \texttt{docs/\allowbreak{}PLAN\_\allowbreak{}V2\_\allowbreak{}AI.\allowbreak{}md} first, and build nothing from later milestones.
+\item A change to \texttt{crates/\allowbreak{}protocol} changes the contract: update the JSON fixtures in \texttt{crates/\allowbreak{}protocol/\allowbreak{}tests/\allowbreak{}fixtures/\allowbreak{}} on purpose and say so in the commit.
+\item Write the test first. Every bug fix comes with a test that fails without it.
+\item Keep files to about 400 lines; split when they grow.
+\item Rust: no \texttt{unwrap()} or \texttt{expect()} in library code (errors are \texttt{thiserror} enums), no \texttt{unsafe} without a comment, a one-line doc comment on every public item.
+\item Wire enums use \texttt{SCREAMING\_\allowbreak{}SNAKE\_\allowbreak{}CASE}, fields \texttt{snake\_\allowbreak{}case}, timestamps Unix milliseconds.
+\item Tests are fast and offline: no network and no sleeps over 100 ms, except tests marked \texttt{\#[ignore]} and named \texttt{*\_\allowbreak{}integration}.
+\item New dependencies need a one-line reason and must be on the list in \texttt{docs/\allowbreak{}DEPENDENCIES.\allowbreak{}md}.
+\item A change is done only when \texttt{just\ check} passes.
+\end{itemize}
+
+\chapter{\texorpdfstring{The protocol crate}{The protocol crate}}
+
+\texttt{crates/\allowbreak{}protocol} defines every type that crosses a process boundary: Rust daemon to browser, CLI to daemon, worker to control. It has no I/O. Other crates depend on it; it depends on nothing in the workspace. With the \texttt{ts} feature, \texttt{ts-{}\allowbreak{}rs} exports each type to TypeScript, so the web app and the daemon cannot disagree on a field name.
+
+\section{\texorpdfstring{Versioning and the envelope}{Versioning and the envelope}}
+
+Every WebSocket message is wrapped in \texttt{Envelope\textless{}T\textgreater{}\ \{\ version,\allowbreak{}\ payload\ \}}. The version is \texttt{PROTOCOL\_\allowbreak{}VERSION} (currently 1). Contract tests in \texttt{crates/\allowbreak{}protocol/\allowbreak{}tests/\allowbreak{}contract.\allowbreak{}rs} round-trip about 35 JSON fixtures in \texttt{tests/\allowbreak{}fixtures/\allowbreak{}}; if one fails, compatibility broke. Fix the code, or bump the version and update the fixture deliberately.
+
+Conventions: enums are \texttt{SCREAMING\_\allowbreak{}SNAKE\_\allowbreak{}CASE} on the wire, fields \texttt{snake\_\allowbreak{}case}, times are \texttt{Timestamp} (Unix milliseconds, \texttt{i64}). IDs are typed (\texttt{SessionId}, \texttt{CommandId}, \texttt{EventId}, \texttt{MachineId}, \texttt{ProjectId}) so one can never be passed where another is expected.
+
+\section{\texorpdfstring{Modules}{Modules}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.356}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.644}\relax}}
+\toprule
+\textbf{Module} & \textbf{Defines} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Module} & \textbf{Defines} \\
+\midrule
+\endhead
+\texttt{session.\allowbreak{}rs} & \texttt{Session}, \texttt{SessionState}, \texttt{SessionOrigin}, \texttt{CaptureLevel}, Session creation and continuation. \\
+\texttt{command.\allowbreak{}rs}, \texttt{command\_\allowbreak{}line.\allowbreak{}rs} & \texttt{Command} (text, cwd, start, finish, exit code); rendering a structured argv as one safe shell input line. \\
+\texttt{event.\allowbreak{}rs} & \texttt{Event} and \texttt{EventKind}, the common language of the system. \\
+\texttt{evidence.\allowbreak{}rs} & Which Events and health claims each capture level can support. \\
+\texttt{health.\allowbreak{}rs}, \texttt{health\_\allowbreak{}report.\allowbreak{}rs} & Deterministic Session health; owner-only diagnostics and incident reports. \\
+\texttt{metric.\allowbreak{}rs}, \texttt{process.\allowbreak{}rs}, \texttt{training.\allowbreak{}rs} & Resource samples, process trees, training summaries (loss, epoch, step). \\
+\texttt{machine.\allowbreak{}rs}, \texttt{machine\_\allowbreak{}details.\allowbreak{}rs} & A Machine and its page data: host facts, daemon facts, metric history. \\
+\texttt{message.\allowbreak{}rs} & \texttt{ClientRequest}, \texttt{DaemonMessage}, \texttt{LocalRequest}, \texttt{LocalResponse}, \texttt{Envelope}. About 1,000 lines. \\
+\texttt{link.\allowbreak{}rs}, \texttt{pairing.\allowbreak{}rs}, \texttt{pairing\_\allowbreak{}words.\allowbreak{}rs} & Enrollment: pairing codes, the control registry, worker links, discovery, the 256-word verification list. \\
+\texttt{projection.\allowbreak{}rs} & The privacy-minimised Session summaries a worker uploads to the control. \\
+\texttt{notification.\allowbreak{}rs} & Notification rules, intents, facts and the delivery journal. \\
+\texttt{recipe.\allowbreak{}rs} & Recipe templates and parameter validation. \\
+\texttt{search.\allowbreak{}rs}, \texttt{complete.\allowbreak{}rs} & Search requests, hits and the shared ranking formula; completion and frecency. \\
+\texttt{agent.\allowbreak{}rs}, \texttt{coding\_\allowbreak{}agent.\allowbreak{}rs} & Agent tokens, levels, attribution and activity; summaries of coding agents (Claude Code, Codex) inside a Session. \\
+\texttt{observability.\allowbreak{}rs} & Sentinal's own health: typing delay, terminal open time, link round trips. \\
+\texttt{release.\allowbreak{}rs}, \texttt{worker\_\allowbreak{}update.\allowbreak{}rs} & Signed release state and per-worker updates. \\
+\texttt{auth.\allowbreak{}rs} & Owner password setup, login and session types. \\
+\texttt{error.\allowbreak{}rs} & The crate's single error type and the wire error codes. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Session states}{Session states}}
+
+A Session moves through \texttt{CREATED}, \texttt{RUNNING}, \texttt{IDLE}, \texttt{WAITING} (a prompt needs an answer), \texttt{STALLED} (no progress for too long), and ends \texttt{COMPLETED}, \texttt{FAILED} or \texttt{INTERRUPTED}. \texttt{DISCONNECTED} marks a Session whose Machine is unreachable. \texttt{dismissed\_\allowbreak{}at} (added with Dismiss) hides a failure from "Needs you" on every device without deleting it.
+
+\section{\texorpdfstring{Capture levels}{Capture levels}}
+
+Capture is a security capability. The daemon enforces it for every client, including AI agents.
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-12\tabcolsep)*\real{0.164}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-12\tabcolsep)*\real{0.222}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-12\tabcolsep)*\real{0.154}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-12\tabcolsep)*\real{0.154}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-12\tabcolsep)*\real{0.154}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-12\tabcolsep)*\real{0.154}\relax}}
+\toprule
+\textbf{Capture} & \textbf{Daemon owns the PTY} & \textbf{Output} & \textbf{Commands} & \textbf{Metrics} & \textbf{Remote input} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Capture} & \textbf{Daemon owns the PTY} & \textbf{Output} & \textbf{Commands} & \textbf{Metrics} & \textbf{Remote input} \\
+\midrule
+\endhead
+\texttt{FULL} & yes & yes & yes & yes & yes \\
+\texttt{COMMANDS} & no & no & yes & yes & no \\
+\texttt{PROCESS\_\allowbreak{}LOG} & no & log only & no & yes & no \\
+\texttt{PROCESS} & no & no & no & yes & no \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Messages}{Messages}}
+
+Browser and CLI clients send \texttt{ClientRequest} values over the WebSocket: \texttt{GetMachine}, \texttt{ListSessions}, \texttt{CreateSession}, \texttt{ContinueSession}, \texttt{Attach}, \texttt{Detach}, \texttt{Resize}, \texttt{Kill}, \texttt{GetHistory}, \texttt{GetEvents}, \texttt{Search}, \texttt{SearchCommands}, \texttt{Complete}, \texttt{DismissSession}, \texttt{SetOutputSearch}, \texttt{ListRecipes}, \texttt{RunRecipe}, \texttt{SaveRecipe}, notification-rule requests, and Machine details and metrics.
+
+The daemon answers and pushes \texttt{DaemonMessage} values: \texttt{Machine}, \texttt{Sessions}, \texttt{SessionUpdated}, \texttt{CommandUpdated}, \texttt{Event}, \texttt{Events}, \texttt{MachineMetrics}, \texttt{SessionMetrics}, \texttt{History}, \texttt{Completions}, \texttt{SearchResults}, \texttt{Recipes}, \texttt{NotificationRules}, \texttt{MachineDetails}, \texttt{MachineMetricsHistory}, \texttt{NotificationJournal} and \texttt{Error}. Terminal bytes travel as binary frames, not JSON.
+
+Shell hooks use the smaller \texttt{LocalRequest} set over the local socket: \texttt{RegisterShell}, \texttt{ShellCommandStarted}, \texttt{ShellCommandFinished}, \texttt{Complete} and the Watch and adoption requests.
+
+\section{\texorpdfstring{Events}{Events}}
+
+\texttt{EventKind} covers \texttt{CommandStarted}, \texttt{CommandFinished}, \texttt{ProcessStarted}, \texttt{ProcessExited}, \texttt{ProgressUpdated}, \texttt{WarningDetected}, \texttt{ErrorDetected}, \texttt{ResourceHigh}, \texttt{WaitingForInput}, \texttt{PossiblyStalled}, \texttt{CheckpointCreated}, \texttt{ServerStarted}, \texttt{AgentActivity} and \texttt{AgentTurnFinished}. Each carries closed, typed fields; free text is bounded in length.
+
+\section{\texorpdfstring{Projection}{Projection}}
+
+\texttt{projection.\allowbreak{}rs} defines what a worker may tell the control. Titles are cut to 48 characters (192 bytes), one upload holds at most 128 changes and 256 KiB, and a \texttt{source\_\allowbreak{}epoch} lets the control detect a reset worker and resynchronise. \texttt{ProjectedSession} and \texttt{ProjectedEventFacts} contain codes and numbers, never Command text, cwd or output.
+
+\section{\texorpdfstring{Shared ranking}{Shared ranking}}
+
+Search and completion scores are computed in Rust and again in TypeScript. Both implementations are tested against the same fixture, \texttt{tests/\allowbreak{}fixtures/\allowbreak{}search\_\allowbreak{}ranking.\allowbreak{}json}, so a hit gets the same score whichever side ranks it (Section 11).
+
+\chapter{\texorpdfstring{The daemon: \texttt{sentinald}}{The daemon: sentinald}}
+
+\texttt{crates/\allowbreak{}daemon} is the heart of Sentinal: about 29,000 lines in 115 files. One binary does both jobs. Every Machine runs it as a worker; on the Machine the owner chose, the same binary also runs the control role. The binary \texttt{tad} is a compatibility alias.
+
+\section{\texorpdfstring{Startup (\texttt{entry.\allowbreak{}rs})}{Startup (entry.rs)}}
+
+\texttt{entry:\allowbreak{}:\allowbreak{}run()} loads \texttt{daemon.\allowbreak{}toml}, validates the bind address (a Tailscale IP or localhost, never \texttt{0.\allowbreak{}0.\allowbreak{}0.\allowbreak{}0}), opens the SQLite store, loads the Machine identity, Projects and Recipes, and then starts the long-running tasks:
+
+\begin{enumerate}
+\item The Session manager and the external-Session monitor.
+\item The metric sampler (CPU, memory, GPU through NVML or \texttt{nvidia-{}\allowbreak{}smi}).
+\item Notification workers, and on a worker the uploaders for notification intents and the projection outbox.
+\item The projection recorder, which turns local state changes into projection rows.
+\item On the control: the link health monitor, the Web Push delivery worker, and the daily release watch.
+\item The self-health sampler (the daemon measures its own memory and latency once a minute).
+\item Storage retention for compressed output logs.
+\item The local Unix-socket server for the CLI and shell hooks.
+\item The Axum HTTP and WebSocket server.
+\end{enumerate}
+
+A signal handler shuts them down in order on SIGTERM or SIGINT.
+
+\section{\texorpdfstring{Sessions and PTYs (\texttt{session\_\allowbreak{}manager/\allowbreak{}}, \texttt{pty.\allowbreak{}rs})}{Sessions and PTYs (session\_manager/, pty.rs)}}
+
+\texttt{SessionManager} owns every Session's lifecycle. Its modules split the job:
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.334}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.666}\relax}}
+\toprule
+\textbf{Module} & \textbf{Job} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Module} & \textbf{Job} \\
+\midrule
+\endhead
+\texttt{lifecycle.\allowbreak{}rs} & Create a Session, start its PTY task, continue a finished one. \\
+\texttt{tasks.\allowbreak{}rs} & Background PTY reader and child-exit tasks: read bytes, write the log, feed the watcher, broadcast to attached viewers. \\
+\texttt{operations.\allowbreak{}rs} & Attach and the PTY operations gated by state: input, resize, signal, kill. \\
+\texttt{capture.\allowbreak{}rs} & The capture gate: refuses PTY operations on reduced-capture Sessions. \\
+\texttt{external.\allowbreak{}rs}, \texttt{external\_\allowbreak{}lifecycle.\allowbreak{}rs} & \texttt{SHELL\_\allowbreak{}HOOK} and \texttt{COMMANDS} Sessions reported by ordinary shells; liveness and recovery after restart. \\
+\texttt{adopt.\allowbreak{}rs}, \texttt{adopted\_\allowbreak{}log.\allowbreak{}rs} & Read-only adoption of an existing process, and tailing its log file. \\
+\texttt{replay.\allowbreak{}rs}, \texttt{log\_\allowbreak{}budget.\allowbreak{}rs} & Bounded replay of saved output; a size cap on one Session's saved log. \\
+\texttt{structured.\allowbreak{}rs} & Command queries, search, completion, output-search toggle, Dismiss. \\
+\texttt{continuation.\allowbreak{}rs} & Continue a finished Session as a new one with \texttt{continued\_\allowbreak{}from} (at most one successor, enforced in SQLite). \\
+\texttt{local\_\allowbreak{}dispatch.\allowbreak{}rs} & Answers validated requests from the local socket. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\texttt{pty.\allowbreak{}rs} hides PTY creation behind a real backend (\texttt{portable-{}\allowbreak{}pty}) and a deterministic fake one used by tests. A finished PTY is never revived; continuing creates a new Session with a new PTY and log.
+
+New Sessions get the user's login environment (\texttt{login\_\allowbreak{}env.\allowbreak{}rs}) and a UTF-8 locale when none is set (\texttt{locale.\allowbreak{}rs}), because a launchd or systemd daemon has neither.
+
+\section{\texorpdfstring{Command tracking (\texttt{osc.\allowbreak{}rs}, \texttt{tracker.\allowbreak{}rs}, \texttt{shell.\allowbreak{}rs})}{Command tracking (osc.rs, tracker.rs, shell.rs)}}
+
+The shell hooks emit OSC 133 marks around each prompt and Command. \texttt{osc.\allowbreak{}rs} parses them from the byte stream without changing the bytes shown to the user. \texttt{tracker.\allowbreak{}rs} turns those marks into \texttt{Command} rows (text, cwd, start, finish, exit code) and Events. \texttt{shell.\allowbreak{}rs} installs the embedded hook scripts and loads the right one for zsh, bash or fish.
+
+\section{\texorpdfstring{The API (\texttt{api.\allowbreak{}rs}, \texttt{api/\allowbreak{}})}{The API (api.rs, api/)}}
+
+The Axum server exposes HTTP routes and one WebSocket (\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}ws}). Every route and WebSocket upgrade checks the browser \texttt{Origin} against an exact allow-list (\texttt{origin.\allowbreak{}rs}). The main groups:
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.410}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.590}\relax}}
+\toprule
+\textbf{Routes} & \textbf{Purpose} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Routes} & \textbf{Purpose} \\
+\midrule
+\endhead
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}ws} & The client WebSocket: \texttt{ClientRequest} in, \texttt{DaemonMessage} out, binary frames for terminal bytes. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}auth/\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}} & Owner password setup, login, logout and session; browser variants under \texttt{/\allowbreak{}auth/\allowbreak{}browser/\allowbreak{}}. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}machine}, \texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}machines}, \texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}sessions} & Machine and Session reads. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}sessions/\allowbreak{}\{id\}/\allowbreak{}output} & Authenticated, bounded replay of saved output. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}control/\allowbreak{}snapshot}, \texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}control/\allowbreak{}live} & The dashboard read model: one snapshot plus a live stream. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}link/\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}} & Worker link: exchange, heartbeat, projection, identity, refresh, update, move, disconnect. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}pairing/\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}} & Pairing codes and click-to-approve requests. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}push/\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}} & Web Push public key, subscriptions, provider, deliveries. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}agent/\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}}, \texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}agents/\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}} & Agent API (snapshot, updates, whoami) and token management with activity. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}health/\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}} & Owner-only diagnostics: summary, incidents, samples, report. \\
+\texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}control/\allowbreak{}release/\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}} & Signed release state, update checks and policy. \\
+\texttt{/\allowbreak{}llms.\allowbreak{}txt} & A plain-text guide for AI agents. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\texttt{api/\allowbreak{}attach.\allowbreak{}rs} forwards an attached Session's output to a viewer's socket; \texttt{audit.\allowbreak{}rs} writes an append-only record of every remote terminal input.
+
+\section{\texorpdfstring{The control role (\texttt{control/\allowbreak{}})}{The control role (control/)}}
+
+\texttt{control/\allowbreak{}mod.\allowbreak{}rs} (about 1,400 lines) manages pairing codes, the registry of Machines and worker links. Around it:
+
+\begin{itemize}
+\item \texttt{proxy.\allowbreak{}rs} and \texttt{relay.\allowbreak{}rs}: forward a browser's terminal WebSocket to the worker that owns the Session, after an identity check.
+\item \texttt{approval*.\allowbreak{}rs}, \texttt{discovery.\allowbreak{}rs}: click-to-approve pairing, and an unauthenticated discovery answer reachable only through Tailscale Serve.
+\item \texttt{agents.\allowbreak{}rs}, \texttt{agent\_\allowbreak{}routes.\allowbreak{}rs}, \texttt{agent\_\allowbreak{}activity.\allowbreak{}rs}: agent tokens, levels and the in-memory activity log.
+\item \texttt{health*.\allowbreak{}rs}, \texttt{ping.\allowbreak{}rs}, \texttt{timing.\allowbreak{}rs}: link health (delayed and offline), diagnostics and \texttt{Server-{}\allowbreak{}Timing} headers.
+\item \texttt{release*.\allowbreak{}rs}, \texttt{worker\_\allowbreak{}update.\allowbreak{}rs}: the daily signed-release check and updating one worker from the dashboard.
+\item \texttt{handoff.\allowbreak{}rs}: a control stepping down hands its workers to another control.
+\item \texttt{secrets.\allowbreak{}rs}, \texttt{refresh.\allowbreak{}rs}: control secrets kept outside SQLite, and worker credential refresh.
+\end{itemize}
+
+\section{\texorpdfstring{The worker side of the link (\texttt{link/\allowbreak{}})}{The worker side of the link (link/)}}
+
+\texttt{link/\allowbreak{}mod.\allowbreak{}rs} holds the worker's identity, pairing, heartbeats and revocation. \texttt{client.\allowbreak{}rs} is the HTTPS client to the control, \texttt{file.\allowbreak{}rs} the owner-only link file, \texttt{approval.\allowbreak{}rs} the worker's half of click-to-approve, and \texttt{handoff.\allowbreak{}rs} moving to a new control. \texttt{tailnet\_\allowbreak{}dns.\allowbreak{}rs} resolves \texttt{*.\allowbreak{}ts.\allowbreak{}net} names through Tailscale rather than \texttt{/\allowbreak{}etc/\allowbreak{}resolv.\allowbreak{}conf}, and \texttt{nodelay.\allowbreak{}rs} turns Nagle's algorithm off on every terminal socket.
+
+\section{\texorpdfstring{Notifications and push}{Notifications and push}}
+
+Events become privacy-safe notification intents (\texttt{notifications.\allowbreak{}rs}, \texttt{notifications/\allowbreak{}}). A worker stores intents in a SQLite outbox and uploads them to the control. The control alone holds the VAPID key and browser subscriptions (\texttt{push/\allowbreak{}}): it encrypts the payload, validates and DNS-pins the provider address on every attempt, refuses redirects, and retries with saved state. Provider mode is one of \texttt{WEB\_\allowbreak{}PUSH}, \texttt{NTFY\_\allowbreak{}LEGACY} or \texttt{DISABLED}.
+
+\section{\texorpdfstring{Packages and updates (\texttt{package\_\allowbreak{}service/\allowbreak{}}, \texttt{worker\_\allowbreak{}update.\allowbreak{}rs})}{Packages and updates (package\_service/, worker\_update.rs)}}
+
+On the control, a second loopback-only listener serves verified releases and the production PWA through Tailscale Serve. Releases are checked against owner signing keys compiled into \texttt{sentinald} (\texttt{release\_\allowbreak{}keys.\allowbreak{}rs}). \texttt{bootstrap.\allowbreak{}rs} generates the \texttt{install.\allowbreak{}sh} that a new worker pipes to \texttt{sh}. A worker updates itself when its control asks, only to a validated, signed version.
+
+\section{\texorpdfstring{Other modules}{Other modules}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.396}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.604}\relax}}
+\toprule
+\textbf{Module} & \textbf{Job} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Module} & \textbf{Job} \\
+\midrule
+\endhead
+\texttt{metrics.\allowbreak{}rs}, \texttt{gpu\_\allowbreak{}smi.\allowbreak{}rs} & Sample system resources; debounce the ResourceHigh Event. \\
+\texttt{insights.\allowbreak{}rs} & Facts for the Machine page: host, daemon, latest processes. \\
+\texttt{projects.\allowbreak{}rs}, \texttt{recipes.\allowbreak{}rs} & Load Projects (longest root wins) and Recipes (rendered safely on the daemon). \\
+\texttt{search.\allowbreak{}rs}, \texttt{search\_\allowbreak{}output.\allowbreak{}rs}, \texttt{complete.\allowbreak{}rs} & One Machine's search, opt-in output search, and completion (Section 11). \\
+\texttt{storage.\allowbreak{}rs}, \texttt{scrollback.\allowbreak{}rs} & Retention for compressed logs; bounded in-memory scrollback. \\
+\texttt{identity.\allowbreak{}rs} & The immutable Machine ID, created once and never silently replaced. \\
+\texttt{private\_\allowbreak{}fs.\allowbreak{}rs} & Owner-only directories and files for daemon data. \\
+\texttt{self\_\allowbreak{}health.\allowbreak{}rs} & The daemon measuring itself. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\chapter{\texorpdfstring{The store: SQLite}{The store: SQLite}}
+
+\texttt{crates/\allowbreak{}store} is all of Sentinal's persistence: one SQLite database per Machine, opened in WAL mode with foreign keys on, at \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}share/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}terminal-{}\allowbreak{}agent.\allowbreak{}sqlite3}. Terminal output does not live in SQLite; each \texttt{FULL} Session's output is a compressed file, \texttt{sessions/\allowbreak{}\textless{}id\textgreater{}.\allowbreak{}log.\allowbreak{}zst}, in the same data directory.
+
+\section{\texorpdfstring{Data directory}{Data directory}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.506}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.494}\relax}}
+\toprule
+\textbf{File or folder} & \textbf{Holds} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{File or folder} & \textbf{Holds} \\
+\midrule
+\endhead
+\texttt{terminal-{}\allowbreak{}agent.\allowbreak{}sqlite3} (+ \texttt{-{}\allowbreak{}wal}, \texttt{-{}\allowbreak{}shm}) & The database. \\
+\texttt{sessions/\allowbreak{}*.\allowbreak{}log.\allowbreak{}zst} & Compressed output of each \texttt{FULL} Session. \\
+\texttt{audit.\allowbreak{}jsonl} & Every remote terminal input, append-only. \\
+\texttt{link-{}\allowbreak{}audit.\allowbreak{}jsonl}, \texttt{pairing-{}\allowbreak{}audit.\allowbreak{}jsonl}, \texttt{security-{}\allowbreak{}audit.\allowbreak{}jsonl} & Metadata-only audit of links, pairing and rejected local peers. \\
+\texttt{run/\allowbreak{}} & The private local socket. \\
+\texttt{packages/\allowbreak{}} & Releases served by the control. \\
+\texttt{release-{}\allowbreak{}watch.\allowbreak{}json}, \texttt{release-{}\allowbreak{}notified.\allowbreak{}json} & Release watch state. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+Configuration and secrets live separately, in \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}config/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}} (\texttt{daemon.\allowbreak{}toml}, the Machine token, the password hash, \texttt{projects.\allowbreak{}toml}, \texttt{notify.\allowbreak{}toml}, adapters, user Recipes).
+
+\section{\texorpdfstring{Migrations}{Migrations}}
+
+Migrations are numbered SQL files in \texttt{crates/\allowbreak{}store/\allowbreak{}migrations/\allowbreak{}}, applied in order on open. The schema version is 13.
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.288}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.712}\relax}}
+\toprule
+\textbf{Migration} & \textbf{Adds} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Migration} & \textbf{Adds} \\
+\midrule
+\endhead
+\texttt{001\_\allowbreak{}initial} & \texttt{machines}, \texttt{sessions}, \texttt{commands} (+ \texttt{commands\_\allowbreak{}fts}, unicode61), \texttt{events}, \texttt{metrics\_\allowbreak{}raw}, \texttt{metrics\_\allowbreak{}minute}. \\
+\texttt{002\_\allowbreak{}session\_\allowbreak{}lineage} & Continuation lineage: at most one direct successor per Session. \\
+\texttt{003\_\allowbreak{}log\_\allowbreak{}cursors} & Read positions for adopted logs, so a restart does not replay a log. \\
+\texttt{004\_\allowbreak{}machine\_\allowbreak{}registry} & Control registry: \texttt{registry\_\allowbreak{}machines}, \texttt{registry\_\allowbreak{}links}, \texttt{pairing\_\allowbreak{}codes}, \texttt{pairing\_\allowbreak{}failures}. \\
+\texttt{005\_\allowbreak{}notification\_\allowbreak{}deliveries} & Notification decisions and retry state. \\
+\texttt{006\_\allowbreak{}native\_\allowbreak{}push} & \texttt{notification\_\allowbreak{}intent\_\allowbreak{}outbox} (worker), \texttt{control\_\allowbreak{}notification\_\allowbreak{}intents}, \texttt{push\_\allowbreak{}subscriptions}, \texttt{push\_\allowbreak{}deliveries}, \texttt{notification\_\allowbreak{}provider\_\allowbreak{}state} (control). \\
+\texttt{007} to \texttt{009} projection & Worker side: \texttt{worker\_\allowbreak{}projection\_\allowbreak{}records}, \texttt{projection\_\allowbreak{}outbox}, \texttt{projection\_\allowbreak{}worker\_\allowbreak{}state}. Control side: \texttt{control\_\allowbreak{}projection\_\allowbreak{}sessions}, \texttt{\_\allowbreak{}events}, \texttt{\_\allowbreak{}metrics}, \texttt{\_\allowbreak{}changes}, \texttt{\_\allowbreak{}state}, snapshot chunks; resynchronisation. \\
+\texttt{010\_\allowbreak{}pairing\_\allowbreak{}requests} & Click-to-approve requests and claim failures. \\
+\texttt{011\_\allowbreak{}health} & \texttt{health\_\allowbreak{}samples}, \texttt{health\_\allowbreak{}minutes}, \texttt{health\_\allowbreak{}incidents}. \\
+\texttt{012\_\allowbreak{}search} & Trigram FTS5: \texttt{commands\_\allowbreak{}trigram} and the contentless \texttt{events\_\allowbreak{}trigram}. \\
+\texttt{013\_\allowbreak{}complete} & \texttt{commands\_\allowbreak{}text} index for prefix ranges in completion. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+Adding a migration means bumping the schema version tests too.
+
+\section{\texorpdfstring{Storage style}{Storage style}}
+
+Sessions and Machines are stored as a few indexed columns (state, \texttt{updated\_\allowbreak{}at}) plus the full value as JSON. That keeps the protocol type the single source of truth: adding a field to \texttt{Session} needs no migration. Commands, Events and metrics are proper columns, because they are queried and indexed.
+
+\section{\texorpdfstring{Full-text search}{Full-text search}}
+
+Three FTS5 indexes serve different needs:
+
+\begin{itemize}
+\item \texttt{commands\_\allowbreak{}fts} (unicode61 tokenizer) serves one- and two-character word prefixes.
+\item \texttt{commands\_\allowbreak{}trigram} finds any three or more characters anywhere in Command text.
+\item \texttt{events\_\allowbreak{}trigram} (contentless, mapped by Event ID) indexes the text-bearing Events: errors, warnings, prompts, checkpoints and servers.
+\end{itemize}
+
+Triggers keep the indexes in step with inserts, updates and deletes. Completion uses the plain \texttt{commands\_\allowbreak{}text} B-tree index instead: \texttt{text\ \textgreater{}=\allowbreak{}\ prefix\ AND\ text\ \textless{}\ prefix\ \textbar{}\textbar{}\ U+10FFFF} is one index range.
+
+\section{\texorpdfstring{Modules}{Modules}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.401}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.599}\relax}}
+\toprule
+\textbf{Module} & \textbf{Job} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Module} & \textbf{Job} \\
+\midrule
+\endhead
+\texttt{lib.\allowbreak{}rs} & Opening, migrations, Machines, Sessions. \\
+\texttt{records.\allowbreak{}rs} & Command and Event writes and queries. \\
+\texttt{metrics.\allowbreak{}rs} & Raw samples kept one hour, then downsampled to one-minute rows. \\
+\texttt{lineage.\allowbreak{}rs} & Session continuation chains. \\
+\texttt{log\_\allowbreak{}cursors.\allowbreak{}rs} & Resumable adopted-log positions. \\
+\texttt{registry.\allowbreak{}rs} & Control registry, pairing codes, worker links, Machine ID rewrite. \\
+\texttt{projection.\allowbreak{}rs} & The worker's outbox and the control's materialised rows (about 1,100 lines). \\
+\texttt{native\_\allowbreak{}push.\allowbreak{}rs}, \texttt{notification\_\allowbreak{}deliveries.\allowbreak{}rs} & Intents, subscriptions, deliveries, retry state. \\
+\texttt{pairing\_\allowbreak{}requests.\allowbreak{}rs} & Click-to-approve requests. \\
+\texttt{search.\allowbreak{}rs} & Search candidates from the FTS indexes. \\
+\texttt{complete.\allowbreak{}rs} & Completion candidates and the last exit code per Command text. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Retention}{Retention}}
+
+Raw metrics are kept for one hour and then folded into one-minute rows. Finished Sessions' compressed logs are deleted oldest first when the total passes 4 GiB or a log is older than 90 days (\texttt{storage.\allowbreak{}rs}, both configurable); a running Session's log is never deleted. Each Session's saved log also has its own size cap (\texttt{log\_\allowbreak{}budget.\allowbreak{}rs}): live output keeps streaming past the cap, but no more is saved.
+
+\chapter{\texorpdfstring{The watcher: output to Events}{The watcher: output to Events}}
+
+\texttt{crates/\allowbreak{}watcher} turns what a Session prints into typed Events and a health verdict. It is pure and deterministic: no I/O, no clock of its own, no model. The same input always gives the same Events, which is what makes it testable and safe to trust.
+
+\section{\texorpdfstring{The pipeline}{The pipeline}}
+
+\begin{enumerate}
+\item \textbf{Framing} (\texttt{framing.\allowbreak{}rs}): PTY or adopted-log bytes have ANSI escape codes removed and are cut into bounded lines.
+\item \textbf{Observations} (\texttt{observation.\allowbreak{}rs}): lines, Command starts and ends, process-tree samples and metrics enter as typed, bounded \texttt{Observation} values.
+\item \textbf{Engine} (\texttt{engine.\allowbreak{}rs}): each live Session owns one \texttt{EventEngine}. It always runs the Generic adapter, plus at most one adapter chosen by the running Command, plus any user-defined adapters.
+\item \textbf{Rate limiting}: progress Events at most every 5 seconds, so a fast training loop does not flood the store.
+\item \textbf{Health} (\texttt{health.\allowbreak{}rs}): a \texttt{HealthTracker} folds Events and metrics into \texttt{Healthy}, \texttt{Warning}, \texttt{PossiblyStalled} or \texttt{Failed}, with up to 16 pieces of bounded evidence.
+\end{enumerate}
+
+The daemon then assigns Event IDs, stores them, broadcasts them, and puts health on the Session. The web app never parses terminal text itself; it rebuilds its timeline with \texttt{GET\_\allowbreak{}EVENTS}.
+
+\section{\texorpdfstring{Adapters}{Adapters}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.146}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.273}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.581}\relax}}
+\toprule
+\textbf{Adapter} & \textbf{File} & \textbf{Recognises} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Adapter} & \textbf{File} & \textbf{Recognises} \\
+\midrule
+\endhead
+Generic & \texttt{generic.\allowbreak{}rs} & Prompts that wait for an answer (\texttt{[y/\allowbreak{}N]}, \texttt{(yes/\allowbreak{}no)} and similar at the cursor), warnings, errors, and a Session that has been quiet for 10 minutes (possibly stalled). \\
+Training & \texttt{training.\allowbreak{}rs} & Epoch and step progress, loss and other scalars with their trend, checkpoints saved. \\
+pytest & \texttt{pytest.\allowbreak{}rs} & Collection, progress, failures and the final summary. \\
+Cargo & \texttt{cargo\_\allowbreak{}adapter.\allowbreak{}rs} & Build and test output. \\
+Server & \texttt{server.\allowbreak{}rs} & vLLM and llama.cpp servers becoming ready, with their port. \\
+AI coding agents & \texttt{agent\_\allowbreak{}cli.\allowbreak{}rs}, \texttt{agent\_\allowbreak{}activity.\allowbreak{}rs} & Claude Code, Codex, aider and others: which agent, tool calls, working lines, token usage, API errors, turn finished. \\
+Declarative & \texttt{declarative.\allowbreak{}rs} & User adapters from bounded TOML files in \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}config/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}adapters/\allowbreak{}}: a Command-matching regex plus rules that map lines to Events. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+An adapter implements one small trait in \texttt{adapter.\allowbreak{}rs}. Adapters only see bounded observations and only produce \texttt{EventKind} values; they cannot touch the store or the network.
+
+\section{\texorpdfstring{Capture limits}{Capture limits}}
+
+\texttt{EventEngine} is told the Session's capture level and limits its Events and health claims to what that level can support (\texttt{protocol:\allowbreak{}:\allowbreak{}evidence}). A \texttt{PROCESS} Session, for example, has no output, so it can never produce an ErrorDetected Event from text.
+
+\section{\texorpdfstring{Coding agents (Milestone 6.1)}{Coding agents (Milestone 6.1)}}
+
+When a Session runs an AI coding agent, \texttt{agent\_\allowbreak{}cli.\allowbreak{}rs} recognises it and \texttt{agent\_\allowbreak{}activity.\allowbreak{}rs} reads its screen: tool-use lines, "working" lines, usage lines and API errors. The result is a \texttt{CodingAgentSummary} on the Session (agent, last action, tool uses, tokens) and \texttt{AgentActivity} / \texttt{AgentTurnFinished} Events. Only closed codes and numbers leave the Machine. A turn that finishes with zero tool uses does not send a notification.
+
+\section{\texorpdfstring{Redaction}{Redaction}}
+
+\texttt{redact.\allowbreak{}rs} hides secret-shaped values before terminal text is shown anywhere else, for example in output search results. It replaces with \texttt{[redacted]}:
+
+\begin{itemize}
+\item values named like secrets: \texttt{PASSWORD=\allowbreak{}}, \texttt{api\_\allowbreak{}key:\allowbreak{}}, \texttt{token=\allowbreak{}}, \texttt{secret}, \texttt{credential} and similar;
+\item bearer tokens (\texttt{Authorization:\allowbreak{}\ Bearer\ .\allowbreak{}.\allowbreak{}.\allowbreak{}});
+\item credentials in URLs (\texttt{https:\allowbreak{}/\allowbreak{}/\allowbreak{}user:\allowbreak{}pass@host});
+\item well-known token formats: GitHub, GitLab, OpenAI-style \texttt{sk-{}\allowbreak{}}, Slack, AWS access keys, Tailscale auth keys and Sentinal agent tokens;
+\item any line containing a private key header.
+\end{itemize}
+
+Ordinary output (hashes, paths, numbers, loss values) is left alone, and tests check both sides.
+
+\section{\texorpdfstring{Evaluation baseline}{Evaluation baseline}}
+
+\texttt{examples/\allowbreak{}eval\_\allowbreak{}baseline.\allowbreak{}rs} runs today's deterministic adapters over the \texttt{eval/\allowbreak{}} benchmark. It is the baseline any model must beat before it may propose Events (Section 10).
+
+\chapter{\texorpdfstring{The CLI and shell hooks}{The CLI and shell hooks}}
+
+\texttt{crates/\allowbreak{}cli} builds \texttt{sentinal}, the command-line client (about 11,300 lines). It talks to the local daemon over the private Unix socket or its WebSocket, using the Machine token in \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}config/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}token}. Commands are declared with \texttt{clap} in \texttt{src/\allowbreak{}args.\allowbreak{}rs}; each has its own module.
+
+\section{\texorpdfstring{Commands}{Commands}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.373}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.627}\relax}}
+\toprule
+\textbf{Command} & \textbf{What it does} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Command} & \textbf{What it does} \\
+\midrule
+\endhead
+\texttt{sentinal\ ls\ [-{}\allowbreak{}-{}\allowbreak{}json]} & List Sessions on this daemon. \\
+\texttt{sentinal\ top\ [-{}\allowbreak{}-{}\allowbreak{}once]\ [-{}\allowbreak{}-{}\allowbreak{}json]} & Live text view of this Machine's load and running Sessions. \\
+\texttt{sentinal\ status\ \textless{}id\textgreater{}\ [-{}\allowbreak{}-{}\allowbreak{}json]} & One Session's progress, training numbers, health, processes and Events. \\
+\texttt{sentinal\ new}, \texttt{attach\ \textless{}id\textgreater{}}, \texttt{kill\ \textless{}id\textgreater{}} & Create, attach to, or end a Session. \\
+\texttt{sentinal\ watch\ [-{}\allowbreak{}-{}\allowbreak{}\ CMD\ .\allowbreak{}.\allowbreak{}.\allowbreak{}]} & Run this terminal inside a persistent \texttt{FULL} Session and attach. With a command, it runs once and the shell stays open. Detach with Ctrl+J; closing the window also only detaches. \\
+\texttt{sentinal\ auto\ on/\allowbreak{}off/\allowbreak{}status} & Opt-in auto-wrap: new interactive terminals start inside a \texttt{FULL} Session. \\
+\texttt{sentinal\ adopt\ \textless{}pid\textgreater{}} & Observe an existing process read-only (\texttt{ADOPTED} / \texttt{PROCESS}): metrics and exit only, never signals or input. \\
+\texttt{sentinal\ hook\ install/\allowbreak{}uninstall/\allowbreak{}zsh/\allowbreak{}bash/\allowbreak{}fish} & Report Commands from ordinary terminals (\texttt{SHELL\_\allowbreak{}HOOK} / \texttt{COMMANDS}). \\
+\texttt{sentinal\ setup} & Make this Machine a control or connect it to one, after a preview. Re-running finishes what is missing and changes nothing that is right. \\
+\texttt{sentinal\ connect\ \textless{}control-{}\allowbreak{}url\textgreater{}} & Pair this Machine with a control using a one-time code typed at a hidden prompt. \\
+\texttt{sentinal\ connection\ status}, \texttt{disconnect} & Show or remove this Machine's control link; the Machine ID is kept. \\
+\texttt{sentinal\ identity\ reset} & Replace a corrupt or unwanted Machine ID. \\
+\texttt{sentinal\ doctor} & Check the local installation without pairing or changing anything. \\
+\texttt{sentinal\ update}, \texttt{release} & Check, install or roll back verified releases. \\
+\texttt{sentinal\ backup\ create/\allowbreak{}restore} & Back up or restore this Machine's config and data, credentials included. \\
+\texttt{sentinal\ complete} & Complete the line being typed from this Machine's history (used by Ctrl-Space). \\
+\texttt{sentinal\ mcp} & Serve Sentinal's agent tools to an MCP client over stdio (Section 10). \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Four ways work enters Sentinal}{Four ways work enters Sentinal}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.107}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.205}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.269}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.419}\relax}}
+\toprule
+\textbf{Mode} & \textbf{Command} & \textbf{Origin / capture} & \textbf{What Sentinal sees} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Mode} & \textbf{Command} & \textbf{Origin / capture} & \textbf{What Sentinal sees} \\
+\midrule
+\endhead
+UI & New terminal in the web app & \texttt{UI} / \texttt{FULL} & Everything; you can type into it remotely. \\
+Watch & \texttt{sentinal\ watch} & \texttt{WATCH} / \texttt{FULL} & Everything, for a terminal you started yourself. \\
+Auto-wrap & \texttt{sentinal\ auto\ on} & \texttt{AUTO\_\allowbreak{}WRAP} / \texttt{FULL} & Every new interactive terminal, automatically. \\
+Shell hook & \texttt{sentinal\ hook\ install} & \texttt{SHELL\_\allowbreak{}HOOK} / \texttt{COMMANDS} & Commands, cwd, exit codes and metrics; no output, no remote input. \\
+Adopt & \texttt{sentinal\ adopt\ \textless{}pid\textgreater{}} & \texttt{ADOPTED} / \texttt{PROCESS} or \texttt{PROCESS\_\allowbreak{}LOG} & Metrics and when it ends; its log file if one is found. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Shell hooks}{Shell hooks}}
+
+There are two hook paths, and they never report the same Command twice.
+
+\textbf{Daemon-owned PTY path.} When the daemon starts a \texttt{FULL} Session, it loads an isolated wrapper (\texttt{shell/\allowbreak{}ta.\allowbreak{}zsh}, \texttt{ta.\allowbreak{}bash}, \texttt{ta.\allowbreak{}fish}) before your normal shell config. The wrapper writes terminal sequences into the PTY stream:
+
+\begin{itemize}
+\item OSC 133 \texttt{A}: prompt start
+\item OSC 133 \texttt{B}: Command start
+\item OSC 133 \texttt{C}: output start
+\item OSC 133 \texttt{D;\textless{}exit\textgreater{}}: Command end
+\item OSC 7 \texttt{file:\allowbreak{}/\allowbreak{}/\allowbreak{}host/\allowbreak{}path}: the cwd
+\item OSC 7420 \texttt{cmd=\allowbreak{}\textless{}base64\textgreater{}}: the exact Command text
+\end{itemize}
+
+The daemon's streaming parser accepts sequences split at any byte, passes every byte through unchanged, and bounds unterminated sequences. These wrappers never edit your rc files.
+
+\textbf{Ordinary-shell path.} \texttt{sentinal\ hook\ install} adds one marked block to your rc file. The block only runs if the \texttt{sentinal} binary still exists, so removing Sentinal never breaks a shell. Each interactive shell then registers itself as a \texttt{SHELL\_\allowbreak{}HOOK} Session and reports each Command's text, cwd, start, finish and exit status over the local socket. Sources are \texttt{shell/\allowbreak{}external/\allowbreak{}sentinal.\allowbreak{}\{zsh,\allowbreak{}bash,\allowbreak{}fish\}}; bash uses the vendored \texttt{bash-{}\allowbreak{}preexec.\allowbreak{}sh}.
+
+\section{\texorpdfstring{Ctrl-Space completion}{Ctrl-Space completion}}
+
+The external hook scripts also bind Ctrl-Space. The widget passes the line typed so far to \texttt{sentinal\ complete} in the \texttt{SENTINAL\_\allowbreak{}COMPLETE\_\allowbreak{}PREFIX} environment variable, never as an argument, so it never appears in \texttt{ps}. The daemon ranks this Machine's Command history (Section 11) and the widget fills in or cycles through the results.
+
+\section{\texorpdfstring{Setup and \texttt{doctor}}{Setup and doctor}}
+
+\texttt{sentinal\ setup} is the guided path for a new Machine: it previews what it will change, then makes the Machine a control or connects it to one. \texttt{sentinal\ doctor} checks the install read-only: binaries, service, socket, config permissions, link state. Both are safe to re-run.
+
+\chapter{\texorpdfstring{The web app (PWA)}{The web app (PWA)}}
+
+\texttt{web/\allowbreak{}} is a React 19 + Vite 7 app with xterm.js for terminals: about 22,900 lines of TypeScript. It installs as a PWA (\texttt{public/\allowbreak{}manifest.\allowbreak{}webmanifest}, \texttt{public/\allowbreak{}sw.\allowbreak{}js}), so it can sit on a phone's home screen and receive push notifications. In production the control serves the built app; in development \texttt{just\ network} runs the Vite dev server.
+
+\section{\texorpdfstring{Data layer (\texttt{src/\allowbreak{}data/\allowbreak{}})}{Data layer (src/data/)}}
+
+Every screen reads data through one interface, \texttt{DataAdapter} (\texttt{data/\allowbreak{}adapter.\allowbreak{}ts}), with two implementations:
+
+\begin{itemize}
+\item \texttt{data/\allowbreak{}api/\allowbreak{}}: the real adapter. It speaks the protocol to the control (snapshot plus live stream for the dashboard, the WebSocket for terminals and requests) and fans search out to every Machine.
+\item \texttt{data/\allowbreak{}mock/\allowbreak{}}: a full simulation with fixtures, used by tests, demos and design work. It is selected only when the build sets \texttt{VITE\_\allowbreak{}DATA=\allowbreak{}mock}.
+\end{itemize}
+
+\texttt{LiveDataContext.\allowbreak{}tsx} holds the live Machines, Sessions and terminals for the whole app and survives rotation and shell switches. Helpers turn raw data into what screens show: \texttt{format.\allowbreak{}ts} (durations, labels, \texttt{needsAttention}), \texttt{capture.\allowbreak{}ts} (what a capture level allows), \texttt{health.\allowbreak{}ts}, \texttt{lineage.\allowbreak{}ts} (continuation chains), \texttt{search.\allowbreak{}ts} (the TypeScript port of the ranking formula). The protocol types themselves are generated from Rust into \texttt{src/\allowbreak{}protocol/\allowbreak{}}.
+
+\texttt{flags.\allowbreak{}ts} hides UI that is designed but not yet backed by a real API; flags are on only in mock mode.
+
+\section{\texorpdfstring{Two shells}{Two shells}}
+
+\texttt{AppShell.\allowbreak{}tsx} picks a shell by viewport. Below 768 px wide (or below 500 px tall on a touch screen) it is the \textbf{phone shell}; above, the \textbf{glass shell}. \texttt{LiveDataProvider} sits above the switch, so rotating a tablet keeps live data.
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.103}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.382}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.515}\relax}}
+\toprule
+\textbf{} & \textbf{Glass shell (desktop)} & \textbf{Phone shell} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{} & \textbf{Glass shell (desktop)} & \textbf{Phone shell} \\
+\midrule
+\endhead
+Top & Live island: page name, one live item, needs-you count & Mobile island; on detail screens it shows back, the title and a screen control; docked flat over the terminal \\
+Bottom & Prompt bar & Prompt pill (hidden on the terminal, where the keyboard owns the edge) \\
+Navigation & Back-history sheets stacked over the dashboard & No tab bar or menu: the prompt does what menus used to \\
+Dashboard & \texttt{GlassDashboard} with Needs you, Machines, feed and sparklines & \texttt{PhoneOverview} with Needs you cards (with Dismiss) and Machine cards \\
+Terminals & Split View with several panes & \texttt{PhoneTerminals} list, then a full-screen \texttt{PhoneTerminal} \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Routes}{Routes}}
+
+Public: \texttt{/\allowbreak{}} (landing), \texttt{/\allowbreak{}login}, \texttt{/\allowbreak{}setup}. Behind login, under \texttt{/\allowbreak{}app/\allowbreak{}}: \texttt{overview}, \texttt{sessions/\allowbreak{}:\allowbreak{}id}, \texttt{sessions/\allowbreak{}:\allowbreak{}id/\allowbreak{}terminal}, \texttt{split}, \texttt{projects/\allowbreak{}:\allowbreak{}id}, \texttt{history}, \texttt{recipes}, \texttt{recipes/\allowbreak{}:\allowbreak{}id}, \texttt{settings}, \texttt{settings/\allowbreak{}:\allowbreak{}tab}. Unknown paths go to the overview.
+
+\section{\texorpdfstring{The prompt}{The prompt}}
+
+Both shells centre on one prompt ("go, run, find, y / n..."). \texttt{shell/\allowbreak{}promptGrammar.\allowbreak{}ts} matches typed text against what Sentinal already knows, with no model: Machine and Session names, Recipes, \texttt{find\ .\allowbreak{}.\allowbreak{}.\allowbreak{}} searches with filters such as \texttt{failed} or \texttt{on\ \textless{}machine\textgreater{}}, and \texttt{y}/\texttt{n} answers to waiting prompts. Each suggestion carries the action Enter performs and the text Tab completes to; ghost text shows the completion inline. Nothing executes from the grammar directly: \texttt{run} opens a prefilled form and \texttt{kill} asks for confirmation. \texttt{usePromptActions.\allowbreak{}tsx} performs the chosen action.
+
+\section{\texorpdfstring{Terminals (\texttt{src/\allowbreak{}terminal/\allowbreak{}})}{Terminals (src/terminal/)}}
+
+\texttt{TerminalPane.\allowbreak{}tsx} wraps xterm.js 6 with the fit and WebGL addons (4,000 lines of scrollback). For a live \texttt{FULL} Session it attaches through \texttt{useRealTerminalSession.\allowbreak{}ts}; for a finished one it replays saved output read-only. Continuation chains are replayed into separate xterm instances so old ANSI state cannot leak into the live one.
+
+On a phone, the terminal is full screen with Sentinal's own keyboard (\texttt{terminal/\allowbreak{}keyboard/\allowbreak{}TermKeyboard.\allowbreak{}tsx}) instead of the OS one: Ctrl, Alt, Esc, Tab, arrows, a symbols layer, a hold-to-delete key, and a space bar you swipe to move the cursor. Above the keys, chips offer \texttt{y}/\texttt{n} when a prompt waits, history completions for the line being typed (\texttt{typedLine.\allowbreak{}ts} tracks it), and tokens from recent output. A hardware keyboard leaves only the accessory row. Ctrl-C on a long job asks for confirmation first.
+
+\texttt{touchScroll.\allowbreak{}ts} (added 3 November 2026) makes a one-finger drag scroll the scrollback with a short fling; in full-screen programs such as \texttt{vim} or \texttt{less} the drag sends arrow keys instead.
+
+\section{\texorpdfstring{Pages}{Pages}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.166}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.834}\relax}}
+\toprule
+\textbf{Page} & \textbf{Shows} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Page} & \textbf{Shows} \\
+\midrule
+\endhead
+Overview & Needs you (failed, waiting, stalled), Machines and their Sessions; filtered by Machine it adds the Machine panel with host facts, metric charts, capture sources, processes, and "New terminal on \textbackslash{}\textless{}Machine\textgreater{}". \\
+Session & State, capture, health, progress and metrics, Events, last output for failures, "See how it passed last time", Open terminal and Stop. \\
+Split View & Several live terminals side by side. \\
+Project & Sessions and Commands under one project root. \\
+History & Commands across Machines with filters. \\
+Recipes & Built-in and user Recipes; run one with parameters on a chosen Machine. \\
+Settings & Account, Machines (add, pair, revoke, update), Notifications, Agents, Diagnostics, Simulation. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Tests}{Tests}}
+
+Component and unit tests use Vitest and Testing Library next to the code (\texttt{*.\allowbreak{}test.\allowbreak{}ts(x)}), mostly against the mock adapter. Browser tests in \texttt{web/\allowbreak{}e2e/\allowbreak{}} use Playwright against a real daemon, including a mobile suite that fails on any sideways page scroll.
+
+\chapter{\texorpdfstring{AI and agents}{AI and agents}}
+
+AI in Sentinal is a layer on top, never a foundation: every feature works with no model running, and the daemon, not the model, enforces what an AI may do. Three pieces exist today: the Agent API for outside AI clients (6.0), agent-aware Sessions for coding agents running inside Sentinal (6.1), and the beginnings of a local screen translator (6.2).
+
+\section{\texorpdfstring{Rules that never change}{Rules that never change}}
+
+\begin{enumerate}
+\item \textbf{Structured state first.} A model can add Events; it can never be the only way something works.
+\item \textbf{Terminal output is untrusted.} It is data to a model, never instructions; it is never executed and never becomes a URL.
+\item \textbf{Permissions are enforced in the daemon}, by token, never by asking a model or client to behave.
+\item \textbf{Nothing destructive in one step.} Input, Ctrl-C, kill and Recipe runs need a person's confirmation.
+\item \textbf{Every agent action is attributed and audited}: which agent, which token, which level, what it asked.
+\end{enumerate}
+
+\section{\texorpdfstring{Permission levels}{Permission levels}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.114}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.114}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.498}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.274}\relax}}
+\toprule
+\textbf{Level} & \textbf{Name} & \textbf{May} & \textbf{Status} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Level} & \textbf{Name} & \textbf{May} & \textbf{Status} \\
+\midrule
+\endhead
+0 & Observe & Read Machines, Sessions, Events and metrics; watch changes; wait for a state & Available \\
+1 & Annotate & Also add notes and proposed Events, marked inferred & Next \\
+2 & Suggest & Also suggest a command or answer that a person accepts by hand; notify & Next \\
+none & Act & Not offered. The protocol cannot name a level 3. & Needs its own review (Milestone 7.0) \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+At every level an agent \textbf{cannot} type into a terminal, resize or kill a Session, run a Recipe, pair Machines, manage agents, or read terminal output.
+
+\section{\texorpdfstring{Agent tokens}{Agent tokens}}
+
+On the control, Settings $\rightarrow$ Agents creates a token with a name and a level. The token (\texttt{sat\_\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}}) is shown once; only its SHA-256 is stored, in the owner-only \texttt{agent-{}\allowbreak{}tokens.\allowbreak{}json}. Revoking it stops it on the next request. Only the owner's browser session can create, list or revoke agents; the Machine token and agent tokens are refused for that.
+
+\section{\texorpdfstring{MCP and HTTP}{MCP and HTTP}}
+
+\texttt{sentinal\ mcp\ -{}\allowbreak{}-{}\allowbreak{}control\ \textless{}origin\textgreater{}} serves the agent tools over stdio to any MCP client, with the token in \texttt{SENTINAL\_\allowbreak{}AGENT\_\allowbreak{}TOKEN}. For Claude Code:
+
+\begin{lstlisting}[language=sh]
+claude mcp add sentinal --env SENTINAL_AGENT_TOKEN=sat_... -- \
+  sentinal mcp --control https://sentinal.<tailnet>.ts.net
+\end{lstlisting}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.256}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.744}\relax}}
+\toprule
+\textbf{Tool} & \textbf{Returns} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tool} & \textbf{Returns} \\
+\midrule
+\endhead
+\texttt{whoami} & The agent's name and level \\
+\texttt{list\_\allowbreak{}machines} & Machines, connection status, running and needs-you counts \\
+\texttt{list\_\allowbreak{}sessions} & Sessions, filtered by Machine, state or \texttt{needs\_\allowbreak{}you} \\
+\texttt{get\_\allowbreak{}session} & One Session with its Events and latest resource use \\
+\texttt{watch} & Changes after a revision, waiting up to 30 seconds \\
+\texttt{wait\_\allowbreak{}for} & Blocks until a Session reaches a state, up to 600 seconds \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+The same catalogue is available over HTTP: \texttt{GET\ /\allowbreak{}api/\allowbreak{}v1/\allowbreak{}agent/\allowbreak{}whoami}, \texttt{/\allowbreak{}agent/\allowbreak{}snapshot} and \texttt{/\allowbreak{}agent/\allowbreak{}updates?after=\allowbreak{}N\&wait\_\allowbreak{}ms=\allowbreak{}M}, with \texttt{Authorization:\allowbreak{}\ Bearer\ sat\_\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}}. Errors are 401 (missing or revoked token) or 403 (level too low). Full schemas are in \texttt{docs/\allowbreak{}agent-{}\allowbreak{}tools.\allowbreak{}json}.
+
+Agents read the control's privacy-minimised read model, so they never see Command text or output.
+
+\section{\texorpdfstring{Attribution and audit}{Attribution and audit}}
+
+Each agent has an attribution, "via claude (level 0)". The control keeps its latest 100 calls (tool and outcome, never arguments) in memory, shown under Settings $\rightarrow$ Agents $\rightarrow$ Activity; that list starts empty after a restart. The durable record is \texttt{pairing-{}\allowbreak{}audit.\allowbreak{}jsonl}: \texttt{AGENT\_\allowbreak{}CREATED}, \texttt{AGENT\_\allowbreak{}REVOKED} and \texttt{AGENT\_\allowbreak{}DENIED} (a request above the agent's level), with the agent ID and never the token.
+
+\section{\texorpdfstring{Coding agents inside Sentinal (6.1)}{Coding agents inside Sentinal (6.1)}}
+
+When a \texttt{FULL} Session runs Claude Code, Codex, aider or a similar tool, the watcher recognises it (Section 7). The Session gets a \texttt{CodingAgentSummary} (which agent, last action, tool uses, tokens), the UI shows an agent badge and an "AI agents" filter, and a finished turn produces an \texttt{AgentTurnFinished} Event and an \texttt{AgentFinished} notification. This is deterministic: no model reads the screen.
+
+\section{\texorpdfstring{The screen translator (6.2, started)}{The screen translator (6.2, started)}}
+
+\texttt{intelligence/\allowbreak{}} is a separate Python process. At level 1 it will read the last screen of a \texttt{FULL} Session that no deterministic adapter understands, and propose Events marked \texttt{INFERRED}:
+
+\begin{enumerate}
+\item Clean: strip ANSI, keep the last 60 lines or 6,000 characters, redact secrets before the model sees anything.
+\item Call a small local model (FunctionGemma 270M fine-tuned, against \texttt{sentinal-{}\allowbreak{}qwen3-{}\allowbreak{}0.\allowbreak{}6b}), constrained to the tool schema.
+\item Guard in code: every number must appear in the screen text, no URLs, no paths outside the cwd, no secret-shaped strings.
+\item The daemon re-checks grounding; deterministic Events stay authoritative when both exist.
+\end{enumerate}
+
+Models run locally only, never in the cloud. Before it is on by default, it must pass a gate on at least 200 hand-labelled real screens: F1 at least 0.95, precision at least 0.97 on errors and prompts, zero secret leaks, p95 under 1 second. \texttt{eval/\allowbreak{}} holds the benchmark; \texttt{just\ train-{}\allowbreak{}functiongemma} fine-tunes.
+
+\section{\texorpdfstring{What comes next}{What comes next}}
+
+\begin{itemize}
+\item \textbf{6.3 Assistant:} template-written summaries and "While you were away" (a model only rephrases), \texttt{?\ why\ did\ pytest\ fail\ on\ rtx-{}\allowbreak{}pc} answers that cite their Events and Commands, rule-first suggestions such as a smaller batch size after CUDA out-of-memory.
+\item \textbf{7.0 Act with approval:} an agent may request input, an answer, a Recipe run or an interrupt; each becomes an approval card a person must approve with hold-to-confirm. Not started; needs a separate review.
+\item \textbf{Open decision:} whether agents get \texttt{search} and \texttt{complete} tools, given that output access stays off by default (decision 3).
+\end{itemize}
+
+\chapter{\texorpdfstring{Search and completion}{Search and completion}}
+
+Search (Milestone 5.S) finds Sessions, Commands, Events, Recipes and, opt-in, terminal output across every Machine. Completion (5.A) suggests the rest of the Command you are typing, from that Machine's history. Neither uses a model, and both keep Command text on the Machine it came from.
+
+\section{\texorpdfstring{How a search runs}{How a search runs}}
+
+\begin{enumerate}
+\item You type \texttt{find\ .\allowbreak{}.\allowbreak{}.\allowbreak{}} in the prompt (or the search field). The grammar parses filters: \texttt{failed}, \texttt{running}, a time such as \texttt{today}, \texttt{on\ \textless{}machine\textgreater{}}.
+\item The browser sends \texttt{Search} to \textbf{every online Machine at once} (or only the named one). The control's read model holds no Command text, so it cannot answer this itself.
+\item Each worker searches its own store (\texttt{daemon/\allowbreak{}src/\allowbreak{}search.\allowbreak{}rs}):
+\begin{itemize}
+\item Sessions, by name and cwd;
+\item Commands, from the trigram index plus the 1,000 most recent;
+\item text-bearing Events (errors, warnings, prompts, checkpoints, servers), from \texttt{events\_\allowbreak{}trigram} plus a recent scan;
+\item Recipes, by name, ID, category and command;
+\item output, only for Sessions the owner opted in.
+\end{itemize}
+\item Each worker ranks its hits and returns at most 50.
+\item The browser merges every Machine's hits by score, adds what it already holds (Machines, Settings pages), ranks those with the same formula, and shows one list.
+\end{enumerate}
+
+\section{\texorpdfstring{The ranking formula}{The ranking formula}}
+
+Each query word is matched against the hit's fields and scores the best tier it reaches:
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.523}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.182}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.295}\relax}}
+\toprule
+\textbf{Tier} & \textbf{Score} & \textbf{Example: query \texttt{oom}} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tier} & \textbf{Score} & \textbf{Example: query \texttt{oom}} \\
+\midrule
+\endhead
+Prefix: the field starts with the word & 100 & \texttt{oom-{}\allowbreak{}killer\ invoked} \\
+Word start: the word starts a later word & 80 & \texttt{kernel:\allowbreak{}\ oom-{}\allowbreak{}killer} \\
+Substring: anywhere & 60 & \texttt{room} \\
+Initials: each letter starts a word, in order & 40 & \texttt{out\ of\ memory} \\
+Fuzzy: the letters appear in order & 20 & \texttt{cOnfig\ lOad\ Mismatch} \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+If any word matches nothing, the hit scores 0. Otherwise the match is the mean over the words, and:
+
+\[\text{score} = \text{match} + 15 \cdot 0.5^{\,\text{age}/1\,\text{day}} + (30 \text{ if the Session waits for you})\]
+
+The result is rounded to hundredths so Rust and TypeScript agree exactly. Ties go to the newest hit. Both sides are tested against \texttt{crates/\allowbreak{}protocol/\allowbreak{}tests/\allowbreak{}fixtures/\allowbreak{}search\_\allowbreak{}ranking.\allowbreak{}json}. Matching ignores case.
+
+\section{\texorpdfstring{Output search (opt-in)}{Output search (opt-in)}}
+
+Output is not indexed. For a \texttt{FULL} Session the owner has opted in (the Output search toggle on the Session, \texttt{SetOutputSearch}), the worker scans the saved log on demand: at most the last 64 MiB, at most 5 hits per Session, each line passed through \texttt{watcher:\allowbreak{}:\allowbreak{}redact} first. It is off by default, per Session (decision 6 in \texttt{PLAN\_\allowbreak{}V2\_\allowbreak{}AI.\allowbreak{}md}), and documented in \texttt{SECURITY.\allowbreak{}md}.
+
+\section{\texorpdfstring{How completion works}{How completion works}}
+
+\begin{enumerate}
+\item \textbf{In a terminal:} press Ctrl-Space. The hook passes the typed line in \texttt{SENTINAL\_\allowbreak{}COMPLETE\_\allowbreak{}PREFIX} to \texttt{sentinal\ complete}. \textbf{On the phone:} completion chips appear above the keyboard as you type.
+\item The daemon (\texttt{daemon/\allowbreak{}src/\allowbreak{}complete.\allowbreak{}rs}) reads every distinct Command text that starts with the prefix, as one range on the \texttt{commands\_\allowbreak{}text} index. For an empty or short prefix it only looks at recent history (the last 5,000 Commands for an empty prefix, 20,000 for one under 3 characters), so it stays fast.
+\item Each candidate is scored, the top 20 are returned, and the last exit code is looked up only for those.
+\end{enumerate}
+
+\section{\texorpdfstring{The completion formula}{The completion formula}}
+
+For each distinct Command text, with its counts of successful and failed runs:
+
+\[\text{frecency} = w_f \cdot \text{successes} \cdot 0.5^{\,\text{days since last run}/h}\]
+
+\[\text{score} = \text{frecency} + 10 \cdot p_{\text{project}} + 5 \cdot p_{\text{cwd}} + 2 \cdot p_{\text{success}} - 10 \cdot p_{\text{failure}}\]
+
+Here each p is the share of the runs that were inside the current project, in the current directory, succeeded or failed. The failure penalty applies only when failures are asked for; Commands that never succeeded are otherwise not offered. A matching Recipe scores a flat 1. The defaults are w\textbackslash{}\_f = 1 and a half-life h of 7 days; all of them can be changed:
+
+\begin{lstlisting}
+[complete]
+frecency_weight = 1.0
+half_life_days = 7.0
+project_bonus = 10.0
+cwd_bonus = 5.0
+success_bonus = 2.0
+failure_penalty = 10.0
+recipe = 1.0
+\end{lstlisting}
+
+Negative weights, a zero half-life and unknown keys are rejected at startup.
+
+\section{\texorpdfstring{Projects}{Projects}}
+
+\texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}config/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}projects.\allowbreak{}toml} names project roots. The longest matching root wins and symlinks are resolved, so \texttt{\textasciitilde{}/\allowbreak{}code/\allowbreak{}app} and its symlinked path count as one project. Completion uses it for the project bonus; the Project page groups Sessions and Commands by it.
+
+\section{\texorpdfstring{Performance budget}{Performance budget}}
+
+Completion must answer within its budget on a large generated history; a timed \texttt{\#[ignore]} test checks it. Moving the last-exit lookup to the top results only and windowing short prefixes took it from 28 ms to about 11 ms.
+
+\chapter{\texorpdfstring{Security model}{Security model}}
+
+Sentinal controls shells, so its first security rule is reach: nothing is on the public internet, and every route says exactly who may call it. Inside that boundary, credentials are separate per role, capture levels limit what each Session exposes, terminal output is treated as untrusted, and every remote input is audited. \texttt{docs/\allowbreak{}SECURITY.\allowbreak{}md} is the full reference.
+
+\section{\texorpdfstring{Network boundary}{Network boundary}}
+
+\begin{itemize}
+\item The daemon binds only to loopback or a Tailscale address (\texttt{100.\allowbreak{}64.\allowbreak{}0.\allowbreak{}0/\allowbreak{}10}). It rejects \texttt{0.\allowbreak{}0.\allowbreak{}0.\allowbreak{}0}, \texttt{:\allowbreak{}:\allowbreak{}} and ordinary LAN addresses, and the launchers never fall back to them.
+\item The browser reaches the control through Tailscale Serve HTTPS. Funnel (public exposure) must never be enabled.
+\item Every HTTP route and WebSocket upgrade checks the \texttt{Origin} header against an exact allow-list.
+\item \texttt{*.\allowbreak{}ts.\allowbreak{}net} names resolve through Tailscale, not \texttt{/\allowbreak{}etc/\allowbreak{}resolv.\allowbreak{}conf}.
+\end{itemize}
+
+\section{\texorpdfstring{Credentials}{Credentials}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.141}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.121}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.319}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-8\tabcolsep)*\real{0.419}\relax}}
+\toprule
+\textbf{Credential} & \textbf{Who holds it} & \textbf{Used for} & \textbf{Stored as} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Credential} & \textbf{Who holds it} & \textbf{Used for} & \textbf{Stored as} \\
+\midrule
+\endhead
+Machine token & The local user & CLI and first-setup access to the local daemon & 256 random bits, file mode \texttt{0600}, compared in constant time \\
+Owner password & The owner & Browser sign-in on the control & Argon2id hash only \\
+Browser session & The owner's browser & Every browser request & \texttt{Secure}, \texttt{HttpOnly}, \texttt{SameSite=\allowbreak{}Strict} cookie; expires; revoked by logout or password change \\
+Pairing code & The owner, once & Exchanged for link credentials when a Machine joins & Single use; typed at a hidden prompt, never in argv, a URL, env or history \\
+Worker credential & Each worker & Worker to control: heartbeat, projection, intents, refresh & Unique per Machine, revocable \\
+Control credential & The control & Control to worker: terminal proxy, output replay, identity proof & Generated by the worker at pairing \\
+Agent token (\texttt{sat\_\allowbreak{}.\allowbreak{}.\allowbreak{}.\allowbreak{}}) & An AI client & Agent API and MCP, at its level & SHA-256 only, in owner-only \texttt{agent-{}\allowbreak{}tokens.\allowbreak{}json} \\
+VAPID key & The control only & Signing Web Push & Owner-only key store \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+JavaScript never receives a bearer token, WebSocket URLs carry no credential, and production rejects tokens in query strings. Password attempts are rate-limited per client.
+
+\section{\texorpdfstring{Route classes}{Route classes}}
+
+\begin{itemize}
+\item \textbf{Public:} health, auth status and login, discovery (control only, reachable only through Tailscale Serve).
+\item \textbf{First setup:} needs the local Machine token.
+\item \textbf{Terminal and data:} the Machine token or the owner's browser session.
+\item \textbf{Registry, pairing management, agents:} the owner's browser session only.
+\item \textbf{Link:} the directional link credential for that direction.
+\item \textbf{Agent API:} an agent token at a high enough level.
+\end{itemize}
+
+\section{\texorpdfstring{Enrollment}{Enrollment}}
+
+Installing and pairing are separate. The package URL carries no token, password, code or credential; an installed worker is \texttt{UNPAIRED} until \texttt{sentinal\ connect} (or click-to-approve with verification words) pairs it. Before proxying any terminal, the control checks the worker's \texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}link/\allowbreak{}identity} answer and pins its immutable Machine ID. Revoking a Machine does not uninstall it or delete its Sessions.
+
+\section{\texorpdfstring{Terminal integrity}{Terminal integrity}}
+
+\begin{itemize}
+\item \textbf{Audit:} every remote input frame appends time, client address, Session ID and byte count (never the bytes) to \texttt{audit.\allowbreak{}jsonl} before the bytes reach the PTY. Input that cannot be recorded is refused.
+\item \textbf{Forged Commands:} OSC 133 and OSC 7420 marks only count when tagged with a per-Session 128-bit nonce, which the hook copies and unsets before user rc files load. A program's output cannot forge Command history, exit codes or cwd.
+\item \textbf{Finished Sessions} refuse input, resize, signal and kill before any PTY handle or audit entry is touched.
+\item \textbf{Capture levels} are enforced in the daemon for every client (Section 4).
+\end{itemize}
+
+\section{\texorpdfstring{Data on disk}{Data on disk}}
+
+The data directory and \texttt{sessions/\allowbreak{}} are \texttt{0700}; logs, SQLite (with WAL and SHM) and audit files are \texttt{0600} whatever the umask, and wider permissions are tightened at startup. Adopted log tails refuse symlinks, non-regular files and other users' files. Terminal output may contain printed secrets, so logs are bounded (Section 6) and output search is opt-in and redacted.
+
+\section{\texorpdfstring{AI boundary}{AI boundary}}
+
+Terminal output is data, never instructions: it is never executed and never treated as a command by any model. Agents read only the privacy-minimised read model, levels are enforced per request by token, and nothing destructive is possible in one step (Section 10).
+
+\section{\texorpdfstring{Releases and signing}{Releases and signing}}
+
+\begin{itemize}
+\item Releases are signed by the owner; \texttt{sentinald} has the allowed signing keys compiled in (\texttt{packaging/\allowbreak{}release-{}\allowbreak{}keys/\allowbreak{}allowed\_\allowbreak{}signers}) and verifies \texttt{SHA256SUMS} and its signature before installing.
+\item Installers check SHA-256, refuse unsafe archive entries, accept only binaries owned by the current user and not group- or world-writable, replace programs atomically, and keep the previous programs if the service fails to start.
+\item Service files contain paths but never a token or password hash.
+\item On macOS, the installer now signs \texttt{sentinal} and \texttt{sentinald} with a local identity under fixed identifiers, so privacy grants survive updates (Section 13).
+\end{itemize}
+
+\section{\texorpdfstring{Known open items}{Known open items}}
+
+\texttt{SECURITY.\allowbreak{}md} lists what is still a V1 release blocker, including total quotas, rotation and secure purge for compressed logs and JSONL audits, and a second global login rate limiter for Tailscale Serve mode.
+
+\chapter{\texorpdfstring{Install, release and operations}{Install, release and operations}}
+
+A Machine needs Tailscale signed in, then one install command; \texttt{sentinal\ setup} makes it the control or connects it to one. Releases are built by GitHub Actions, signed on the owner's Mac with \texttt{just\ ship}, and installed only after their signature checks out. \texttt{docs/\allowbreak{}SETUP.\allowbreak{}md} has every command.
+
+\section{\texorpdfstring{Install a Machine}{Install a Machine}}
+
+From GitHub (any Machine, no checkout):
+
+\begin{lstlisting}[language=sh]
+curl -fsSLO https://github.com/SentinalResearch/ProjectSentinal/releases/latest/download/install.sh
+sh install.sh
+\end{lstlisting}
+
+From your control (a Machine on the Tailnet joining it):
+
+\begin{lstlisting}[language=sh]
+curl -fsSL https://sentinal-control.<tailnet>.ts.net/install.sh | sh
+\end{lstlisting}
+
+The installer downloads the release for this platform (macOS arm64 or Intel, Linux x86\textbackslash{}\_64 or arm64), checks its SHA-256, refuses unsafe archive entries, finds this Machine's Tailscale IPv4, and runs \texttt{install-{}\allowbreak{}worker.\allowbreak{}sh}. That script:
+
+\begin{enumerate}
+\item installs \texttt{sentinal} and \texttt{sentinald} into \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}bin} atomically, shell assets and the PWA into \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}share/\allowbreak{}sentinal/\allowbreak{}};
+\item creates owner-only config (\texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}config/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}}) and data (\texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}share/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}}) directories, keeping existing ones;
+\item renders and starts a user service: launchd \texttt{dev.\allowbreak{}sentinal.\allowbreak{}sentinald} on macOS, systemd \texttt{sentinald.\allowbreak{}service} on Linux;
+\item restores the previous programs if the service fails to start;
+\item adds \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}bin} to PATH in your shell start-up files (new on 3 November 2026);
+\item on macOS, signs both programs with a local identity (new on 3 November 2026).
+\end{enumerate}
+
+Then run \texttt{sentinal\ setup}. On the control, choose "Create my Sentinal control"; it writes the control config, enables linger, adds the Tailscale Serve routes and publishes worker packages. On a worker, create a one-time code in the control's Settings $\rightarrow$ Machines $\rightarrow$ Add Machine and run \texttt{sentinal\ connect\ \textless{}control-{}\allowbreak{}url\textgreater{}}.
+
+\section{\texorpdfstring{\texttt{sentinal} in every terminal}{sentinal in every terminal}}
+
+With the default prefix, the installer adds a marked block (\texttt{\#\ \textgreater{}\textgreater{}\textgreater{}\ sentinal\ path\ \textgreater{}\textgreater{}\textgreater{}}) to \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}zshrc}, \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}bashrc} (\texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}bash\_\allowbreak{}profile} on macOS), \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}profile} when it exists, and \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}config/\allowbreak{}fish/\allowbreak{}conf.\allowbreak{}d/\allowbreak{}sentinal.\allowbreak{}fish}. Uninstall removes the block; \texttt{SENTINAL\_\allowbreak{}NO\_\allowbreak{}MODIFY\_\allowbreak{}PATH=\allowbreak{}1} skips it. For an older install, add it by hand:
+
+\begin{lstlisting}[language=sh]
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc   # or ~/.bashrc
+\end{lstlisting}
+
+\section{\texorpdfstring{macOS privacy prompts}{macOS privacy prompts}}
+
+macOS asks before a program reads Desktop, Documents or Downloads, and a Session started from the phone waits on that dialog until someone clicks Allow at the Mac. Release binaries are ad-hoc signed, and macOS remembered them by a hash that changed with every update, so the prompts came back after each one. The installer now signs both programs as "Sentinal Local Code Signing" (created in the login keychain on first install) under fixed identifiers \texttt{dev.\allowbreak{}sentinal.\allowbreak{}sentinal} and \texttt{dev.\allowbreak{}sentinal.\allowbreak{}sentinald}, so a grant survives updates. If the keychain is locked, for example over SSH, signing is skipped and the next install at the Mac adds it; \texttt{SENTINAL\_\allowbreak{}NO\_\allowbreak{}MACOS\_\allowbreak{}SIGNING=\allowbreak{}1} turns it off.
+
+To stop the prompts for good, once at the Mac: System Settings $\rightarrow$ Privacy \& Security $\rightarrow$ Full Disk Access $\rightarrow$ \textbf{+} $\rightarrow$ Cmd+Shift+G $\rightarrow$ \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}bin/\allowbreak{}sentinald}, turn it on, then run \texttt{launchctl\ kickstart\ -{}\allowbreak{}k\ gui/\allowbreak{}\$(id\ -{}\allowbreak{}u)/\allowbreak{}dev.\allowbreak{}sentinal.\allowbreak{}sentinald}.
+
+\section{\texorpdfstring{Shipping a release}{Shipping a release}}
+
+The owner runs \texttt{just\ ship\ \textless{}version\textgreater{}} on their own Mac. It is safe to re-run; each step is skipped when already done:
+
+\begin{enumerate}
+\item push \texttt{main} and tag \texttt{v\textless{}version\textgreater{}};
+\item wait for the GitHub "release" workflow to build the unsigned draft for every platform;
+\item download the draft and sign \texttt{SHA256SUMS} with the owner's key (\texttt{scripts/\allowbreak{}sign-{}\allowbreak{}release.\allowbreak{}sh} checks every file first);
+\item upload \texttt{SHA256SUMS.\allowbreak{}sig} and publish the release as latest.
+\end{enumerate}
+
+The signing key never leaves the Mac; its path comes from \texttt{-{}\allowbreak{}-{}\allowbreak{}key} or the gitignored \texttt{.\allowbreak{}release.\allowbreak{}local}.
+
+\section{\texorpdfstring{Updating}{Updating}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.166}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.834}\relax}}
+\toprule
+\textbf{Who} & \textbf{How} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Who} & \textbf{How} \\
+\midrule
+\endhead
+The control & \texttt{sentinal\ release\ check\ /\allowbreak{}\ update\ /\allowbreak{}\ rollback\ \textless{}version\textgreater{}\ /\allowbreak{}\ policy}, or Settings $\rightarrow$ Machines $\rightarrow$ Control release. An update must pass \texttt{/\allowbreak{}api/\allowbreak{}v1/\allowbreak{}health} within 60 seconds, or the control rolls back to the previous signed release automatically. Policy: notify (default), auto (inside a 03:00 to 05:00 window, only with no live \texttt{FULL} Session), or off. \\
+A worker & Update from the dashboard (the control forwards a validated version over the link), or \texttt{sentinal\ update}, or re-run the install command. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+Updating restarts \texttt{sentinald}, which interrupts live \texttt{FULL} Sessions until the R1 "keeper" work lands (\texttt{docs/\allowbreak{}R1\_\allowbreak{}KEEPER\_\allowbreak{}DESIGN.\allowbreak{}md}).
+
+\section{\texorpdfstring{Service operations}{Service operations}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.215}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.351}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.434}\relax}}
+\toprule
+\textbf{Task} & \textbf{Linux} & \textbf{macOS} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Task} & \textbf{Linux} & \textbf{macOS} \\
+\midrule
+\endhead
+Status & \texttt{systemctl\ -{}\allowbreak{}-{}\allowbreak{}user\ status\ sentinald} & \texttt{launchctl\ print\ gui/\allowbreak{}\$(id\ -{}\allowbreak{}u)/\allowbreak{}dev.\allowbreak{}sentinal.\allowbreak{}sentinald} \\
+Logs & \texttt{journalctl\ -{}\allowbreak{}-{}\allowbreak{}user\ -{}\allowbreak{}u\ sentinald\ -{}\allowbreak{}-{}\allowbreak{}since\ today} & \texttt{tail\ -{}\allowbreak{}F\ \textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}share/\allowbreak{}terminal-{}\allowbreak{}agent/\allowbreak{}sentinald.\allowbreak{}stderr.\allowbreak{}log} \\
+Restart & \texttt{systemctl\ -{}\allowbreak{}-{}\allowbreak{}user\ restart\ sentinald} & \texttt{launchctl\ kickstart\ -{}\allowbreak{}k\ gui/\allowbreak{}\$(id\ -{}\allowbreak{}u)/\allowbreak{}dev.\allowbreak{}sentinal.\allowbreak{}sentinald} \\
+Stay running after logout & \texttt{sudo\ loginctl\ enable-{}\allowbreak{}linger\ \$USER} once & Not needed \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Backup and uninstall}{Backup and uninstall}}
+
+\texttt{sentinal\ backup\ create} and \texttt{restore} save and restore config and data, credentials included. \texttt{scripts/\allowbreak{}install-{}\allowbreak{}worker.\allowbreak{}sh\ uninstall} removes programs, the service and the PATH block, and keeps config and data unless you pass \texttt{-{}\allowbreak{}-{}\allowbreak{}delete-{}\allowbreak{}data} with the exact data path.
+
+\section{\texorpdfstring{Troubleshooting}{Troubleshooting}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.197}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.401}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.401}\relax}}
+\toprule
+\textbf{Symptom} & \textbf{Check} & \textbf{Fix} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Symptom} & \textbf{Check} & \textbf{Fix} \\
+\midrule
+\endhead
+\texttt{sentinal:\allowbreak{}\ command\ not\ found} & \texttt{ls\ \textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}bin} & If only \texttt{sentinald} is there, re-run the install; if both are, add \texttt{\textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}bin} to PATH. \\
+Machine shows offline & \texttt{systemctl\ -{}\allowbreak{}-{}\allowbreak{}user\ status\ sentinald} or \texttt{launchctl\ print\ .\allowbreak{}.\allowbreak{}.\allowbreak{}}; \texttt{sentinal\ connection\ status} & Restart the service; enable linger on Linux; check Tailscale is up. \\
+Terminal will not open from the phone & Settings $\rightarrow$ Diagnostics $\rightarrow$ ping the Machine & Check the worker listens on its Tailscale IP, port 7420. \\
+macOS keeps asking for folder access & \texttt{codesign\ -{}\allowbreak{}dr\ -{}\allowbreak{}\ \textasciitilde{}/\allowbreak{}.\allowbreak{}local/\allowbreak{}bin/\allowbreak{}sentinald} should name \texttt{dev.\allowbreak{}sentinal.\allowbreak{}sentinald} & Re-install at the Mac, then grant Full Disk Access once. \\
+Anything else & \texttt{sentinal\ doctor} & It reports what is missing without changing anything. \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\chapter{\texorpdfstring{Testing and roadmap status}{Testing and roadmap status}}
+
+Everything through Milestone 6.1 is built and tested; what remains for V1 is mostly acceptance on real devices, the installer and pilot work in 4.E, and the R1 daemon-restart work. The Rust side has about 1,040 tests in 176 files, the web app 76 test files plus 9 Playwright suites, and \texttt{just\ check} runs them all with the shell and Python tests before every commit.
+
+\section{\texorpdfstring{Kinds of tests}{Kinds of tests}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.167}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.421}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.412}\relax}}
+\toprule
+\textbf{Kind} & \textbf{Checks} & \textbf{Lives in} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Kind} & \textbf{Checks} & \textbf{Lives in} \\
+\midrule
+\endhead
+Unit & One function or type & \texttt{\#[cfg(test)]\ mod\ tests} in the same file \\
+Contract & The JSON wire format never changes by accident & \texttt{crates/\allowbreak{}protocol/\allowbreak{}tests/\allowbreak{}contract.\allowbreak{}rs} and \texttt{tests/\allowbreak{}fixtures/\allowbreak{}*.\allowbreak{}json} \\
+Behaviour & A scenario across several types, such as a Session's whole life & \texttt{crates/\allowbreak{}\textless{}crate\textgreater{}/\allowbreak{}tests/\allowbreak{}\textless{}scenario\textgreater{}.\allowbreak{}rs} \\
+Integration & Real shells, PTYs and network & \texttt{tests/\allowbreak{}*\_\allowbreak{}integration.\allowbreak{}rs}, marked \texttt{\#[ignore]}, run by hand or nightly \\
+Web unit and component & Screens and logic against the mock adapter & \texttt{web/\allowbreak{}src/\allowbreak{}**/\allowbreak{}*.\allowbreak{}test.\allowbreak{}ts(x)} (Vitest) \\
+Browser & Real flows against a real daemon, including mobile layout & \texttt{web/\allowbreak{}e2e/\allowbreak{}*.\allowbreak{}spec.\allowbreak{}ts} (Playwright) \\
+Shell & Installers, packaging, release signing, launchers, PATH, macOS signing & \texttt{scripts/\allowbreak{}tests/\allowbreak{}*.\allowbreak{}sh} \\
+Python & Intelligence and evaluation & \texttt{intelligence/\allowbreak{}tests}, \texttt{eval/\allowbreak{}test\_\allowbreak{}*.\allowbreak{}py} \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+Tests are fast and offline: no network and no sleeps over 100 ms outside \texttt{*\_\allowbreak{}integration} tests. PTY tests use the fake backend in \texttt{pty.\allowbreak{}rs}. The web tests use the mock adapter; \texttt{test-{}\allowbreak{}viewport.\allowbreak{}ts} sets phone and desktop sizes.
+
+\section{\texorpdfstring{Writing a change}{Writing a change}}
+
+\begin{enumerate}
+\item Find the milestone; build nothing from later ones.
+\item Write the failing test.
+\item Write the code until it passes.
+\item After a protocol change, update fixtures on purpose and run \texttt{just\ gen-{}\allowbreak{}ts}.
+\item Run \texttt{just\ check} and report the real result. Never delete or weaken a failing test to make it pass.
+\end{enumerate}
+
+\section{\texorpdfstring{Milestone status}{Milestone status}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.096}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.452}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-6\tabcolsep)*\real{0.452}\relax}}
+\toprule
+\textbf{Milestone} & \textbf{What it delivers} & \textbf{Status} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Milestone} & \textbf{What it delivers} & \textbf{Status} \\
+\midrule
+\endhead
+0 Protocol & The shared contract & Done \\
+1, 1.1 & Persistent Sessions; owner authentication & Done \\
+2 & Command tracking and metrics & Done \\
+1b & Any terminal into Sentinal: Watch, shell hook, auto-wrap, adopt, log tails, finished-Session replay & Done \\
+1c, 1c.1 & Deployable worker; Tailnet package delivery & Done \\
+1d & Session continuation history & Done \\
+3 & Events and the watcher & Done \\
+4.0, 4.A & Secure enrollment; multi-Machine aggregation & Built; two-Machine acceptance run to record \\
+4.B, 4.C, 4.D & Recipes, notifications, mobile dashboard, native Web Push & Built; real-phone acceptance to record \\
+4.D.1 & Incremental aggregation and the control read model & Built; scale proof at 10 Machines and 1,000 Sessions to record \\
+4.E & V1 installers, discovery, releases, private pilot & In progress: installers, release and update flows, pilot deployment and clean-state acceptance remain \\
+4.F & Mobile web experience & Built; real-iPhone acceptance to record \\
+4.H & Sentinal's own health and diagnostics & Done \\
+4.I & Glass desktop shell & Built; full prompt reach and an accessibility audit remain \\
+R1 & Sessions survive a daemon restart (keeper process) & Not started; design awaiting approval \\
+5.S & Search everywhere, with opt-in output search & Done \\
+5.A & Autocomplete from history & Done \\
+6.0 & Agent API and MCP, levels 0 to 2 & Done (level 0 tools live) \\
+6.1 & Agent-aware Sessions & Done \\
+6.2 & Screen translator in the product & Started: sanitising, guards and evaluation exist; model run and product wiring remain \\
+6.3 & Assistant features & Not started \\
+7.0 & Act with approval & Not offered; needs its own review \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\section{\texorpdfstring{Open items}{Open items}}
+
+\begin{itemize}
+\item Push \texttt{main} with the latest commits and ship the next release, so every Machine gets the phone terminal fixes, PATH set-up and macOS signing.
+\item Decide whether agents get \texttt{search} and \texttt{complete} tools.
+\item Not started from the 5.x plans: the History page moving into search, Recipe parameters inline in the prompt, project git info and a project page, a Bash 4 widget check on real Linux, Codex capture, and keeping agent activity across restarts.
+\item Link v2 (one persistent link per worker, opened by the worker) is designed in \texttt{docs/\allowbreak{}LINK\_\allowbreak{}V2\_\allowbreak{}DESIGN.\allowbreak{}md} and awaits review.
+\end{itemize}
+
+\section{\texorpdfstring{Further reading}{Further reading}}
+
+\begin{small}
+\begin{longtable}{>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.573}\relax}>{\raggedright\arraybackslash}p{\dimexpr(\linewidth-4\tabcolsep)*\real{0.427}\relax}}
+\toprule
+\textbf{Document} & \textbf{Covers} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Document} & \textbf{Covers} \\
+\midrule
+\endhead
+\texttt{AGENTS.\allowbreak{}md} & The rules for any change \\
+\texttt{docs/\allowbreak{}ARCHITECTURE.\allowbreak{}md} & Shape, decisions, boundaries \\
+\texttt{docs/\allowbreak{}ROADMAP.\allowbreak{}md}, \texttt{docs/\allowbreak{}PLAN\_\allowbreak{}V2\_\allowbreak{}AI.\allowbreak{}md} & What is built and what comes next \\
+\texttt{docs/\allowbreak{}SETUP.\allowbreak{}md} & Every install and operations command \\
+\texttt{docs/\allowbreak{}SECURITY.\allowbreak{}md} & The full security boundary \\
+\texttt{docs/\allowbreak{}CAPTURE\_\allowbreak{}MODES.\allowbreak{}md}, \texttt{docs/\allowbreak{}SHELL\_\allowbreak{}HOOKS.\allowbreak{}md} & Capture modes and hooks in depth \\
+\texttt{docs/\allowbreak{}AGENT\_\allowbreak{}API.\allowbreak{}md}, \texttt{docs/\allowbreak{}agent-{}\allowbreak{}tools.\allowbreak{}json} & Agent API and tool schemas \\
+\texttt{docs/\allowbreak{}TESTING.\allowbreak{}md}, \texttt{docs/\allowbreak{}DEPENDENCIES.\allowbreak{}md} & Test rules; approved dependencies \\
+\texttt{docs/\allowbreak{}LINK\_\allowbreak{}V2\_\allowbreak{}DESIGN.\allowbreak{}md}, \texttt{docs/\allowbreak{}R1\_\allowbreak{}KEEPER\_\allowbreak{}DESIGN.\allowbreak{}md} & Designs awaiting approval \\
+\bottomrule
+\end{longtable}
+\end{small}

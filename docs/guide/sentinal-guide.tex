@@ -1,0 +1,92 @@
+% Sentinal: System Design and Code Guide
+% Build: pdflatex sentinal-guide.tex (twice, for the table of contents),
+% or: latexmk -pdf sentinal-guide.tex
+\documentclass[11pt,a4paper,oneside]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=2.3cm]{geometry}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{calc}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+\usepackage{bookmark}
+
+\definecolor{accent}{HTML}{3D5AFE}
+\definecolor{codebg}{HTML}{F5F6F8}
+
+% Paragraphs: space between, no indent.
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\setlist{itemsep=0.15em, topsep=0.3em}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\LTpre}{0.4em}
+\setlength{\LTpost}{0.6em}
+
+% Chapter headings: compact, numbered, accent rule.
+\titleformat{\chapter}[display]
+  {\normalfont\sffamily\bfseries\Huge}
+  {\color{accent}\Large Chapter \thechapter}{0.3em}{}[\vspace{0.2em}{\color{accent}\titlerule[1pt]}]
+\titlespacing*{\chapter}{0pt}{0pt}{1.4em}
+\titleformat{\section}{\normalfont\sffamily\bfseries\Large}{\thesection}{0.8em}{}
+\titlespacing*{\section}{0pt}{1.4em}{0.4em}
+
+% Code blocks.
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{black!12},
+  framesep=6pt, xleftmargin=6pt, xrightmargin=6pt,
+  breaklines=true, breakatwhitespace=false,
+  columns=fullflexible, keepspaces=true,
+  showstringspaces=false, upquote=true,
+}
+
+% Running header.
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\sffamily\color{black!60}Sentinal: System Design and Code Guide}
+\fancyhead[R]{\small\sffamily\color{black!60}\leftmark}
+\fancyfoot[C]{\small\sffamily\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\sffamily\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+\hypersetup{
+  pdftitle={Sentinal: System Design and Code Guide},
+  pdfauthor={Sohith Vishnu Sai},
+}
+
+\begin{document}
+
+\begin{titlepage}
+  \sffamily
+  \vspace*{5cm}
+  {\color{accent}\rule{\linewidth}{2pt}}\\[1.2em]
+  {\Huge\bfseries Sentinal}\\[0.6em]
+  {\LARGE System Design and Code Guide}\\[1.2em]
+  {\color{accent}\rule{\linewidth}{2pt}}\\[2em]
+  {\large Persistent, observable terminal Sessions on your own machines,\\
+  watched and driven from a phone or a desktop browser.}
+  \vfill
+  {\large Sohith Vishnu Sai}\\[0.3em]
+  {\large 3 November 2026}\\[0.3em]
+  {\color{black!60}Repository state: commit \texttt{6b7936e}}
+\end{titlepage}
+
+\tableofcontents
+
+\input{body}
+
+\end{document}

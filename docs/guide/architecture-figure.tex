@@ -1,0 +1,44 @@
+% Sentinal architecture: control, workers, clients (TikZ).
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1cm, font=\small,
+  box/.style={draw=black!45, rounded corners=3pt, line width=0.6pt, align=center, inner sep=5pt},
+  main/.style={box, draw=accent, fill=accent!10, line width=1.2pt},
+  arrow/.style={-{Stealth[length=2.2mm]}, draw=black!50, line width=0.6pt},
+  lbl/.style={font=\footnotesize, text=black!60},
+]
+% Clients
+\node[box, minimum width=4.4cm, minimum height=1.2cm] (browser) at (2.4,8.2)
+  {\textbf{Phone or desktop browser}\\{\footnotesize\color{black!60}Installable PWA}};
+\node[box, minimum width=4.4cm, minimum height=1.2cm] (agents) at (7.3,8.2)
+  {\textbf{AI agents}\\{\footnotesize\color{black!60}Agent API and \texttt{sentinal mcp}}};
+\node[box, minimum width=3.6cm, minimum height=1.2cm] (push) at (11.7,8.2)
+  {\textbf{Push service}\\{\footnotesize\color{black!60}Web Push to the phone}};
+% Control
+\node[main, minimum width=13.4cm, minimum height=2.5cm, align=left, text width=12.8cm] (control) at (6.85,5.2)
+  {\textbf{Control Machine: \texttt{sentinald} with the control role (also a worker)}\\[3pt]
+   Serves the web app and the owner login; hosts the Agent API and MCP tools\\
+   Read model: privacy-minimised Session summaries in SQLite, one live stream\\
+   Routes each terminal and action to the Machine that owns the Session\\
+   Sends push notifications; serves verified worker releases};
+% Bottom row
+\node[box, minimum width=3.4cm, minimum height=2.2cm, align=left, text width=3cm] (cli) at (1.85,1.2)
+  {\textbf{\texttt{sentinal} CLI, hooks}\\[2pt]{\footnotesize\color{black!60}On the same Machine\\as its daemon\\Ctrl-Space completion}};
+\node[box, minimum width=4.1cm, minimum height=2.2cm, align=left, text width=3.7cm] (wa) at (6.6,1.2)
+  {\textbf{Worker \texttt{sentinald}}\\[2pt]{\footnotesize\color{black!60}PTYs and output logs\\Watcher: output to Events\\Metrics, Commands, Recipes\\SQLite: the source of truth}};
+\node[box, minimum width=4.1cm, minimum height=2.2cm, align=left, text width=3.7cm] (wb) at (11.45,1.2)
+  {\textbf{Another worker}\\[2pt]{\footnotesize\color{black!60}Same daemon, own data\\Paired with its own\\revocable credential}};
+% Connections
+\draw[arrow] (browser.south) -- node[lbl, right] {HTTPS and WSS, owner login} (browser.south |- control.north);
+\draw[arrow] (agents.south) -- node[lbl, right] {agent token} (agents.south |- control.north);
+\draw[arrow] (push.south |- control.north) -- node[lbl, right] {encrypted push} (push.south);
+\draw[arrow] ([xshift=-0.9cm]wa.north |- control.south) -- node[lbl, left] {terminals, actions} ([xshift=-0.9cm]wa.north);
+\draw[arrow] ([xshift=0.9cm]wa.north) -- node[lbl, right] {summaries, intents} ([xshift=0.9cm]wa.north |- control.south);
+\draw[arrow] ([xshift=-0.9cm]wb.north |- control.south) -- ([xshift=-0.9cm]wb.north);
+\draw[arrow] ([xshift=0.9cm]wb.north) -- ([xshift=0.9cm]wb.north |- control.south);
+\draw[arrow] (cli.east) -- node[lbl, above] {local} node[lbl, below] {socket} (wa.west);
+\end{tikzpicture}
+\caption{The browser and AI agents talk only to the control; workers own every Session. Everything runs inside your Tailscale network, and no daemon listens on \texttt{0.0.0.0}.}
+\label{fig:architecture}
+\end{figure}
