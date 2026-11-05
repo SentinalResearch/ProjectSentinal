@@ -632,3 +632,73 @@ async fn worker_audit_and_link_file_never_contain_the_code() {
     }
     assert!(audit.contains("CONNECTED") && audit.contains("CONNECT_FAILED"));
 }
+
+#[tokio::test]
+async fn a_second_install_with_the_same_credentials_is_refused_and_sends_nothing() {
+    // The sandbox incident, over real HTTP: a separate install reading this
+    // Machine's own link and identity files.
+    let h = harness().await;
+    let real = worker(&h);
+    let code = h.control.create_code().unwrap();
+    real.connect(&h.url, code.code.expose(), None).await;
+    let real_manager = real.manager.clone().with_instance("real-install".into());
+    real_manager.heartbeat_once().await.unwrap();
+
+    let identity_file = real.dir.join("machine-id.json");
+    let identity = identity::load_or_create(&identity_file, Timestamp(START), "pop-os")
+        .map_err(|error| error.to_string());
+    let tick = h.clock.clone();
+    let sandbox = LinkManager::open(
+        LinkSettings {
+            link_file: real.dir.join("link.json"),
+            identity_file,
+            identity,
+            legacy_machine_id: "pop-os".into(),
+            hostname: "pop-os".into(),
+            endpoint: LinkEndpoint {
+                address: "127.0.0.1".into(),
+                port: 7520,
+                dns_name: None,
+            },
+            os: Os::Linux,
+            daemon_version: "2.10.0".into(),
+            development: true,
+            audit_dir: real.dir.clone(),
+            background: false,
+        },
+        Arc::new(move || Timestamp(tick.load(Ordering::SeqCst))),
+    )
+    .with_instance("sandbox-install".into());
+
+    let refused = sandbox.heartbeat_once().await.unwrap_err();
+    assert_eq!(refused.code, LocalErrorCode::Conflict);
+    assert!(
+        refused.message.contains("another Sentinal install"),
+        "{}",
+        refused.message
+    );
+    assert!(sandbox.refused());
+    assert!(!sandbox.notification_ingress());
+
+    // The control still points at the real install, and it carries on.
+    let machine = h
+        .control
+        .registry()
+        .unwrap()
+        .machines
+        .into_iter()
+        .find(|machine| machine.machine_id == real.machine_id())
+        .unwrap();
+    assert_eq!(
+        machine.daemon_version.as_deref(),
+        Some("0.0.1"),
+        "not the sandbox's 2.10.0"
+    );
+    assert!(!real_manager.refused());
+    real_manager.heartbeat_once().await.unwrap();
+    assert!(!real_manager.refused());
+    assert!(
+        real.link_file().contains("worker_credential"),
+        "the real link is intact"
+    );
+}

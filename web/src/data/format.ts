@@ -205,9 +205,11 @@ export function confirmConsequence(session: Session, machineName: string): strin
 }
 
 /** One-line summary under a Machine's name: its hardware, else its Sentinal version, else its OS. */
-export function machineSummary(machine: Pick<Machine, "hardware" | "daemonVersion" | "os">): string {
+export function machineSummary(machine: Pick<Machine, "hardware" | "daemonVersion" | "buildCommit" | "os">): string {
   if (machine.hardware) return machine.hardware;
-  if (machine.daemonVersion) return `Sentinal ${machine.daemonVersion}`;
+  if (machine.daemonVersion) {
+    return `Sentinal ${machine.daemonVersion}${machine.buildCommit ? ` (${machine.buildCommit})` : ""}`;
+  }
   return machine.os;
 }
 

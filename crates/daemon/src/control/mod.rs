@@ -70,6 +70,12 @@ const MAX_CODES_PER_WINDOW: u32 = 10;
 const MAX_FAILURES_PER_WINDOW: u32 = 20;
 const OFFLINE_AFTER_MS: i64 = 90_000;
 const MAX_CLOCK_SKEW_MS: i64 = 5 * 60 * 1_000;
+/// Missed heartbeats after which another install may take over a Machine.
+const INSTANCE_SILENT_BEATS: u64 = 3;
+/// Never treat an install as gone sooner than this, however fast heartbeats are.
+const MIN_INSTANCE_SILENT_MS: i64 = 90_000;
+/// How long the owner is shown a refused install after its last attempt.
+const INSTANCE_CONFLICT_SHOWN_MS: i64 = 5 * 60 * 1_000;
 const CREDENTIAL_LIFETIME_MS: i64 = 90 * 24 * 60 * 60 * 1_000;
 const REFRESH_WITHIN_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
 const REFRESH_GRACE_MS: i64 = 60_000;
@@ -473,11 +479,12 @@ impl ControlService {
             .map_err(|message| {
                 ControlFailure::new(400, LinkFailureCode::InvalidRequest, message)
             })?;
-        let previous = self
+        let row = self
             .store
             .registry_machine(&request.machine_id)
-            .map_err(ControlFailure::internal)?
-            .and_then(|row| row.endpoint);
+            .map_err(ControlFailure::internal)?;
+        self.check_instance(&request, row.as_ref().and_then(|row| row.last_seen), now)?;
+        let previous = row.and_then(|row| row.endpoint);
         let accepted = self
             .store
             .record_heartbeat(
@@ -506,6 +513,13 @@ impl ControlService {
                 ),
             ));
         }
+        self.store
+            .record_machine_instance(
+                &request.machine_id,
+                request.instance_id.as_deref(),
+                request.build_commit.as_deref(),
+            )
+            .map_err(ControlFailure::internal)?;
         if previous.is_some_and(|previous| previous != request.endpoint) {
             let change = format!("{}:{}", request.endpoint.address, request.endpoint.port);
             self.audit
@@ -539,6 +553,65 @@ impl ControlService {
             ),
             projection_sync,
         })
+    }
+
+    /// One daemon install speaks for a Machine. Refuse a different one while
+    /// that install is alive: it would replace the Machine's Sessions, address,
+    /// and version. Once the old one has been silent, the new one takes over,
+    /// starting from an empty list so that its own full list replaces it.
+    fn check_instance(
+        &self,
+        request: &LinkHeartbeatRequest,
+        last_seen: Option<Timestamp>,
+        now: Timestamp,
+    ) -> Result<(), ControlFailure> {
+        let Some(claimed) = request.instance_id.as_deref() else {
+            return Ok(());
+        };
+        let known = self
+            .store
+            .machine_instance(&request.machine_id)
+            .map_err(ControlFailure::internal)?;
+        if known.instance_id.is_none_or(|current| current == claimed) {
+            return Ok(());
+        }
+        let silent_after = i64::try_from(
+            self.settings
+                .heartbeat_interval_ms
+                .saturating_mul(INSTANCE_SILENT_BEATS),
+        )
+        .unwrap_or(i64::MAX)
+        .max(MIN_INSTANCE_SILENT_MS);
+        let alive = last_seen.is_some_and(|seen| now.0.saturating_sub(seen.0) < silent_after);
+        if alive {
+            let port = request.endpoint.port.to_string();
+            self.audit
+                .machine(now, "INSTANCE_CONFLICT", &request.machine_id, Some(&port));
+            self.store
+                .record_machine_conflict(
+                    &request.machine_id,
+                    now,
+                    &request.daemon_version,
+                    request.build_commit.as_deref(),
+                    request.endpoint.port,
+                )
+                .map_err(ControlFailure::internal)?;
+            return Err(ControlFailure::new(
+                409,
+                LinkFailureCode::InstanceConflict,
+                format!(
+                    "another Sentinal install is already speaking for this Machine; stop it or \
+                     wait {} s after it stops",
+                    silent_after / 1_000
+                ),
+            ));
+        }
+        self.audit
+            .machine(now, "INSTANCE_CHANGED", &request.machine_id, None);
+        self.store
+            .purge_control_projection(&request.machine_id)
+            .map_err(ControlFailure::internal)?;
+        Ok(())
     }
 
     /// Authenticate and durably apply one bounded projection upload.
@@ -721,12 +794,26 @@ impl ControlService {
                 self.projection_pending(&machine.machine_id),
                 now,
             );
+            let instance = self
+                .store
+                .machine_instance(&machine.machine_id)
+                .map_err(ControlFailure::internal)?;
             machines.push(ControlProjectedMachine {
                 machine_id: machine.machine_id.clone(),
                 projection_available: state.is_some(),
                 display_name: machine.display_name,
                 os: machine.os,
                 daemon_version: machine.daemon_version,
+                build_commit: instance.build_commit,
+                instance_conflict: instance
+                    .conflict_at
+                    .filter(|at| now.0.saturating_sub(at.0) < INSTANCE_CONFLICT_SHOWN_MS)
+                    .map(|at| protocol::projection::InstanceConflict {
+                        at,
+                        daemon_version: instance.conflict_version,
+                        build_commit: instance.conflict_commit,
+                        port: instance.conflict_port,
+                    }),
                 capabilities: machine.capabilities,
                 registry_status: machine.status,
                 freshness,
@@ -798,6 +885,10 @@ impl ControlService {
                 .as_ref()
                 .is_some_and(|state| state.source_epoch != report.source_epoch)
             || report.current_cursor < committed
+            // The worker has discarded changes this control never received
+            // (it lost its copy, or another daemon used this Machine's
+            // identity). A delta would leave a gap: only a snapshot can heal it.
+            || report.last_acked_cursor > committed
         {
             ProjectionSyncAction::Snapshot
         } else if report.current_cursor > committed {

@@ -314,6 +314,13 @@ pub struct LinkHeartbeatRequest {
     /// How this daemon is doing (4.H); absent from older workers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health: Option<crate::observability::DaemonHealthReport>,
+    /// Random ID of this daemon install; absent from older workers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance_id: Option<String>,
+    /// Commit this daemon was built from, e.g. `27357f9`; absent from older
+    /// workers and unstamped development builds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_commit: Option<String>,
 }
 
 /// State of an accepted link.
@@ -445,6 +452,8 @@ pub enum LinkFailureCode {
     LinkRevoked,
     /// A heartbeat was replayed or out of order.
     StaleSequence,
+    /// Another daemon install is already speaking for this Machine.
+    InstanceConflict,
     /// A browser Origin is not allowed.
     OriginRejected,
     /// The credential was missing or wrong for this route.
@@ -469,13 +478,14 @@ pub enum LinkFailureCode {
 
 impl LinkFailureCode {
     /// Every code, in declaration order.
-    pub const ALL: [LinkFailureCode; 16] = [
+    pub const ALL: [LinkFailureCode; 17] = [
         LinkFailureCode::InvalidCode,
         LinkFailureCode::PairingLocked,
         LinkFailureCode::InvalidMachine,
         LinkFailureCode::NotControl,
         LinkFailureCode::LinkRevoked,
         LinkFailureCode::StaleSequence,
+        LinkFailureCode::InstanceConflict,
         LinkFailureCode::OriginRejected,
         LinkFailureCode::Unauthorized,
         LinkFailureCode::NotFound,

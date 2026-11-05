@@ -5,6 +5,7 @@ mod error;
 pub mod health;
 mod lineage;
 mod log_cursors;
+mod machine_instances;
 mod metrics;
 mod native_push;
 mod notification_deliveries;
@@ -29,6 +30,7 @@ use std::{
 pub use complete::CompletionQuery;
 pub use error::StoreError;
 pub use log_cursors::StoredLogCursor;
+pub use machine_instances::MachineInstance;
 pub use metrics::{MinuteMetric, RawMetricSample};
 pub use native_push::{
     NewNotificationIntentOutbox, NotificationIntentOutboxInsert, PushDelivery,
@@ -59,6 +61,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
     (12, include_str!("../migrations/012_search.sql")),
     (13, include_str!("../migrations/013_complete.sql")),
     (14, include_str!("../migrations/014_session_delete.sql")),
+    (15, include_str!("../migrations/015_machine_instances.sql")),
 ];
 
 /// The first Event ID never used, even by a deleted Session's Events.

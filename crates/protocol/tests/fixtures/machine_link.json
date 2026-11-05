@@ -92,6 +92,16 @@
     "daemon_version": "0.0.1",
     "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"]
   },
+  "heartbeat_request_with_instance": {
+    "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
+    "sequence": 44,
+    "sent_at": 1790900650000,
+    "endpoint": { "address": "100.64.0.9", "port": 7420, "dns_name": null },
+    "daemon_version": "0.3.0",
+    "capabilities": ["SESSIONS"],
+    "instance_id": "6f1c2a9e0b7d4c3e",
+    "build_commit": "27357f9"
+  },
   "heartbeat_request_with_health": {
     "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
     "sequence": 43,
@@ -131,6 +141,7 @@
     { "code": "NOT_CONTROL", "message": "this daemon is not a control Machine" },
     { "code": "LINK_REVOKED", "message": "this Machine link was revoked" },
     { "code": "STALE_SEQUENCE", "message": "heartbeat sequence 41 is not after 42" },
+    { "code": "INSTANCE_CONFLICT", "message": "another Sentinal install is already speaking for this Machine" },
     { "code": "ORIGIN_REJECTED", "message": "origin is not allowed" },
     { "code": "UNAUTHORIZED", "message": "missing or invalid credential" },
     { "code": "NOT_FOUND", "message": "unknown Machine" },

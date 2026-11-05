@@ -47,4 +47,13 @@ export type LinkHeartbeatRequest = {
    * How this daemon is doing (4.H); absent from older workers.
    */
   health?: DaemonHealthReport | null;
+  /**
+   * Random ID of this daemon install; absent from older workers.
+   */
+  instance_id?: string | null;
+  /**
+   * Commit this daemon was built from, e.g. `27357f9`; absent from older
+   * workers and unstamped development builds.
+   */
+  build_commit?: string | null;
 };

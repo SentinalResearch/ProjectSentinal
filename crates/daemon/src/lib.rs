@@ -19,6 +19,7 @@ pub mod framing;
 pub mod gpu_smi;
 pub mod identity;
 pub mod insights;
+pub mod instance;
 pub mod link;
 pub mod link_audit;
 pub mod link_crypto;

@@ -915,3 +915,19 @@ sentinal connect → PAIRED Machine
 
 The package carries no pairing code or Machine credential, and nothing in
 install, update, or service startup pairs implicitly.
+
+## One Sentinal install per Machine
+
+Each daemon install has a random ID in `instance-id` beside its database, and
+reports it with the commit it was built from (`0.2.9 (27357f9)`, or
+`…-dirty` for a build with uncommitted changes). An update keeps the ID.
+
+If a different install uses the same Machine credentials while the first is alive,
+the control refuses it, changes nothing, and shows a warning on that Machine's page
+with the other install's port, version, and build. Stop that install or give it its
+own `config_dir`. An install may take over only after the old one has been silent
+for 90 s (or three heartbeats, if longer), and its own list then replaces the old one.
+
+To check a Machine's list after any mix-up, a full resend can be requested without a
+restart: the control does this by itself when a worker has discarded changes it
+never received.

@@ -150,6 +150,14 @@ function mapMachine(machine: ControlProjectedMachine, now: number): { machine: M
       // The projection carries no hardware facts; never show the version as hardware.
       hardware: "",
       daemonVersion: machine.daemon_version ?? undefined,
+      buildCommit: machine.build_commit ?? undefined,
+      instanceConflict: machine.instance_conflict
+        ? {
+            daemonVersion: machine.instance_conflict.daemon_version ?? undefined,
+            buildCommit: machine.instance_conflict.build_commit ?? undefined,
+            port: machine.instance_conflict.port ?? undefined,
+          }
+        : undefined,
       status: machineStatus(machine),
       freshness: machine.freshness,
       lastSeen,

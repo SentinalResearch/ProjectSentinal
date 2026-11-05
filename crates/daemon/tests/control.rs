@@ -157,6 +157,8 @@ impl Harness {
                     projection_sync: None,
                     update_status: None,
                     health: None,
+                    instance_id: None,
+                    build_commit: None,
                 },
             )
             .map(|_| ())
@@ -247,6 +249,8 @@ fn heartbeat_negotiates_projection_upload_without_breaking_legacy_workers() {
         }),
         update_status: None,
         health: None,
+        instance_id: None,
+        build_commit: None,
     };
     let response = h
         .control
@@ -286,6 +290,53 @@ fn heartbeat_negotiates_projection_upload_without_breaking_legacy_workers() {
 }
 
 #[test]
+fn a_worker_ahead_of_what_the_control_holds_must_resend_everything() {
+    // The worker discarded changes the control no longer has (another daemon
+    // used this Machine's identity and replaced its list). A delta from there
+    // would be accepted and leave most Sessions missing.
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    let report = |current_cursor, last_acked_cursor| protocol::ProjectionSyncReport {
+        schema_version: PROJECTION_SCHEMA_VERSION,
+        source_epoch: "pe_test".into(),
+        current_cursor,
+        last_acked_cursor,
+        snapshot_required: false,
+    };
+    let beat = |sequence, projection_sync| LinkHeartbeatRequest {
+        machine_id: MachineId(WORKER_A.into()),
+        sequence,
+        sent_at: h.now(),
+        endpoint: endpoint("100.64.0.9"),
+        daemon_version: "0.0.1".into(),
+        capabilities: vec![MachineCapability::Sessions],
+        projection_sync: Some(projection_sync),
+        update_status: None,
+        health: None,
+        instance_id: None,
+        build_commit: None,
+    };
+    let action = |sequence, projection_sync| {
+        h.control
+            .heartbeat(credential.expose(), beat(sequence, projection_sync))
+            .unwrap()
+            .projection_sync
+            .unwrap()
+            .action
+    };
+    // The control holds nothing, and the worker has already discarded through 50.
+    assert_eq!(
+        action(1, report(53, 50)),
+        protocol::ProjectionSyncAction::Snapshot
+    );
+    // A worker that has discarded nothing the control lacks just uploads.
+    assert_eq!(
+        action(2, report(53, 0)),
+        protocol::ProjectionSyncAction::Upload
+    );
+}
+
+#[test]
 fn disabled_read_model_refuses_projection_without_deleting_existing_data() {
     let h = harness();
     let credential = h.pair(WORKER_A, "A");
@@ -313,6 +364,8 @@ fn disabled_read_model_refuses_projection_without_deleting_existing_data() {
                 }),
                 update_status: None,
                 health: None,
+                instance_id: None,
+                build_commit: None,
             },
         )
         .unwrap();
@@ -880,6 +933,8 @@ fn heartbeats_reject_replays_wrong_machines_skew_and_unknown_credentials() {
             projection_sync: None,
             update_status: None,
             health: None,
+            instance_id: None,
+            build_commit: None,
         },
     );
     assert_eq!(
@@ -905,6 +960,8 @@ fn endpoint_changes_are_recorded_and_audited() {
                 projection_sync: None,
                 update_status: None,
                 health: None,
+                instance_id: None,
+                build_commit: None,
             },
         )
         .unwrap();
@@ -1070,6 +1127,8 @@ fn a_crash_mid_refresh_is_rolled_back_when_the_control_restarts() {
             projection_sync: None,
             update_status: None,
             health: None,
+            instance_id: None,
+            build_commit: None,
         },
     );
     assert!(
@@ -1105,6 +1164,8 @@ fn a_worker_still_on_its_previous_credential_is_told_to_refresh_again() {
                     projection_sync: None,
                     update_status: None,
                     health: None,
+                    instance_id: None,
+                    build_commit: None,
                 },
             )
             .unwrap()
@@ -1216,6 +1277,8 @@ fn health_heartbeat(
             upload_failures: 0,
             errors: vec![],
         }),
+        instance_id: None,
+        build_commit: None,
     }
 }
 
@@ -1551,4 +1614,139 @@ fn a_quiet_worker_with_nothing_pending_stays_live_between_heartbeats() {
     // A missed heartbeat window means the copy may be behind.
     h.advance(21_000);
     assert_eq!(status(&h), protocol::ProjectionFreshness::Stale);
+}
+
+// ---- one install per Machine ----------------------------------------
+
+fn instance_beat(
+    h: &Harness,
+    sequence: u64,
+    instance: Option<&str>,
+    commit: Option<&str>,
+    port: u16,
+) -> LinkHeartbeatRequest {
+    let mut address = endpoint("100.64.0.9");
+    address.port = port;
+    LinkHeartbeatRequest {
+        machine_id: MachineId(WORKER_A.into()),
+        sequence,
+        sent_at: h.now(),
+        endpoint: address,
+        daemon_version: "0.2.9".into(),
+        capabilities: vec![MachineCapability::Sessions],
+        projection_sync: None,
+        update_status: None,
+        health: None,
+        instance_id: instance.map(str::to_owned),
+        build_commit: commit.map(str::to_owned),
+    }
+}
+
+#[test]
+fn a_second_install_cannot_take_over_a_machine_that_is_alive() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    h.control
+        .heartbeat(
+            credential.expose(),
+            instance_beat(&h, 1, Some("real"), Some("27357f9"), 7420),
+        )
+        .unwrap();
+
+    // The sandbox incident: same credentials, a different install and port.
+    let refused = h
+        .control
+        .heartbeat(
+            credential.expose(),
+            instance_beat(&h, 2, Some("sandbox"), Some("6b7936e-dirty"), 7520),
+        )
+        .unwrap_err();
+    assert_eq!(refused.status, 409);
+    assert_eq!(refused.failure.code, LinkFailureCode::InstanceConflict);
+
+    // Nothing it claimed was recorded: address, version, and hash stay the real one's.
+    let machine = MachineId(WORKER_A.into());
+    let row = h.store.registry_machine(&machine).unwrap().unwrap();
+    assert_eq!(row.endpoint.unwrap().port, 7420);
+    let instance = h.store.machine_instance(&machine).unwrap();
+    assert_eq!(instance.instance_id.as_deref(), Some("real"));
+    assert_eq!(instance.build_commit.as_deref(), Some("27357f9"));
+    // The owner can see who tried.
+    assert_eq!(instance.conflict_port, Some(7520));
+    assert_eq!(instance.conflict_commit.as_deref(), Some("6b7936e-dirty"));
+
+    // The real install carries on, including after a restart or an update.
+    h.control
+        .heartbeat(
+            credential.expose(),
+            instance_beat(&h, 3, Some("real"), Some("abcdef0"), 7420),
+        )
+        .unwrap();
+    let instance = h.store.machine_instance(&machine).unwrap();
+    assert_eq!(instance.build_commit.as_deref(), Some("abcdef0"));
+}
+
+#[test]
+fn a_new_install_takes_over_once_the_old_one_is_silent_and_resends_everything() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    let machine = MachineId(WORKER_A.into());
+    h.control
+        .heartbeat(
+            credential.expose(),
+            instance_beat(&h, 1, Some("old"), None, 7420),
+        )
+        .unwrap();
+    h.control
+        .accept_projection(credential.expose(), projection_batch(WORKER_A))
+        .unwrap();
+    assert!(h
+        .store
+        .control_projection_state(&machine)
+        .unwrap()
+        .is_some());
+
+    // A reinstall with fresh data: the old install stopped long ago.
+    h.clock.fetch_add(10 * 60 * 1_000, Ordering::SeqCst);
+    h.control
+        .heartbeat(
+            credential.expose(),
+            instance_beat(&h, 2, Some("new"), None, 7420),
+        )
+        .unwrap();
+    let instance = h.store.machine_instance(&machine).unwrap();
+    assert_eq!(instance.instance_id.as_deref(), Some("new"));
+    // The old install's Sessions are gone, so the new one's full list replaces them.
+    assert!(h
+        .store
+        .control_projection_state(&machine)
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn an_older_worker_with_no_instance_keeps_working_and_erases_nothing() {
+    let h = harness();
+    let credential = h.pair(WORKER_A, "A");
+    let machine = MachineId(WORKER_A.into());
+    h.control
+        .heartbeat(credential.expose(), instance_beat(&h, 1, None, None, 7420))
+        .unwrap();
+    h.control
+        .heartbeat(
+            credential.expose(),
+            instance_beat(&h, 2, Some("real"), None, 7420),
+        )
+        .unwrap();
+    h.control
+        .heartbeat(credential.expose(), instance_beat(&h, 3, None, None, 7420))
+        .unwrap();
+    assert_eq!(
+        h.store
+            .machine_instance(&machine)
+            .unwrap()
+            .instance_id
+            .as_deref(),
+        Some("real")
+    );
 }

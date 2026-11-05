@@ -193,6 +193,9 @@ pub fn spawn_projection_uploader(
 }
 
 async fn upload_projection_once(link: &LinkManager, store: &Store) -> Result<(), LinkFailure> {
+    if link.refused() {
+        return Ok(());
+    }
     let Some(directive) = link.projection_directive()? else {
         return Ok(());
     };
@@ -370,6 +373,10 @@ struct Inner {
     heartbeats_running: AtomicBool,
     projection_store: Mutex<Option<Arc<Store>>>,
     projection_directive: Mutex<Option<ProjectionSyncDirective>>,
+    /// This daemon install's ID, once set.
+    instance: Mutex<Option<String>>,
+    /// The control refused this install: another one speaks for this Machine.
+    refused: AtomicBool,
     approval: Mutex<Option<approval::PendingApproval>>,
     updater: Mutex<Option<crate::worker_update::WorkerUpdater>>,
     /// The latest health report not yet delivered by a heartbeat (4.H).
@@ -396,6 +403,8 @@ impl LinkManager {
                 heartbeats_running: AtomicBool::new(false),
                 projection_store: Mutex::new(None),
                 projection_directive: Mutex::new(None),
+                instance: Mutex::new(None),
+                refused: AtomicBool::new(false),
                 approval: Mutex::new(None),
                 updater: Mutex::new(None),
                 health: Mutex::new(None),
@@ -411,6 +420,19 @@ impl LinkManager {
     pub fn with_updater(self, updater: crate::worker_update::WorkerUpdater) -> Self {
         if let Ok(mut slot) = self.inner.updater.lock() {
             *slot = Some(updater);
+        }
+        self
+    }
+
+    /// Whether the control refused this install, which then sends it nothing.
+    pub fn refused(&self) -> bool {
+        self.inner.refused.load(Ordering::SeqCst)
+    }
+
+    /// Report this daemon install's ID in heartbeats.
+    pub fn with_instance(self, instance_id: String) -> Self {
+        if let Ok(mut instance) = self.inner.instance.lock() {
+            *instance = Some(instance_id);
         }
         self
     }
@@ -438,10 +460,12 @@ impl LinkManager {
 
     /// Whether the last authenticated heartbeat enabled native intent ingress.
     pub fn notification_ingress(&self) -> bool {
-        self.read_link()
-            .ok()
-            .flatten()
-            .is_some_and(|link| link.state == StoredState::Active && link.notification_ingress)
+        !self.refused()
+            && self
+                .read_link()
+                .ok()
+                .flatten()
+                .is_some_and(|link| link.state == StoredState::Active && link.notification_ingress)
     }
 
     /// Upload one bounded intent batch using the existing Machine credential.
@@ -776,6 +800,13 @@ impl LinkManager {
             endpoint: self.inner.settings.endpoint.clone(),
             daemon_version: self.inner.settings.daemon_version.clone(),
             capabilities: all_capabilities(),
+            instance_id: self
+                .inner
+                .instance
+                .lock()
+                .ok()
+                .and_then(|instance| instance.clone()),
+            build_commit: crate::instance::build_commit(),
             projection_sync,
             update_status: self
                 .inner
@@ -803,6 +834,7 @@ impl LinkManager {
         match result {
             Ok(Some(response)) => {
                 self.inner.failures.store(0, Ordering::SeqCst);
+                self.inner.refused.store(false, Ordering::SeqCst);
                 // Delivered: a newer report queued meanwhile is kept.
                 if let Ok(mut pending) = self.inner.health.lock() {
                     if pending.as_ref() == request.health.as_ref() {
@@ -824,6 +856,22 @@ impl LinkManager {
                     self.refresh(&mut link, &machine_id, &credential).await?;
                 }
                 Ok(())
+            }
+            Err(error) if error.code() == Some(LinkFailureCode::InstanceConflict) => {
+                // Not this install's Machine right now: send nothing further.
+                *self
+                    .inner
+                    .projection_directive
+                    .lock()
+                    .map_err(|_| internal("projection directive lock poisoned"))? = None;
+                // In memory only: if the link file is shared with the install
+                // that owns this Machine, its settings must stay untouched.
+                self.inner.refused.store(true, Ordering::SeqCst);
+                tracing::error!(error = %error, "another Sentinal install speaks for this Machine");
+                Err(LinkFailure::new(
+                    LocalErrorCode::Conflict,
+                    error.to_string(),
+                ))
             }
             Err(error) if error.code() == Some(LinkFailureCode::LinkRevoked) => {
                 link.revoke();

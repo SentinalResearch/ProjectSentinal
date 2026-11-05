@@ -143,6 +143,15 @@ export function MachinePanel({ machine, sessions }: { machine: Machine; sessions
           onCancel={() => setConfirmClear(false)}
         />
       </div>
+      {machine.instanceConflict && (
+        <p className={styles.notice} role="alert">
+          Another Sentinal install tried to use {machine.name}'s identity and was refused
+          {machine.instanceConflict.port ? ` (port ${machine.instanceConflict.port}` : " ("}
+          {machine.instanceConflict.daemonVersion ? `, version ${machine.instanceConflict.daemonVersion}` : ""}
+          {machine.instanceConflict.buildCommit ? `, build ${machine.instanceConflict.buildCommit}` : ""}). Stop it, or give
+          it its own config.
+        </p>
+      )}
       {detailsError && !insight && (
         <p className={styles.notice} role="alert">
           {detailsError}
@@ -166,7 +175,10 @@ export function MachinePanel({ machine, sessions }: { machine: Machine; sessions
           <h2 className={styles.cardTitle}>Sentinal daemon</h2>
           <dl className={styles.facts}>
             <dt>Version</dt>
-            <dd className="mono">{insight?.daemonVersion ?? "—"}</dd>
+            <dd className="mono">
+              {insight?.daemonVersion ?? machine.daemonVersion ?? "—"}
+              {machine.buildCommit ? ` (${machine.buildCommit})` : ""}
+            </dd>
             <dt>Uptime</dt>
             <dd>{insight ? since(insight.startedAt, now) : "—"}</dd>
             <dt>Listening</dt>

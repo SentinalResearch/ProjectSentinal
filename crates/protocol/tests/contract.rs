@@ -361,6 +361,10 @@ mod machine_link {
             &section("heartbeat_request"),
             "heartbeat_request",
         );
+        let with_instance = section("heartbeat_request_with_instance");
+        let decoded: LinkHeartbeatRequest = serde_json::from_value(with_instance.clone()).unwrap();
+        assert_eq!(decoded.build_commit.as_deref(), Some("27357f9"));
+        assert_eq!(serde_json::to_value(&decoded).unwrap(), with_instance);
         let with_health = section("heartbeat_request_with_health");
         assert_round_trip::<LinkHeartbeatRequest>(&with_health, "heartbeat_request_with_health");
         let parsed: LinkHeartbeatRequest = serde_json::from_value(with_health).unwrap();

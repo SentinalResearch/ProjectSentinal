@@ -118,6 +118,9 @@ pub enum DaemonError {
     /// The control role could not start.
     #[error(transparent)]
     Control(#[from] crate::control::ControlError),
+    /// This install's ID could not be read or created.
+    #[error(transparent)]
+    Instance(#[from] crate::instance::InstanceError),
     /// Declarative watcher adapters could not be loaded safely.
     #[error(transparent)]
     Adapters(#[from] AdapterConfigError),
@@ -221,7 +224,8 @@ pub async fn run() -> Result<(), DaemonError> {
         },
         Arc::new(now),
     )
-    .with_projection_store(store.clone());
+    .with_projection_store(store.clone())
+    .with_instance(crate::instance::load_or_create(&config.data_dir)?);
     let interrupted = store.interrupt_orphaned_sessions(now())?;
     if !interrupted.is_empty() {
         tracing::info!(

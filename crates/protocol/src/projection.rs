@@ -248,6 +248,22 @@ impl ProjectedProgressUnit {
     }
 }
 
+/// A second daemon install that claimed a Machine already speaking through
+/// another, and was refused. Shown so the owner can find and stop it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct InstanceConflict {
+    /// When it last tried.
+    pub at: Timestamp,
+    /// Its daemon version.
+    pub daemon_version: Option<String>,
+    /// Its commit.
+    pub build_commit: Option<String>,
+    /// The port it listens on.
+    pub port: Option<u16>,
+}
+
 /// Safe structured facts for a dashboard Event summary.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -719,6 +735,12 @@ pub struct ControlProjectedMachine {
     pub os: Option<Os>,
     /// Reported daemon version.
     pub daemon_version: Option<String>,
+    /// Commit the daemon was built from, when it reports one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_commit: Option<String>,
+    /// Another install recently claimed this Machine and was refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance_conflict: Option<InstanceConflict>,
     /// Reported Machine capabilities.
     pub capabilities: Vec<MachineCapability>,
     /// Registry lifecycle status.

@@ -10,6 +10,7 @@ export type LinkFailureCode =
   | "NOT_CONTROL"
   | "LINK_REVOKED"
   | "STALE_SEQUENCE"
+  | "INSTANCE_CONFLICT"
   | "ORIGIN_REJECTED"
   | "UNAUTHORIZED"
   | "NOT_FOUND"

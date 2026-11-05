@@ -14,6 +14,10 @@ export interface Machine {
   hardware: string;
   /** Version of the Machine's sentinald, when known. */
   daemonVersion?: string;
+  /** Commit the daemon was built from. */
+  buildCommit?: string;
+  /** Another install recently claimed this Machine and was refused. */
+  instanceConflict?: { daemonVersion?: string; buildCommit?: string; port?: number };
   status: MachineStatus;
   freshness?: ProjectionFreshness;
   syncedAt?: number;
