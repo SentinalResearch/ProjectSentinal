@@ -73,7 +73,9 @@ them to clients. The web rebuilds its bounded timeline with `GET_EVENTS` and
 never parses terminal text itself.
 
 Current adapters cover training, pytest, vLLM/llama.cpp, Cargo, and validated
-TOML rules in `~/.config/terminal-agent/adapters/`. Health is deterministic
+TOML rules in `~/.config/terminal-agent/adapters/`. A program no adapter
+recognises still reports explicit counters (`task 3/50`, `[4/10]`, a tqdm
+bar) as progress. Health is deterministic
 derived state with bounded evidence, stored on the Session and delivered by
 the existing `SESSION_UPDATED` message. No watcher path uses a model.
 

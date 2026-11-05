@@ -10,6 +10,7 @@ mod framing;
 mod generic;
 mod health;
 mod observation;
+mod progress;
 mod pytest;
 pub mod redact;
 mod server;

@@ -103,8 +103,19 @@ impl EventEngine {
                     }),
             );
         }
-        if let Some(adapter) = &mut self.selected {
-            events.extend(adapter.observe(observation));
+        match (&mut self.selected, &observation.kind) {
+            (Some(adapter), _) => events.extend(adapter.observe(observation)),
+            // No adapter knows this program: explicit counters still count.
+            (None, ObservationKind::OutputLine(line)) => {
+                if let Some((current, total, unit)) = crate::progress::fallback_progress(line) {
+                    events.push(EventKind::ProgressUpdated {
+                        current,
+                        total: Some(total),
+                        unit,
+                    });
+                }
+            }
+            (None, _) => {}
         }
         events = deduplicate(events)
             .into_iter()
