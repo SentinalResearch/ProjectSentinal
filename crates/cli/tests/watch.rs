@@ -58,6 +58,7 @@ fn bare_watch_has_no_title_or_command() {
         parse(&["sentinal", "watch"]),
         Command::Watch {
             title: None,
+            detach: false,
             command: None
         }
     ));
@@ -87,7 +88,7 @@ fn title_and_command_after_separator_are_preserved_exactly() {
         "--",
         "-t",
     ];
-    let Command::Watch { title, command } = parse(&args) else {
+    let Command::Watch { title, command, .. } = parse(&args) else {
         panic!("expected watch");
     };
     assert_eq!(title.as_deref(), Some("Qwen Training"));
@@ -427,4 +428,22 @@ async fn watch_without_a_terminal_fails_before_contact_and_never_runs_the_comman
     assert!(stderr.contains("not run outside Sentinal"), "{stderr}");
     assert_eq!(daemon.connections.load(Ordering::SeqCst), 0);
     assert!(!marker.exists());
+}
+
+#[test]
+fn detach_runs_without_a_terminal_and_inside_another_session() {
+    let mut context = context();
+    context.interactive = false;
+    context.existing_session = Some("9".into());
+    let plan = plan_watch(None, Some(vec!["make".into()]), &context.detached()).unwrap();
+    assert!(matches!(plan, WatchPlan::Create(_)));
+}
+
+#[test]
+fn detach_needs_a_command() {
+    assert!(Cli::try_parse_from(["sentinal", "watch", "--detach"]).is_err());
+    assert!(matches!(
+        parse(&["sentinal", "watch", "-d", "--", "make"]),
+        Command::Watch { detach: true, .. }
+    ));
 }

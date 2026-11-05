@@ -6,7 +6,12 @@ use std::path::PathBuf;
 
 /// Sentinal: persistent, observable terminal Sessions.
 #[derive(Debug, Parser)]
-#[command(name = "sentinal", version = crate::version::VERSION.as_str(), about)]
+#[command(
+    name = "sentinal",
+    version = crate::version::VERSION.as_str(),
+    about,
+    after_help = "AI agents: run `sentinal agent-guide` before using this command."
+)]
 pub struct Cli {
     /// Daemon WebSocket URL.
     #[arg(long, env = "SENTINAL_URL")]
@@ -62,6 +67,8 @@ pub enum Command {
         /// Session ID.
         id: u64,
     },
+    /// Print the guide for AI agents using Sentinal on this Machine.
+    AgentGuide,
     /// Serve Sentinal's agent tools to an MCP client over stdio (Claude Code, Claude Desktop, …).
     ///
     /// Needs an agent token from Settings → Agents, in SENTINAL_AGENT_TOKEN
@@ -193,6 +200,12 @@ pub enum Command {
         /// Session title shown in `ls` and the web UI.
         #[arg(short = 't', long)]
         title: Option<String>,
+        /// Start the Command, print the Session ID, and return without attaching.
+        ///
+        /// Needs no terminal and may run inside another Session, so AI agents
+        /// and scripts can run work under Sentinal.
+        #[arg(short = 'd', long, requires = "command")]
+        detach: bool,
         /// Command and arguments, passed exactly as given after `--`.
         #[arg(last = true, num_args = 1.., value_name = "COMMAND")]
         command: Option<Vec<String>>,
@@ -215,7 +228,7 @@ pub enum Command {
         /// Choose from your running processes instead of naming a PID.
         #[arg(long)]
         pick: bool,
-        /// Log file the process writes (recorded now; tailing arrives later).
+        /// Log file the process writes; Sentinal follows it read-only for Events.
         #[arg(long, value_name = "PATH")]
         log: Option<PathBuf>,
         /// Session title shown in `ls` and the web UI.

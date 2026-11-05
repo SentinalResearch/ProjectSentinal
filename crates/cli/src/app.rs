@@ -98,6 +98,10 @@ async fn dispatch(
 ) -> Result<ExitCode, AppError> {
     // Hook commands never use the WebSocket API and need no token.
     let cli = match cli.command {
+        Command::AgentGuide => {
+            let _ = out.write_all(crate::AGENT_GUIDE.as_bytes());
+            return Ok(ExitCode::SUCCESS);
+        }
         Command::Mcp {
             control,
             token_file,
@@ -251,8 +255,13 @@ async fn dispatch(
         None => default_token_file()?,
     };
     let urls = resolve_daemon_urls(cli.url.as_deref())?;
-    if let Command::Watch { title, command } = cli.command {
-        return watch(&urls, &token_file, title, command, err).await;
+    if let Command::Watch {
+        title,
+        detach,
+        command,
+    } = cli.command
+    {
+        return watch(&urls, &token_file, title, detach, command, out, err).await;
     }
 
     let mut client = DaemonClient::connect(&urls, &token_file).await?;
@@ -371,6 +380,7 @@ async fn dispatch(
         | Command::Connection { .. }
         | Command::Disconnect
         | Command::Mcp { .. }
+        | Command::AgentGuide
         | Command::Identity { .. } => {}
     }
     Ok(ExitCode::SUCCESS)
@@ -380,7 +390,9 @@ async fn watch(
     urls: &[String],
     token_file: &std::path::Path,
     title: Option<String>,
+    detach: bool,
     command: Option<Vec<String>>,
+    out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<ExitCode, AppError> {
     let context = WatchContext {
@@ -391,6 +403,7 @@ async fn watch(
         interactive: std::io::stdin().is_terminal() && std::io::stdout().is_terminal(),
         env: crate::session_env::terminal_env(),
     };
+    let context = if detach { context.detached() } else { context };
     match plan_watch(title, command, &context)? {
         WatchPlan::AlreadyWatched {
             session,
@@ -416,6 +429,10 @@ async fn watch(
             let (client, session) =
                 create_session(|| DaemonClient::connect(urls, token_file), request).await?;
             let id = session.id.0;
+            if detach {
+                let _ = writeln!(out, "{id}");
+                return Ok(ExitCode::SUCCESS);
+            }
             let end = client
                 .attach(session.id)
                 .await

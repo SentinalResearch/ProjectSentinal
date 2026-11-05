@@ -292,6 +292,8 @@ sentinal kill <SESSION_ID>
 sentinal watch
 sentinal watch -- COMMAND [ARG...]
 sentinal watch -t TITLE -- COMMAND [ARG...]
+sentinal watch --detach [-t TITLE] -- COMMAND [ARG...]
+sentinal agent-guide
 
 sentinal hook zsh|bash|fish
 sentinal hook install [zsh|bash|fish] [--rc PATH]
@@ -415,13 +417,20 @@ With `-- COMMAND [ARG...]`:
 Inside any daemon-owned FULL Session, `SENTINAL_SESSION_ID` is set before the
 user's shell configuration loads. Watch refuses to nest when it is set.
 
+`--detach` (`-d`) starts the Command, prints the Session ID on stdout, and
+returns without attaching. It needs no terminal and may run inside another
+Session, where it creates a sibling rather than nesting. This is how AI agents
+and scripts run work under Sentinal. `sentinal agent-guide` prints the guide for
+them (`docs/AGENT_GUIDE.md`, built into the program), and `sentinal --help`
+points to it.
+
 Exit status:
 
 | Status | When |
 |---:|---|
 | `0` | detached (explicitly, EOF, or closed window), or bare `watch` inside an already-watched terminal (nothing created) |
 | `1` | `watch -- COMMAND` inside an already-watched terminal (nothing created, Command not run) |
-| `1` | not an interactive terminal, invalid arguments, daemon unavailable, or creation rejected — the Command never runs outside Sentinal |
+| `1` | not an interactive terminal (without `--detach`), invalid arguments, daemon unavailable, or creation rejected — the Command never runs outside Sentinal |
 | `1` | the Session was created but attaching failed — the Command runs inside that Session; the error names the ID to reattach |
 
 ### `hook`

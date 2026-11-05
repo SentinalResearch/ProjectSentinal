@@ -7,6 +7,12 @@ An agent needs its own token, created by the owner in Settings → Agents. The
 control enforces the token's level on every request. Agents can never type
 into a terminal, run commands, or read terminal output.
 
+## On a Machine running Sentinal
+
+Run `sentinal agent-guide`. Start long work with
+`sentinal watch --detach -t NAME -- COMMAND`, then read it with
+`sentinal status ID --json`. No token is needed on the Machine itself.
+
 ## Levels
 
 - 0 Observe: read Machines, Sessions, Events and metrics; watch changes.

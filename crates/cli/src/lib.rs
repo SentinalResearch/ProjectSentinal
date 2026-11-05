@@ -33,3 +33,6 @@ pub mod update;
 mod update_guard;
 pub mod version;
 pub mod watch;
+
+/// The guide printed by `sentinal agent-guide`.
+pub const AGENT_GUIDE: &str = include_str!("../../../docs/AGENT_GUIDE.md");

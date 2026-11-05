@@ -58,6 +58,18 @@ pub enum WatchError {
     Rejected(String),
 }
 
+impl WatchContext {
+    /// The same facts for `--detach`, which attaches nothing: it needs no
+    /// terminal, and its Session is a sibling of any enclosing one, not nested.
+    pub fn detached(self) -> Self {
+        WatchContext {
+            interactive: true,
+            existing_session: None,
+            ..self
+        }
+    }
+}
+
 /// Decide whether to create a Session, without any I/O.
 pub fn plan_watch(
     title: Option<String>,
