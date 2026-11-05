@@ -386,7 +386,7 @@ async fn a_worker_has_no_release_routes() {
 
 #[test]
 fn a_development_build_never_offers_or_starts_a_self_update() {
-    // `just sandbox` must not be able to replace the real installation.
+    // `just dev` must not be able to replace the real installation.
     let dir = std::env::temp_dir().join(format!("sentinal-dev-release-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();

@@ -182,6 +182,23 @@ impl SessionManager {
         }
         shell_launch
             .env
+            .extend(self.inner.session_env.iter().cloned());
+        if let Some(first) = &self.inner.session_path_first {
+            let inherited = match &base_env {
+                Some(env) => env
+                    .iter()
+                    .find(|(name, _)| name == "PATH")
+                    .map(|(_, value)| value.clone()),
+                None => std::env::var("PATH").ok(),
+            };
+            let path = match inherited {
+                Some(rest) if !rest.is_empty() => format!("{}:{rest}", first.display()),
+                _ => first.display().to_string(),
+            };
+            shell_launch.env.push(("PATH".into(), path));
+        }
+        shell_launch
+            .env
             .push(("SENTINAL_SESSION_ID".into(), id.0.to_string()));
         // Only the hook learns this secret, so output cannot forge shell signals.
         let osc_nonce = new_nonce().map_err(SessionManagerError::OscNonce)?;

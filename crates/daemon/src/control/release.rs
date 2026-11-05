@@ -44,7 +44,7 @@ pub enum Detach {
 /// Wiring for one control's release service.
 #[derive(Clone)]
 pub struct ControlReleaseSettings {
-    /// A development build (`just sandbox`, `just network`): it never offers or
+    /// A development build (`just dev`, `just network`): it never offers or
     /// starts a self-update, which would act on a real installation.
     pub development: bool,
     /// Daemon data directory holding the CLI's state files.

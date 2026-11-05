@@ -134,14 +134,16 @@ A daemon restart or update ends FULL Sessions, so it can end a multi-day run.
 
 ## Track D: one install per Machine
 
-From the 2026-11-05 incident: a sandbox reused this Mac's real link and replaced its
+From the 2026-11-05 incident: a test daemon reused this Mac's real link and replaced its
 Sessions, address, and version on the production control.
 
 - [x] `config_dir`: every credential and settings file follows one setting
 - [x] Control asks for a full resend when a worker discarded changes it never received
 - [x] Daemon install ID and build commit in heartbeats; the control refuses a second
       live install and tells the owner (`machine_instances`, migration 015)
-- [ ] "SANDBOX" badge in the sandbox UI
+- [x] `just dev`: `isolated` daemons cannot link, update, or use production's paths;
+      a DEV badge; dev terminals reach the dev daemon (`docs/TESTING.md`)
+- [x] `just promote`: `dev` reaches `main` only after every automated check
 
 ## Suggested order
 

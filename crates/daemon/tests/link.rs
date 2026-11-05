@@ -635,7 +635,7 @@ async fn worker_audit_and_link_file_never_contain_the_code() {
 
 #[tokio::test]
 async fn a_second_install_with_the_same_credentials_is_refused_and_sends_nothing() {
-    // The sandbox incident, over real HTTP: a separate install reading this
+    // The 2026-11-05 incident, over real HTTP: a separate install reading this
     // Machine's own link and identity files.
     let h = harness().await;
     let real = worker(&h);
@@ -648,7 +648,7 @@ async fn a_second_install_with_the_same_credentials_is_refused_and_sends_nothing
     let identity = identity::load_or_create(&identity_file, Timestamp(START), "pop-os")
         .map_err(|error| error.to_string());
     let tick = h.clock.clone();
-    let sandbox = LinkManager::open(
+    let second = LinkManager::open(
         LinkSettings {
             link_file: real.dir.join("link.json"),
             identity_file,
@@ -668,17 +668,17 @@ async fn a_second_install_with_the_same_credentials_is_refused_and_sends_nothing
         },
         Arc::new(move || Timestamp(tick.load(Ordering::SeqCst))),
     )
-    .with_instance("sandbox-install".into());
+    .with_instance("second-install".into());
 
-    let refused = sandbox.heartbeat_once().await.unwrap_err();
+    let refused = second.heartbeat_once().await.unwrap_err();
     assert_eq!(refused.code, LocalErrorCode::Conflict);
     assert!(
         refused.message.contains("another Sentinal install"),
         "{}",
         refused.message
     );
-    assert!(sandbox.refused());
-    assert!(!sandbox.notification_ingress());
+    assert!(second.refused());
+    assert!(!second.notification_ingress());
 
     // The control still points at the real install, and it carries on.
     let machine = h
@@ -692,7 +692,7 @@ async fn a_second_install_with_the_same_credentials_is_refused_and_sends_nothing
     assert_eq!(
         machine.daemon_version.as_deref(),
         Some("0.0.1"),
-        "not the sandbox's 2.10.0"
+        "not the second install's 2.10.0"
     );
     assert!(!real_manager.refused());
     real_manager.heartbeat_once().await.unwrap();
@@ -701,4 +701,58 @@ async fn a_second_install_with_the_same_credentials_is_refused_and_sends_nothing
         real.link_file().contains("worker_credential"),
         "the real link is intact"
     );
+}
+
+#[tokio::test]
+async fn an_isolated_daemon_cannot_link_even_with_a_real_link_file() {
+    let h = harness().await;
+    let real = worker(&h);
+    let code = h.control.create_code().unwrap();
+    real.connect(&h.url, code.code.expose(), None).await;
+    real.manager.heartbeat_once().await.unwrap();
+    let seen = h.control.registry().unwrap().machines[0].last_seen;
+
+    let identity_file = real.dir.join("machine-id.json");
+    let identity = identity::load_or_create(&identity_file, Timestamp(START), "pop-os")
+        .map_err(|error| error.to_string());
+    let tick = h.clock.clone();
+    let isolated = LinkManager::open(
+        LinkSettings {
+            link_file: real.dir.join("link.json"),
+            identity_file,
+            identity,
+            legacy_machine_id: "pop-os".into(),
+            hostname: "pop-os".into(),
+            endpoint: LinkEndpoint {
+                address: "127.0.0.1".into(),
+                port: 7520,
+                dns_name: None,
+            },
+            os: Os::Linux,
+            daemon_version: "2.10.0".into(),
+            development: true,
+            audit_dir: real.dir.clone(),
+            background: false,
+        },
+        Arc::new(move || Timestamp(tick.load(Ordering::SeqCst))),
+    )
+    .isolated();
+
+    h.clock.fetch_add(60_000, Ordering::SeqCst);
+    let refused = isolated.heartbeat_once().await.unwrap_err();
+    assert!(refused.message.contains("isolated"), "{}", refused.message);
+    assert!(!isolated.notification_ingress());
+    let code = h.control.create_code().unwrap();
+    let response = isolated
+        .handle_local(LocalRequest::ConnectControl {
+            control_url: h.url.clone(),
+            pairing_code: Secret::new(code.code.expose()),
+            display_name: None,
+        })
+        .await;
+    assert!(
+        matches!(response, LocalResponse::Error { message, .. } if message.contains("isolated"))
+    );
+    // The control never heard from it.
+    assert_eq!(h.control.registry().unwrap().machines[0].last_seen, seen);
 }

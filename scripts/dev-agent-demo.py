@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""See how an AI agent uses Sentinal, live, against a running `just sandbox`.
+"""See how an AI agent uses Sentinal, live, against a running `just dev`.
 
 Does what a real agent does, through the same `sentinal` commands and MCP tools:
 gets its own token, starts a job with no terminal, follows its progress, notices
 when the job needs a person, tries something it may not do, and is revoked.
 
-Keep the sandbox web page open while it runs: everything appears there too.
+Keep the dev web page open while it runs: everything appears there too.
 `--keep` leaves the token active and prints how to connect Claude Code.
 """
 
@@ -35,12 +35,12 @@ def step(number: int, title: str, why: str) -> None:
 
 
 def fail(message: str) -> None:
-    sys.exit(f"sandbox-agent: {message}")
+    sys.exit(f"dev-agent: {message}")
 
 
-def sandbox_paths() -> dict[str, Path]:
-    root = Path(os.environ.get("SENTINAL_SANDBOX_DIR", Path.home() / ".local/share/sentinal-sandbox"))
-    return {"token": root / "config/token", "password": root / "config/sandbox-password", "kept": root / "config/agent-token"}
+def dev_paths() -> dict[str, Path]:
+    root = Path(os.environ.get("SENTINAL_DEV_DIR", Path.home() / ".local/share/sentinal-dev"))
+    return {"token": root / "config/token", "password": root / "config/dev-password", "kept": root / "config/agent-token"}
 
 
 def tailscale_ip() -> str:
@@ -76,7 +76,7 @@ class Mcp:
         self.next_id = 0
         self.request("initialize", {
             "protocolVersion": "2025-06-18", "capabilities": {},
-            "clientInfo": {"name": "sandbox-agent-demo", "version": "1"},
+            "clientInfo": {"name": "dev-agent-demo", "version": "1"},
         })
         self.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
@@ -147,17 +147,17 @@ def main() -> int:
     parser.add_argument("--answer-wait", type=int, default=120, help="seconds to wait for you to answer the question")
     args = parser.parse_args()
 
-    paths = sandbox_paths()
+    paths = dev_paths()
     ip = tailscale_ip()
-    daemon_port = os.environ.get("SENTINAL_SANDBOX_DAEMON_PORT", "7520")
-    web_port = os.environ.get("SENTINAL_SANDBOX_WEB_PORT", "5273")
+    daemon_port = os.environ.get("SENTINAL_DEV_DAEMON_PORT", "7520")
+    web_port = os.environ.get("SENTINAL_DEV_WEB_PORT", "5273")
     base = f"http://{ip}:{daemon_port}"
     try:
         http(base, "GET", "/api/v1/health")
     except (urllib.error.URLError, TimeoutError):
-        fail(f"no sandbox answers at {base}. Start it first in another terminal: just sandbox")
+        fail(f"no dev environment answers at {base}. Start it first in another terminal: just dev")
     if not paths["password"].is_file():
-        fail("this sandbox has no saved password. Run: just sandbox --reset, then just sandbox")
+        fail("this dev environment has no saved password. Run: just dev --reset, then just dev")
     version = os.environ.get("SENTINAL_RELEASE_VERSION")
     build_env = dict(os.environ)
     tag = subprocess.run(["git", "-C", str(REPO), "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"],
@@ -166,6 +166,9 @@ def main() -> int:
         build_env["SENTINAL_RELEASE_VERSION"] = tag.removeprefix("v")
         build_env["SENTINAL_GIT_COMMIT"] = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"],
                                                           capture_output=True, text=True).stdout.strip()
+        if subprocess.run(["git", "-C", str(REPO), "status", "--porcelain", "--untracked-files=no"],
+                          capture_output=True, text=True).stdout.strip():
+            build_env["SENTINAL_GIT_COMMIT"] += "-dirty"
     say("Building this checkout's `sentinal`...")
     subprocess.run(["cargo", "build", "--locked", "-q", "-p", "cli", "--bin", "sentinal"], cwd=REPO, check=True, env=build_env)
     target = Path(os.environ.get("CARGO_TARGET_DIR", REPO / "target"))
@@ -245,15 +248,15 @@ def main() -> int:
         say(f"   send_input → {'refused: ' + refusal_words(refusal) if refused else 'NOT REFUSED: this is a bug'}")
 
         if args.keep:
-            step(7, "Token kept, so you can connect Claude Code", "Saved in a private file inside the sandbox folder.")
+            step(7, "Token kept, so you can connect Claude Code", "Saved in a private file inside the dev folder.")
             mcp.close()
             flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
             with os.fdopen(os.open(paths["kept"], flags, 0o600), "w") as file:
                 file.write(token + "\n")
-            say(f"   claude mcp add sentinal-sandbox -- {sentinal} mcp --control {base} \\")
+            say(f"   claude mcp add sentinal-dev -- {sentinal} mcp --control {base} \\")
             say(f"     --development --token-file {paths['kept']}")
-            say(f"\n   Then ask: \"What is running in the sandbox, and does anything need me?\"")
-            say("   Remove it later: claude mcp remove sentinal-sandbox; revoke it in Settings → Agents.")
+            say(f"\n   Then ask: \"What is running in dev, and does anything need me?\"")
+            say("   Remove it later: claude mcp remove sentinal-dev; revoke it in Settings → Agents.")
             refused_after = True
         else:
             step(7, "The owner revokes the token", "It stops working on the very next request.")
@@ -263,8 +266,9 @@ def main() -> int:
             mcp.close()
 
     say(f"\n{'─' * WIDTH}")
-    say(f"Done. Session {session_id} ({name}) stays in the sandbox for you to open, hide, or delete.")
-    say("Run with --keep to leave the agent active and see its calls under Settings → Agents → Activity.")
+    say(f"Done. Session {session_id} ({name}) stays in dev for you to open, hide, or delete.")
+    if not args.keep:
+        say("Run with --keep to leave the agent active and see its calls under Settings → Agents → Activity.")
     return 0 if refused and refused_after else 1
 
 

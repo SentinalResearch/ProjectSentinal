@@ -1,7 +1,7 @@
 //! This daemon install's random ID, and the commit it was built from.
 //!
 //! The ID lives with the Session database, so an update keeps it and a separate
-//! install (a sandbox, a copied config) gets its own. The control uses it to
+//! install (a dev environment, a copied config) gets its own. The control uses it to
 //! refuse a second install claiming a Machine that is already alive.
 
 use crate::{auth::random_hex_token, private_fs::private_file_options};
@@ -56,7 +56,7 @@ fn valid(id: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
-/// A release or sandbox build's short commit, with `-dirty` when it had
+/// A release or dev build's short commit, with `-dirty` when it had
 /// uncommitted changes. `None` for an unstamped development build.
 pub fn build_commit() -> Option<String> {
     short_commit(option_env!("SENTINAL_GIT_COMMIT"))

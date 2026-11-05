@@ -208,3 +208,25 @@ fn global_url_and_token_file_can_come_from_the_environment() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("/nonexistent/sentinal-token"), "{stderr}");
 }
+
+#[test]
+fn a_development_terminal_cannot_change_the_installed_sentinal() {
+    use cli::app::refused_when_isolated as refused;
+    let parse = |args: &[&str]| Cli::try_parse_from(args).unwrap().command;
+    for args in [
+        &["sentinal", "update"][..],
+        &["sentinal", "setup"],
+        &["sentinal", "release", "check"],
+        &["sentinal", "auto", "status"],
+        &["sentinal", "disconnect"],
+    ] {
+        assert!(refused(&parse(args)).is_some(), "{args:?}");
+    }
+    for args in [
+        &["sentinal", "ls"][..],
+        &["sentinal", "agent-guide"],
+        &["sentinal", "status", "7"],
+    ] {
+        assert!(refused(&parse(args)).is_none(), "{args:?}");
+    }
+}

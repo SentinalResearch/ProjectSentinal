@@ -397,18 +397,18 @@ fn completion_weights_default_and_can_be_tuned() {
 
 #[test]
 fn config_dir_moves_every_credential_and_settings_file_away_from_home() {
-    // A sandbox shares this Machine's HOME. If any of these stayed under it, the
-    // sandbox would log in to the real control as this Machine.
+    // A dev environment shares this Machine's HOME. If any of these stayed under it, the
+    // dev daemon would log in to the real control as this Machine.
     let root = std::env::temp_dir().join(format!("sentinal-config-dir-{}", std::process::id()));
     let home = root.join("home");
-    let sandbox = root.join("sandbox");
+    let own = root.join("dev");
     let text = format!(
         "bind = \"127.0.0.1:7520\"\ndata_dir = \"{}\"\nconfig_dir = \"{}\"\n",
         root.join("data").display(),
-        sandbox.display()
+        own.display()
     );
     let config = DaemonConfig::from_toml(&text, &home).unwrap();
-    assert_eq!(config.config_dir, sandbox);
+    assert_eq!(config.config_dir, own);
     for path in [
         &config.token_file,
         &config.auth_file,
@@ -418,9 +418,50 @@ fn config_dir_moves_every_credential_and_settings_file_away_from_home() {
         &config.control_credentials_file,
     ] {
         assert!(
-            path.starts_with(&sandbox),
+            path.starts_with(&own),
             "{} escaped config_dir",
             path.display()
         );
     }
+}
+
+fn isolated_toml(root: &Path, extra: &str) -> String {
+    format!(
+        "isolated = true\ndata_dir = \"{}\"\nconfig_dir = \"{}\"\n{extra}",
+        root.join("data").display(),
+        root.join("config").display()
+    )
+}
+
+#[test]
+fn an_isolated_daemon_starts_only_with_its_own_paths() {
+    let home = Path::new("/home/tester");
+    let own = Path::new("/home/tester/.local/share/sentinal-dev");
+    let config = DaemonConfig::from_toml(&isolated_toml(own, ""), home).unwrap();
+    assert!(config.isolated);
+    assert!(config.link_file.starts_with(own));
+
+    // No explicit directories: every default would be the installed Sentinal's.
+    assert!(DaemonConfig::from_toml("isolated = true", home).is_err());
+
+    // One real credential path is enough to refuse, however it got there.
+    for extra in [
+        "link_file = \"/home/tester/.config/terminal-agent/link.json\"\n",
+        "identity_file = \"/home/tester/.config/terminal-agent/machine-id.json\"\n",
+        "token_file = \"/home/tester/.config/terminal-agent/token\"\n",
+        "control_credentials_file = \"/home/tester/.local/share/terminal-agent/c.json\"\n",
+    ] {
+        let error = DaemonConfig::from_toml(&isolated_toml(own, extra), home).unwrap_err();
+        assert!(error.to_string().contains("isolated"), "{error}");
+    }
+    let real_data = "isolated = true\ndata_dir = \"/home/tester/.local/share/terminal-agent\"\nconfig_dir = \"/tmp/x\"\n";
+    assert!(DaemonConfig::from_toml(real_data, home).is_err());
+    let real_config = "isolated = true\ndata_dir = \"/tmp/x\"\nconfig_dir = \"/home/tester/.config/terminal-agent\"\n";
+    assert!(DaemonConfig::from_toml(real_config, home).is_err());
+}
+
+#[test]
+fn production_is_not_isolated_by_default() {
+    let config = DaemonConfig::from_toml("", Path::new("/home/tester")).unwrap();
+    assert!(!config.isolated);
 }

@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import { DevBadge } from "../../../components/DevBadge";
 import { SentinalMark } from "../../../components/SentinalMark";
 import { useLiveData } from "../../../data/LiveDataContext";
 import { islandLocation } from "../shell/location";
@@ -36,6 +37,7 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
           <span className={styles.title}>{title}</span>
           {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
         </span>
+        <DevBadge />
         {back.trailing}
       </nav>
     );
@@ -47,6 +49,7 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
       <Link to="/app/overview" className={styles.logo} aria-label="Dashboard">
         <SentinalMark size={18} />
       </Link>
+      <DevBadge />
       <PlacesMenu label={`You are on ${name}. Go somewhere`} triggerClass={styles.page}>
         <span>{name}</span>
         <span className={styles.caret} aria-hidden="true">▾</span>

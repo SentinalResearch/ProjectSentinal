@@ -25,6 +25,26 @@ pub async fn run(cli: Cli, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode
     }
 }
 
+/// Why `command` may not run in a development terminal, which must not change
+/// the installed Sentinal, its service, or its shell setup.
+pub fn refused_when_isolated(command: &Command) -> Option<&'static str> {
+    match command {
+        Command::Update { .. } | Command::Release { .. } => Some("updates the installed Sentinal"),
+        Command::Setup { .. } | Command::Backup { .. } => {
+            Some("changes the installed Sentinal's setup")
+        }
+        Command::Auto { .. }
+        | Command::Hook {
+            action:
+                crate::args::HookAction::Install { .. } | crate::args::HookAction::Uninstall { .. },
+        } => Some("changes your shell setup"),
+        Command::Connect { .. } | Command::Disconnect | Command::Identity { .. } => {
+            Some("changes a Machine link")
+        }
+        _ => None,
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 enum AppError {
     #[error("HOME is not set; pass --token-file explicitly")]
@@ -96,6 +116,15 @@ async fn dispatch(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<ExitCode, AppError> {
+    if std::env::var_os("SENTINAL_ISOLATED").is_some_and(|value| !value.is_empty()) {
+        if let Some(reason) = refused_when_isolated(&cli.command) {
+            let _ = writeln!(
+                err,
+                "sentinal: refused in a development terminal: this command {reason}"
+            );
+            return Ok(ExitCode::FAILURE);
+        }
+    }
     // Hook commands never use the WebSocket API and need no token.
     let cli = match cli.command {
         Command::AgentGuide => {

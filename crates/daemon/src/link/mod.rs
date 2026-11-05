@@ -377,6 +377,8 @@ struct Inner {
     instance: Mutex<Option<String>>,
     /// The control refused this install: another one speaks for this Machine.
     refused: AtomicBool,
+    /// A development daemon: no link to any control, whatever files it finds.
+    isolated: AtomicBool,
     approval: Mutex<Option<approval::PendingApproval>>,
     updater: Mutex<Option<crate::worker_update::WorkerUpdater>>,
     /// The latest health report not yet delivered by a heartbeat (4.H).
@@ -405,6 +407,7 @@ impl LinkManager {
                 projection_directive: Mutex::new(None),
                 instance: Mutex::new(None),
                 refused: AtomicBool::new(false),
+                isolated: AtomicBool::new(false),
                 approval: Mutex::new(None),
                 updater: Mutex::new(None),
                 health: Mutex::new(None),
@@ -426,7 +429,27 @@ impl LinkManager {
 
     /// Whether the control refused this install, which then sends it nothing.
     pub fn refused(&self) -> bool {
-        self.inner.refused.load(Ordering::SeqCst)
+        self.inner.refused.load(Ordering::SeqCst) || self.is_isolated()
+    }
+
+    /// Never talk to a control. For development daemons.
+    pub fn isolated(self) -> Self {
+        self.inner.isolated.store(true, Ordering::SeqCst);
+        self
+    }
+
+    fn is_isolated(&self) -> bool {
+        self.inner.isolated.load(Ordering::SeqCst)
+    }
+
+    fn refuse_if_isolated(&self) -> Result<(), LinkFailure> {
+        if self.is_isolated() {
+            return Err(LinkFailure::new(
+                LocalErrorCode::Unavailable,
+                "this is an isolated development daemon: it does not connect to a control",
+            ));
+        }
+        Ok(())
     }
 
     /// Report this daemon install's ID in heartbeats.
@@ -549,6 +572,20 @@ impl LinkManager {
 
     /// Answer one local-socket link request.
     pub async fn handle_local(&self, request: LocalRequest) -> LocalResponse {
+        if matches!(
+            request,
+            LocalRequest::ConnectControl { .. }
+                | LocalRequest::RequestApproval { .. }
+                | LocalRequest::ClaimApproval
+                | LocalRequest::CancelApproval
+        ) {
+            if let Err(failure) = self.refuse_if_isolated() {
+                return LocalResponse::Error {
+                    code: failure.code,
+                    message: failure.message,
+                };
+            }
+        }
         let result = match request {
             LocalRequest::GetIdentity => self.identity_response(),
             LocalRequest::ConnectControl {
@@ -762,6 +799,7 @@ impl LinkManager {
 
     /// Send one heartbeat, refreshing credentials when the control asks.
     pub async fn heartbeat_once(&self) -> Result<(), LinkFailure> {
+        self.refuse_if_isolated()?;
         let _operation = self.inner.operation.lock().await;
         let machine_id = self.machine_id().map_err(identity_failure)?;
         let Some(mut link) = self.read_link()? else {

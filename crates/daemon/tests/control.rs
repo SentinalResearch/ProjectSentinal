@@ -1653,12 +1653,12 @@ fn a_second_install_cannot_take_over_a_machine_that_is_alive() {
         )
         .unwrap();
 
-    // The sandbox incident: same credentials, a different install and port.
+    // The 2026-11-05 incident: same credentials, a different install and port.
     let refused = h
         .control
         .heartbeat(
             credential.expose(),
-            instance_beat(&h, 2, Some("sandbox"), Some("6b7936e-dirty"), 7520),
+            instance_beat(&h, 2, Some("other"), Some("6b7936e-dirty"), 7520),
         )
         .unwrap_err();
     assert_eq!(refused.status, 409);

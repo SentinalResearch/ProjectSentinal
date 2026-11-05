@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { DevBadge } from "../../../components/DevBadge";
 import { SentinalMark } from "../../../components/SentinalMark";
 import { useLiveData } from "../../../data/LiveDataContext";
 import { islandLocation } from "./location";
@@ -62,6 +63,7 @@ export function LiveIsland({ onOpenPrompt }: { onOpenPrompt: (prefill?: string) 
       <button type="button" className={styles.logo} onClick={() => navigate("/app/overview")} title="Dashboard">
         <SentinalMark size={18} />
       </button>
+      <DevBadge />
       <PlacesMenu
         triggerClass={styles.location}
         onSearch={() => onOpenPrompt()}

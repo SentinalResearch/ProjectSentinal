@@ -164,6 +164,11 @@ pub async fn run() -> Result<(), DaemonError> {
     if config.control.is_some() {
         machine.role = Some(MachineRole::Control);
     }
+    if config.isolated {
+        // Never mistaken for the real Machine on any screen.
+        machine.name = format!("dev-{}", machine.name);
+        tracing::warn!("isolated development daemon: no control link, no update checks");
+    }
     ensure_private_dir(&config.data_dir).map_err(|source| DaemonError::DataDirectory {
         path: config.data_dir.clone(),
         source,
@@ -220,12 +225,17 @@ pub async fn run() -> Result<(), DaemonError> {
             daemon_version: crate::DAEMON_VERSION.into(),
             development: config.development,
             audit_dir: config.data_dir.clone(),
-            background: true,
+            background: !config.isolated,
         },
         Arc::new(now),
     )
     .with_projection_store(store.clone())
     .with_instance(crate::instance::load_or_create(&config.data_dir)?);
+    let link = if config.isolated {
+        link.isolated()
+    } else {
+        link
+    };
     let interrupted = store.interrupt_orphaned_sessions(now())?;
     if !interrupted.is_empty() {
         tracing::info!(
@@ -278,6 +288,32 @@ pub async fn run() -> Result<(), DaemonError> {
     .with_watcher_adapters(watcher_adapters)
     .with_projects(projects.clone())
     .with_process_probe(ProcessProbe::system(daemon_uid));
+    // A dev terminal's `sentinal` must reach this daemon, never the installed one.
+    let sessions = if config.isolated {
+        let own_bin = sibling_sentinal_bin()
+            .ok()
+            .and_then(|bin| bin.parent().map(Path::to_path_buf));
+        sessions.with_session_env(
+            vec![
+                ("SENTINAL_ISOLATED".into(), "1".into()),
+                (
+                    "SENTINAL_URL".into(),
+                    format!("ws://{}/api/v1/ws", config.bind),
+                ),
+                (
+                    "SENTINAL_TOKEN_FILE".into(),
+                    config.token_file.display().to_string(),
+                ),
+                (
+                    protocol::local::SOCKET_ENV.into(),
+                    config.local_socket.display().to_string(),
+                ),
+            ],
+            own_bin,
+        )
+    } else {
+        sessions
+    };
     // FULL Sessions were interrupted above; reduced-capture ones are resumed
     // only when their root process identity still matches.
     sessions.recover_external_sessions(store.live_sessions()?)?;
@@ -508,17 +544,19 @@ pub async fn run() -> Result<(), DaemonError> {
                     sentinal_bin.clone(),
                     sessions.clone(),
                 );
-                spawn_release_watch(
-                    ReleaseWatchSettings {
-                        data_dir: config.data_dir.clone(),
-                        sentinal_bin,
-                    },
-                    Some(crate::control::release_watch::ReleaseActors {
-                        release: service.clone(),
-                        push: push.clone(),
-                    }),
-                    server_shutdown_rx.clone(),
-                );
+                if !config.isolated {
+                    spawn_release_watch(
+                        ReleaseWatchSettings {
+                            data_dir: config.data_dir.clone(),
+                            sentinal_bin,
+                        },
+                        Some(crate::control::release_watch::ReleaseActors {
+                            release: service.clone(),
+                            push: push.clone(),
+                        }),
+                        server_shutdown_rx.clone(),
+                    );
+                }
                 release = Some(service);
             }
             Err(error) => {

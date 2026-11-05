@@ -165,6 +165,10 @@ struct SessionManagerInner {
     observations: broadcast::Sender<DaemonMessage>,
     /// Machine-wide Metrics stream consumed by the projection recorder.
     projection_observations: broadcast::Sender<DaemonMessage>,
+    /// Set in every new Session (an isolated daemon points its CLI at itself).
+    session_env: Vec<(String, String)>,
+    /// Put first on every new Session's PATH.
+    session_path_first: Option<PathBuf>,
     /// Machine-wide structured Event stream.
     events: broadcast::Sender<Event>,
     /// Serializes external shell registration so concurrent reports create one Session.
@@ -242,6 +246,8 @@ impl SessionManager {
                 probe: ProcessProbe::unavailable(),
                 observations: broadcast::channel(256).0,
                 projection_observations: broadcast::channel(256).0,
+                session_env: Vec::new(),
+                session_path_first: None,
                 events: broadcast::channel(256).0,
                 registration: Mutex::new(()),
                 continuation: tokio::sync::Mutex::new(()),
@@ -266,6 +272,23 @@ impl SessionManager {
         match Arc::get_mut(&mut self.inner) {
             Some(inner) => inner.watcher_adapters = adapters,
             None => tracing::error!("watcher adapters must be set before the manager is shared"),
+        }
+        self
+    }
+
+    /// Variables set in every new Session, over its login environment, and a
+    /// directory put first on its PATH. Set before this manager is shared.
+    pub fn with_session_env(
+        mut self,
+        env: Vec<(String, String)>,
+        path_first: Option<PathBuf>,
+    ) -> Self {
+        match Arc::get_mut(&mut self.inner) {
+            Some(inner) => {
+                inner.session_env = env;
+                inner.session_path_first = path_first;
+            }
+            None => tracing::error!("Session environment must be set before the manager is shared"),
         }
         self
     }

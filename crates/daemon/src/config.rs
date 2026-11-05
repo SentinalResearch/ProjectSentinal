@@ -51,8 +51,11 @@ pub struct DaemonConfig {
     pub bind: SocketAddr,
     /// Directory containing session logs and the audit log.
     pub data_dir: PathBuf,
+    /// A development daemon: it never links to a control or checks for updates,
+    /// and refuses to start on any path belonging to the installed Sentinal.
+    pub isolated: bool,
     /// Directory of credentials and settings: identity, control link, tokens,
-    /// notification and push keys, recipes. A sandbox sets this to stay off the
+    /// notification and push keys, recipes. A dev environment sets this to stay off the
     /// installed Machine's link. Defaults to `~/.config/terminal-agent`.
     pub config_dir: PathBuf,
     /// Maximum number of terminal lines retained in memory per session.
@@ -100,6 +103,8 @@ struct RawConfig {
     local_socket: Option<PathBuf>,
     packages: Option<RawPackageConfig>,
     config_dir: Option<PathBuf>,
+    #[serde(default)]
+    isolated: bool,
     identity_file: Option<PathBuf>,
     link_file: Option<PathBuf>,
     control_credentials_file: Option<PathBuf>,
@@ -158,6 +163,9 @@ pub enum ConfigError {
     /// A `[storage]` limit was zero.
     #[error("invalid [storage] setting: {0} must be at least 1")]
     InvalidStorage(&'static str),
+    /// An isolated daemon was pointed at the installed Sentinal's files.
+    #[error("isolated daemon refused to start: {0}")]
+    NotIsolated(String),
     /// The configuration file could not be read.
     #[error("failed to read daemon config '{}': {source}", path.display())]
     Read {
@@ -220,6 +228,32 @@ pub enum ConfigError {
 }
 
 impl DaemonConfig {
+    /// Refuse every path that belongs to the installed Sentinal.
+    fn ensure_isolated(&self, home: &Path) -> Result<(), ConfigError> {
+        let installed = [
+            home.join(protocol::local::DEFAULT_DATA_DIR),
+            home.join(".config/terminal-agent"),
+        ];
+        for (name, path) in [
+            ("data_dir", &self.data_dir),
+            ("config_dir", &self.config_dir),
+            ("token_file", &self.token_file),
+            ("auth_file", &self.auth_file),
+            ("notify_file", &self.notify_file),
+            ("identity_file", &self.identity_file),
+            ("link_file", &self.link_file),
+            ("control_credentials_file", &self.control_credentials_file),
+        ] {
+            if installed.iter().any(|root| path.starts_with(root)) {
+                return Err(ConfigError::NotIsolated(format!(
+                    "{name} '{}' belongs to the installed Sentinal",
+                    path.display()
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Load a configuration file, using defaults when it does not exist.
     pub fn load(path: &Path, home: &Path) -> Result<Self, ConfigError> {
         let text = match fs::read_to_string(path) {
@@ -264,6 +298,7 @@ impl DaemonConfig {
             return Err(ConfigError::UnsafeBind(bind_text));
         }
 
+        let raw_data_dir_missing = raw.data_dir.is_none();
         let data_dir = raw
             .data_dir
             .unwrap_or_else(|| home.join(protocol::local::DEFAULT_DATA_DIR));
@@ -276,13 +311,21 @@ impl DaemonConfig {
         let packages = parse_package_config(raw.packages)?;
         crate::origin::OriginPolicy::new(&raw.allowed_origins, raw.development)?;
         let control = parse_control_config(raw.control, raw.development)?;
+        let isolated = raw.isolated;
+        if isolated && (raw.config_dir.is_none() || raw_data_dir_missing) {
+            return Err(ConfigError::NotIsolated(
+                "set both data_dir and config_dir; the defaults are the installed Sentinal's"
+                    .into(),
+            ));
+        }
         let config_dir = raw
             .config_dir
             .unwrap_or_else(|| home.join(".config/terminal-agent"));
 
-        Ok(DaemonConfig {
+        let config = DaemonConfig {
             bind,
             data_dir,
+            isolated,
             config_dir: config_dir.clone(),
             scrollback_lines: raw.scrollback_lines.unwrap_or(DEFAULT_SCROLLBACK_LINES),
             token_file: raw.token_file.unwrap_or_else(|| config_dir.join("token")),
@@ -315,7 +358,11 @@ impl DaemonConfig {
                     .map_err(ConfigError::InvalidComplete)?;
                 raw.complete
             },
-        })
+        };
+        if config.isolated {
+            config.ensure_isolated(home)?;
+        }
+        Ok(config)
     }
 }
 

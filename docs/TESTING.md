@@ -135,25 +135,46 @@ Machine routing, terminal control, Recipes, notifications, or mobile behavior
 must record both `just check` and `just test-e2e`; `just acceptance` runs that
 combined gate.
 
-## Trying a change before release
+## From development to production
 
-Pushing to `main` does not release anything; only a `v*` tag does. Before a tag:
+Production never runs anything from this cycle until the last step, and nothing in
+it can reach production before then.
 
-| Step | Command | Proves |
+| Step | Command | What it does |
 |---|---|---|
-| Fast checks | `just check` | Formatting, lints, unit and contract tests |
-| Browser suite | `just test-e2e` | The built UI against isolated real daemons |
-| Look and click | `just demo` | Layouts with fake data, nothing real |
-| Use it yourself | `just sandbox` | This checkout, real terminals, separate data |
+| 1. Work | commits on the `dev` branch | `main` stays what production runs |
+| 2. Fast checks | `just check` | Formatting, lints, unit and contract tests |
+| 3. Browser suite | `just test-e2e` | The built UI against throwaway real daemons |
+| 4. Use it | `just dev` | This checkout, real terminals, isolated |
+| 5. Promote | `just promote` | Re-runs 2 and 3, then fast-forwards `main`. Pushes nothing |
+| 6. Release | `just ship X.Y.Z` | Only from a clean `main`; only this reaches your Machines |
 
-`just sandbox` runs this checkout on this Machine's Tailscale address (web UI on
-port 5273, daemon on 7520), so a phone on the Tailnet can open it. Its data and
-config are in `~/.local/share/sentinal-sandbox`, and `just sandbox --reset` erases
-them. A new sandbox finishes first-time setup itself and prints a random password
-to sign in with, so there is no Machine token to paste. The installed Sentinal is not touched, and neither are its Sessions.
+Pushing a branch releases nothing. Only a `v*` tag does.
 
-It isolates Sentinal's data, not the operating system: terminals opened in it run
-real commands as you on this Machine.
+### `just dev`
 
-Use `just sandbox` rather than plain `just network` when an installed Sentinal is
-on the Machine: `just network` defaults to the installed data directory.
+An isolated single-Machine Sentinal for trying terminals, the UI, AI agents and the
+watcher. Web UI on port 5273, daemon on 7520, data in `~/.local/share/sentinal-dev`.
+`just dev --reset` erases it. It finishes first-time setup itself and prints the
+password.
+
+| Guarantee | How |
+|---|---|
+| Cannot use production's data or credentials | `isolated = true`: the daemon refuses to start if any path is the installed Sentinal's |
+| Cannot reach a control | No heartbeats, uploads, pairing or approval, even if it finds a real link file |
+| Does not check for or apply updates | No release watch, and no update offered |
+| Dev terminals reach the dev daemon | `SENTINAL_URL`, `SENTINAL_TOKEN_FILE` and `SENTINAL_SOCKET` point at it, and its `sentinal` is first on PATH |
+| Dev terminals cannot change the install | `update`, `release`, `setup`, `backup`, `auto`, `hook install`, `connect`, `disconnect` and `identity` are refused there by this checkout's `sentinal` |
+| You can always tell | Amber DEV badge, `Sentinal DEV` tab title, Machine named `dev-…` |
+
+What it does not isolate: it runs as you on this Machine, so its terminals have your
+files and can run any command, including the installed binary by its full path (an
+older installed `sentinal` has no development guard). For separation from your
+account too, run it under a separate user or on a spare VM.
+
+`just dev-cli ls` runs any `sentinal` command against it from an ordinary terminal.
+`just dev-agent` walks through how an AI agent uses it: a token, a job with no
+terminal, progress, a question it may not answer, and revocation.
+
+`just network` is different: it uses the installed data directory by default. Use
+`just dev` for testing on a Machine with Sentinal installed.
