@@ -74,6 +74,13 @@ describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Search" })).not.toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Tabs" })).not.toBeInTheDocument();
+    // The prompt is the fast path; tapping the page name shows the main places.
+    expect(screen.queryByRole("group", { name: "Places" })).not.toBeInTheDocument();
+    await userEvent.setup().click(within(island).getByRole("button", { name: /Go somewhere/ }));
+    const places = screen.getByRole("group", { name: "Places" });
+    for (const name of ["Overview", "Machines", "History", "Recipes", "Settings"]) {
+      expect(within(places).getByRole("link", { name })).toBeInTheDocument();
+    }
   });
 
   it("uses the desktop glass shell from 768 px (START_HERE.md)", () => {

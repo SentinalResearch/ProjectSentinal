@@ -309,7 +309,7 @@ Design source: `sentinal-glass-handoff/` (`START_HERE.md`, `specs/GLASS_SPEC.md`
 Desktop shell from 768 px (768–1023 px stacks the dashboard's right column); phones get the
 glass mobile shell and built-in terminal keyboard (4.I mobile, below).
 - [x] Glass tokens and `GlassPill` / `GlassPanel` / `AttentionCard`, with a no-`backdrop-filter` fallback
-- [x] Shell: no sidebar on desktop; Live island with the FAILED > WAITING > STALLED > RUNNING ticker
+- [x] Shell: no sidebar on desktop; Live island with the FAILED > WAITING > STALLED > RUNNING ticker. Its page name drops down the main places (owner decision after real use, `docs/PLAN_DAILY_USE_AND_WATCHER.md` A2)
 - [x] Prompt: ⌘K, `/`, island button; deterministic `go`, `y|n`, `run`, `find`, `split`, `kill`, fuzzy fallback
 - [x] Sheets: back history of up to 3 pages, ⌘[ to pop, restore keeps scroll and terminal attachment
 - [x] Dashboard: needs-you cards with inline actions, Machine lanes with sparklines, "While you were away"
@@ -324,7 +324,7 @@ glass mobile shell and built-in terminal keyboard (4.I mobile, below).
 - [x] Prompt sheet with the built-in keyboard; same grammar as desktop
 - [x] ^C confirm: hold-to-send on jobs running ≥ 30 s
 
-**Demo:** with no sidebar, see what needs you in the island, press `/`, `y`,
+**Demo:** see what needs you in the island, press `/`, `y`,
 `↵` to answer a waiting prompt from any page, and step back through the last
 pages from the sheets on the right.
 

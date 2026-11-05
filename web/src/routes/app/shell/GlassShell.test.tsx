@@ -98,12 +98,21 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
     expect(signal).toHaveBeenCalledWith(expect.any(String), "SIGINT");
   });
 
-  it("clicking where you are opens the prompt with `go ` typed", async () => {
+  it("the page name drops down the main places, and Search opens the prompt", async () => {
     renderShell("/app/history");
     const island = await islandReady();
     const user = userEvent.setup();
-    await user.click(within(island).getByRole("button", { name: /You are on History/ }));
-    expect(screen.getByRole("combobox", { name: "Command" })).toHaveValue("go ");
+    expect(screen.queryByRole("group", { name: "Places" })).not.toBeInTheDocument();
+    await user.hover(within(island).getByRole("button", { name: /You are on History/ }));
+    const places = screen.getByRole("group", { name: "Places" });
+    expect(within(places).getByRole("link", { name: "History" })).toHaveAttribute("aria-current", "page");
+    await user.click(within(places).getByRole("button", { name: "Search" }));
+    expect(screen.getByRole("combobox", { name: "Command" })).toBeInTheDocument();
+  });
+
+  it("has no sidebar", () => {
+    renderShell("/app/overview");
+    expect(screen.queryByRole("navigation", { name: "Places" })).not.toBeInTheDocument();
   });
 
   it("does not steal / while typing in a field", async () => {

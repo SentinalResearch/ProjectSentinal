@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { SentinalMark } from "../../../components/SentinalMark";
 import { useLiveData } from "../../../data/LiveDataContext";
 import { islandLocation } from "../shell/location";
+import { PlacesMenu } from "../shell/PlacesMenu";
 import { needCount, tickerItems } from "../shell/ticker";
 import type { IslandBack } from "./islandBack";
 import styles from "./MobileIsland.module.css";
@@ -46,7 +47,10 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
       <Link to="/app/overview" className={styles.logo} aria-label="Dashboard">
         <SentinalMark size={18} />
       </Link>
-      <span className={styles.page}>{name}</span>
+      <PlacesMenu label={`You are on ${name}. Go somewhere`} triggerClass={styles.page}>
+        <span>{name}</span>
+        <span className={styles.caret} aria-hidden="true">▾</span>
+      </PlacesMenu>
       {top && (
         <Link to={`/app/sessions/${encodeURIComponent(top.sessionId)}`} className={styles.ticker} data-state={top.state}>
           <span className={styles.square} aria-hidden="true" />

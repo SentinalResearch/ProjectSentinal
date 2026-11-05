@@ -11,8 +11,9 @@ import styles from "./phone.module.css";
 
 /**
  * The glass phone shell (MOBILE_GLASS_SPEC §1): an island on top, a prompt
- * pill at the bottom, no tab bar, menu, or sidebar. Detail screens put ‹ back
- * in the island; the prompt does everything the menu used to.
+ * pill at the bottom, no tab bar or sidebar. Detail screens put ‹ back in the
+ * island. Tapping the page name drops down the main places for a new user;
+ * the prompt is the fast path.
  */
 export function PhoneShell() {
   const [back, setBack] = useState<IslandBack | null>(null);

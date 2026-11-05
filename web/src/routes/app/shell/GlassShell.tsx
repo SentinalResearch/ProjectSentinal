@@ -10,8 +10,9 @@ import { ShellContext, type ShellValue } from "./ShellContext";
 import styles from "./GlassShell.module.css";
 
 /**
- * Desktop (≥ 1024 px) shell: the Live island on top, the routed page below,
- * and the prompt on demand (GLASS_SPEC.md §4–5). ⌘K / Ctrl-K and "/" open
+ * Desktop (≥ 768 px) shell: the Live island on top, the routed page below,
+ * and the prompt on demand (GLASS_SPEC.md §4–5). The island's page name drops
+ * down the main places for a new user; the prompt is the fast path. ⌘K / Ctrl-K and "/" open
  * the prompt; it only proposes, and this shell performs the chosen action
  * with the app's usual confirmations.
  */

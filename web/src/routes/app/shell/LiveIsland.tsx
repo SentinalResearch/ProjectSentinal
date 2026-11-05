@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { SentinalMark } from "../../../components/SentinalMark";
 import { useLiveData } from "../../../data/LiveDataContext";
 import { islandLocation } from "./location";
+import { PlacesMenu } from "./PlacesMenu";
 import { needCount, tickerItems } from "./ticker";
 import styles from "./LiveIsland.module.css";
 
@@ -61,12 +62,10 @@ export function LiveIsland({ onOpenPrompt }: { onOpenPrompt: (prefill?: string) 
       <button type="button" className={styles.logo} onClick={() => navigate("/app/overview")} title="Dashboard">
         <SentinalMark size={18} />
       </button>
-      <button
-        type="button"
-        className={styles.location}
-        onClick={() => onOpenPrompt("go ")}
-        title="Go somewhere"
-        aria-label={`You are on ${where.kind === "session" ? `${where.machine} › ${where.title}` : where.name}. Go somewhere`}
+      <PlacesMenu
+        triggerClass={styles.location}
+        onSearch={() => onOpenPrompt()}
+        label={`You are on ${where.kind === "session" ? `${where.machine} › ${where.title}` : where.name}. Go somewhere`}
       >
         {where.kind === "session" ? (
           <>
@@ -77,7 +76,7 @@ export function LiveIsland({ onOpenPrompt }: { onOpenPrompt: (prefill?: string) 
         ) : (
           <span className={styles.title}>{where.name}</span>
         )}
-      </button>
+      </PlacesMenu>
       {(items.length > 0 || needs > 0) && <span className={styles.divider} aria-hidden="true" />}
       <span ref={slot} className={styles.ticker} aria-live="polite" aria-label="What needs you">
         {collapsed || items.length === 0 ? (
