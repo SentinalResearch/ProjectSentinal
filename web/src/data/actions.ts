@@ -33,9 +33,17 @@ export function offeredChoices(session: Session): PromptChoice[] {
   return (session.promptOptions ?? []).filter((choice) => choiceKeysAllowed(choice.keys)).slice(0, 6);
 }
 
-/** A WAITING Session with a prompt whose capture lets the owner type into it. */
+/** `[y/N]`, `(Y/n)`, `[yes/no]`: a key and Enter answers it. A bare `(yes/no)` wants the word typed. */
+const YES_NO = /\[\s*y(es)?\s*\/\s*n(o)?\s*\]|\(\s*y\s*\/\s*n\s*\)/i;
+
+/**
+ * A WAITING Session whose answers the UI can offer: the program's own list, or
+ * y and n for a yes-or-no question. Never y or n for a password or free text.
+ */
 export function canAnswer(session: Session): boolean {
-  return session.state === "WAITING" && Boolean(session.prompt) && captureCapabilities(captureOf(session)).canSendInput;
+  if (session.state !== "WAITING" || !session.prompt) return false;
+  if (!captureCapabilities(captureOf(session)).canSendInput) return false;
+  return offeredChoices(session).length > 0 || YES_NO.test(session.prompt);
 }
 
 /** A live Session that accepts Ctrl-C (the daemon still enforces it). */

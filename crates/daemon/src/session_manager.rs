@@ -137,6 +137,8 @@ struct SessionHandle {
     watcher: Mutex<watcher::EventEngine>,
     /// ANSI-free bounded line framing shared by PTY and log observations.
     line_framer: Mutex<watcher::LineFramer>,
+    /// When the screen was last shown to the watcher.
+    screen_sampled_at: std::sync::atomic::AtomicI64,
     /// Shared allocator for watcher-produced Event IDs.
     watcher_ids: TrackerIds,
     /// Rendered Watch initial Command, taken and typed at the first prompt.

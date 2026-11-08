@@ -63,7 +63,9 @@ impl HealthTracker {
                     self.add_evidence(&format!("Command finished with exit code {code}"));
                 }
             }
-            ObservationKind::ProcessSample(_) | ObservationKind::Tick => {}
+            ObservationKind::ProcessSample(_)
+            | ObservationKind::Tick
+            | ObservationKind::Screen { .. } => {}
         }
         for event in events {
             self.apply_event(event);

@@ -474,6 +474,7 @@ impl SessionManager {
             )),
             watcher: Mutex::new(watcher),
             line_framer: Mutex::new(watcher::LineFramer::default()),
+            screen_sampled_at: std::sync::atomic::AtomicI64::new(0),
             watcher_ids: self.inner.tracker_ids.clone(),
             initial_command: Mutex::new(None),
             shell_reports: Mutex::default(),

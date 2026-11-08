@@ -110,7 +110,7 @@ impl WatcherAdapter for GenericAdapter {
                 self.state.stalled = false;
                 Vec::new()
             }
-            ObservationKind::ProcessSample(_) => Vec::new(),
+            ObservationKind::ProcessSample(_) | ObservationKind::Screen { .. } => Vec::new(),
         }
     }
 
@@ -126,6 +126,12 @@ impl WatcherAdapter for GenericAdapter {
 pub(crate) fn prompt_line(line: &str) -> Option<String> {
     // Real prompts usually leave the cursor after a space ("Continue? [y/N] ").
     let unterminated = line.trim_end_matches(['\r', '\n']);
+    // A terminal reply echoed into the output, or part of a drawn box, asks nothing.
+    if unterminated.contains("^[")
+        || unterminated.contains(['╭', '╮', '╰', '╯', '┌', '┐', '└', '┘', '│'])
+    {
+        return None;
+    }
     let trimmed = unterminated.trim_end();
     let lower = trimmed.to_ascii_lowercase();
     let exact_suffix = lower.ends_with("[y/n]")

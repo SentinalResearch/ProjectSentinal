@@ -13,6 +13,7 @@ mod observation;
 mod progress;
 mod pytest;
 pub mod redact;
+mod screen_prompt;
 mod server;
 pub mod training;
 

@@ -21,6 +21,10 @@ pub enum CodingAgent {
     Aider,
     /// Gemini CLI.
     Gemini,
+    /// Mistral Vibe.
+    Vibe,
+    /// Google Antigravity CLI (`agy`).
+    Antigravity,
 }
 
 impl CodingAgent {
@@ -31,6 +35,8 @@ impl CodingAgent {
             CodingAgent::Codex => "Codex",
             CodingAgent::Aider => "aider",
             CodingAgent::Gemini => "Gemini CLI",
+            CodingAgent::Vibe => "Mistral Vibe",
+            CodingAgent::Antigravity => "Antigravity",
         }
     }
 }

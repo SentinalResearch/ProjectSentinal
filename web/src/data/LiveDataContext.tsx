@@ -58,7 +58,11 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
             ...event.session,
             events: prev[idx].events,
             progress: event.session.progress ?? prev[idx].progress,
-            prompt: event.session.prompt ?? prev[idx].prompt,
+            // A question that is over must never be answered as if still open.
+            prompt: event.session.state === "WAITING" ? event.session.prompt ?? prev[idx].prompt : undefined,
+            promptOptions: event.session.state === "WAITING"
+              ? event.session.promptOptions ?? prev[idx].promptOptions
+              : undefined,
             details: prev[idx].details ?? event.session.details,
             metrics: event.session.metrics ?? prev[idx].metrics,
             training: event.session.training ?? prev[idx].training,

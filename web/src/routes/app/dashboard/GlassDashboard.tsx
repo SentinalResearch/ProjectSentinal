@@ -183,7 +183,7 @@ function NeedsCard({
   return (
     // The title is the card's one "open" control; the rest of the card is a
     // larger mouse target for it (no button nested in a button).
-    <AttentionCard as="article" state={session.state} className={styles.needCard} aria-labelledby={titleId} onClick={onOpen}>
+    <AttentionCard as="article" state={session.state} className={styles.needCard} data-wide={offeredChoices(session).length > 0 || undefined} aria-labelledby={titleId} onClick={onOpen}>
       <div className={styles.needTop}>
         <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
         {session.codingAgent && <AgentBadge agent={session.codingAgent} />}
@@ -207,6 +207,9 @@ function NeedsCard({
         <div className={styles.choiceColumn}>
           <span className={styles.well}>{session.prompt}</span>
           <PromptChoices session={session} />
+          <button type="button" className={styles.chip} onClick={stop(onOpen)}>
+            Open terminal
+          </button>
         </div>
       ) : session.state === "WAITING" && canAnswer(session) ? (
         <div className={styles.answerRow}>

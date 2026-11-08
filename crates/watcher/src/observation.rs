@@ -44,6 +44,13 @@ pub enum ObservationKind {
     CommandFinished(Command),
     /// A clock tick used for quiet-time decisions.
     Tick,
+    /// What the terminal screen shows now.
+    Screen {
+        /// Each row of text.
+        rows: Vec<String>,
+        /// Whether a full-screen program has the terminal.
+        alternate: bool,
+    },
 }
 
 /// One timestamped structured watcher input.
@@ -75,6 +82,14 @@ impl Observation {
                 ram_percent: None,
                 vram_percent: None,
             }),
+        }
+    }
+
+    /// Build one look at the terminal screen.
+    pub fn screen(at: Timestamp, rows: Vec<String>, alternate: bool) -> Self {
+        Observation {
+            at,
+            kind: ObservationKind::Screen { rows, alternate },
         }
     }
 

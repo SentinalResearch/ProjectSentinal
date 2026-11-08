@@ -305,6 +305,14 @@ impl SessionManager {
             })?;
         }
         let reduced = lock_session(&handle)?.capture != CaptureLevel::Full;
+        // A quiet screen still needs looking at: a question draws once, then waits.
+        tasks::sample_screen(
+            session_id,
+            &handle,
+            self.inner.store.as_deref(),
+            metrics.at,
+            0,
+        );
         let observation = watcher::Observation {
             at: metrics.at,
             kind: watcher::ObservationKind::MetricsSample(resources),

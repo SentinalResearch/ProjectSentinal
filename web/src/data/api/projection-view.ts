@@ -96,6 +96,9 @@ function mapSession(
     .filter((event) => event.session_id === session.id)
     .sort((left, right) => left.at - right.at)
     .map(mapEvent);
+  const promptEvent = events
+    .filter((event) => event.session_id === session.id && event.facts.category === "WAITING")
+    .reduce<number | undefined>((latest, event) => Math.max(latest ?? 0, Number(event.id)), undefined);
   const latestMetrics = metrics
     .filter((entry) => entry.scope === "SESSION" && entry.session_id === session.id)
     .sort((left, right) => right.at - left.at)[0];
@@ -121,6 +124,7 @@ function mapSession(
       ? undefined : { current: session.health.progress, total: 100, unit: "%" },
     metrics: metricView(latestMetrics),
     dismissed: session.dismissed_at ? true : undefined,
+    ...(promptEvent === undefined ? {} : { promptEventId: promptEvent }),
     codingAgent: session.coding_agent
       ? {
           agent: session.coding_agent.agent,
@@ -188,6 +192,10 @@ function replaceSession(sessions: Session[], session: Session): Session[] {
   if (index < 0) return [...sessions, session];
   const next = sessions.slice();
   next[index] = { ...sessions[index], ...session, events: sessions[index].events };
+  // A question that is over must never be answered as if it were still open.
+  if (session.state !== "WAITING") {
+    next[index] = { ...next[index], prompt: undefined, promptOptions: undefined, promptEventId: undefined };
+  }
   return next;
 }
 
@@ -217,8 +225,11 @@ export function applyProjectionMessage(
     } else if (change.type === "EVENT_APPEND") {
       const sessionId = compositeId(message.machine_id, change.event.session_id);
       const event = mapEvent(change.event);
+      // A new question: its text is on the owning Machine, not here.
+      const question = change.event.facts.category === "WAITING"
+        ? { promptEventId: Number(change.event.id), prompt: undefined, promptOptions: undefined } : {};
       current.sessions = current.sessions.map((session) => session.id === sessionId
-        ? { ...session, events: [...(session.events ?? []), event] } : session);
+        ? { ...session, ...question, events: [...(session.events ?? []), event] } : session);
       events.push({ type: "EVENT_APPENDED", sessionId, event });
     } else if (change.metrics.scope === "SESSION" && change.metrics.session_id !== null) {
       const sessionId = compositeId(message.machine_id, change.metrics.session_id);

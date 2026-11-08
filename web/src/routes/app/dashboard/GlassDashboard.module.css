@@ -174,7 +174,14 @@
 .answerRow {
   margin-top: auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+}
+
+/* A question with several long answers needs room to be read. */
+.needCard[data-wide] {
+  grid-column: span 2;
 }
 
 .choiceColumn {
@@ -185,16 +192,21 @@
   min-width: 0;
 }
 
+/* In a column, the row layout's 100% basis would become a height. */
+.choiceColumn .well {
+  flex: none;
+}
+
+/* The whole question, always: you cannot answer what you cannot read. */
 .well {
   min-width: 0;
-  flex: 1;
+  flex: 1 0 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  padding: 0 14px;
-  height: 44px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  padding: 10px 14px;
+  min-height: 44px;
+  overflow-wrap: anywhere;
   background: var(--well);
   border-radius: var(--radius-key);
   font-family: var(--font-mono);

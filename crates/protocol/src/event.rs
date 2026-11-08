@@ -303,7 +303,7 @@ mod tests {
 }
 
 /// Longest prompt-option label kept, in characters.
-pub const MAX_PROMPT_OPTION_LABEL: usize = 80;
+pub const MAX_PROMPT_OPTION_LABEL: usize = 160;
 /// Most options one prompt carries.
 pub const MAX_PROMPT_OPTIONS: usize = 6;
 

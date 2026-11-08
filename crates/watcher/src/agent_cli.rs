@@ -23,7 +23,7 @@ const ANSWERED_AFTER_LINES: usize = 12;
 const BORDER: &[char] = &[
     '│', '┃', '║', '╭', '╮', '╰', '╯', '─', '━', '═', '┌', '┐', '└', '┘', '|',
 ];
-const MARKERS: &[char] = &['❯', '›', '>', '▶', '●', '○', '*', '◯', '◉'];
+pub(crate) const MARKERS: &[char] = &['❯', '›', '>', '▶', '●', '○', '*', '◯', '◉'];
 
 /// What the agent adapter currently knows.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -54,6 +54,9 @@ pub struct AgentCliAdapter {
     lines_since_prompt: usize,
     turn: crate::agent_activity::AgentTurn,
     state: AgentCliState,
+    /// The daemon shows us the screen, which is what questions are read from.
+    /// Lines remain the fallback for replays and logs.
+    screen_seen: bool,
 }
 
 impl AgentCliAdapter {
@@ -64,7 +67,7 @@ impl AgentCliAdapter {
 
     /// Whether an approval prompt is waiting for a person.
     pub fn waiting(&self) -> bool {
-        self.emitted.is_some()
+        !self.screen_seen && self.emitted.is_some()
     }
 
     fn reset(&mut self) {
@@ -110,6 +113,8 @@ pub fn coding_agent(slug: &str) -> Option<protocol::coding_agent::CodingAgent> {
         "codex" => Some(CodingAgent::Codex),
         "aider" => Some(CodingAgent::Aider),
         "gemini" => Some(CodingAgent::Gemini),
+        "vibe" => Some(CodingAgent::Vibe),
+        "antigravity" => Some(CodingAgent::Antigravity),
         _ => None,
     }
 }
@@ -132,6 +137,8 @@ pub fn agent_of(command: &str) -> Option<&'static str> {
         "codex" => Some("codex"),
         "aider" => Some("aider"),
         "gemini" | "gemini-cli" => Some("gemini"),
+        "vibe" | "mistral-vibe" => Some("vibe"),
+        "agy" | "antigravity" => Some("antigravity"),
         _ => None,
     }
 }
@@ -163,6 +170,21 @@ impl WatcherAdapter for AgentCliAdapter {
                 self.reset();
                 Vec::new()
             }
+            ObservationKind::Screen { rows, .. } => {
+                self.screen_seen = true;
+                self.emitted = None;
+                self.candidate = None;
+                let mut events = Vec::new();
+                for row in rows {
+                    let cleaned = clean(row);
+                    if !cleaned.trim().is_empty() {
+                        events.extend(self.turn.line(observation.at, &cleaned));
+                    }
+                }
+                self.refresh_summary();
+                events
+            }
+            ObservationKind::OutputLine(_) if self.screen_seen => Vec::new(),
             ObservationKind::OutputLine(line) => {
                 let cleaned = clean(line);
                 if cleaned.trim().is_empty() {
@@ -192,7 +214,10 @@ impl WatcherAdapter for AgentCliAdapter {
             }
             ObservationKind::Tick | ObservationKind::MetricsSample(_) => {
                 let mut events = self.settle(observation.at);
-                events.extend(self.turn.tick(observation.at, self.emitted.is_some()));
+                events.extend(
+                    self.turn
+                        .tick(observation.at, self.emitted.is_some() || self.state.waiting),
+                );
                 self.refresh_summary();
                 events
             }
@@ -214,7 +239,7 @@ impl WatcherAdapter for AgentCliAdapter {
 }
 
 /// Remove dialog borders; keep the indentation inside them.
-fn clean(line: &str) -> String {
+pub(crate) fn clean(line: &str) -> String {
     let line = line.trim_end();
     let line = line.strip_prefix(BORDER).unwrap_or(line);
     let line = line.trim_end_matches(|c: char| BORDER.contains(&c) || c.is_whitespace());
@@ -230,11 +255,16 @@ fn clean(line: &str) -> String {
 
 fn detect(lines: &VecDeque<String>) -> Option<Prompt> {
     let last = lines.back()?;
-    letter_choices(last).or_else(|| numbered_choices(lines))
+    letter_choices(last)
+        .map(|found| Prompt {
+            question: found.question,
+            options: found.options,
+        })
+        .or_else(|| numbered_choices(lines))
 }
 
 /// aider: `Question? (Y)es/(N)o/(D)on't ask again [Yes]:`
-fn letter_choices(line: &str) -> Option<Prompt> {
+pub(crate) fn letter_choices(line: &str) -> Option<crate::screen_prompt::ScreenQuestion> {
     let line = line.trim();
     let body = line.strip_suffix(':')?.trim_end();
     let body = match body.rfind(" [") {
@@ -258,16 +288,16 @@ fn letter_choices(line: &str) -> Option<Prompt> {
             PromptOption::new(&label, &format!("{}\r", letter.to_ascii_lowercase()))
         })
         .collect::<Option<Vec<_>>>()?;
-    (2..=MAX_PROMPT_OPTIONS)
-        .contains(&options.len())
-        .then(|| Prompt {
+    (2..=MAX_PROMPT_OPTIONS).contains(&options.len()).then(|| {
+        crate::screen_prompt::ScreenQuestion {
             question: question.to_string(),
             options,
-        })
+        }
+    })
 }
 
 /// A numbered option line: `❯ 1. Yes`. Returns (number, label, label column in characters).
-fn option_line(line: &str) -> Option<(u32, &str, usize)> {
+pub(crate) fn option_line(line: &str) -> Option<(u32, &str, usize)> {
     let mut rest = line.trim_start();
     if let Some(stripped) = rest.strip_prefix(MARKERS) {
         rest = stripped.trim_start();
@@ -287,7 +317,7 @@ fn leading_spaces(line: &str) -> usize {
     line.chars().take_while(|c| *c == ' ').count()
 }
 
-fn is_hint(line: &str) -> bool {
+pub(crate) fn is_hint(line: &str) -> bool {
     let lower = line.trim().to_ascii_lowercase();
     lower.len() < 100
         && [
@@ -297,6 +327,10 @@ fn is_hint(line: &str) -> bool {
             "tab to",
             "↑/↓",
             "to navigate",
+            "enter select",
+            "esc reject",
+            "to select",
+            "navigate",
         ]
         .iter()
         .any(|hint| lower.contains(hint))

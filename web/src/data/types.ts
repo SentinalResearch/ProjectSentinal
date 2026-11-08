@@ -89,6 +89,8 @@ export interface Session {
   details?: string;
   result?: SessionResult;
   prompt?: string;
+  /** The Event holding `prompt`, when the control stored only that it exists. */
+  promptEventId?: number;
   /** The answers the waiting program offered (6.1), e.g. Claude Code's numbered choices. */
   promptOptions?: PromptChoice[];
   health?: SessionHealth;
@@ -236,7 +238,7 @@ export interface MachineMetricSample {
 }
 
 export interface CodingAgentView {
-  agent: "CLAUDE" | "CODEX" | "AIDER" | "GEMINI";
+  agent: "CLAUDE" | "CODEX" | "AIDER" | "GEMINI" | "VIBE" | "ANTIGRAVITY";
   /** On a turn now. */
   working: boolean;
   toolUses: number;

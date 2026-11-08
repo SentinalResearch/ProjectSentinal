@@ -274,6 +274,44 @@ pub(super) fn apply_output(
             watcher::Observation::output(at, line),
         );
     }
+    sample_screen(session_id, handle, store, at, SCREEN_SAMPLE_MS);
+}
+
+/// Look at the screen at most this often while a program is printing.
+const SCREEN_SAMPLE_MS: i64 = 250;
+
+/// Show the watcher the parsed screen, for a Session whose program is running.
+/// A full-screen program's output is not lines; its screen is what a person reads.
+pub(super) fn sample_screen(
+    session_id: SessionId,
+    handle: &SessionHandle,
+    store: Option<&Store>,
+    at: protocol::Timestamp,
+    at_most_every_ms: i64,
+) {
+    use std::sync::atomic::Ordering;
+    let running = match handle.session.lock() {
+        Ok(session) => session.capture == protocol::CaptureLevel::Full && session.state.is_busy(),
+        Err(_) => false,
+    };
+    let last = handle.screen_sampled_at.load(Ordering::Relaxed);
+    if !running || at.0.saturating_sub(last) < at_most_every_ms {
+        return;
+    }
+    handle.screen_sampled_at.store(at.0, Ordering::Relaxed);
+    let sample = match handle.parser.lock() {
+        Ok(parser) => {
+            let screen = parser.screen();
+            let (_, cols) = screen.size();
+            let rows: Vec<String> = screen.rows(0, cols).collect();
+            watcher::Observation::screen(at, rows, screen.alternate_screen())
+        }
+        Err(_) => {
+            tracing::error!(session = session_id.0, "screen lock poisoned");
+            return;
+        }
+    };
+    apply_observation(session_id, handle, store, sample);
 }
 
 pub(super) fn finish_output(

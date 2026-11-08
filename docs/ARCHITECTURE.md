@@ -75,7 +75,10 @@ never parses terminal text itself.
 Current adapters cover training, pytest, vLLM/llama.cpp, Cargo, and validated
 TOML rules in `~/.config/terminal-agent/adapters/`. A program no adapter
 recognises still reports explicit counters (`task 3/50`, `[4/10]`, a tqdm
-bar) as progress. Health is deterministic
+bar) as progress. Questions come from the parsed screen, not from lines, for any
+running program: a numbered menu with a selection marker or key hints, with its
+answers, until it leaves the screen (`watcher/src/screen_prompt.rs`). Named agents
+only add a badge. Health is deterministic
 derived state with bounded evidence, stored on the Session and delivered by
 the existing `SESSION_UPDATED` message. No watcher path uses a model.
 

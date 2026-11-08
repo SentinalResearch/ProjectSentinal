@@ -1,3 +1,4 @@
+import { canAnswer as canAnswerPrompt } from "../../../data/actions";
 import { SessionRemoveActions } from "../SessionRemoveActions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -131,7 +132,7 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
         </div>
 
         {waiting ? (
-          <WaitingPanel session={session} canAnswer={capabilities.canSendInput} />
+          <WaitingPanel session={session} canAnswer={canAnswerPrompt(session)} />
         ) : failed ? (
           <FailureDetail session={session} />
         ) : (

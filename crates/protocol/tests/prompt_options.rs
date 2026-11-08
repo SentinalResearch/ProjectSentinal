@@ -31,12 +31,12 @@ fn labels_are_display_text_only() {
     let option = PromptOption::new("Yes\u{1b}[31m\u{202e} please", "1").unwrap();
     assert_eq!(option.label, "Yes[31m please");
     assert_eq!(
-        PromptOption::new(&"y".repeat(200), "y")
+        PromptOption::new(&"y".repeat(300), "y")
             .unwrap()
             .label
             .chars()
             .count(),
-        80
+        160
     );
     assert!(PromptOption::new("   ", "1").is_none());
     assert!(PromptOption::new("Yes", "yes\r").is_none());

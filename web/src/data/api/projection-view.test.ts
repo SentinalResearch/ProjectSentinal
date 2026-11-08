@@ -126,3 +126,59 @@ describe("control projection view", () => {
     }, 1_100)).toBeNull();
   });
 });
+
+describe("the prompt of a WAITING Session", () => {
+  const base = () => {
+    const data = snapshot();
+    const machine = data.machines[0];
+    machine.sessions[0].state = "WAITING";
+    machine.events = [
+      { id: 40, session_id: machine.sessions[0].id, at: 1, facts: { category: "WARNING" } },
+      { id: 41, session_id: machine.sessions[0].id, at: 2, facts: { category: "WAITING" } },
+    ] as typeof machine.events;
+    return data;
+  };
+
+  it("remembers which Event holds the text the control does not store", () => {
+    const view = projectionView(base(), 3)!;
+    const session = [...view.machines.values()][0].sessions[0];
+    expect(session.promptEventId).toBe(41);
+    expect(session.prompt).toBeUndefined();
+  });
+
+  it("forgets the old question as soon as the Session is no longer waiting", () => {
+    const data = base();
+    const view = projectionView(data, 3)!;
+    const machine = [...view.machines.values()][0];
+    machine.sessions[0] = { ...machine.sessions[0], prompt: "Old question? [y/N]" };
+    const events = applyProjectionMessage(view, {
+      type: "PROJECTION_DELTA",
+      machine_id: data.machines[0].machine_id,
+      from_revision: view.revision,
+      to_revision: view.revision + 1,
+      changes: [{ type: "SESSION_UPSERT", cursor: 9, session: { ...data.machines[0].sessions[0], state: "RUNNING" } }],
+    } as never, 4);
+    expect(events).not.toBeNull();
+    expect(machine.sessions[0].prompt).toBeUndefined();
+  });
+
+  it("a new question replaces the Event to fetch and drops the old text", () => {
+    const data = base();
+    const view = projectionView(data, 3)!;
+    const machine = [...view.machines.values()][0];
+    machine.sessions[0] = { ...machine.sessions[0], prompt: "Old question? [y/N]" };
+    applyProjectionMessage(view, {
+      type: "PROJECTION_DELTA",
+      machine_id: data.machines[0].machine_id,
+      from_revision: view.revision,
+      to_revision: view.revision + 1,
+      changes: [{
+        type: "EVENT_APPEND",
+        cursor: 9,
+        event: { id: 55, session_id: data.machines[0].sessions[0].id, at: 9, facts: { category: "WAITING" } },
+      }],
+    } as never, 4);
+    expect(machine.sessions[0].promptEventId).toBe(55);
+    expect(machine.sessions[0].prompt).toBeUndefined();
+  });
+});

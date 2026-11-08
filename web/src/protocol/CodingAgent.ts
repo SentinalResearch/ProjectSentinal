@@ -3,4 +3,10 @@
 /**
  * An AI coding agent Sentinal recognises from its Command.
  */
-export type CodingAgent = "CLAUDE" | "CODEX" | "AIDER" | "GEMINI";
+export type CodingAgent =
+  | "CLAUDE"
+  | "CODEX"
+  | "AIDER"
+  | "GEMINI"
+  | "VIBE"
+  | "ANTIGRAVITY";

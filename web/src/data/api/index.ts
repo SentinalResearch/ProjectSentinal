@@ -517,6 +517,9 @@ class DaemonTransport {
   }
 }
 
+/** A prompt that could not be fetched is asked for again after this long. */
+const PROMPT_RETRY_MS = 5_000;
+
 export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
   const storage = options.storage ?? window.localStorage;
   const socketFactory = options.socketFactory ?? ((url: string) => new WebSocket(url));
@@ -598,6 +601,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       machines: [...connections.values()].map((connection) => connection.machine),
       sessions: [...connections.values()].flatMap((connection) => connection.sessions),
     });
+    fetchWaitingPrompts();
   };
 
   const closeProjectionStream = (): void => {
@@ -670,6 +674,7 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
         }
       }
       for (const event of events) emit(event);
+      fetchWaitingPrompts();
     };
     socket.onclose = (event) => {
       if (projectionSocket !== socket) return;
@@ -901,6 +906,43 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
     if (projection !== null) return [...connections.values()].flatMap((connection) => connection.sessions);
     await refreshLegacy();
     return [...connections.values()].flatMap((connection) => connection.sessions);
+  };
+
+  /**
+   * The control stores that a Session is waiting, never the words (4.D privacy
+   * minimisation). Ask the owning Machine for that one Event, as History asks
+   * for Commands, so the text travels only in a reply to the owner.
+   */
+  const promptAsked = new Map<string, number>();
+  const fetchPrompt = async (connection: MachineConnection, session: Session, eventId: number): Promise<void> => {
+    const reply = await connection.transport.request(
+      { type: "GET_EVENTS", session_id: localId(session.id), after: eventId - 1, limit: 1 },
+      (message) => message.type === "EVENTS" || message.type === "ERROR",
+    );
+    if (reply.type !== "EVENTS") return;
+    const event = reply.events.find((entry) => Number(entry.id) === eventId);
+    if (!event || event.kind.type !== "WAITING_FOR_INPUT") return;
+    const patch = watcherEventPatch(event);
+    const index = connection.sessions.findIndex((entry) => entry.id === session.id);
+    const current = connection.sessions[index];
+    // Only if this is still the open question.
+    if (!current || current.state !== "WAITING" || current.promptEventId !== eventId) return;
+    const updated = { ...current, ...patch };
+    connection.sessions[index] = updated;
+    emit({ type: "SESSION_UPDATED", session: updated });
+  };
+  const fetchWaitingPrompts = (): void => {
+    for (const connection of connections.values()) {
+      if (connection.machine.status !== "ONLINE") continue;
+      for (const session of connection.sessions) {
+        const eventId = session.promptEventId;
+        if (session.state !== "WAITING" || session.prompt || eventId === undefined) continue;
+        const key = `${session.id}:${eventId}`;
+        if (now() - (promptAsked.get(key) ?? -Infinity) < PROMPT_RETRY_MS) continue;
+        promptAsked.set(key, now());
+        void fetchPrompt(connection, session, eventId).catch(() => undefined);
+      }
+    }
   };
 
   const owner = (sessionId: string): MachineConnection => {

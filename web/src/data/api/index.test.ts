@@ -600,6 +600,33 @@ describe("apiAdapter authentication", () => {
     expect(worker?.requests.some((request) => request.type === "GET_EVENTS")).toBe(false);
   });
 
+  it("asks the owning Machine for a waiting prompt the control does not store", async () => {
+    // The control holds no terminal text, so the browser asks for the one Event.
+    const { adapter, server, sockets } = setup();
+    const snapshot = controlProjection();
+    const machine = snapshot.machines.find((entry) => entry.machine_id === "worker-machine");
+    if (!machine) throw new Error("the fixture has no worker");
+    machine.sessions[0].state = "WAITING";
+    machine.events = [
+      { id: 77, session_id: machine.sessions[0].id, at: 1, facts: { category: "WAITING" } },
+    ] as typeof machine.events;
+    server.projectionSnapshot = snapshot;
+    await adapter.auth.login("correct horse battery staple");
+    const live: import("../adapter").LiveEvent[] = [];
+    const unsubscribe = adapter.subscribe((event) => live.push(event));
+    await adapter.getSessions();
+
+    await vi.waitFor(() => {
+      const worker = sockets.find((socket) => socket.machineId === "worker-machine");
+      expect(worker?.requests.find((request) => request.type === "GET_EVENTS")).toMatchObject({
+        session_id: machine.sessions[0].id,
+        after: 76,
+        limit: 1,
+      });
+    });
+    unsubscribe();
+  });
+
   it("applies the control live delta without opening a worker socket", async () => {
     const { adapter, server, sockets } = setup();
     server.projectionSnapshot = controlProjection();

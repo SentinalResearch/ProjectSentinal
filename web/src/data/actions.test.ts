@@ -31,3 +31,25 @@ describe("interrupting", () => {
     expect(canInterrupt({ ...waiting, state: "RUNNING", capture: "COMMANDS" })).toBe(false);
   });
 });
+
+describe("what an answer button may send", () => {
+  const waiting = (prompt: string) =>
+    ({ id: "m:1", state: "WAITING", prompt, capture: "FULL" }) as unknown as Parameters<typeof canAnswer>[0];
+
+  it("offers y and n only for a yes-or-no question", () => {
+    for (const prompt of ["Publish the results? [y/N]", "Continue [Y/n]", "Overwrite (y/n)?", "Proceed? [yes/no]"]) {
+      expect(canAnswer(waiting(prompt)), prompt).toBe(true);
+    }
+  });
+
+  it("never offers y or n to a question those keys cannot answer", () => {
+    for (const prompt of ["Password:", "Press any key", "Are you sure? (yes/no)", "Which file? "]) {
+      expect(canAnswer(waiting(prompt)), prompt).toBe(false);
+    }
+  });
+
+  it("offers a program's own listed answers whatever the wording", () => {
+    const session = { ...waiting("Allow this?"), promptOptions: [{ label: "Allow", keys: "1" }] };
+    expect(canAnswer(session)).toBe(true);
+  });
+});

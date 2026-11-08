@@ -13,7 +13,7 @@
   gap: 10px;
   min-width: 0;
   min-height: 40px;
-  padding: 0 12px;
+  padding: 8px 12px;
   border: 0;
   border-radius: var(--radius-key, 10px);
   background: var(--chip, var(--bg-1));
@@ -48,9 +48,8 @@
   opacity: 0.8;
 }
 
+/* The whole answer: "Yes, and don't ask again for…" must be readable to choose it. */
 .label {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }

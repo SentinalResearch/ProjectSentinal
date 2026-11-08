@@ -35,6 +35,7 @@ pub struct EventEngine {
     capture: CaptureLevel,
     command_activity_required: bool,
     command_active: bool,
+    screen: crate::screen_prompt::ScreenPrompts,
 }
 
 impl EventEngine {
@@ -50,6 +51,7 @@ impl EventEngine {
             capture: CaptureLevel::Full,
             command_activity_required: false,
             command_active: command.is_some(),
+            screen: crate::screen_prompt::ScreenPrompts::default(),
         };
         if let Some(command) = command {
             engine.select(command);
@@ -80,11 +82,21 @@ impl EventEngine {
             self.select(command);
             self.last_progress = None;
             self.command_active = true;
+            self.screen.reset();
         } else if matches!(observation.kind, ObservationKind::CommandFinished(_)) {
             self.command_active = false;
+            self.screen.reset();
         }
         let capture = self.capture;
         let mut events = self.process_events(observation);
+        if let ObservationKind::Screen { rows, alternate } = &observation.kind {
+            if self.command_active {
+                events.extend(self.screen.observe(observation.at, rows, *alternate));
+            }
+        }
+        // In a full-screen program lines are fragments of redraws; while the
+        // screen shows a question it is the only one being asked.
+        let lines_mean_nothing = self.screen.alternate() || self.screen.waiting();
         let quiet_timer = matches!(
             observation.kind,
             ObservationKind::MetricsSample(_) | ObservationKind::Tick
@@ -99,7 +111,8 @@ impl EventEngine {
                     .observe(observation)
                     .into_iter()
                     .filter(|event| {
-                        !(owns_prompts && matches!(event, EventKind::WaitingForInput { .. }))
+                        !((owns_prompts || lines_mean_nothing)
+                            && matches!(event, EventKind::WaitingForInput { .. }))
                     }),
             );
         }
@@ -125,10 +138,11 @@ impl EventEngine {
         let health = self.health.observe(observation, &events);
         let health = bound(capture, health);
         let adapter_state = self.selected.as_ref().map(|adapter| adapter.state());
-        let waiting = match &self.selected {
-            Some(adapter) if adapter.owns_prompts() => adapter.waiting(),
-            _ => self.generic.waiting(),
-        };
+        let waiting = self.screen.waiting()
+            || match &self.selected {
+                Some(adapter) if adapter.owns_prompts() => adapter.waiting(),
+                _ => !lines_mean_nothing && self.generic.waiting(),
+            };
         EngineUpdate {
             events,
             health,

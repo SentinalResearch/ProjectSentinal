@@ -2,7 +2,7 @@ import { Button } from "../../components/Button";
 import { extractPort, formatLearningRate, lossOf, type SessionKind } from "../../data/format";
 import type { Session } from "../../data/types";
 import { PromptChoices } from "../../components/PromptChoices";
-import { offeredChoices } from "../../data/actions";
+import { canAnswer, offeredChoices } from "../../data/actions";
 import styles from "./SessionTopBlock.module.css";
 
 const TREND = { IMPROVING: "↓ improving", STABLE: "→ stable", WORSENING: "↑ worsening" } as const;
@@ -153,6 +153,8 @@ export function SessionTopBlock({
   }
 
   if (kind === "waiting" && session.prompt) {
+    // y and n only for a yes-or-no question, never for a password or free text.
+    const yesNo = canSendInput && canAnswer(session);
     return (
       <section className={`${styles.panel} ${styles.waiting}`}>
         <div className={styles.waitingLeft}>
@@ -165,11 +167,13 @@ export function SessionTopBlock({
               ? "Sentinal has no terminal input for this Session. Answer where the process runs."
               : offeredChoices(session).length > 0
                 ? "Each answer types the key the program asked for."
-                : "Default is N. Your answer is typed into the terminal followed by Enter."}
+                : yesNo
+                  ? "Your answer is typed into the terminal, followed by Enter."
+                  : "Answer this one in the terminal."}
           </span>
           {canSendInput && <PromptChoices session={session} />}
         </div>
-        {canSendInput && offeredChoices(session).length === 0 && (
+        {yesNo && offeredChoices(session).length === 0 && (
           <div className={styles.yn}>
             <button type="button" className={styles.ynKey} onClick={() => onAnswer("y")}>
               y

@@ -113,6 +113,8 @@ const CODING_AGENT_NAMES: Record<CodingAgentView["agent"], string> = {
   CODEX: "Codex",
   AIDER: "aider",
   GEMINI: "Gemini CLI",
+  VIBE: "Mistral Vibe",
+  ANTIGRAVITY: "Antigravity",
 };
 
 /** "Claude Code", "Codex", … (6.1). */
