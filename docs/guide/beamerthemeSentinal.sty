@@ -1,0 +1,30 @@
+\ProvidesPackage{beamerthemeSentinal}[2026/11/03 Sentinal Research slides]
+\newif\ifsr@light\sr@lightfalse
+\DeclareOptionBeamer{light}{\sr@lighttrue}
+\ProcessOptionsBeamer
+\RequirePackage{sentinal-brand}
+\ifsr@light
+  \colorlet{srBg}{srCream}\colorlet{srFg}{srInk}\colorlet{srFg2}{srText2}\colorlet{srAccent}{srBlueInk}\colorlet{srMarkInk}{srInk}
+\else
+  \colorlet{srBg}{srNight}\colorlet{srFg}{srNightText}\colorlet{srFg2}{srNightText2}\colorlet{srAccent}{srBlueSoft}\colorlet{srMarkInk}{srNightText}
+\fi
+\setbeamercolor{background canvas}{bg=srBg}
+\setbeamercolor{normal text}{fg=srFg,bg=srBg}
+\setbeamercolor{structure}{fg=srAccent}
+\setbeamercolor{frametitle}{fg=srFg}
+\setbeamercolor{framesubtitle}{fg=srFg2}
+\setbeamercolor{title}{fg=srFg}
+\setbeamercolor{subtitle}{fg=srFg2}
+\setbeamercolor{alerted text}{fg=srAccent}
+\setbeamercolor{item}{fg=srBlue}
+\setbeamercolor{block title}{fg=srAccent}
+\setbeamercolor{block body}{fg=srFg}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}{\raisebox{0.22ex}{\rule{0.42em}{0.42em}}}
+\setbeamertemplate{enumerate items}{\texttt{\insertenumlabel}}
+\setbeamersize{text margin left=12mm,text margin right=12mm}
+\setbeamertemplate{frametitle}{\vspace*{7mm}{\srdisplay\fontsize{24}{28}\selectfont\insertframetitle\par}{\usebeamercolor[fg]{framesubtitle}\normalsize\insertframesubtitle\par}\vspace{2mm}}
+\setbeamertemplate{footline}{\leavevmode\hbox to\paperwidth{\hspace{12mm}\srmark[7pt]\hspace{5pt}{\tiny\bfseries\color{srFg}Sentinal Research}\hfill{\tiny\ttfamily\color{srFg2}\insertframenumber\,/\,\inserttotalframenumber}\hspace{12mm}}\vspace{5mm}}
+\setbeamertemplate{title page}{\vfill\srmark[40pt]\par\vspace{9mm}{\usebeamercolor[fg]{title}\srdisplay\fontsize{34}{36}\selectfont\inserttitle\par}\vspace{3mm}{\usebeamercolor[fg]{subtitle}\large\insertsubtitle\par}\vspace{9mm}{\small\bfseries\insertauthor\par}{\small\ttfamily\usebeamercolor[fg]{subtitle}\insertinstitute\ \textperiodcentered\ \insertdate\par}\vfill}
+\AtBeginSection[]{{\setbeamercolor{background canvas}{bg=srBlue}\colorlet{srMarkInk}{white}\begin{frame}[plain]\vfill{\color{white}\ttfamily\small Section \insertsectionnumber\par}\vspace{3mm}{\color{white}\srdisplay\fontsize{40}{44}\selectfont\insertsectionhead\par}\vfill\end{frame}}}
+\endinput

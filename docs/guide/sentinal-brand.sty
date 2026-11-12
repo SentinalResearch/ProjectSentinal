@@ -1,0 +1,92 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{sentinal-brand}[2026/11/03 Sentinal Research brand: colours, fonts, marks; mark baseline fix 2026/11/08]
+\RequirePackage{iftex}
+\RequirePackage{xcolor}
+\RequirePackage{tikz}
+\RequirePackage{listings}
+
+% ---------- colours (print = light palette; night = dark palette) ----------
+\definecolor{srInk}{HTML}{0A0A0A}
+\definecolor{srPaper}{HTML}{FFFFFF}
+\definecolor{srCream}{HTML}{F7F6F2}
+\definecolor{srSurface}{HTML}{EFEEE9}
+\definecolor{srSurface2}{HTML}{E4E3DD}
+\definecolor{srText2}{HTML}{4A4A46}
+\definecolor{srText3}{HTML}{5E5E5A}
+\definecolor{srLine}{HTML}{D9D8D2}
+\definecolor{srBlue}{HTML}{3D5AFE}
+\definecolor{srBlueInk}{HTML}{2A44E0}
+\definecolor{srBlueSoft}{HTML}{8C9EFF}
+\definecolor{srDestructive}{HTML}{D12A20}
+\definecolor{srNight}{HTML}{0A0A0A}
+\definecolor{srNight1}{HTML}{111111}
+\definecolor{srNight2}{HTML}{1C1C1C}
+\definecolor{srNightLine}{HTML}{262626}
+\definecolor{srNightText}{HTML}{F2F2F0}
+\definecolor{srNightText2}{HTML}{A6A6A2}
+\definecolor{srNightText3}{HTML}{8A8A86}
+\definecolor{srTerm}{HTML}{0C0C0C}
+\definecolor{srState-CREATED}{HTML}{B9A8FF}
+\definecolor{srState-IDLE}{HTML}{9C9C98}
+\definecolor{srState-RUNNING}{HTML}{29D35F}
+\definecolor{srState-WAITING}{HTML}{FFD000}
+\definecolor{srState-STALLED}{HTML}{FF8A00}
+\definecolor{srState-COMPLETED}{HTML}{36C5E8}
+\definecolor{srState-FAILED}{HTML}{FF3B2F}
+\definecolor{srState-INTERRUPTED}{HTML}{FF5CA8}
+\definecolor{srState-DISCONNECTED}{HTML}{D9D8D2}
+\colorlet{srMarkInk}{srInk}
+\colorlet{srLockupSub}{srText2}
+
+% ---------- fonts ----------
+% XeLaTeX / LuaLaTeX: Archivo + JetBrains Mono from ./fonts (bundled).
+% pdfLaTeX: Archivo from TeX Live (archivo package) + Inconsolata.
+\ifPDFTeX
+  \RequirePackage[T1]{fontenc}
+  \IfFileExists{archivo.sty}{\RequirePackage[sfdefault]{archivo}}{\RequirePackage[scaled=0.92]{tgheros}}
+  \IfFileExists{zi4.sty}{\RequirePackage[varqu,varl,scaled=0.9]{zi4}}{}
+  \renewcommand{\familydefault}{\sfdefault}
+  \newcommand{\srdisplay}{\bfseries}
+\else
+  \RequirePackage{fontspec}
+  \IfFileExists{fonts/Archivo-Regular.ttf}{%
+    \setmainfont{Archivo}[Path=fonts/,Extension=.ttf,UprightFont=*-Regular,BoldFont=*-Bold,ItalicFont=*-Italic,BoldItalicFont=*-BoldItalic]%
+    \setsansfont{Archivo}[Path=fonts/,Extension=.ttf,UprightFont=*-Regular,BoldFont=*-Bold,ItalicFont=*-Italic,BoldItalicFont=*-BoldItalic]%
+    \newfontfamily\srdisplayfont{Archivo}[Path=fonts/,Extension=.ttf,UprightFont=*-ExtraBold,BoldFont=*-ExtraBold,ItalicFont=*-ExtraBold]%
+  }{%
+    \setmainfont{texgyreheros}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]%
+    \setsansfont{texgyreheros}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]%
+    \newfontfamily\srdisplayfont{texgyreheros}[Extension=.otf,UprightFont=*-bold,BoldFont=*-bold,ItalicFont=*-bold]%
+  }
+  \IfFileExists{fonts/JetBrainsMono-Regular.ttf}{%
+    \setmonofont{JetBrainsMono}[Path=fonts/,Extension=.ttf,UprightFont=*-Regular,BoldFont=*-Bold,ItalicFont=*-Regular,Scale=0.86]%
+  }{}
+  \renewcommand{\familydefault}{\sfdefault}
+  \newcommand{\srdisplay}{\srdisplayfont}
+\fi
+
+% ---------- marks ----------
+% \srmark[size]        Sentinal Research: slash + ring
+% \sentinalmark[size]  Sentinal (product): slash + filled dot
+% Ink colour: \colorlet{srMarkInk}{srNightText} on dark backgrounds.
+\newcommand{\srmark}[1][1em]{{\pgfmathsetlengthmacro\sru{(#1)/24}%
+\begin{tikzpicture}[x=\sru,y=-\sru,baseline={(0pt,-#1)}]%
+\path[use as bounding box] (0,0) rectangle (24,24);%
+\draw[srMarkInk,line width=3.4*\sru,line cap=rect] (5,22)--(13.5,2);%
+\draw[srBlue,line width=2.2*\sru] (18,18.5) circle[radius=3.1];%
+\end{tikzpicture}}}
+\newcommand{\sentinalmark}[1][1em]{{\pgfmathsetlengthmacro\sru{(#1)/24}%
+\begin{tikzpicture}[x=\sru,y=-\sru,baseline={(0pt,-#1)}]%
+\path[use as bounding box] (0,0) rectangle (24,24);%
+\draw[srMarkInk,line width=3.4*\sru,line cap=rect] (5,22)--(13.5,2);%
+\fill[srBlue] (18,18.5) circle[radius=3.4];%
+\end{tikzpicture}}}
+\newcommand{\srlockup}[1][14pt]{\mbox{\srmark[#1]\hspace{0.45em}{\fontsize{#1}{#1}\selectfont\srdisplay Sentinal\ \normalfont\color{srLockupSub}Research}}}
+\newcommand{\sentinallockup}[1][14pt]{\mbox{\sentinalmark[#1]\hspace{0.45em}{\fontsize{#1}{#1}\selectfont\srdisplay Sentinal}}}
+
+% ---------- state badge: \srstate{RUNNING} ----------
+\newcommand{\srstate}[1]{{\setlength{\fboxsep}{1.8pt}\colorbox{srState-#1}{\hspace{2pt}\color{srInk}\scriptsize\bfseries\vphantom{Ag}#1\hspace{2pt}}}}
+
+% ---------- code: terminal look ----------
+\lstset{basicstyle=\ttfamily\small\color{srNightText},backgroundcolor=\color{srTerm},frame=single,rulecolor=\color{srTerm},framesep=8pt,xleftmargin=8pt,xrightmargin=8pt,aboveskip=1.1em,belowskip=1.1em,keywordstyle=\color{srBlueSoft},commentstyle=\color{srNightText3},stringstyle=\color{srState-COMPLETED},columns=fullflexible,keepspaces=true,breaklines=true,showstringspaces=false,upquote=true}
+\endinput

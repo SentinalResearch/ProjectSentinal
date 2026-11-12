@@ -1,0 +1,213 @@
+% Sentinal: system overview (Beamer, 16:9, Sentinal Research theme)
+% Build: ./build.sh, or Overleaf with Menu > Compiler > XeLaTeX.
+% Light version: \usetheme[light]{Sentinal}
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{Sentinal}
+\usetikzlibrary{arrows.meta}
+
+\title{Sentinal}
+\subtitle{Every terminal on your machines, watched and answered from anywhere}
+\author{Sohith Vishnu Sai}
+\institute{Sentinal Research}
+\date{8 November 2026}
+
+% Small helpers in brand style: a mono label, and a column with a top rule.
+\newcommand{\srlabel}[1]{{\ttfamily\footnotesize\usebeamercolor[fg]{structure}#1}}
+\newcommand{\ruled}[2]{{\usebeamercolor[fg]{normal text}\rule{\linewidth}{0.8pt}}\par\vspace{2mm}\srlabel{#1}\par\vspace{1mm}#2}
+
+\begin{document}
+
+\begin{frame}[plain]
+\titlepage
+\end{frame}
+
+\begin{frame}{Agenda}
+\begin{enumerate}
+  \item What Sentinal is
+  \item The watcher: progress without changing the program
+  \item Daily use
+  \item The development cycle
+  \item What comes next
+\end{enumerate}
+\end{frame}
+
+% ---------------------------------------------------------------
+\section{What Sentinal is}
+
+\begin{frame}{Long work lives in a terminal you have to sit at}{Sentinal moves it into Sessions the daemon owns}
+\begin{columns}[T]
+\begin{column}{0.31\textwidth}\ruled{SEE}{What is running, waiting or failed on every Machine.}\end{column}
+\begin{column}{0.31\textwidth}\ruled{ANSWER}{Get a push when a run fails or waits. Answer an agent's question from the dashboard.}\end{column}
+\begin{column}{0.31\textwidth}\ruled{DRIVE}{Open the live terminal on a phone and type into it.}\end{column}
+\end{columns}
+\vfill
+{\small\usebeamercolor[fg]{framesubtitle}Local-first: a daemon per Machine, data in SQLite on that Machine, traffic only inside Tailscale.}
+\end{frame}
+
+\begin{frame}{One control, many workers}{Workers own every Session; the control routes and summarises}
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\small,
+  box/.style={draw=srNightText2,line width=0.6pt,align=center,inner sep=5pt,minimum height=1cm},
+  main/.style={box,draw=srBlue,line width=1.4pt},
+  arrow/.style={-{Stealth[length=2mm]},draw=srNightText2,line width=0.6pt},
+  lbl/.style={font=\scriptsize\ttfamily,text=srNightText3}]
+\node[box,minimum width=3.6cm] (b) at (0,3.2) {Phone or browser};
+\node[box,minimum width=3.6cm] (a) at (4.4,3.2) {AI agents};
+\node[box,minimum width=3.6cm] (p) at (8.8,3.2) {Push service};
+\node[main,minimum width=12.4cm] (c) at (4.4,1.6) {\textbf{Control} \quad web app, login, read model, routing, Agent API, push};
+\node[box,minimum width=3.6cm] (w1) at (0,0) {Worker};
+\node[box,minimum width=3.6cm] (w2) at (4.4,0) {Worker};
+\node[box,minimum width=3.6cm] (w3) at (8.8,0) {Worker};
+\foreach \n in {b,a} \draw[arrow] (\n.south) -- (\n.south |- c.north);
+\draw[arrow] (p.south |- c.north) -- (p.south);
+\foreach \n in {w1,w2,w3} \draw[arrow,<->] (\n.north) -- (\n.north |- c.south);
+\end{tikzpicture}
+\vfill
+{\small\usebeamercolor[fg]{framesubtitle}The read model holds no terminal text. No daemon listens on \texttt{0.0.0.0}.}
+\end{frame}
+
+\begin{frame}{Every Session has one state}{States are never colour-only: the label is always there}
+\vspace{4mm}
+\srstate{CREATED}\ \srstate{RUNNING}\ \srstate{WAITING}\ \srstate{IDLE}\ \srstate{STALLED}\par\vspace{3mm}
+\srstate{COMPLETED}\ \srstate{FAILED}\ \srstate{INTERRUPTED}\par
+\vspace{8mm}
+\begin{columns}[T]
+\begin{column}{0.47\textwidth}\ruled{WAITING}{A prompt or an agent's question needs an answer.}\end{column}
+\begin{column}{0.47\textwidth}\ruled{STALLED}{Quiet for ten minutes while it should be working.}\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Four ways work enters Sentinal}{From full terminals to observing a process you already started}
+\begin{columns}[T]
+\begin{column}{0.23\textwidth}\ruled{FULL}{\texttt{sentinal watch}\par\small A persistent terminal: output, screen, input.}\end{column}
+\begin{column}{0.23\textwidth}\ruled{COMMANDS}{\texttt{sentinal hook}\par\small Commands from ordinary terminals.}\end{column}
+\begin{column}{0.23\textwidth}\ruled{AUTO}{\texttt{sentinal auto on}\par\small Every new terminal starts inside a Session.}\end{column}
+\begin{column}{0.23\textwidth}\ruled{PROCESS}{\texttt{sentinal adopt}\par\small Metrics and exit of a running PID. Read-only.}\end{column}
+\end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+\section{The watcher}
+
+\begin{frame}{Output becomes Events, with no model}{Deterministic: the same input always gives the same Events}
+\begin{columns}[T]
+\begin{column}{0.18\textwidth}\ruled{1 FRAME}{\small Bytes to bounded lines, escapes removed.}\end{column}
+\begin{column}{0.18\textwidth}\ruled{2 OBSERVE}{\small Lines, Commands, processes, metrics, screens.}\end{column}
+\begin{column}{0.18\textwidth}\ruled{3 ADAPT}{\small Generic, training, pytest, cargo, servers, agents.}\end{column}
+\begin{column}{0.18\textwidth}\ruled{4 LIMIT}{\small Progress at most every 5 s.}\end{column}
+\begin{column}{0.18\textwidth}\ruled{5 HEALTH}{\small Healthy, warning, stalled or failed, with evidence.}\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Sentinal reads the agent's screen}{Read as lines, questions were garbled, missed, or ended early}
+\begin{columns}[T]
+\begin{column}{0.47\textwidth}
+\ruled{DETECT}{\small A numbered menu of 2 to 6 options and the question above it.}
+\vspace{2mm}
+\ruled{END}{\small When the menu leaves the screen. No time limit.}
+\end{column}
+\begin{column}{0.47\textwidth}
+\ruled{WORKS WITH}{\small Any program with a numbered menu: Claude Code, Codex, Vibe, Antigravity and more.}
+\vspace{2mm}
+\ruled{ANSWER}{\small Click or tap an option. The input is audit-logged.}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Progress without changing the program}{Explicit counters only: a bare fraction is never progress}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize\color{srNightText},aboveskip=0.4em,belowskip=0.4em]
+Evaluating:  42%|####      | 21/50 [00:10<00:14]   -> 21 of 50 item
+[4/10] building                                    -> 4 of 10 item
+Processing sample 12 of 200                        -> 12 of 200 sample
+accuracy 41/50 on condition A                      -> nothing
+\end{lstlisting}
+\vspace{2mm}
+{\srlabel{NEXT}\par\small Programs being written now can say it themselves, in one printed line:}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize\color{srNightText},aboveskip=0.4em,belowskip=0.4em]
+::sentinal progress current=3 total=50 unit=task
+\end{lstlisting}
+\end{frame}
+
+% ---------------------------------------------------------------
+\section{Daily use}
+
+\begin{frame}{Finished Sessions no longer pile up}{Hide, delete, or clear a whole Machine}
+\begin{columns}[T]
+\begin{column}{0.31\textwidth}\ruled{HIDE}{\small Leaves every list on every device. History stays searchable; restore from the Hidden page.}\end{column}
+\begin{column}{0.31\textwidth}\ruled{DELETE}{\small Output, Commands, Events, metrics and search rows erased. Logged; IDs never reused.}\end{column}
+\begin{column}{0.31\textwidth}\ruled{CLEAR FINISHED}{\small One action on the Machine page hides all of its finished Sessions.}\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Navigation that takes no space}{The page name drops down the main places}
+\begin{columns}[T]
+\begin{column}{0.47\textwidth}
+\ruled{PLACES}{Overview, Terminals, Machines, History, Recipes, Settings.}
+\end{column}
+\begin{column}{0.47\textwidth}
+\ruled{OPENS}{On hover on a desktop, on a tap on a phone, with Enter from the keyboard. Each place shows its prompt word.}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------
+\section{Development cycle}
+
+\begin{frame}{Development never touches production}{After a test daemon replaced this Mac's Sessions on the control, 5 November}
+\begin{columns}[T]
+\begin{column}{0.31\textwidth}\ruled{JUST DEV}{\small Own data, config, ports 5273 and 7520. A DEV badge.}\end{column}
+\begin{column}{0.31\textwidth}\ruled{ISOLATED}{\small Refuses production paths. Never links, never updates itself.}\end{column}
+\begin{column}{0.31\textwidth}\ruled{ONE INSTALL}{\small Install ID and build commit in every heartbeat; the control refuses a second live install.}\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{From dev to a release}{Each step is a gate; nothing is pushed until the owner asks}
+\vspace{6mm}
+\begin{tikzpicture}[x=1cm,y=1cm,font=\small,
+  stage/.style={font=\footnotesize,draw=srNightText2,line width=0.6pt,align=left,text width=1.95cm,minimum height=1.5cm,inner sep=5pt},
+  last/.style={stage,draw=srBlue,line width=1.4pt},
+  arrow/.style={-{Stealth[length=2mm]},draw=srNightText2,line width=0.6pt}]
+\node[stage] (a) at (0,0) {\texttt{dev}\\\scriptsize test first};
+\node[stage] (b) at (2.75,0) {\texttt{just check}\\\scriptsize\texttt{test-e2e}};
+\node[stage] (c) at (5.5,0) {\texttt{just dev}\\\scriptsize by hand};
+\node[stage] (d) at (8.25,0) {\texttt{just promote}\\\scriptsize into \texttt{main}};
+\node[last] (e) at (11,0) {\texttt{just ship}\\\scriptsize owner only};
+\foreach \x/\y in {a/b,b/c,c/d,d/e} \draw[arrow] (\x) -- (\y);
+\end{tikzpicture}
+\vfill
+{\small\usebeamercolor[fg]{framesubtitle}Update the control first, then the workers, when a release changes the protocol.}
+\end{frame}
+
+% ---------------------------------------------------------------
+\section{What comes next}
+
+\begin{frame}{Next, in order}{The full list, with a prompt for coding agents, is in \texttt{docs/TASKS.md}}
+\begin{enumerate}
+  \item Retest screen questions with real Claude Code, Vibe and Antigravity
+  \item Progress API: \texttt{::sentinal progress} and \texttt{::sentinal metric}
+  \item Rules: metrics from any program, full-screen apps, builds and servers
+  \item Release \texttt{v2.11.0}
+  \item Keepers, so a daemon restart no longer ends a multi-day run
+  \item Data collection, then swappable local models, then a fine-tuned small model
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{The size of it today}
+\vfill
+{\srdisplay\fontsize{80}{80}\selectfont 1,100\par}
+\vspace{4mm}
+{\usebeamercolor[fg]{subtitle}\large Rust tests, plus 81 web test files and 17 browser scenarios\par}
+\vspace{2mm}
+{\usebeamercolor[fg]{subtitle}\small\ttfamily 90k lines of Rust \textperiodcentered\ 31k of TypeScript \textperiodcentered\ 5 Machines\par}
+\vfill
+\end{frame}
+
+\begin{frame}[plain]
+\vfill
+\sentinalmark[40pt]\par\vspace{8mm}
+{\srdisplay\fontsize{34}{36}\selectfont Thank you.\par}
+\vspace{4mm}
+{\ttfamily\usebeamercolor[fg]{subtitle}github.com/SentinalResearch\par}
+\vfill
+\end{frame}
+\end{document}

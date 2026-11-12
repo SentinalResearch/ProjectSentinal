@@ -1,0 +1,96 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{sentinal}[2026/11/03 Sentinal Research document layout]
+\RequirePackage{sentinal-brand}
+\RequirePackage[top=28mm,bottom=26mm,left=24mm,right=24mm,headheight=16pt,headsep=12mm,footskip=12mm]{geometry}
+\RequirePackage{fancyhdr}
+\RequirePackage{titlesec}
+\RequirePackage{enumitem}
+\RequirePackage{booktabs}
+\RequirePackage{array}
+\RequirePackage{graphicx}
+\RequirePackage{caption}
+\RequirePackage{tcolorbox}
+\RequirePackage{microtype}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.65em}
+\linespread{1.1}
+\raggedbottom
+\AtBeginDocument{\color{srInk}}
+
+% ---------- metadata ----------
+\gdef\sr@doctype{Document}\gdef\sr@subtitle{}\gdef\sr@affil{}\gdef\sr@short{}
+\newcommand{\doctype}[1]{\gdef\sr@doctype{#1}}
+\newcommand{\subtitle}[1]{\gdef\sr@subtitle{#1}}
+\newcommand{\affiliation}[1]{\gdef\sr@affil{#1}}
+\newcommand{\shorttitle}[1]{\gdef\sr@short{#1}}
+
+% ---------- header / footer ----------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancyhead[L]{\srlockup[8pt]}
+\fancyhead[R]{\footnotesize\ttfamily\color{srText3}\sr@doctype}
+\fancyfoot[L]{\footnotesize\color{srText3}\sr@short}
+\fancyfoot[R]{\footnotesize\ttfamily\color{srText3}\thepage}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[R]{\footnotesize\ttfamily\color{srText3}\thepage}}
+
+% ---------- headings: rule above, number in blue ----------
+\titleformat{\section}{{\color{srInk}\titlerule[1.2pt]}\vspace{8pt}\normalfont\srdisplay\fontsize{20}{24}\selectfont\raggedright}{\textcolor{srBlueInk}{\thesection}}{0.55em}{}
+\titlespacing*{\section}{0pt}{2.4em}{0.9em}
+\titleformat{\subsection}{\normalfont\bfseries\fontsize{13}{16}\selectfont\raggedright}{\textcolor{srBlueInk}{\thesubsection}}{0.55em}{}
+\titlespacing*{\subsection}{0pt}{1.6em}{0.4em}
+\titleformat{\subsubsection}{\normalfont\bfseries\raggedright}{\textcolor{srBlueInk}{\thesubsubsection}}{0.5em}{}
+\titlespacing*{\subsubsection}{0pt}{1.2em}{0.2em}
+
+% ---------- title block ----------
+\renewcommand{\maketitle}{\par\begingroup\raggedright\renewcommand{\and}{\unskip,\ }%
+  \srmark[30pt]\par\vspace{12pt}%
+  {\ttfamily\small\color{srText3}\sr@doctype\ \textperiodcentered\ \@date\par}\vspace{10pt}%
+  {\srdisplay\fontsize{30}{33}\selectfont\color{srInk}\@title\par}%
+  \ifx\sr@subtitle\@empty\else\vspace{8pt}{\fontsize{15}{20}\selectfont\color{srText2}\sr@subtitle\par}\fi
+  \vspace{16pt}{\bfseries\@author\par}%
+  \ifx\sr@affil\@empty\else{\small\color{srText2}\sr@affil\par}\fi
+  \vspace{14pt}{\color{srInk}\rule{\linewidth}{1.2pt}}\par\vspace{6pt}%
+  \endgroup\thispagestyle{plain}}
+
+\renewenvironment{abstract}{\par\noindent\begin{minipage}{\linewidth}{\ttfamily\small\color{srBlueInk}Abstract}\par\vspace{4pt}\fontsize{11.5}{17}\selectfont\color{srText2}}{\end{minipage}\par\vspace{10pt}}
+
+% ---------- cover page (reports) ----------
+\newcommand{\srcover}{\begingroup\renewcommand{\and}{\unskip,\ }%
+\thispagestyle{empty}%
+\begin{tikzpicture}[remember picture,overlay]
+  \fill[srNight] (current page.south west) rectangle (current page.north east);
+  \begin{scope}[shift={([xshift=24mm,yshift=-28mm]current page.north west)},x=2.2mm,y=-2.2mm]
+    \draw[srNightText,line width=7.48mm,line cap=rect] (5,22)--(13.5,2);
+    \draw[srBlue,line width=4.84mm] (18,18.5) circle[radius=3.1];
+  \end{scope}
+  \node[anchor=south west,inner sep=0,text width=0.74\paperwidth,align=left] at ([xshift=24mm,yshift=30mm]current page.south west) {%
+    {\ttfamily\small\color{srBlueSoft}\sr@doctype\par}\vspace{10pt}%
+    {\srdisplay\fontsize{40}{42}\selectfont\color{srNightText}\@title\par}%
+    \ifx\sr@subtitle\@empty\else\vspace{12pt}{\fontsize{16}{22}\selectfont\color{srNightText2}\sr@subtitle\par}\fi
+    \vspace{26pt}{\color{srNightLine}\rule{0.74\paperwidth}{0.8pt}}\par\vspace{10pt}%
+    {\small\bfseries\color{srNightText}\@author\par}%
+    {\small\ttfamily\color{srNightText3}\ifx\sr@affil\@empty\else\sr@affil\ \textperiodcentered\ \fi\@date\par}};
+\end{tikzpicture}%
+\null\newpage\endgroup}
+
+% ---------- boxes ----------
+\newtcolorbox{srnote}[1][Note]{colback=srSurface,colframe=srSurface,arc=0pt,boxrule=0pt,left=10pt,right=10pt,top=8pt,bottom=8pt,before upper={{\ttfamily\small\color{srBlueInk}#1}\par\smallskip}}
+\newtcolorbox{srevidence}[1][Evidence]{colback=srNight,colframe=srNight,coltext=srNightText,arc=0pt,boxrule=0pt,left=10pt,right=10pt,top=8pt,bottom=8pt,before upper={{\ttfamily\small\color{srBlueSoft}#1}\par\smallskip}}
+\newcommand{\srplaceholder}[2][5cm]{\par\noindent\begin{tikzpicture}\fill[srSurface] (0,0) rectangle (\linewidth,#1);\node[text=srText3,font=\ttfamily\small] at (0.5\linewidth,#1/2) {#2};\end{tikzpicture}\par}
+
+% ---------- lists, tables, captions ----------
+\setlist{itemsep=2pt,topsep=4pt}
+\setlist[itemize]{label={\textcolor{srBlueInk}{\raisebox{0.22ex}{\rule{0.42em}{0.42em}}}}}
+\setlist[enumerate]{label={\textcolor{srBlueInk}{\ttfamily\arabic*}}}
+\renewcommand{\arraystretch}{1.3}
+\setlength{\aboverulesep}{0pt}\setlength{\belowrulesep}{0pt}
+\captionsetup{font=small,labelfont={bf,color=srBlueInk},labelsep=quad,justification=raggedright,singlelinecheck=false}
+
+% ---------- links ----------
+\RequirePackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=srBlueInk,urlcolor=srBlueInk,citecolor=srBlueInk,pdfcreator={Sentinal Research}}
+\urlstyle{tt}
+\endinput

@@ -1,89 +1,73 @@
 % Sentinal: System Design and Code Guide
-% Build: pdflatex sentinal-guide.tex (twice, for the table of contents),
-% or: latexmk -pdf sentinal-guide.tex
+% Brand: Sentinal Research report template (sentinal.sty, sentinal-brand.sty).
+% Build: ./build.sh (tectonic or latexmk -xelatex), or upload the Overleaf zip
+% and pick Menu > Compiler > XeLaTeX. Brand fonts are read from ./fonts/;
+% without them it falls back to TeX Gyre Heros.
 \documentclass[11pt,a4paper,oneside]{report}
-
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage{lmodern}
-\usepackage[a4paper,margin=2.3cm]{geometry}
-\usepackage{microtype}
-\usepackage{amsmath}
-\usepackage{xcolor}
-\usepackage{booktabs}
+\usepackage{sentinal}
 \usepackage{longtable}
-\usepackage{array}
 \usepackage{calc}
-\usepackage{enumitem}
-\usepackage{listings}
-\usepackage{tikz}
+\usepackage{amsmath}
 \usetikzlibrary{arrows.meta}
-\usepackage{titlesec}
-\usepackage{fancyhdr}
-\usepackage[hidelinks]{hyperref}
 \usepackage{bookmark}
 
-\definecolor{accent}{HTML}{3D5AFE}
-\definecolor{codebg}{HTML}{F5F6F8}
+\doctype{System guide}
+\title{Sentinal}
+\subtitle{System design and code guide. How it works, how the code is organised, and how to install, run and change it.}
+\shorttitle{Sentinal: System design and code guide}
+\author{Sohith Vishnu Sai}
+\affiliation{Sentinal Research}
+\date{8 November 2026}
 
-% Paragraphs: space between, no indent.
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{0.55em}
-\setlist{itemsep=0.15em, topsep=0.3em}
-\renewcommand{\arraystretch}{1.25}
-\setlength{\LTpre}{0.4em}
-\setlength{\LTpost}{0.6em}
+\makeatletter
+% Product document: the Sentinal mark (slash + dot) in the header.
+\fancyhead[L]{\sentinallockup[8pt]}
+\fancyhead[R]{\footnotesize\ttfamily\color{srText3}\sr@doctype}
 
-% Chapter headings: compact, numbered, accent rule.
+% Cover: the report cover, with the product mark instead of the Research mark.
+\newcommand{\sentinalcover}{\begingroup\renewcommand{\and}{\unskip,\ }%
+\thispagestyle{empty}%
+\begin{tikzpicture}[remember picture,overlay]
+  \fill[srNight] (current page.south west) rectangle (current page.north east);
+  \begin{scope}[shift={([xshift=24mm,yshift=-28mm]current page.north west)},x=2.2mm,y=-2.2mm]
+    \draw[srNightText,line width=7.48mm,line cap=rect] (5,22)--(13.5,2);
+    \fill[srBlue] (18,18.5) circle[radius=3.4];
+  \end{scope}
+  \node[anchor=south west,inner sep=0,text width=0.74\paperwidth,align=left] at ([xshift=24mm,yshift=30mm]current page.south west) {%
+    {\ttfamily\small\color{srBlueSoft}\sr@doctype\par}\vspace{10pt}%
+    {\srdisplay\fontsize{40}{42}\selectfont\color{srNightText}\@title\par}%
+    \vspace{12pt}{\fontsize{16}{22}\selectfont\color{srNightText2}\sr@subtitle\par}%
+    \vspace{26pt}{\color{srNightLine}\rule{0.74\paperwidth}{0.8pt}}\par\vspace{10pt}%
+    {\small\bfseries\color{srNightText}\@author\par}%
+    {\small\ttfamily\color{srNightText3}\sr@affil\ \textperiodcentered\ \@date\ \textperiodcentered\ commit 9512ded\par}};
+\end{tikzpicture}%
+\null\newpage\endgroup}
+\makeatother
+
+% Chapters: strong top rule, mono label in blue, display title. Left-aligned.
 \titleformat{\chapter}[display]
-  {\normalfont\sffamily\bfseries\Huge}
-  {\color{accent}\Large Chapter \thechapter}{0.3em}{}[\vspace{0.2em}{\color{accent}\titlerule[1pt]}]
-\titlespacing*{\chapter}{0pt}{0pt}{1.4em}
-\titleformat{\section}{\normalfont\sffamily\bfseries\Large}{\thesection}{0.8em}{}
-\titlespacing*{\section}{0pt}{1.4em}{0.4em}
+  {\normalfont\raggedright}
+  {{\color{srInk}\titlerule[1.2pt]}\vspace{8pt}{\ttfamily\small\color{srBlueInk}Chapter \thechapter}}
+  {6pt}
+  {\srdisplay\fontsize{30}{33}\selectfont\color{srInk}}
+\titleformat{name=\chapter,numberless}[display]
+  {\normalfont\raggedright}
+  {{\color{srInk}\titlerule[1.2pt]}}
+  {8pt}
+  {\srdisplay\fontsize{30}{33}\selectfont\color{srInk}}
+\titlespacing*{\chapter}{0pt}{0pt}{1.6em}
+\renewcommand{\contentsname}{Contents}
+\setlength{\emergencystretch}{3em}
 
-% Code blocks.
-\lstset{
-  basicstyle=\ttfamily\small,
-  backgroundcolor=\color{codebg},
-  frame=single, rulecolor=\color{black!12},
-  framesep=6pt, xleftmargin=6pt, xrightmargin=6pt,
-  breaklines=true, breakatwhitespace=false,
-  columns=fullflexible, keepspaces=true,
-  showstringspaces=false, upquote=true,
-}
+% Tables: smaller rows inside the long tables of the guide.
+\setlength{\LTpre}{0.6em}
+\setlength{\LTpost}{0.8em}
+\renewcommand{\arraystretch}{1.25}
 
-% Running header.
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{\small\sffamily\color{black!60}Sentinal: System Design and Code Guide}
-\fancyhead[R]{\small\sffamily\color{black!60}\leftmark}
-\fancyfoot[C]{\small\sffamily\thepage}
-\renewcommand{\headrulewidth}{0.3pt}
-\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
-\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\sffamily\thepage}\renewcommand{\headrulewidth}{0pt}}
-
-\hypersetup{
-  pdftitle={Sentinal: System Design and Code Guide},
-  pdfauthor={Sohith Vishnu Sai},
-}
+\hypersetup{pdftitle={Sentinal: System design and code guide},pdfauthor={Sohith Vishnu Sai}}
 
 \begin{document}
-
-\begin{titlepage}
-  \sffamily
-  \vspace*{5cm}
-  {\color{accent}\rule{\linewidth}{2pt}}\\[1.2em]
-  {\Huge\bfseries Sentinal}\\[0.6em]
-  {\LARGE System Design and Code Guide}\\[1.2em]
-  {\color{accent}\rule{\linewidth}{2pt}}\\[2em]
-  {\large Persistent, observable terminal Sessions on your own machines,\\
-  watched and driven from a phone or a desktop browser.}
-  \vfill
-  {\large Sohith Vishnu Sai}\\[0.3em]
-  {\large 3 November 2026}\\[0.3em]
-  {\color{black!60}Repository state: commit \texttt{6b7936e}}
-\end{titlepage}
+\sentinalcover
 
 \tableofcontents
 
