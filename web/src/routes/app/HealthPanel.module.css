@@ -151,3 +151,52 @@
     grid-template-columns: 1fr;
   }
 }
+
+.chartPicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.select {
+  height: 32px;
+  padding: 0 32px 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--bg-0)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23A6A6A2' stroke-width='1.5'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.select:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Incidents read as a log: one rule-separated row each, no bullets. */
+.incidents {
+  list-style: none;
+  padding-left: 0;
+  gap: 0;
+}
+.incidents li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-2);
+}
+.incidents li:first-child {
+  border-top: 1px solid var(--line);
+}

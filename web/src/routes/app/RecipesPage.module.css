@@ -225,19 +225,6 @@
   font-size: 14px;
 }
 
-/* SaveRecipeForm's Name/ID fields: same dark field look as .paramInput, laid out inline in the row. */
-.saveInput {
-  flex: 1 1 220px;
-  min-width: 0;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--line-strong);
-  background: transparent;
-  color: var(--text-1);
-  font-family: var(--font-mono);
-  font-size: 14px;
-}
-
 .paramError {
   font-size: 12px;
   font-weight: 600;
@@ -382,5 +369,49 @@
 
   .machineOption {
     padding: 14px 16px;
+  }
+}
+
+/* Save as recipe: Name and ID side by side, stacking on narrow screens. */
+.saveFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px 24px;
+}
+
+.paramCheck {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid var(--line-strong);
+  background: transparent;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+.paramCheck::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  transform: scale(0);
+  transition: transform 0.1s var(--ease-out);
+}
+.paramCheck:checked {
+  border-color: var(--accent);
+}
+.paramCheck:checked::after {
+  transform: scale(1);
+}
+.paramCheck:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .paramCheck::after {
+    transition: none;
   }
 }

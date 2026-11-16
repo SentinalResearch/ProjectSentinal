@@ -30,6 +30,17 @@ describe("HealthChart", () => {
     expect(container.querySelectorAll("svg circle").length).toBe(3);
   });
 
+  it("draws a single sample as a level line across the plot, not a lone point", () => {
+    render(<HealthChart metric="TYPING_ECHO_MS" title="Typing delay" points={[{ at: 1000, p50: 8, p95: 69, count: 1 }]} />);
+    const lines = Array.from(screen.getByRole("img", { name: "Typing delay" }).querySelectorAll("polyline"));
+    for (const line of lines) {
+      const coords = line.getAttribute("points")!.split(" ");
+      expect(coords).toHaveLength(2);
+      expect(coords[0].startsWith("0,")).toBe(true);
+      expect(coords[1].startsWith("640,")).toBe(true);
+    }
+  });
+
   it("says when there are no samples", () => {
     render(<HealthChart metric="LINK_RTT_MS" title="Link round trip on mini" points={[]} />);
     expect(screen.getByText("No samples in this range yet.")).toBeInTheDocument();

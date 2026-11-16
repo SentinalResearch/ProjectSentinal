@@ -149,11 +149,50 @@
   padding-left: 4px;
 }
 
+.commandCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.commandCell > :not(.command) {
+  flex: none;
+}
+
 .command {
+  min-width: 0;
   font-size: 13.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Quiet until the row is hovered or the button has focus; always reachable by keyboard. */
+.saveRecipe {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.row:hover .saveRecipe,
+.saveRecipe:focus-visible {
+  opacity: 1;
+}
+.saveRecipe:hover {
+  border-color: var(--text-1);
+  color: var(--text-1);
+}
+.saveRecipe:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
 }
 
 .machineCell {

@@ -24,12 +24,17 @@ export function HealthChart({ title, metric, points }: { title: string; metric: 
   const top = Math.max(...points.map((point) => point.p95)) * 1.1 || 1;
   const x = (at: number) => (last === first ? WIDTH / 2 : ((at - first) / (last - first)) * WIDTH);
   const y = (value: number) => HEIGHT - (Math.max(0, value) / top) * HEIGHT;
-  const line = (key: "p50" | "p95") => points.map((point) => `${x(point.at).toFixed(1)},${y(point[key]).toFixed(1)}`).join(" ");
+  // One sample has no time span: draw it as a level line across the plot instead of a single, invisible point.
+  const line = (key: "p50" | "p95") =>
+    last === first
+      ? `0,${y(points[0][key]).toFixed(1)} ${WIDTH},${y(points[0][key]).toFixed(1)}`
+      : points.map((point) => `${x(point.at).toFixed(1)},${y(point[key]).toFixed(1)}`).join(" ");
   const latest = points[points.length - 1];
   return (
     <figure className={chart.chart}>
       <div className={chart.chartPlot}>
         <svg role="img" aria-label={title} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" className={chart.chartSvg}>
+          <line x1="0" x2={WIDTH} y1={HEIGHT / 2} y2={HEIGHT / 2} className={chart.gridLine} vectorEffect="non-scaling-stroke" />
           <polyline points={line("p95")} fill="none" stroke="var(--s-waiting-fg)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
           <polyline points={line("p50")} fill="none" stroke="var(--accent-fg)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           {/* A one-point polyline renders nothing; the markers keep single-sample series visible. */}
@@ -40,8 +45,14 @@ export function HealthChart({ title, metric, points }: { title: string; metric: 
       </div>
       <figcaption className={styles.legend}>
         <span>{title}</span>
-        <span>median {formatValue(metric, latest.p50)}</span>
-        <span>p95 {formatValue(metric, latest.p95)}</span>
+        <span>
+          <i className={styles.swatch} style={{ background: "var(--accent-fg)" }} aria-hidden="true" />
+          median {formatValue(metric, latest.p50)}
+        </span>
+        <span>
+          <i className={styles.swatch} style={{ background: "var(--s-waiting-fg)" }} aria-hidden="true" />
+          p95 {formatValue(metric, latest.p95)}
+        </span>
         <span>top {formatValue(metric, top / 1.1)}</span>
       </figcaption>
     </figure>

@@ -123,7 +123,7 @@ describe("RecipesPage", () => {
 
       await user.click(await screen.findByRole("checkbox", { name: "data.csv" }, { timeout: 5000 }));
       expect(screen.getByTestId("save-recipe-template")).toHaveTextContent("awk '{{print $1}}' {value1}");
-      await user.click(screen.getByRole("button", { name: "Save Recipe" }));
+      await user.click(screen.getByRole("button", { name: "Save recipe" }));
 
       await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
       expect(save).toHaveBeenCalledWith(
@@ -140,8 +140,10 @@ describe("RecipesPage", () => {
       renderRecipes(newPath);
       const name = await screen.findByRole("textbox", { name: "Name" }, { timeout: 5000 });
       const id = screen.getByRole("textbox", { name: "ID" });
-      expect(name.className).toMatch(/saveInput/);
-      expect(id.className).toMatch(/saveInput/);
+      // Both use the shared Input component, whose field class carries the dark theme.
+      expect(name.className).toMatch(/input/);
+      expect(id.className).toMatch(/input/);
+      expect(id.className).toMatch(/mono/);
     });
 
     it("refuses an ID that is not lowercase words joined by hyphens", async () => {
@@ -150,10 +152,17 @@ describe("RecipesPage", () => {
       const id = await screen.findByRole("textbox", { name: "ID" }, { timeout: 5000 });
       await user.clear(id);
       await user.type(id, "../escape");
-      expect(screen.getByRole("button", { name: "Save Recipe" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save recipe" })).toBeDisabled();
+      expect(screen.getByText(/Use lowercase letters, digits and single hyphens/)).toBeInTheDocument();
       await user.clear(id);
       await user.type(id, "awk-first-column");
-      expect(screen.getByRole("button", { name: "Save Recipe" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Save recipe" })).toBeEnabled();
+    });
+
+    it("says why it cannot save when the Machine is offline", async () => {
+      renderRecipes(`/app/recipes/new?machine=mbp&command=${encodeURIComponent("cargo build")}`);
+      expect(await screen.findByText(/is offline\. Recipes are saved on the Machine/, undefined, { timeout: 5000 })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save recipe" })).toBeDisabled();
     });
 
     it("keeps the form and shows why when the Machine refuses the Recipe", async () => {
@@ -161,9 +170,9 @@ describe("RecipesPage", () => {
       const user = userEvent.setup();
       vi.spyOn(dataAdapter, "saveRecipe").mockRejectedValue(new Error("recipe id already exists"));
 
-      await user.click(await screen.findByRole("button", { name: "Save Recipe" }, { timeout: 5000 }));
+      await user.click(await screen.findByRole("button", { name: "Save recipe" }, { timeout: 5000 }));
       expect(await screen.findByRole("alert")).toHaveTextContent("recipe id already exists");
-      expect(screen.getByRole("button", { name: "Save Recipe" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Save recipe" })).toBeEnabled();
     });
   });
 });

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
+import { Input } from "../../components/Input";
 import { MockBadge } from "../../components/MockBadge";
 import { dataAdapter, isMockData } from "../../data";
 import { useLiveData } from "../../data/LiveDataContext";
@@ -267,7 +268,8 @@ function SaveRecipeForm() {
     params[key] = part;
     return `{${key}}`;
   }).join("");
-  const valid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) && name.trim() !== "" && command.trim() !== "" && target?.status === "ONLINE";
+  const idValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id);
+  const valid = idValid && name.trim() !== "" && command.trim() !== "" && target?.status === "ONLINE";
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -303,24 +305,23 @@ function SaveRecipeForm() {
           <span>{target?.name ?? machineId}</span>
         </header>
         <form onSubmit={save} className={styles.formBody}>
-          <label className={styles.paramRow}>
-            Name
-            <input className={styles.saveInput} value={name} onChange={(event) => setName(event.target.value)} />
-          </label>
-          <label className={styles.paramRow}>
-            ID
-            <input
-              className={`${styles.saveInput} mono`}
+          <div className={styles.saveFields}>
+            <Input label="Name" value={name} onChange={(event) => setName(event.target.value)} />
+            <Input
+              label="ID"
+              mono
               value={id}
               onChange={(event) => setId(event.target.value.toLowerCase())}
+              error={idValid ? undefined : "Use lowercase letters, digits and single hyphens, e.g. train-base."}
             />
-          </label>
+          </div>
           <div className={styles.section}>
             <span className={styles.sectionLabel}>Choose literal values to make parameters</span>
             {selectable.map(({ part, index }) => (
               <label key={index} className={styles.paramRow}>
                 <input
                   type="checkbox"
+                  className={styles.paramCheck}
                   checked={selected.has(index)}
                   onChange={() => setSelected((current) => {
                     const next = new Set(current);
@@ -334,7 +335,12 @@ function SaveRecipeForm() {
           </div>
           <div className={styles.previewBlock} data-testid="save-recipe-template">{template}</div>
           {error && <p className={styles.paramError} role="alert">{error}</p>}
-          <Button type="submit" variant="primary" disabled={!valid || saving} loading={saving}>Save Recipe</Button>
+          {target?.status !== "ONLINE" && (
+            <p className={styles.runHint} role="status">
+              {target ? `${target.name} is offline. Recipes are saved on the Machine, so reconnect it first.` : "This Machine is no longer registered, so the Recipe cannot be saved."}
+            </p>
+          )}
+          <Button type="submit" variant="primary" disabled={!valid || saving} loading={saving}>Save recipe</Button>
         </form>
       </div>
     </div>

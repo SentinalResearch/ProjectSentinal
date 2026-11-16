@@ -148,7 +148,7 @@ export function HealthPanel() {
             <div className={styles.charts}>
               <label className={styles.chartPicker}>
                 Charts for{" "}
-                <select value={charted.machine_id} onChange={(event) => setChartMachine(event.target.value)}>
+                <select className={styles.select} value={charted.machine_id} onChange={(event) => setChartMachine(event.target.value)}>
                   {summary.machines.map((machine) => (
                     <option key={machine.machine_id} value={machine.machine_id}>
                       {machine.display_name}

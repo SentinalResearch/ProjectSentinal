@@ -180,12 +180,15 @@ function DesktopHistory() {
                   {/* Line variant: in a dense list the solid block reads as a missing icon; the glyph + color carry the state. */}
                   <StateTag state={state} size="sm" variant="line" iconOnly />
                 </span>
-                <span className={`${styles.command} mono`}>
-                  {entry.command}
+                <span className={styles.commandCell}>
+                  <span className={`${styles.command} mono`} title={entry.command}>
+                    {entry.command}
+                  </span>
                   {session && <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />}
                   {entry.ok === true && entry.machine && (
                     <button
                       type="button"
+                      className={styles.saveRecipe}
                       onClick={(event) => {
                         event.stopPropagation();
                         const query = new URLSearchParams({ machine: entry.machine!, command: entry.command });
