@@ -245,3 +245,47 @@ fn provider_mode_defaults_disabled_and_persists() {
         PushProviderMode::WebPush
     );
 }
+
+#[test]
+fn the_control_pushes_each_new_question_but_folds_a_redraw() {
+    let store = Store::open_in_memory().unwrap();
+    store
+        .upsert_push_subscription(
+            "ps_one",
+            "hash-one",
+            &subscription(
+                "Phone",
+                "https://push.example.invalid/a",
+                "AAECAwQFBgcICQoLDA0ODw",
+            ),
+            Timestamp(1_000),
+            16,
+        )
+        .unwrap();
+    let question = |id: char, event: u64, at: i64| NotificationIntent {
+        facts: NotificationFacts::Waiting,
+        ..intent(id, event, 7, at)
+    };
+    let accept = |intent: NotificationIntent, at: i64| {
+        let batch = NotificationIntentBatch {
+            machine_id: MachineId("01J9Z3K8V6Q2T7M4X5C0RNB8DA".into()),
+            sent_at: Timestamp(at),
+            intents: vec![intent],
+        };
+        store
+            .accept_notification_intents(&batch, Timestamp(at), 7 * 86_400_000, 300_000)
+            .unwrap();
+        store.due_push_deliveries(Timestamp(at), 32).unwrap().len()
+    };
+    assert_eq!(accept(question('a', 1, 2_000), 2_000), 1);
+    assert_eq!(
+        accept(question('b', 2, 7_000), 7_000),
+        1,
+        "a redraw is folded"
+    );
+    assert_eq!(
+        accept(question('c', 3, 122_000), 122_000),
+        2,
+        "a new question pushes"
+    );
+}

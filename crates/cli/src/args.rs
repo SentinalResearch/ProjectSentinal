@@ -10,7 +10,7 @@ use std::path::PathBuf;
     name = "sentinal",
     version = crate::version::VERSION.as_str(),
     about,
-    after_help = "AI agents: run `sentinal agent-guide` before using this command."
+    after_help = "Attach: `sentinal attach <id>`; detach while attached with Ctrl+J, and the Session keeps running. AI agents: `sentinal agent-guide`."
 )]
 pub struct Cli {
     /// Daemon WebSocket URL.
@@ -69,6 +69,9 @@ pub enum Command {
     },
     /// Print the guide for AI agents using Sentinal on this Machine.
     AgentGuide,
+    /// Alias for `agent-guide`, so `sentinal help agents` prints the guide.
+    #[command(name = "agents", hide = true)]
+    Agents,
     /// Serve Sentinal's agent tools to an MCP client over stdio (Claude Code, Claude Desktop, …).
     ///
     /// Needs an agent token from Settings → Agents, in SENTINAL_AGENT_TOKEN

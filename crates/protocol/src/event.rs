@@ -137,6 +137,13 @@ pub enum EventKind {
         /// Tool calls in that turn.
         tool_uses: u32,
     },
+    /// A program reported a named metric, e.g. loss or accuracy (B2/B1).
+    MetricReported {
+        /// Metric name, e.g. `"loss"`, `"accuracy"`, `"tokens_per_sec"`.
+        name: String,
+        /// The value.
+        value: f64,
+    },
 }
 
 impl EventKind {

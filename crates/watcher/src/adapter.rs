@@ -41,4 +41,7 @@ pub trait WatcherAdapter: Send {
     fn owns_prompts(&self) -> bool {
         false
     }
+    /// The engine found a question on the screen (or it went away), so a
+    /// program waiting on it is not idle.
+    fn set_question_on_screen(&mut self, _waiting: bool) {}
 }

@@ -15,6 +15,8 @@ const sessions: Session[] = [
   { id: "rtx:2", machine: "rtx", name: "pytest", state: "FAILED", result: { passed: 182, failed: 3, duration: "42s", summary: "3 failures" } },
   { id: "rtx:3", machine: "rtx", name: "Qwen Training", state: "RUNNING", project: "TIM" },
   { id: "rtx:4", machine: "rtx", name: "tailed log", state: "WAITING", prompt: "Overwrite? [y/N]", capture: "PROCESS_LOG" },
+  { id: "rtx:5", machine: "rtx", name: "old build", state: "COMPLETED", updatedAt: 1 },
+  { id: "mini:6", machine: "mini", name: "hidden job", state: "FAILED", dismissed: true, updatedAt: 2 },
 ];
 
 const recipes: Recipe[] = [
@@ -188,6 +190,48 @@ describe("prompt grammar", () => {
 
     it("uses the ranking shared with the daemon, initials included", () => {
       expect(matchScore("oom", ["CUDA out of memory"])).toBe(40);
+    });
+  });
+
+  describe("hide / restore / delete (A4)", () => {
+    it("hide offers finished Sessions only", () => {
+      const rows = suggest("hide ", index).filter((row) => row.id.startsWith("hide:"));
+      expect(rows.map((row) => row.action)).toEqual([
+        { kind: "hide", sessionId: "rtx:2" },
+        { kind: "hide", sessionId: "rtx:5" },
+        { kind: "hide", sessionId: "mini:6" },
+      ]);
+    });
+
+    it("hide narrows by name", () => {
+      const rows = suggest("hide old", index).filter((row) => row.id.startsWith("hide:"));
+      expect(rows[0].action).toEqual({ kind: "hide", sessionId: "rtx:5" });
+      expect(rows[0].command).toBe("hide rtx-pc/old-build");
+    });
+
+    it("restore offers hidden finished Sessions only", () => {
+      const rows = suggest("restore ", index).filter((row) => row.id.startsWith("restore:"));
+      expect(rows.map((row) => row.action)).toEqual([{ kind: "restore", sessionId: "mini:6" }]);
+    });
+
+    it("delete offers finished Sessions and says it asks first", () => {
+      const rows = suggest("delete ", index).filter((row) => row.id.startsWith("delete:"));
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows[0].action).toEqual({ kind: "delete", sessionId: "rtx:2" });
+      expect(rows[0].detail).toContain("asks first");
+    });
+
+    it("live Sessions are never offered for hide or delete", () => {
+      for (const verb of ["hide ", "delete ", "restore "]) {
+        const rows = suggest(verb, index);
+        expect(rows.some((row) => row.sessionId === "rtx:3"), `${verb} must not offer a RUNNING Session`).toBe(false);
+      }
+    });
+
+    it("hide/restore/delete are not searched as text", () => {
+      expect(searchText("hide old build")).toBeUndefined();
+      expect(searchText("delete pytest")).toBeUndefined();
+      expect(searchText("restore hidden")).toBeUndefined();
     });
   });
 });

@@ -42,11 +42,13 @@ model) to build the whole system, one milestone at a time.
 | R1 | `09-reliability-r1-daemon-restart-sessions.md` | Optional keeper architecture for PTYs across daemon restart |
 | 4.G | `10-milestone-4g-terminal-reliability-performance.md` | Real-terminal fidelity, keepers (includes R1), honest status, measured performance |
 | 4.H | `11-milestone-4h-observability.md` | Pre-V1: continuous health measurements on the control, health page, shareable anonymised report |
+| 6.4 | `12-milestone-6d-agent-sandbox-state.md` | Agent sandbox Sessions, agent state reporting via local socket, agent skill file (V2) |
+| T | `13-terminal-upgrade-package.md` | Terminal upgrade package: watcher fixes, one size per Session, `libghostty-vt` screen, `sentinal watch` pick-up from any Machine, keepers (replaces the open parts of 4.G and R1) |
 
-Milestones 1b.0, 4.0, 4.D, and 4.D.1, plus Reliability R1, begin with a
+Milestones 1b.0, 4.0, 4.D, 4.D.1, 6.4, plus Reliability R1, begin with a
 mandatory human review. Paste the approval back into the same agent session;
 do not let the agent infer wire, pairing, push-security, projection privacy,
-dependency, or PTY-ownership decisions.
+dependency, local-socket, or PTY-ownership decisions.
 
 The recommended path from the current repository is 1b.E → 1c → 1c.1 → 1d →
 3 → 1b.D → 4.0 → 4.A → 4.B → 4.C → 4.D → 4.D.1 → 4.F → 4.E. 4.F comes

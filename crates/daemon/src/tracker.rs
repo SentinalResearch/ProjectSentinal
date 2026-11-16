@@ -185,7 +185,12 @@ impl CommandTracker {
             return Ok(TrackerUpdate::default());
         };
         command.finish(exit_code, at)?;
-        session.transition(SessionState::Idle, at)?;
+        if session.state.is_finished() {
+            // Killed or already over: the Command still ends, the Session stays.
+            session.current_command = None;
+        } else {
+            session.transition(SessionState::Idle, at)?;
+        }
         let event = Event {
             id: self.ids.event(),
             session_id: session.id,
@@ -237,6 +242,26 @@ mod tests {
         tracker
             .handle(session, ShellSignal::CommandStart, Timestamp(at))
             .unwrap();
+    }
+
+    #[test]
+    fn a_killed_session_still_finishes_its_command() {
+        let (mut session, mut tracker) = setup();
+        start(&mut tracker, &mut session, "python train.py", 1_000);
+        // `kill` marks the Session interrupted before the shell's exit is seen.
+        session
+            .transition(SessionState::Interrupted, Timestamp(2_000))
+            .unwrap();
+
+        let update = tracker
+            .finish_on_shell_exit(&mut session, 137, Timestamp(2_100))
+            .unwrap();
+
+        let command = update.command.unwrap();
+        assert_eq!(command.status(), CommandStatus::Failed);
+        assert_eq!(session.state, SessionState::Interrupted);
+        assert_eq!(session.current_command, None);
+        assert!(update.event.is_some());
     }
 
     #[test]

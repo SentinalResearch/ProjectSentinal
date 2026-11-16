@@ -211,6 +211,52 @@ fn worker_outbox_coalesces_replaceable_metrics_without_cursor_gaps() {
 }
 
 #[test]
+fn a_change_read_for_upload_is_never_rewritten_before_its_acknowledgement() {
+    let store = Store::open_in_memory().unwrap();
+    let machine = MachineId(MACHINE.into());
+    let limits = ProjectionOutboxLimits::default();
+    store
+        .record_projection_change(&machine, EPOCH, &upsert(1, 10), Timestamp(1), limits)
+        .unwrap();
+    // The link reads cursor 1 and starts uploading it.
+    assert_eq!(
+        store
+            .projection_changes_after(&machine, EPOCH, 0, 128)
+            .unwrap()
+            .len(),
+        1
+    );
+    // Meanwhile the Session starts waiting.
+    let mut waiting = projected_session(10, 2);
+    waiting.state = protocol::SessionState::Waiting;
+    store
+        .record_projection_change(
+            &machine,
+            EPOCH,
+            &ProjectionChange::SessionUpsert {
+                cursor: 2,
+                session: waiting.clone(),
+            },
+            Timestamp(2),
+            limits,
+        )
+        .unwrap();
+    // The control acknowledges what it was sent: cursor 1.
+    store
+        .acknowledge_projection_cursor(&machine, EPOCH, 1)
+        .unwrap();
+    assert_eq!(
+        store
+            .projection_changes_after(&machine, EPOCH, 1, 128)
+            .unwrap(),
+        vec![ProjectionChange::SessionUpsert {
+            cursor: 2,
+            session: waiting,
+        }]
+    );
+}
+
+#[test]
 fn worker_outbox_keeps_terminal_session_transition() {
     let store = Store::open_in_memory().unwrap();
     let machine = MachineId(MACHINE.into());
@@ -389,6 +435,40 @@ fn snapshot_chunks_replace_projection_only_after_the_final_chunk() {
     let sessions = store.projected_sessions(&machine, 10).unwrap();
     assert_eq!(sessions.len(), 2);
     assert!(sessions.iter().all(|session| session.id != SessionId(99)));
+}
+
+#[test]
+fn a_worker_with_a_long_history_can_resync_a_fresh_control() {
+    // A worker keeps up to 34 records a Session (itself, its metrics and its
+    // last 32 Events), so 100 Sessions is about 3,400 records: 27 chunks of 128.
+    let store = Store::open_in_memory().unwrap();
+    let machine = MachineId(MACHINE.into());
+    let chunks: u64 = 30;
+    for index in 0..chunks {
+        let batch = ProjectionBatch::Snapshot {
+            schema_version: PROJECTION_SCHEMA_VERSION,
+            machine_id: machine.clone(),
+            source_epoch: EPOCH.into(),
+            snapshot_id: "snapshot_big".into(),
+            snapshot_cursor: 5_000,
+            chunk_index: u32::try_from(index).unwrap(),
+            final_chunk: index + 1 == chunks,
+            sent_at: Timestamp(2),
+            records: (0..100).map(|n| upsert(1, index * 100 + n + 1)).collect(),
+        };
+        let result = store
+            .apply_projection_batch(&machine, &batch, Timestamp(3))
+            .unwrap();
+        assert_ne!(
+            result.status,
+            protocol::ProjectionAcknowledgementStatus::ResyncRequired,
+            "chunk {index} refused"
+        );
+    }
+    assert_eq!(
+        store.projected_sessions(&machine, 5_000).unwrap().len(),
+        3_000
+    );
 }
 
 #[test]

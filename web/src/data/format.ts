@@ -122,7 +122,26 @@ export function codingAgentName(agent: CodingAgentView["agent"]): string {
   return CODING_AGENT_NAMES[agent];
 }
 
-const AGENT_ACTION_WORDS: Record<AgentAction, string> = {
+/**
+ * Display name for a Session: its title, else the agent name plus the project
+ * folder ("Claude Code · sentinal") when a coding agent runs in it, else
+ * "Session N" (P5).
+ */
+export function sessionDisplayName(session: {
+  id: string | number;
+  name?: string;
+  title?: string | null;
+  cwd?: string;
+  codingAgent?: CodingAgentView;
+}): string {
+  if (session.title) return session.title;
+  if (session.codingAgent) {
+    const folder = session.cwd?.split("/").filter(Boolean).pop();
+    const agent = codingAgentName(session.codingAgent.agent);
+    return folder ? `${agent} · ${folder}` : agent;
+  }
+  return `Session ${session.id}`;
+}const AGENT_ACTION_WORDS: Record<AgentAction, string> = {
   RAN_COMMAND: "ran",
   RAN_TESTS: "ran tests",
   EDITED_FILE: "edited",

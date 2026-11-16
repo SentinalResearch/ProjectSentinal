@@ -127,4 +127,14 @@ export type EventKind = {
    * Tool calls in that turn.
    */
   tool_uses: number;
+} | {
+  "type": "METRIC_REPORTED";
+  /**
+   * Metric name, e.g. `"loss"`, `"accuracy"`, `"tokens_per_sec"`.
+   */
+  name: string;
+  /**
+   * The value.
+   */
+  value: number;
 };

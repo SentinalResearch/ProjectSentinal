@@ -55,6 +55,22 @@ pub enum NotificationCategory {
     Release,
 }
 
+impl NotificationCategory {
+    /// How long one notification of this category silences the next one for
+    /// the same Session, on the worker and on the control; `None` never does.
+    ///
+    /// A finish (of a Command or an agent's turn) always matters. Each new
+    /// question needs an answer, so only a redraw of the same wait moments
+    /// later is folded; a question two minutes after the last one notifies.
+    pub const fn dedup_window_ms(self) -> Option<i64> {
+        match self {
+            Self::Completed | Self::Failed => None,
+            Self::Waiting => Some(30_000),
+            _ => Some(5 * 60 * 1_000),
+        }
+    }
+}
+
 /// Current decision or delivery state for one Event notification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]

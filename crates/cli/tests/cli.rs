@@ -19,6 +19,17 @@ fn parses_list_command() {
 }
 
 #[test]
+fn there_is_no_detach_command_because_another_process_cannot_end_an_attachment() {
+    // An attachment belongs to one terminal's own connection; a separate
+    // `sentinal detach <id>` could only hang. Ctrl+J in that terminal detaches.
+    assert!(Cli::try_parse_from(["sentinal", "detach", "7"]).is_err());
+    use clap::CommandFactory;
+    let help = Cli::command().render_long_help().to_string();
+    assert!(help.contains("Ctrl+J"));
+    assert!(!help.contains("sentinal detach"));
+}
+
+#[test]
 fn read_commands_take_json() {
     // 6.0: every read command prints the API's own shapes with --json.
     let parse = |args: &[&str]| Cli::try_parse_from(args).unwrap().command;
@@ -134,10 +145,37 @@ fn rejects_attach_without_session_id() {
 fn control_j_detaches_without_forwarding_input() {
     let mut detector = DetachDetector::new();
 
-    let result = detector.push(b"hello\x0aignored");
+    let result = detector.push(b"hello\x0a");
 
     assert_eq!(result.bytes, b"hello");
     assert!(result.detach);
+}
+
+#[test]
+fn a_line_feed_inside_input_is_forwarded_not_a_detach() {
+    let mut detector = DetachDetector::new();
+
+    let result = detector.push(b"line one\x0aline two\x0a\r");
+
+    assert_eq!(result.bytes, b"line one\x0aline two\x0a\r");
+    assert!(!result.detach);
+}
+
+#[test]
+fn a_bracketed_paste_ending_in_a_line_feed_is_forwarded() {
+    let mut detector = DetachDetector::new();
+
+    let first = detector.push(b"\x1b[200~echo one\x0a");
+    let second = detector.push(b"echo two\x0a");
+    let third = detector.push(b"\x1b[201~");
+    let after = detector.push(b"\x0a");
+
+    assert_eq!(first.bytes, b"\x1b[200~echo one\x0a");
+    assert!(!first.detach);
+    assert_eq!(second.bytes, b"echo two\x0a");
+    assert!(!second.detach);
+    assert!(!third.detach);
+    assert!(after.detach, "Ctrl+J after the paste still detaches");
 }
 
 #[test]

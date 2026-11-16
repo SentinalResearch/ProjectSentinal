@@ -58,6 +58,16 @@ describe("HistoryPage", () => {
     await screen.findByText("cargo build");
   });
 
+  it("shows the row state as a line-variant glyph (not a solid block) so it is readable in a dense list", async () => {
+    renderHistory();
+    const command = await screen.findByText("cargo build");
+    const row = command.closest("div");
+    const tag = row?.querySelector("[data-state]");
+    expect(tag).not.toBeNull();
+    // Line variant: transparent background, glyph in the state color — never a solid fill without a label.
+    expect(tag).toHaveStyle({ background: "transparent" });
+  });
+
   it("labels an all-Machine search when one Machine is unavailable", async () => {
     const partial = [] as HistoryResults;
     partial.unavailableMachines = ["mbp"];

@@ -22,7 +22,7 @@ export function HealthChart({ title, metric, points }: { title: string; metric: 
   const first = points[0].at;
   const last = points[points.length - 1].at;
   const top = Math.max(...points.map((point) => point.p95)) * 1.1 || 1;
-  const x = (at: number) => (last === first ? WIDTH : ((at - first) / (last - first)) * WIDTH);
+  const x = (at: number) => (last === first ? WIDTH / 2 : ((at - first) / (last - first)) * WIDTH);
   const y = (value: number) => HEIGHT - (Math.max(0, value) / top) * HEIGHT;
   const line = (key: "p50" | "p95") => points.map((point) => `${x(point.at).toFixed(1)},${y(point[key]).toFixed(1)}`).join(" ");
   const latest = points[points.length - 1];
@@ -32,6 +32,10 @@ export function HealthChart({ title, metric, points }: { title: string; metric: 
         <svg role="img" aria-label={title} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" className={chart.chartSvg}>
           <polyline points={line("p95")} fill="none" stroke="var(--s-waiting-fg)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
           <polyline points={line("p50")} fill="none" stroke="var(--accent-fg)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          {/* A one-point polyline renders nothing; the markers keep single-sample series visible. */}
+          {points.map((point) => (
+            <circle key={point.at} cx={x(point.at)} cy={y(point.p50)} r="2.5" fill="var(--accent-fg)" />
+          ))}
         </svg>
       </div>
       <figcaption className={styles.legend}>

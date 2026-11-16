@@ -91,11 +91,62 @@ three isolated loopback daemons with fresh credentials and data directories.
 
 ## Real two-Machine acceptance
 
-**NOT RUN on 2026-10-04.** `tailscale status --json` and `tailscale version`
-both failed on this host with `The Tailscale CLI failed to start: Failed to
-load preferences.` The earlier 4.0 report records a macOS 26.6.2 MacBook and
-a pop-os Linux worker, but it does not prove 4.A Session routing. Their old
-enrollment run is not counted as this acceptance.
+**Partially run 2026-11-08.** One worker confirmed; second worker and phone
+PWA steps pending.
+
+### Worker A: sentinal-deployment-testing (confirmed 2026-11-08)
+
+```console
+hostname: sentinal-deployment-testing
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+uname: Linux sentinal-deployment-testing 6.12.111+deb13-cloud-amd64 ... x86_64 GNU/Linux
+tailscale version: 1.104.4
+tailscale ip: 100.64.0.1
+sentinal version: sentinal 2.10.0 (6b7936e)
+connection: state=ACTIVE, machine_id=01M4K6KMZ6PBCYESBD15FV4EP5,
+  control_url=https://sentinal-control-one.<tailnet>.ts.net,
+  control_machine_id=01M4TDHS207WV7XY15E1CPJDMD
+sessions: id=9 title="4.A routing sentinal-deployment-testing" state=RUNNING origin=WATCH
+```
+
+### Control: sentinal-control-one (confirmed 2026-11-08)
+
+```console
+hostname: sentinal-control-one
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+uname: Linux sentinal-control-one 6.12.111+deb13-cloud-amd64 ... x86_64 GNU/Linux
+tailscale version: 1.104.4
+tailscale ip: 100.64.0.2
+sentinal version: sentinal 2.10.0 (6b7936e)
+connection: state=NOT_CONNECTED (this Machine IS the control)
+machine_id: 01M4TDHS207WV7XY15E1CPJDMD
+```
+
+### Worker B: sentinal-research (confirmed 2026-11-08)
+
+```console
+hostname: sentinal-research
+NAME="Linux Mint" VERSION="22.3 (Zena)"
+uname: Linux sentinal-research 7.0.0-42-generic ... x86_64 GNU/Linux
+tailscale version: 1.104.5
+tailscale ip: 100.64.0.3
+sentinal version: sentinal 2.10.0 (6b7936e)
+connection: state=ACTIVE, machine_id=01M73BXZFNDRPMDF4NF3FJRSWB,
+  control_url=https://sentinal-control-one.<tailnet>.ts.net
+```
+
+### Remaining for 4.A closure
+
+- [x] All three Machines confirmed (control + Worker A + Worker B) with OS, Tailscale, version
+- [ ] Step 3: attach to A from phone PWA, type, resize, Ctrl-C; confirm B unchanged
+- [ ] Step 4: attach to B, search history; one-Machine vs all-Machine filter
+- [x] Step 5 partial: disconnect + re-enroll on Worker A confirmed (link rotated,
+      Machine ID kept, Watch Session survived window close, visible in control)
+- [ ] Step 5 remaining: confirm no duplicate Session/Event rows after re-enroll
+- [ ] Step 6: revoke A; confirm B stays Online; inspect browser storage for secrets
+
+Health report evidence: `sentinal-health-24h-4.json` (5 Machines, 31 918 samples,
+0 dropped, 24 h range) recorded at repo root — feeds Milestone 4.H baseline.
 
 Run and append the literal output below once the control and two workers are
 available. Do not put tokens or pairing codes in this report.

@@ -224,3 +224,38 @@ fn projection_batch_rejects_bad_cursors_and_excess_changes() {
     }
     assert!(delta.validate().is_err());
 }
+
+#[test]
+fn only_known_metric_names_reach_the_control() {
+    use protocol::{
+        Event, EventId, EventKind, ProjectedEventFacts, ProjectedEventSummary, SessionId, Timestamp,
+    };
+    let summary = |name: &str| {
+        ProjectedEventSummary::from_event(&Event {
+            id: EventId(1),
+            session_id: SessionId(1),
+            command_id: None,
+            at: Timestamp(1),
+            kind: EventKind::MetricReported {
+                name: name.into(),
+                value: 0.5,
+            },
+        })
+        .facts
+    };
+    assert_eq!(
+        summary("Loss"),
+        ProjectedEventFacts::MetricReported {
+            name: "loss".into(),
+            value: 0.5
+        }
+    );
+    // A name the program made up could carry anything; the control never sees it.
+    assert_eq!(
+        summary("my_private_project_codename"),
+        ProjectedEventFacts::MetricReported {
+            name: "metric".into(),
+            value: 0.5
+        }
+    );
+}

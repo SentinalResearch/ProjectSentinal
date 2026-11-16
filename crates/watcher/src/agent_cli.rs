@@ -57,6 +57,8 @@ pub struct AgentCliAdapter {
     /// The daemon shows us the screen, which is what questions are read from.
     /// Lines remain the fallback for replays and logs.
     screen_seen: bool,
+    /// The engine read a question from the screen; the turn is not over.
+    question_on_screen: bool,
 }
 
 impl AgentCliAdapter {
@@ -174,13 +176,12 @@ impl WatcherAdapter for AgentCliAdapter {
                 self.screen_seen = true;
                 self.emitted = None;
                 self.candidate = None;
-                let mut events = Vec::new();
-                for row in rows {
-                    let cleaned = clean(row);
-                    if !cleaned.trim().is_empty() {
-                        events.extend(self.turn.line(observation.at, &cleaned));
-                    }
-                }
+                let cleaned: Vec<String> = rows
+                    .iter()
+                    .map(|row| clean(row))
+                    .filter(|row| !row.trim().is_empty())
+                    .collect();
+                let events = self.turn.screen(observation.at, &cleaned);
                 self.refresh_summary();
                 events
             }
@@ -214,10 +215,10 @@ impl WatcherAdapter for AgentCliAdapter {
             }
             ObservationKind::Tick | ObservationKind::MetricsSample(_) => {
                 let mut events = self.settle(observation.at);
-                events.extend(
-                    self.turn
-                        .tick(observation.at, self.emitted.is_some() || self.state.waiting),
-                );
+                events.extend(self.turn.tick(
+                    observation.at,
+                    self.emitted.is_some() || self.state.waiting || self.question_on_screen,
+                ));
                 self.refresh_summary();
                 events
             }
@@ -235,6 +236,10 @@ impl WatcherAdapter for AgentCliAdapter {
 
     fn owns_prompts(&self) -> bool {
         true
+    }
+
+    fn set_question_on_screen(&mut self, waiting: bool) {
+        self.question_on_screen = waiting;
     }
 }
 

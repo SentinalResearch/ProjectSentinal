@@ -86,6 +86,198 @@ If the task changes the protocol and something is unclear, stop and ask.
 - `main` = `origin/main` = tag **v2.10.0** (production).
 - `dev` has 11 local commits (not pushed), including the screen
   question detector and dashboard prompt fixes (task **P0**, now committed).
+- **2026-11-08 agent pass:** B2 (::sentinal progress/metric API), B1
+  (METRIC_REPORTED + server detection), P1 (Vibe arrows+Enter), P2 (marked
+  menus), P4 (Claude "Running N shell command…"), P5 (agent Session names),
+  P6 (agents filter), A2 (every route has a place), A4 (prompt hide/restore/
+  delete) — all done with tests.
+
+---
+
+## X: bugs from the 2026-11-12 review
+
+A review read about a third of the code. Every fix below has a test that
+fails without it. Items marked *(v2.10.0)* are also in production.
+
+### Fixed (uncommitted on `dev`)
+
+- [x] X1 Agent Events never left the engine: `supports_evidence` had no arm for
+      `AgentActivity` / `AgentTurnFinished`, and the notification rules mapped
+      `AgentTurnFinished` to "disabled". No "agent finished" notification was
+      ever sent *(v2.10.0)* — `watcher/tests/agent_events.rs`
+- [x] X2 An emoji before `loss` in a training line panicked the watcher (byte
+      slice in `training.rs`) *(v2.10.0)* — `watcher/tests/unicode_lines.rs`
+- [x] X3 Bash Sessions recorded `$BASH_COMMAND`: aliases expanded and only the
+      first command of a pipeline or list (`ls --color=auto --color=auto` in
+      completion) *(v2.10.0)* — `scripts/tests/bash-preexec-test.sh`
+- [x] X4 Any line-feed byte detached an attached terminal and dropped the rest
+      of the input; now only a lone Ctrl+J keypress outside a bracketed paste
+      *(v2.10.0)* — `cli/tests/cli.rs`
+- [x] X5 A worker with more than about 60 Sessions could never resync a fresh
+      control (16-chunk snapshot cap); now 1,024 chunks, bounded at 64 MiB
+      staged *(v2.10.0)* — `store/tests/projection.rs`
+- [x] X6 Outbox compaction rewrote a change already being uploaded, and its
+      acknowledgement deleted the rewrite (dashboard RUNNING while WAITING)
+      *(v2.10.0)* — `store/tests/projection.rs`
+- [x] X7 A second question within 5 minutes never notified (worker and
+      control); finished agent turns were also folded on the worker. One rule
+      per category now: finishes always, questions after 30 s, others 5 min
+      *(v2.10.0)* — `notifications/tests.rs`, `store/tests/native_push.rs`
+- [x] X8 Killing a Session left its Command RUNNING forever and sent viewers no
+      update *(v2.10.0)* — `daemon/src/tracker.rs` tests
+- [x] X9 Server ports were read from the address or a timestamp (`127.0.0.1:8080`
+      gave 127) — `watcher/tests/generic.rs`
+- [x] X10 Vibe answers pressed Down (N−1) times assuming the marker is on option
+      1. Interim: Vibe questions are answered in the terminal (no one-tap
+      answer). Real fix needs the watcher to report the marked option: a
+      protocol change, **owner to decide**
+- [x] X11 `sentinal detach <id>` hung and could never work (attachments are per
+      connection); removed, help points to Ctrl+J
+- [x] X12 `::sentinal` lines were not bounded: metrics now one per name per 5 s
+      and at most 32 names, `unit` ≤ 32 and names limited to `[A-Za-z0-9_.-]`,
+      any malformed field rejects the line
+- [x] X13 `MetricReported` sent a program-printed name to the control; only an
+      allowlisted name (`loss`, `accuracy`, `lr`, …) goes, else `metric`
+
+### Still open
+
+- [ ] X14 Health stays WARNING after a question is answered, for the rest of
+      the Command (`watcher/src/health.rs:138`); agent Sessions are one Command
+- [ ] X15 Rollback from 2.11: stored rows are decoded strictly, so
+      `METRIC_REPORTED` Events and `VIBE`/`ANTIGRAVITY` Sessions make whole
+      queries fail on 2.10 (`store/src/records.rs:156`, `lib.rs:354`)
+- [ ] X16 Nothing prunes `events`, `commands`, `metrics_minute` or the
+      control's notification tables; every warning line is an Event
+- [ ] X17 The projection recorder decodes every stored Session twice a second
+      and re-records all of them on each restart (`projection_runtime.rs:32`)
+- [ ] X18 A second identical question within 1 s of the first ending is not
+      reported (`screen_prompt.rs:82`)
+- [ ] X19 Marked menus allow 8 options; the protocol and web cap at 6
+- [ ] X20 The control dashboard names every agent Session just "Claude Code"
+      (`sessionDisplayName` has no folder there)
+- [ ] X21 The delete dialog in `usePromptActions.tsx` has no Escape handling or
+      focus trap; `web/src/data/format.ts` has `}const` on one line
+- [ ] X22 Browser logins live only in memory and end on every daemon restart
+- [ ] X23 A panic in the watcher still ends the PTY reader; catch it there so
+      one bad line can never stop a Session being read
+- [ ] X24 From screenshots: on the phone Session page the Open terminal button
+      covers Health · Evidence; the prompt bar covers the last Machine in the
+      Start a Session sheet; an offline Machine's Session still shows IDLE
+- [ ] X25 The unread two thirds: most of `daemon/src/control`, link, push,
+      package service, config and PTY code, most of the CLI and `web/src`,
+      `scripts/`, `intelligence/`, `eval/`
+
+- **2026-11-12 audit and terminal design:** a read of the watcher, protocol,
+  store, and the daemon's Session code found the bugs listed under **T0**, and
+  the causes of cluttered and overlapping terminals. The owner decided the
+  design in `prompts/13-terminal-upgrade-package.md`. Section **T** below is
+  now the main work; it replaces Track **C** and the answering parts of
+  **P1** and **P2**.
+
+---
+
+## T: terminal upgrade package · *main work, target v2.12.0*
+
+Goal: start work on one Machine and pick it up from any terminal, phone, or
+browser with `sentinal watch`, on one correct screen. No tmux bridge. Full
+detail, owner decisions, and the wire proposal are in
+`prompts/13-terminal-upgrade-package.md`; hand that file to the coding agent
+after `prompts/00-master.md`. Stages are done in order, one change set each.
+
+Owner decisions (2026-11-12): one size per Session set by the latest active
+viewer; `libghostty-vt` as the daemon's screen engine if the T2 build gate
+passes; keepers in scope; `adopt` stays read-only.
+
+### T0. Watcher and daemon fixes
+
+Found by reading; the first five were also reproduced by running the code.
+
+- [ ] T0.1 Agent Events are dropped: `supports_evidence` has no case for
+      `AgentActivity` / `AgentTurnFinished` (`crates/protocol/src/evidence.rs`),
+      so no agent activity and no "agent finished" notification
+- [ ] T0.2 Panic on a training line with a multi-byte character before
+      `loss` (`crates/watcher/src/training.rs:282`)
+- [ ] T0.3 A watcher panic stops the PTY reader for that Session
+      (`crates/daemon/src/session_manager/tasks.rs`)
+- [ ] T0.4 Wrong server port (`127.0.0.1:8080` gives 127), and one Event per
+      matching line (`crates/watcher/src/generic.rs`)
+- [ ] T0.5 Tool calls counted again after each turn; a turn "finishes"
+      during an approval dialog (`agent_cli.rs`, `agent_activity.rs`)
+- [ ] T0.6 Health stays WARNING after a question is answered, and FAILED
+      after one error line (`crates/watcher/src/health.rs`)
+- [ ] T0.7 `::sentinal` lines: metrics not rate limited, `unit` unbounded,
+      malformed fields half accepted (B2 said otherwise)
+- [ ] T0.8 Same question asked again within one second is not reported;
+      marked menus allow 8 options, the protocol 6; marked row not reported
+- [ ] T0.9 A second question in the same Session within 5 minutes sends no
+      notification (worker and control both deduplicate). Likely the cause of
+      the A3 item "notifications for questions sometimes never arrived"
+- [ ] T0.10 `kill` leaves the Command running forever in history and tells
+      no viewer
+- [ ] T0.11 No rate limit on warning and error Events
+- [ ] T0.12 One unreadable stored row fails the whole query (matters after a
+      rollback from a newer release)
+- [ ] T0.13 Projection: an update can be lost when it is compacted into a
+      row already being uploaded; a worker with more than about 2,000
+      records can never send a snapshot to a new control
+
+### T1. Display fixes without a protocol change
+
+- [ ] T1.1 Unicode 11 widths in the web terminal
+- [ ] T1.2 Debounced fit
+- [ ] T1.3 CLI handles window resize and restores the local terminal on exit
+- [ ] T1.4 CLI resizes before the snapshot
+- [ ] T1.5 A viewer never starts inside an escape sequence
+- [ ] T1.6 Detach key: `Ctrl-\ d` only; `Ctrl+J` goes to the program. The
+      `sentinal detach` subcommand on `dev` hangs and cannot work as written:
+      owner decides remove or redefine
+
+### T2. Authoritative screen on `libghostty-vt`
+
+- [ ] Build gate on all four release targets, with numbers; stop and report
+- [ ] T2.1–T2.4 one `screen` module, engine thread per Session, every reader
+      moved to it, history in the attach snapshot
+
+### T3. One size per Session · *protocol change, proposal first*
+
+- [ ] T3.1 `ATTACH` fields, `VIEWER_STATE`, `SESSION_SIZE`, fixtures
+- [ ] T3.2 Size policy in the daemon (latest active viewer)
+- [ ] T3.3 Web renders at the Session size; "Use this size" bar; peek cards
+      observe only
+- [ ] T3.4 Answer keys for marked menus computed in the daemon from the
+      current screen; the Vibe-only arrow logic in `web/src/data/actions.ts`
+      (which assumes option 1 is marked) is removed
+- [ ] T3.5 CLI follows the Session size
+- [ ] T3.6 Two-viewer browser test
+
+### T4. `sentinal watch` picks up from anywhere · *design first*
+
+- [ ] T4.1 `sentinal watch` with no argument lists and attaches; `NAME|ID`,
+      `--last`, `--new`, `--machine`
+- [ ] T4.2 Sessions on another Machine reached through the control
+- [ ] T4.3 Docs and help
+- [ ] T4.4 Tried by hand in `just dev`
+
+### T5. Keepers (was Track C)
+
+- [ ] Owner answers the questions in `docs/R1_KEEPER_DESIGN.md` §13
+- [ ] T5.1–T5.5 keeper per Session, reclaim at startup, updates no longer
+      interrupt Sessions, restart and upgrade tests
+
+### Also found, not yet scheduled
+
+- `events`, `commands`, `metrics_minute`, and the control's notification
+  tables are never pruned
+- The projection recorder decodes every stored Session twice a second and
+  re-records all of them at each start (`daemon/src/projection_runtime.rs`)
+- The new `MetricReported` projection sends a program-printed name to the
+  control; the projection otherwise carries no terminal text. Owner decides
+  whether to allowlist names or keep metrics on the Machine
+- Terminal input is written to the PTY on the async executor
+  (`api.rs` → `write_input`); a program that does not read can block it
+- 39 source files are over the 400-line rule
+- Not yet read in the audit: most of `daemon/src/control`, `push`,
+  `package_service`, the rest of the CLI, most of `web/src`, `scripts/`
 
 ---
 
@@ -102,24 +294,24 @@ characters, wider dashboard cards with an Open terminal button.
 - [x] Committed to `dev`
 - [ ] Owner retests with real `claude`, `vibe`, and `agy` in `just dev`
 
-### P1. Answering Vibe's menu
+### P1. Answering Vibe's menu · done (arrows + Enter)
 
 Vibe's menu says "arrows and Enter". Sentinal sends the option's digit, which is
 unverified on real Vibe.
 
-- [ ] Record what real Vibe does with a digit (replay a dev Session's log)
-- [ ] If digits do not work, send arrow keys plus Enter for that agent, chosen
-      in the daemon, never from screen text
+- [ ] Record what real Vibe does with a digit (replay a dev Session's log) — owner
+- [x] For a Vibe Session, send arrow keys plus Enter, chosen from the Session's
+      agent in `web/src/data/actions.ts` (`answerChoice`), never from screen text
 - Where: `crates/watcher/src/screen_prompt.rs`, the daemon's prompt answer path
 
-### P2. Menus without numbers
+### P2. Menus without numbers · done
 
 `menu_at` needs numbered rows (`1.` … `n.`). Some agents draw `❯ Yes` / `  No`.
 
-- [ ] Detect a marked list of 2–8 short rows under a question, only with a
+- [x] Detect a marked list of 2–8 short rows under a question, only with a
       selection marker and a key hint, so plain text is never a menu
-- [ ] Answer by moving the marker (arrows) then Enter
-- [ ] Tests from real captured screens; a test that ordinary output is not a menu
+- [x] Answer by moving the marker (arrows) then Enter
+- [x] Tests from real captured screens; a test that ordinary output is not a menu
 
 ### P3. Agent coverage
 
@@ -133,33 +325,50 @@ unverified on real Vibe.
       or leaving the field out for a control too old to know them (protocol
       change, so ask first)
 
-### P4. Tool calls from Claude Code
+### P4. Tool calls from Claude Code · done
 
 Claude Code now prints `Running 1 shell command…` instead of `Bash(...)`, so
 tool-call counts are 0.
 
-- [ ] Recognise the new wording (from screen rows, not only lines), keeping the
+- [x] Recognise the new wording (from screen rows, not only lines), keeping the
       old wording working
 - Where: `crates/watcher/src/agent_cli.rs`
 
-### P5. Name agent Sessions
+### P5. Name agent Sessions · done
 
 An untitled Session shows as `Session 4`. Show the agent name instead
 ("Claude Code · project-folder") when the title is empty.
 
-### P6. The `AI agents` filter
+- [x] `sessionDisplayName` in `web/src/data/format.ts`, used by both
+      `api/index.ts` and `api/projection-view.ts`
+
+### P6. The `AI agents` filter · done
 
 It decides by command name only. Also count a Session as an agent when its
 screen matched an agent's prompt or banner. Explain the toggle in its tooltip.
+
+- [x] Filter now also matches Sessions with `promptOptions` (a menu on screen)
+- [x] Tooltip explains the toggle in `GlassDashboard.tsx`
 
 ---
 
 ## A: daily use
 
-### A2. Every page has a way back
+### A5. Automate notify.toml setup · new
 
-- [ ] List every route in `web/src/routes/`; each has a visible way back or the
+Today the owner writes `~/.config/terminal-agent/notify.toml` by hand.
+Add `sentinal notifications setup [--server URL] [--topic NAME]` (or fold
+into `sentinal setup`) that creates the config dir, writes a valid
+`notify.toml` with mode 0600, generates a random topic when absent, and
+restarts the daemon. Refuses to overwrite an existing file without
+`--force`. Test: fresh dir, existing file, bad server URL, permissions.
+
+### A2. Every page has a way back · done
+
+- [x] List every route in `web/src/routes/`; each has a visible way back or the
       places menu; add a browser test that walks them
+- [x] Test in `navPlaces.test.ts`: every concrete route + detail routes resolve
+      to a NAV_PLACE; projects now map to Overview
 
 ### A3. UI pass from real use
 
@@ -172,43 +381,43 @@ screen matched an agent's prompt or banner. Explain the toggle in its tooltip.
       P0); notifications for questions sometimes never arrived; check this on
       production after v2.11.0, because dev never sends push
 
-### A4. Hide and delete from the prompt
+### A4. Hide and delete from the prompt · done
 
-- [ ] Prompt verbs `hide`, `restore`, `delete` for a Session (delete asks to
+- [x] Prompt verbs `hide`, `restore`, `delete` for a Session (delete asks to
       confirm), using the existing `useSessionRemoval`
 
 ---
 
 ## B: watcher (progress without changing the program)
 
-### B2. Progress API: one printed line · *do this next*
+### B2. Progress API: one printed line · done
 
 ```text
 ::sentinal progress current=3 total=50 unit=task
 ::sentinal metric name=loss value=0.81
 ```
 
-- [ ] Parse these lines first, ahead of adapters and the fallback counter in
+- [x] Parse these lines first, ahead of adapters and the fallback counter in
       `crates/watcher/src/progress.rs`; once a Session prints one, it is trusted
       over guesses for that Session
-- [ ] They are still untrusted output: they may only set progress and metrics,
+- [x] They are still untrusted output: they may only set progress and metrics,
       never run anything, change Session state, or notify. Bounds: numbers
       finite, `current <= total`, names ≤ 64 characters, rate limited like other
       progress
-- [ ] Malformed lines are ignored and shown as normal output
-- [ ] `docs/AGENT_GUIDE.md` (printed by `sentinal agent-guide`): copy-paste
+- [x] Malformed lines are ignored and shown as normal output
+- [x] `docs/AGENT_GUIDE.md` (printed by `sentinal agent-guide`): copy-paste
       Python and shell examples
-- [ ] `sentinal help agents` prints the same guide
+- [x] `sentinal help agents` prints the same guide (hidden `agents` alias)
 
 ### B1. Rules that recognise more
 
 - [x] Explicit counters (`task 3/50`, `[4/10]`, tqdm bars) (committed in `02cea0a`)
-- [ ] `METRIC_REPORTED` Event from any program (loss, accuracy, tokens/s), not
+- [x] `METRIC_REPORTED` Event from any program (loss, accuracy, tokens/s), not
       only Commands containing "train". Protocol change: fixtures
 - [ ] Full-screen apps (nvtop, htop, vim): read the parsed screen on a timer,
       reusing the P0 screen sampling
-- [ ] Builds, test runs, downloads, servers ("listening on :8080") without a
-      dedicated adapter
+- [x] Servers ("listening on :8080") without a dedicated adapter — generic
+      adapter now emits `SERVER_STARTED` from common server-start lines
 - [ ] Long runs: rate, estimated finish, time since last progress, and a
       progress chart on the Session page
 
@@ -241,9 +450,11 @@ screen matched an agent's prompt or banner. Explain the toggle in its tooltip.
 
 ---
 
-## C: multi-day runs survive a daemon restart
+## C: multi-day runs survive a daemon restart · *now T5*
 
-Today a daemon restart or update ends FULL Sessions.
+Today a daemon restart or update ends FULL Sessions. This track is built as
+stage **T5** of the terminal upgrade package; the list below is kept for the
+detail.
 
 - [ ] Owner approves `docs/R1_KEEPER_DESIGN.md` (no code before this)
 - [ ] A per-Session keeper keeps the PTY and log alive while `sentinald` restarts
@@ -270,6 +481,7 @@ holds credentials or settings must follow `config_dir`.
 - Heartbeat `instance_id`, `build_commit`; `INSTANCE_CONFLICT`
 - `CodingAgent::VIBE`, `ANTIGRAVITY`; prompt option labels up to 160 characters
 - Store migrations 014 (`id_floors`) and 015 (`machine_instances`)
+- `METRIC_REPORTED` EventKind + `ProjectedEventFacts::MetricReported` (B2/B1)
 
 ## Other open items (older plans)
 

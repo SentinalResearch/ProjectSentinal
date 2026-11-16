@@ -27,5 +27,7 @@
   { "id": 11, "session_id": 128, "command_id": 8192, "at": 1790000851000,
     "kind": { "type": "PROCESS_EXITED", "pid": 4242, "exit_code": 1 } },
   { "id": 12, "session_id": 128, "command_id": 8192, "at": 1790000852000,
-    "kind": { "type": "COMMAND_FINISHED", "exit_code": 1, "duration_ms": 732000 } }
+    "kind": { "type": "COMMAND_FINISHED", "exit_code": 1, "duration_ms": 732000 } },
+  { "id": 13, "session_id": 128, "command_id": 8192, "at": 1790000600500,
+    "kind": { "type": "METRIC_REPORTED", "name": "loss", "value": 0.81 } }
 ]

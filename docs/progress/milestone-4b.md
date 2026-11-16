@@ -103,8 +103,27 @@ passed (fmt, clippy -D warnings, workspace tests, bindings, web, shell checks)
 
 ## V1 demo — two enrolled real Machines
 
-**NOT RUN yet.** The workers need a release that contains 4.B. Stable 0.1.6
-predates it.
+**Partially run 2026-11-08.** Workers on 2.10.0 confirmed via health report;
+phone PWA and notification steps pending.
+
+Available workers on current version (from `sentinal-health-24h-4.json`):
+
+| Machine | OS | Version | Notes |
+|---|---|---|---|
+| sentinal-deployment-testing | Debian 13 Linux | 2.10.0 | Confirmed ACTIVE, watch works |
+| sentinal-research | Linux | 2.10.0 | Needs machine info + watch confirm |
+| Advanceds-Mini.studihaus | macOS | **0.2.9** | Too old for 4.B — needs update first |
+| sohiths-MacBook-Pro.local | macOS | **0.2.9** | Too old for 4.B — needs update first |
+
+Control: sentinal-control-one (Linux, 2.10.0).
+
+### Remaining for 4.B closure
+
+- [ ] Worker B (sentinal-research) machine info + watch confirm
+- [ ] notify.toml on both workers; phone subscribed to ntfy topic
+- [ ] Phone PWA installed standalone from control origin
+- [ ] Steps 3–8: attach both, run Recipe on each, notification on finish,
+      waiting push, Save as Recipe, credential sweep
 
 1. Publish the 4.B worker build from the control
    (`scripts/build-worker-release.sh`, then

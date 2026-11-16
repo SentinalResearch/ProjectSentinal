@@ -1,0 +1,50 @@
+{
+  "pkg": "sentinal-ui",
+  "globalName": "SentinalUI",
+  "shape": "package",
+  "entry": "web/design-system/index.ts",
+  "buildCmd": "web/node_modules/.bin/tsc -p web/design-system/tsconfig.json",
+  "srcDir": "../src/components",
+  "componentSrcMap": {
+    "ThemeProvider": null,
+    "GlassPill": "../src/components/glass/Glass.tsx",
+    "GlassPanel": "../src/components/glass/Glass.tsx",
+    "AttentionCard": "../src/components/glass/Glass.tsx",
+    "MockBadge": null,
+    "PwaUpdatePrompt": null
+  },
+  "dtsPropsFor": {
+    "Button": "/** primary = accent fill, one per view; secondary = outline (default); destructive = red fill, only inside a confirm dialog. */\n  variant?: \"primary\" | \"secondary\" | \"destructive\";\n  /** Shows a spinner and disables the button. */\n  loading?: boolean;\n  /** Text shown in place of children while loading. */\n  loadingLabel?: string;\n  disabled?: boolean;\n  type?: \"button\" | \"submit\" | \"reset\";\n  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;\n  className?: string;\n  id?: string;\n  style?: React.CSSProperties;\n  children?: React.ReactNode;\n  /** Every other native <button> attribute is passed through. */\n  [attribute: string]: unknown;",
+    "Input": "/** Uppercase mono caption above the field. */\n  label?: string;\n  /** Helper line under the field. */\n  hint?: string;\n  /** Error line under the field; replaces hint and turns the border red. */\n  error?: string;\n  /** Render the value in the mono font (paths, codes, commands). */\n  mono?: boolean;\n  value?: string;\n  defaultValue?: string;\n  placeholder?: string;\n  type?: string;\n  name?: string;\n  disabled?: boolean;\n  readOnly?: boolean;\n  onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;\n  className?: string;\n  id?: string;\n  style?: React.CSSProperties;\n  /** Every other native <input> attribute is passed through. */\n  [attribute: string]: unknown;",
+    "AgentBadge": "/** The AI coding agent running in a Session. */\n  agent: {\n    agent: \"CLAUDE\" | \"CODEX\" | \"AIDER\" | \"GEMINI\" | \"VIBE\" | \"ANTIGRAVITY\";\n    /** On a turn now: shows the pulsing dot. */\n    working: boolean;\n    toolUses: number;\n    tokens?: number;\n    costUsd?: number;\n  };\n  /** Also show the usage text (tool calls, tokens, cost) after the name. */\n  usage?: boolean;",
+    "PromptChoices": "/** A WAITING Session; one button is rendered per promptOptions entry (at most 6). Renders nothing when there are none. */\n  session: {\n    id: string;\n    machine: string;\n    name: string;\n    state: \"CREATED\" | \"IDLE\" | \"RUNNING\" | \"WAITING\" | \"STALLED\" | \"COMPLETED\" | \"FAILED\" | \"INTERRUPTED\" | \"DISCONNECTED\";\n    prompt?: string;\n    /** keys is the single key the option types, e.g. \"1\" or \"y\". */\n    promptOptions?: { label: string; keys: string }[];\n  };\n  /** Called after an answer was sent to the Session. */\n  onAnswered?: () => void;",
+    "OutputSearchToggle": "/** The Session whose saved output can be opted into search; outputSearch sets the initial checked state. */\n  session: {\n    id: string;\n    machine: string;\n    name: string;\n    state: \"CREATED\" | \"IDLE\" | \"RUNNING\" | \"WAITING\" | \"STALLED\" | \"COMPLETED\" | \"FAILED\" | \"INTERRUPTED\" | \"DISCONNECTED\";\n    outputSearch?: boolean;\n  };",
+    "GlassPill": "/** Element to render; defaults to \"div\". */\n  as?: React.ElementType;\n  /** Stronger, more opaque glass for chrome that sits over busy content. */\n  strong?: boolean;\n  className?: string;\n  style?: React.CSSProperties;\n  children?: React.ReactNode;\n  /** Every other attribute of the rendered element is passed through. */\n  [attribute: string]: unknown;",
+    "GlassPanel": "/** Element to render; defaults to \"section\". */\n  as?: React.ElementType;\n  /** Smaller 14px-radius tile (metric tiles) instead of the 18px panel. */\n  tile?: boolean;\n  className?: string;\n  style?: React.CSSProperties;\n  children?: React.ReactNode;\n  /** Every other attribute of the rendered element is passed through. */\n  [attribute: string]: unknown;",
+    "AttentionCard": "/** Element to render; defaults to \"article\". */\n  as?: React.ElementType;\n  /** The Session state whose colour tints the card. */\n  state: \"CREATED\" | \"IDLE\" | \"RUNNING\" | \"WAITING\" | \"STALLED\" | \"COMPLETED\" | \"FAILED\" | \"INTERRUPTED\" | \"DISCONNECTED\";\n  className?: string;\n  style?: React.CSSProperties;\n  children?: React.ReactNode;\n  /** Every other attribute of the rendered element is passed through. */\n  [attribute: string]: unknown;"
+  },
+  "overrides": {
+    "ConfirmDialog": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "BottomSheet": {
+      "cardMode": "single",
+      "viewport": "390x520"
+    },
+    "PromptChoices": {
+      "cardMode": "column"
+    },
+    "AttentionCard": {
+      "cardMode": "column"
+    },
+    "GlassPanel": {
+      "cardMode": "column"
+    },
+    "GlassPill": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md",
+  "projectId": "92c70c24-4f08-43b1-a049-74d1905dd1e6"
+}

@@ -8,7 +8,7 @@ import type { ProjectedMetrics } from "../../protocol/ProjectedMetrics";
 import type { ProjectedSession } from "../../protocol/ProjectedSession";
 import type { LiveEvent } from "../adapter";
 import type { Machine, MachineStatus, Session, SessionEvent, SessionHealth, SessionMetrics } from "../types";
-import { agentActionWord, agentFinishedText, formatEventTime, sessionElapsedMs } from "../format";
+import { agentActionWord, agentFinishedText, formatEventTime, sessionDisplayName, sessionElapsedMs } from "../format";
 import { compositeId } from "./machine-connections";
 
 /** In-memory privacy-minimized dashboard projection. */
@@ -65,6 +65,7 @@ function eventDetail(facts: ProjectedEventFacts): string {
     case "SERVER_STARTED": return facts.port === null ? "Server started" : `Server started on port ${facts.port}`;
     case "AGENT_ACTIVITY": return agentActionWord(facts.action);
     case "AGENT_TURN_FINISHED": return agentFinishedText(facts.tool_uses);
+    case "METRIC_REPORTED": return `${facts.name} ${facts.value}`;
   }
 }
 
@@ -102,10 +103,23 @@ function mapSession(
   const latestMetrics = metrics
     .filter((entry) => entry.scope === "SESSION" && entry.session_id === session.id)
     .sort((left, right) => right.at - left.at)[0];
+  const codingAgent = session.coding_agent
+    ? {
+        agent: session.coding_agent.agent,
+        working: session.coding_agent.working,
+        toolUses: session.coding_agent.tool_uses,
+        tokens: session.coding_agent.tokens ?? undefined,
+        costUsd: session.coding_agent.cost_usd ?? undefined,
+      }
+    : undefined;
   return {
     id: compositeId(machineId, session.id),
     machine: machineId,
-    name: session.title ?? `Session ${session.id}`,
+    name: sessionDisplayName({
+      id: session.id,
+      title: session.title,
+      codingAgent,
+    }),
     state: session.state,
     runningFor: duration(
       sessionElapsedMs(
@@ -125,15 +139,7 @@ function mapSession(
     metrics: metricView(latestMetrics),
     dismissed: session.dismissed_at ? true : undefined,
     ...(promptEvent === undefined ? {} : { promptEventId: promptEvent }),
-    codingAgent: session.coding_agent
-      ? {
-          agent: session.coding_agent.agent,
-          working: session.coding_agent.working,
-          toolUses: session.coding_agent.tool_uses,
-          tokens: session.coding_agent.tokens ?? undefined,
-          costUsd: session.coding_agent.cost_usd ?? undefined,
-        }
-      : undefined,
+    codingAgent,
     origin: session.origin,
     capture: session.capture,
     exitCode: session.exit_code,

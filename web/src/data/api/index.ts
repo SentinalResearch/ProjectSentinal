@@ -42,7 +42,7 @@ import { createRegistryApi } from "./registry";
 import { createAgentsApi } from "./agents";
 import { applyProjectionMessage, projectionView, type ProjectionView } from "./projection-view";
 import { health, type createHealthCollector } from "../health";
-import { agentActionWord, agentFinishedText, formatEventTime, sessionElapsedMs } from "../format";
+import { agentActionWord, agentFinishedText, formatEventTime, sessionDisplayName, sessionElapsedMs } from "../format";
 import { markLoad } from "../load-timing";
 import { mergeResults, resultFromHit, type SearchResult, type SearchResults } from "../search";
 
@@ -215,7 +215,20 @@ export function mapSession(session: WireSession): Session {
   return {
     id: compositeId(session.machine_id, session.id),
     machine: session.machine_id,
-    name: session.title ?? `Session ${session.id}`,
+    name: sessionDisplayName({
+      id: session.id,
+      title: session.title,
+      cwd: session.cwd,
+      codingAgent: session.coding_agent
+        ? {
+            agent: session.coding_agent.agent,
+            working: session.coding_agent.working,
+            toolUses: session.coding_agent.tool_uses,
+            tokens: session.coding_agent.tokens ?? undefined,
+            costUsd: session.coding_agent.cost_usd ?? undefined,
+          }
+        : undefined,
+    }),
     project: session.project_id ?? undefined,
     cwd: session.cwd,
     state: session.state,
@@ -288,6 +301,7 @@ function eventDetail(kind: EventKind): string {
     case "SERVER_STARTED": return kind.url ?? (kind.port === null ? "server listening" : `port ${kind.port}`);
     case "AGENT_ACTIVITY": return `${agentActionWord(kind.action)} · ${kind.detail}`;
     case "AGENT_TURN_FINISHED": return agentFinishedText(kind.tool_uses);
+    case "METRIC_REPORTED": return `${kind.name} ${kind.value}`;
   }
 }
 

@@ -253,3 +253,21 @@ fn every_agent_is_named_and_others_have_no_summary() {
     }
     assert_eq!(summary(&AgentCliAdapter::new()), None);
 }
+
+#[test]
+fn claude_codes_running_shell_command_wording_counts_as_a_tool_call() {
+    // New wording: "⏺ Running 1 shell command…" instead of "⏺ Bash(...)"
+    assert_eq!(
+        tool_line("⏺ Running 1 shell command…"),
+        Some((AgentAction::RanCommand, "Running 1 shell command…".into()))
+    );
+    assert_eq!(
+        tool_line("⏺ Running 3 shell commands…"),
+        Some((AgentAction::RanCommand, "Running 3 shell commands…".into()))
+    );
+    // Old wording still works.
+    assert!(tool_line("⏺ Bash(cargo test)").is_some());
+    // Unrelated text is not a tool call.
+    assert_eq!(tool_line("⏺ Running tests"), None);
+    assert_eq!(tool_line("⏺ Reading file"), None);
+}

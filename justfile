@@ -59,6 +59,7 @@ check:
     bash scripts/tests/run-roles-test.sh
     bash scripts/tests/install-worker-test.sh
     bash scripts/tests/shell-path-test.sh
+    bash scripts/tests/bash-preexec-test.sh
     bash scripts/tests/macos-signing-test.sh
     bash scripts/tests/setup-doc-test.sh
     bash scripts/tests/deployment-plan-test.sh

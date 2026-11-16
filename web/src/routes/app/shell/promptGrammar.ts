@@ -16,6 +16,9 @@ export type PromptAction =
   | { kind: "navigate"; to: string }
   | { kind: "answer"; sessionId: string; key: "y" | "n" }
   | { kind: "kill"; sessionId: string }
+  | { kind: "hide"; sessionId: string }
+  | { kind: "restore"; sessionId: string }
+  | { kind: "delete"; sessionId: string }
   | { kind: "newSession" }
   | { kind: "toggleTheme" }
   | { kind: "signOut" };
@@ -317,6 +320,63 @@ function kill(index: PromptIndex, query: string): PromptSuggestion[] {
   });
 }
 
+// ── HIDE / RESTORE / DELETE ─────────────────────────────────────────────────
+
+/** Finished Sessions can be hidden, restored, or permanently deleted (A4). */
+function removableSessions(index: PromptIndex): Session[] {
+  return index.sessions.filter(
+    (session) => session.state === "COMPLETED" || session.state === "FAILED" || session.state === "INTERRUPTED",
+  );
+}
+
+function hide(index: PromptIndex, query: string): PromptSuggestion[] {
+  return ranked(removableSessions(index), query, sessionKeys(index)).map((session) => {
+    const path = sessionPath(index, session);
+    return {
+      id: `hide:${session.id}`,
+      group: "DO",
+      command: `hide ${path}`,
+      detail: `${stateWord(session)} · hides it from the dashboard`,
+      action: { kind: "hide", sessionId: session.id },
+      completion: `hide ${path}`,
+      sessionId: session.id,
+    };
+  });
+}
+
+function restore(index: PromptIndex, query: string): PromptSuggestion[] {
+  // Hidden Sessions appear in the index only when they are hidden; the prompt
+  // offers restore for dismissed finished Sessions.
+  const hidden = removableSessions(index).filter((session) => session.dismissed);
+  return ranked(hidden, query, sessionKeys(index)).map((session) => {
+    const path = sessionPath(index, session);
+    return {
+      id: `restore:${session.id}`,
+      group: "DO",
+      command: `restore ${path}`,
+      detail: `${stateWord(session)} · shows it again`,
+      action: { kind: "restore", sessionId: session.id },
+      completion: `restore ${path}`,
+      sessionId: session.id,
+    };
+  });
+}
+
+function deleteSession(index: PromptIndex, query: string): PromptSuggestion[] {
+  return ranked(removableSessions(index), query, sessionKeys(index)).map((session) => {
+    const path = sessionPath(index, session);
+    return {
+      id: `delete:${session.id}`,
+      group: "DO",
+      command: `delete ${path}`,
+      detail: `${stateWord(session)} · asks first, then erases it permanently`,
+      action: { kind: "delete", sessionId: session.id },
+      completion: `delete ${path}`,
+      sessionId: session.id,
+    };
+  });
+}
+
 // ── Bare text ───────────────────────────────────────────────────────────────
 
 function actions(index: PromptIndex): Array<PromptSuggestion & { keys: string[] }> {
@@ -391,7 +451,7 @@ export function searchText(input: string): string | undefined {
   let query: string;
   if (head === "find") query = argument;
   else if ((head === "y" || head === "n") && (hasArgument || text.length === 1)) return undefined;
-  else if (["go", "run", "kill"].includes(head) && hasArgument) return undefined;
+  else if (["go", "run", "kill", "hide", "restore", "delete"].includes(head) && hasArgument) return undefined;
   else if (head === "split") return undefined;
   else query = text;
   return query.length >= MIN_SEARCH ? query : undefined;
@@ -411,6 +471,9 @@ export function suggest(input: string, index: PromptIndex): PromptSuggestion[] {
   else if (head === "find" && hasArgument) all = find(index, argument);
   else if (head === "split" && (hasArgument || text === "split")) all = split(index, text.slice(5).replace(/^\s+/, ""));
   else if (head === "kill" && hasArgument) all = kill(index, argument);
+  else if (head === "hide" && hasArgument) all = hide(index, argument);
+  else if (head === "restore" && hasArgument) all = restore(index, argument);
+  else if (head === "delete" && hasArgument) all = deleteSession(index, argument);
   else all = bare(index, text.trim());
   return capped(all);
 }

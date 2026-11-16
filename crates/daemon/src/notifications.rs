@@ -24,7 +24,6 @@ use std::{
 };
 use store::{NewNotificationDelivery, NotificationDelivery, Store};
 
-const DEDUP_MS: i64 = 5 * 60 * 1_000;
 const MAX_PENDING: u32 = 256;
 const JOURNAL_LIMIT: u32 = 1_000;
 const JOURNAL_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
@@ -334,13 +333,17 @@ impl NotificationService {
         self.store
             .prune_notification_deliveries(Timestamp(now.0.saturating_sub(JOURNAL_RETENTION_MS)))
             .map_err(|error| error.to_string())?;
-        let deduplicate_since = (matches!(
-            state,
-            NotificationDeliveryState::Queued
-                | NotificationDeliveryState::ForwardQueued
-                | NotificationDeliveryState::ControlAccepted
-        ) && !matches!(event.kind, EventKind::CommandFinished { .. }))
-        .then_some(Timestamp(now.0.saturating_sub(DEDUP_MS)));
+        let deduplicate_since = category
+            .dedup_window_ms()
+            .filter(|_| {
+                matches!(
+                    state,
+                    NotificationDeliveryState::Queued
+                        | NotificationDeliveryState::ForwardQueued
+                        | NotificationDeliveryState::ControlAccepted
+                )
+            })
+            .map(|window| Timestamp(now.0.saturating_sub(window)));
         let record = self
             .store
             .record_notification_delivery(&NewNotificationDelivery {
@@ -488,7 +491,9 @@ fn unavailable_status(message: &str) -> NotificationStatus {
 
 fn category_enabled(rules: NotificationRuleSet, kind: &EventKind) -> bool {
     match kind {
-        EventKind::CommandFinished { exit_code: 0, .. } => rules.finished,
+        EventKind::CommandFinished { exit_code: 0, .. } | EventKind::AgentTurnFinished { .. } => {
+            rules.finished
+        }
         EventKind::CommandFinished { .. } | EventKind::ErrorDetected { .. } => rules.error,
         EventKind::ResourceHigh { .. } => rules.error,
         EventKind::PossiblyStalled { .. } => rules.stalled,

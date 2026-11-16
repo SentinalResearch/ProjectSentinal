@@ -27,9 +27,14 @@ export function GlassDashboard() {
   const shell = useShell();
   const { machines, terminals, hidden, loading } = useLiveData();
   const [interrupting, setInterrupting] = useState<Session | null>(null);
-  // 6.1: show only Sessions running an AI coding agent.
+  // 6.1: show only Sessions running an AI coding agent. A Session counts as an
+  // agent when its Command started one or its screen showed a menu with
+  // options (an agent's prompt or banner), not by command name alone (P6).
   const [agentsOnly, setAgentsOnly] = useState(false);
-  const shown = (session: Session) => !agentsOnly || session.codingAgent !== undefined;
+  const isAgentSession = (session: Session) =>
+    session.codingAgent !== undefined ||
+    (session.promptOptions !== undefined && session.promptOptions.length > 0);
+  const shown = (session: Session) => !agentsOnly || isAgentSession(session);
   const now = useClock();
   const sparks = useSparkHistory(terminals);
   const load = useMachineLoad(machines);
@@ -57,6 +62,7 @@ export function GlassDashboard() {
               className={styles.filter}
               aria-pressed={agentsOnly}
               aria-label="AI agents only"
+              title="Show only Sessions running an AI coding agent: the Command started one, or the screen showed its prompt or menu"
               onClick={() => setAgentsOnly((only) => !only)}
             >
               AI agents

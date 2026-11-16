@@ -330,6 +330,45 @@ pub enum ProjectedEventFacts {
         /// Tool calls in that turn.
         tool_uses: u32,
     },
+    /// A named metric was reported.
+    MetricReported {
+        /// An allowlisted metric name, or `metric`: a name the program printed
+        /// never reaches the control.
+        name: String,
+        /// The value.
+        value: f64,
+    },
+}
+
+/// Metric names the control may show; any other printed name becomes `metric`.
+const PROJECTED_METRIC_NAMES: &[&str] = &[
+    "loss",
+    "val_loss",
+    "eval_loss",
+    "train_loss",
+    "accuracy",
+    "acc",
+    "val_accuracy",
+    "f1",
+    "precision",
+    "recall",
+    "perplexity",
+    "reward",
+    "score",
+    "lr",
+    "learning_rate",
+    "grad_norm",
+    "throughput",
+    "latency",
+    "tokens_per_second",
+];
+
+fn projected_metric_name(name: &str) -> &'static str {
+    PROJECTED_METRIC_NAMES
+        .iter()
+        .find(|known| known.eq_ignore_ascii_case(name))
+        .copied()
+        .unwrap_or("metric")
 }
 
 /// Bounded Event summary that contains no raw terminal-derived text.
@@ -391,6 +430,10 @@ impl ProjectedEventSummary {
             }
             EventKind::AgentTurnFinished { tool_uses } => ProjectedEventFacts::AgentTurnFinished {
                 tool_uses: *tool_uses,
+            },
+            EventKind::MetricReported { name, value } => ProjectedEventFacts::MetricReported {
+                name: projected_metric_name(name).to_string(),
+                value: *value,
             },
         };
         Self {

@@ -10,6 +10,8 @@ use std::collections::BTreeMap;
 
 const DEFAULT_STALL_MS: u64 = 10 * 60 * 1_000;
 const PROGRESS_INTERVAL_MS: i64 = 5_000;
+/// Distinct `::sentinal metric` names one Command may report.
+const MAX_METRIC_NAMES: usize = 32;
 
 /// Result of applying one observation to an Event engine.
 #[derive(Debug, Clone, PartialEq)]
@@ -31,11 +33,15 @@ pub struct EventEngine {
     declarative: Vec<DeclarativeAdapter>,
     health: HealthTracker,
     last_progress: Option<(Timestamp, Option<f32>)>,
+    last_metric: std::collections::HashMap<String, Timestamp>,
     processes: BTreeMap<u32, String>,
     capture: CaptureLevel,
     command_activity_required: bool,
     command_active: bool,
     screen: crate::screen_prompt::ScreenPrompts,
+    /// Set when the program printed a `::sentinal` API line; explicit lines are
+    /// then trusted over adapter and fallback guesses.
+    explicit_api: bool,
 }
 
 impl EventEngine {
@@ -47,11 +53,13 @@ impl EventEngine {
             declarative,
             health: HealthTracker::new(),
             last_progress: None,
+            last_metric: std::collections::HashMap::new(),
             processes: BTreeMap::new(),
             capture: CaptureLevel::Full,
             command_activity_required: false,
             command_active: command.is_some(),
             screen: crate::screen_prompt::ScreenPrompts::default(),
+            explicit_api: false,
         };
         if let Some(command) = command {
             engine.select(command);
@@ -81,14 +89,40 @@ impl EventEngine {
         if let ObservationKind::CommandStarted(command) = &observation.kind {
             self.select(command);
             self.last_progress = None;
+            self.last_metric.clear();
             self.command_active = true;
             self.screen.reset();
+            self.explicit_api = false;
         } else if matches!(observation.kind, ObservationKind::CommandFinished(_)) {
             self.command_active = false;
             self.screen.reset();
         }
         let capture = self.capture;
         let mut events = self.process_events(observation);
+        // Explicit ::sentinal API lines are parsed first, ahead of adapters
+        // and the fallback counter. Once a Session prints one, it is trusted
+        // over guesses for that Session.
+        if let ObservationKind::OutputLine(line) = &observation.kind {
+            if let Some(explicit) = crate::progress::explicit_line(line) {
+                self.explicit_api = true;
+                match explicit {
+                    crate::progress::ExplicitLine::Progress {
+                        current,
+                        total,
+                        unit,
+                    } => {
+                        events.push(EventKind::ProgressUpdated {
+                            current,
+                            total,
+                            unit,
+                        });
+                    }
+                    crate::progress::ExplicitLine::Metric { name, value } => {
+                        events.push(EventKind::MetricReported { name, value });
+                    }
+                }
+            }
+        }
         if let ObservationKind::Screen { rows, alternate } = &observation.kind {
             if self.command_active {
                 events.extend(self.screen.observe(observation.at, rows, *alternate));
@@ -116,10 +150,15 @@ impl EventEngine {
                     }),
             );
         }
+        let question_on_screen = self.screen.waiting();
         match (&mut self.selected, &observation.kind) {
-            (Some(adapter), _) => events.extend(adapter.observe(observation)),
-            // No adapter knows this program: explicit counters still count.
-            (None, ObservationKind::OutputLine(line)) => {
+            (Some(adapter), _) => {
+                adapter.set_question_on_screen(question_on_screen);
+                events.extend(adapter.observe(observation));
+            }
+            // No adapter knows this program: explicit counters still count,
+            // unless the program already used the ::sentinal API.
+            (None, ObservationKind::OutputLine(line)) if !self.explicit_api => {
                 if let Some((current, total, unit)) = crate::progress::fallback_progress(line) {
                     events.push(EventKind::ProgressUpdated {
                         current,
@@ -128,7 +167,7 @@ impl EventEngine {
                     });
                 }
             }
-            (None, _) => {}
+            _ => {}
         }
         events = deduplicate(events)
             .into_iter()
@@ -221,6 +260,22 @@ impl EventEngine {
     }
 
     fn allow_event(&mut self, at: Timestamp, event: &EventKind) -> bool {
+        if let EventKind::MetricReported { name, .. } = event {
+            // Like progress: at most one Event per metric every few seconds,
+            // and only so many distinct names per Command.
+            let known = self.last_metric.contains_key(name);
+            if !known && self.last_metric.len() >= MAX_METRIC_NAMES {
+                return false;
+            }
+            let allowed = self
+                .last_metric
+                .get(name)
+                .is_none_or(|previous| at.0.saturating_sub(previous.0) >= PROGRESS_INTERVAL_MS);
+            if allowed {
+                self.last_metric.insert(name.clone(), at);
+            }
+            return allowed;
+        }
         let EventKind::ProgressUpdated { .. } = event else {
             return true;
         };

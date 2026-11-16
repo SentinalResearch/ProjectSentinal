@@ -122,6 +122,11 @@ impl SessionManager {
             if let Some(store) = &self.inner.store {
                 store.update_session(&session)?;
             }
+            // Viewers see the Session end now; its Command ends when the exit
+            // monitor sees the shell go.
+            let _ = handle.structured.send(DaemonMessage::SessionUpdated {
+                session: session.clone(),
+            });
         }
         Ok(())
     }

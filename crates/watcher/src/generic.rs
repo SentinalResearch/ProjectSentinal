@@ -154,9 +154,80 @@ fn classify_line(line: &str) -> Option<EventKind> {
             message: line.to_string(),
         });
     }
+    if let Some((port, url)) = server_started_line(line, &lower) {
+        return Some(EventKind::ServerStarted { port, url });
+    }
     lower
         .contains("warning")
         .then(|| EventKind::WarningDetected {
             message: line.to_string(),
         })
+}
+
+/// The port after the ready phrase: `host:8080`, `[::]:8080`, `:8080` or
+/// `port 8080`. Text before the phrase (a timestamp) is never read.
+fn listening_port(lower: &str) -> Option<u16> {
+    let (start, phrase) = READY_PHRASES
+        .iter()
+        .filter_map(|phrase| lower.find(phrase).map(|at| (at + phrase.len(), *phrase)))
+        .min()?;
+    // "server started on port" already said the next word is the port.
+    let mut previous = phrase.rsplit(' ').next().unwrap_or("");
+    for word in lower[start..].split_whitespace() {
+        let word = word.trim_end_matches(|c: char| ",.;)}".contains(c));
+        let digits = match word.rsplit_once(':') {
+            Some((_, port)) => Some(port),
+            None if previous == "port" => Some(word),
+            None => None,
+        };
+        if let Some(port) = digits
+            .filter(|port| {
+                (1..=5).contains(&port.len()) && port.bytes().all(|b| b.is_ascii_digit())
+            })
+            .and_then(|port| port.parse::<u16>().ok())
+            .filter(|port| *port > 0)
+        {
+            return Some(port);
+        }
+        previous = word;
+    }
+    None
+}
+
+const READY_PHRASES: &[&str] = &[
+    "listening on",
+    "listening at",
+    "uvicorn running on",
+    "server is listening",
+    "server started on port",
+];
+
+/// Recognise common server-start lines without a dedicated adapter (B1):
+/// `listening on :8080`, `Uvicorn running on http://0.0.0.0:8000`,
+/// `server started on port 3000`.
+fn server_started_line(line: &str, lower: &str) -> Option<(Option<u16>, Option<String>)> {
+    if !READY_PHRASES.iter().any(|phrase| lower.contains(phrase)) {
+        return None;
+    }
+    let url = line
+        .split_whitespace()
+        .find(|part| part.starts_with("http://") || part.starts_with("https://"))
+        .map(|part| {
+            part.trim_end_matches(|c: char| ",.;)]}".contains(c))
+                .to_string()
+        });
+    let port = url
+        .as_deref()
+        .and_then(|u| {
+            u.split("//")
+                .nth(1)?
+                .split('/')
+                .next()?
+                .rsplit_once(':')?
+                .1
+                .parse()
+                .ok()
+        })
+        .or_else(|| listening_port(lower));
+    (port.is_some() || url.is_some()).then_some((port, url))
 }

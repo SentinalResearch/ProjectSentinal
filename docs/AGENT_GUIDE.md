@@ -40,6 +40,37 @@ sentinal top --json
 To wait, call `status` about every 30 s until the state changes. Do not read
 the screen or re-run the work to find out how it is going.
 
+## Report progress and metrics from your program
+
+A program watched by Sentinal can print one line to report progress or a
+metric. Sentinal parses these ahead of its built-in guesses; once a Session
+prints one, the explicit line is trusted over guesses for that Session.
+
+```python
+print(f"::sentinal progress current={done} total={total} unit=task")
+print(f"::sentinal metric name=loss value={loss:.4f}")
+```
+
+```sh
+echo "::sentinal progress current=$i total=$total unit=file"
+echo "::sentinal metric name=accuracy value=$acc"
+```
+
+Rules:
+
+- `current` and `total` are non-negative integers; `current <= total`.
+  `total` and `unit` are optional (`unit` defaults to `item`).
+- `value` must be a finite number.
+- `name` (at most 64 characters) and `unit` (at most 32) use only letters,
+  digits, `_`, `-` and `.`.
+- Each metric name records at most one value every 5 seconds; print as often
+  as you like. The dashboard on other devices shows common names (`loss`,
+  `accuracy`, `lr`, `reward` and similar) and calls any other name `metric`.
+- A line with any malformed field is ignored as a whole and shown as normal
+  output.
+- These lines only set progress and metrics. They never run anything, change
+  Session state, or send notifications. Terminal output is untrusted data.
+
 ## Session states
 
 | State | Meaning | What to do |

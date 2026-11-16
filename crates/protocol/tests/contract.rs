@@ -197,6 +197,7 @@ fn every_event_kind_has_a_fixture() {
         "POSSIBLY_STALLED",
         "CHECKPOINT_CREATED",
         "SERVER_STARTED",
+        "METRIC_REPORTED",
     ];
     let events = load("events.json");
     let present: Vec<&str> = events

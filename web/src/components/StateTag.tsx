@@ -74,7 +74,7 @@ export function StateTag({
   const icon = sm ? 11 : 13;
 
   return (
-    <span className={styles.tag} style={style}>
+    <span className={styles.tag} style={style} data-state={state}>
       <svg
         width={icon}
         height={icon}

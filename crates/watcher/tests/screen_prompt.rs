@@ -217,3 +217,37 @@ fn nothing_is_asked_once_the_command_has_ended() {
         "the screen still shows it, but nothing is running"
     );
 }
+
+#[test]
+fn a_marked_unnumbered_menu_is_a_question() {
+    let screen = "Do you want to proceed?\n❯ Yes\n  No\n\n↑↓ to navigate · Enter to select";
+    let mut e = engine("some-agent");
+    look(&mut e, 0, screen);
+    let (events, waiting) = look(&mut e, 1_000, screen);
+    assert!(waiting);
+    let (question, options) = asked(&events).unwrap();
+    assert_eq!(question, "Do you want to proceed?");
+    assert_eq!(options.len(), 2);
+    assert_eq!(options[0].label, "Yes");
+    assert_eq!(options[1].label, "No");
+}
+
+#[test]
+fn ordinary_text_is_never_a_marked_menu() {
+    for screen in [
+        // Plain text with a marker but no key hint.
+        "Status:\n❯ Working on it\n  done",
+        // Key hint but no marker.
+        "Choose:\n  Yes\n  No\n↑↓ navigate · Enter select",
+        // Too many rows.
+        &format!("Pick?\n{}\n↑↓ navigate", (0..10).map(|i| format!("  option {i}")).collect::<Vec<_>>().join("\n")),
+        // Only one row with a marker.
+        "Sure?\n❯ Yes\n↑↓ navigate · Enter select",
+        // Marker but rows are paragraphs.
+        "Note:\n❯ This is a very long paragraph that goes on and on and should not be a menu option at all because it is far too long to be a single choice in a terminal menu\n  Short\n↑↓ navigate",
+    ] {
+        let mut e = engine("some-agent");
+        look(&mut e, 0, screen);
+        assert!(!look(&mut e, 2_000, screen).1, "must not be a menu: {screen}");
+    }
+}

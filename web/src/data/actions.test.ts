@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { answerPrompt, canAnswer, canInterrupt } from "./actions";
+import { answerChoice, answerPrompt, canAnswer, canInterrupt } from "./actions";
 import { dataAdapter } from "./index";
 import type { Session } from "./types";
 
@@ -21,6 +21,49 @@ describe("answering a prompt", () => {
     expect(canAnswer({ ...waiting, prompt: undefined })).toBe(false);
     expect(canAnswer({ ...waiting, capture: "PROCESS_LOG" })).toBe(false);
     expect(canAnswer({ ...waiting, state: "RUNNING" })).toBe(false);
+  });
+});
+
+describe("answering a choice (P1)", () => {
+  it("sends the option's own key for a non-Vibe agent", async () => {
+    const send = vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
+    const session: Session = {
+      id: "m:2",
+      machine: "m",
+      name: "claude",
+      state: "WAITING",
+      prompt: "Proceed?",
+      codingAgent: { agent: "CLAUDE", working: true, toolUses: 1 },
+    };
+    await answerChoice("m:2", { label: "No", keys: "3" }, session);
+    expect(send).toHaveBeenCalledWith("m:2", "3");
+  });
+
+  it("offers no one-tap answer for Vibe, whose marker position is unknown", async () => {
+    // Down x (N-1) assumed the marker starts on option 1; if it does not, the
+    // wrong answer reaches a permission prompt. Until the watcher reports where
+    // the marker is, a Vibe question is answered in the terminal.
+    const send = vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
+    const vibe: Session = {
+      id: "m:3",
+      machine: "m",
+      name: "vibe",
+      state: "WAITING",
+      prompt: "Allow?",
+      promptOptions: [
+        { label: "Yes", keys: "1" },
+        { label: "No", keys: "2" },
+      ],
+      codingAgent: { agent: "VIBE", working: true, toolUses: 0 },
+    };
+    expect(canAnswer(vibe)).toBe(false);
+    await expect(answerChoice("m:3", { label: "No", keys: "2" }, vibe)).rejects.toThrow();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("refuses keys that are not an allowed choice", async () => {
+    vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
+    await expect(answerChoice("m:1", { label: "evil", keys: "rm -rf" }, waiting)).rejects.toThrow("not an answer key");
   });
 });
 

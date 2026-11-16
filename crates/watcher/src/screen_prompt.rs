@@ -114,6 +114,72 @@ pub(crate) fn find_question(rows: &[String]) -> Option<ScreenQuestion> {
         .rev()
         .filter(|index| matches!(option_line(&lines[*index]), Some((1, _, _))))
         .find_map(|index| menu_at(&lines, index, last))
+        .or_else(|| marked_menu(&lines, last))
+}
+
+/// A marked list of 2–8 short rows under a question, where one row carries a
+/// selection marker (`❯ Yes` / `  No`) and a key hint says how to choose.
+/// Plain text is never a menu: a marker and a hint are both required.
+fn marked_menu(lines: &[String], last: usize) -> Option<ScreenQuestion> {
+    // Skip trailing hint/empty lines to find the actual menu rows.
+    let mut menu_end = last;
+    while menu_end > 0 && (lines[menu_end].trim().is_empty() || is_hint(&lines[menu_end])) {
+        menu_end -= 1;
+    }
+    // Collect consecutive non-empty rows going up from menu_end.
+    let mut candidates: Vec<(usize, String, bool)> = Vec::new();
+    let mut index = menu_end;
+    loop {
+        let line = &lines[index];
+        if line.trim().is_empty() {
+            if candidates.is_empty() {
+                if index == 0 {
+                    break;
+                }
+                index -= 1;
+                continue;
+            }
+            break;
+        }
+        let trimmed = line.trim_start();
+        let marked = trimmed.starts_with(MARKERS);
+        let label = trimmed.trim_start_matches(MARKERS).trim();
+        // Short rows only: a menu option is a few words, not a paragraph.
+        // A question line ends the menu.
+        if label.is_empty() || label.chars().count() > 80 || label.ends_with('?') {
+            break;
+        }
+        candidates.push((index, label.to_string(), marked));
+        if candidates.len() >= 8 {
+            break;
+        }
+        if index == 0 {
+            break;
+        }
+        index -= 1;
+    }
+    candidates.reverse();
+    if candidates.len() < 2 || candidates.len() > 8 {
+        return None;
+    }
+    // Exactly one row must carry a selection marker.
+    let marked_count = candidates.iter().filter(|(_, _, m)| *m).count();
+    if marked_count != 1 {
+        return None;
+    }
+    // A key hint must exist below the menu.
+    let hinted = lines[menu_end + 1..=last].iter().any(|line| is_hint(line));
+    if !hinted {
+        return None;
+    }
+    let first = candidates.first()?.0;
+    let question = question_above(lines, first, true)?;
+    let options = candidates
+        .iter()
+        .enumerate()
+        .map(|(position, (_, label, _))| PromptOption::new(label, &(position + 1).to_string()))
+        .collect::<Option<Vec<_>>>()?;
+    Some(ScreenQuestion { question, options })
 }
 
 /// The menu whose option 1 is on `first`, if the screen says it is one.

@@ -136,6 +136,14 @@ describe("RecipesPage", () => {
       );
     });
 
+    it("styles the Name and ID fields with the dark theme instead of browser-default white inputs", async () => {
+      renderRecipes(newPath);
+      const name = await screen.findByRole("textbox", { name: "Name" }, { timeout: 5000 });
+      const id = screen.getByRole("textbox", { name: "ID" });
+      expect(name.className).toMatch(/saveInput/);
+      expect(id.className).toMatch(/saveInput/);
+    });
+
     it("refuses an ID that is not lowercase words joined by hyphens", async () => {
       renderRecipes(newPath);
       const user = userEvent.setup();

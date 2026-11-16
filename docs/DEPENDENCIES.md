@@ -37,6 +37,8 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `futures-util` | 1/1c.1 | Async WebSocket handling for the CLI and bounded file streaming for the daemon package service |
 | `tower` (dev) | 1 | Exercise Axum routes in-process without network sockets |
 | `argon2` | 1.1 | Hash and verify the single owner's password with Argon2id |
+| `libghostty-vt` | Terminal upgrade T2 | Authoritative screen state in the daemon (reflow on resize, correct character widths), replacing `vt100`. Approved by the owner 2026-11-12, on condition that the T2 build gate in `prompts/13-terminal-upgrade-package.md` passes on all four release targets; pre-1.0 and built with Zig, so the version is pinned exactly and used from one module only |
+| `@xterm/addon-unicode11` (web) | Terminal upgrade T1 | Current Unicode character widths in the web terminal, so emoji and wide symbols take the cells the program assumed |
 
 ## Web (Milestone 1+)
 `vite`, `typescript`, `react`, `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-webgl`,

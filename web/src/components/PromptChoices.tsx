@@ -23,7 +23,7 @@ export function PromptChoices({ session, onAnswered }: { session: Session; onAns
             aria-label={`Answer ${session.name}: ${choice.label}`}
             onClick={(event) => {
               event.stopPropagation();
-              void answerChoice(session.id, choice).then(onAnswered, () => undefined);
+              void answerChoice(session.id, choice, session).then(onAnswered, () => undefined);
             }}
           >
             <span className={styles.key} aria-hidden="true">

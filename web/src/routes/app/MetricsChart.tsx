@@ -43,7 +43,7 @@ export function MetricsChart({ samples, range }: { samples: MachineMetricSample[
   }
   const first = samples[0].at;
   const last = samples[samples.length - 1].at;
-  const x = (at: number) => (last === first ? WIDTH : ((at - first) / (last - first)) * WIDTH);
+  const x = (at: number) => (last === first ? WIDTH / 2 : ((at - first) / (last - first)) * WIDTH);
   const y = (value: number) => HEIGHT - (Math.min(100, Math.max(0, value)) / 100) * HEIGHT;
   const latest = samples[samples.length - 1];
 
@@ -61,19 +61,18 @@ export function MetricsChart({ samples, range }: { samples: MachineMetricSample[
             <line key={level} x1={0} x2={WIDTH} y1={y(level)} y2={y(level)} className={styles.gridLine} />
           ))}
           {present.map((series) => {
-            const points = samples
-              .filter((sample) => sample[series.key] !== undefined)
+            const seriesSamples = samples.filter((sample) => sample[series.key] !== undefined);
+            const points = seriesSamples
               .map((sample) => `${x(sample.at).toFixed(1)},${y(sample[series.key] ?? 0).toFixed(1)}`)
               .join(" ");
             return (
-              <polyline
-                key={series.key}
-                points={points}
-                fill="none"
-                stroke={series.color}
-                strokeWidth={1.5}
-                vectorEffect="non-scaling-stroke"
-              />
+              <g key={series.key}>
+                <polyline points={points} fill="none" stroke={series.color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+                {/* A one-point polyline renders nothing; the markers keep single-sample series visible. */}
+                {seriesSamples.map((sample) => (
+                  <circle key={sample.at} cx={x(sample.at)} cy={y(sample[series.key] ?? 0)} r="2.5" fill={series.color} />
+                ))}
+              </g>
             );
           })}
         </svg>

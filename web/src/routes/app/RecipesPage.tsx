@@ -303,8 +303,18 @@ function SaveRecipeForm() {
           <span>{target?.name ?? machineId}</span>
         </header>
         <form onSubmit={save} className={styles.formBody}>
-          <label className={styles.paramRow}>Name<input value={name} onChange={(event) => setName(event.target.value)} /></label>
-          <label className={styles.paramRow}>ID<input value={id} onChange={(event) => setId(event.target.value.toLowerCase())} /></label>
+          <label className={styles.paramRow}>
+            Name
+            <input className={styles.saveInput} value={name} onChange={(event) => setName(event.target.value)} />
+          </label>
+          <label className={styles.paramRow}>
+            ID
+            <input
+              className={`${styles.saveInput} mono`}
+              value={id}
+              onChange={(event) => setId(event.target.value.toLowerCase())}
+            />
+          </label>
           <div className={styles.section}>
             <span className={styles.sectionLabel}>Choose literal values to make parameters</span>
             {selectable.map(({ part, index }) => (

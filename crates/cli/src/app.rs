@@ -127,7 +127,7 @@ async fn dispatch(
     }
     // Hook commands never use the WebSocket API and need no token.
     let cli = match cli.command {
-        Command::AgentGuide => {
+        Command::AgentGuide | Command::Agents => {
             let _ = out.write_all(crate::AGENT_GUIDE.as_bytes());
             return Ok(ExitCode::SUCCESS);
         }
@@ -410,6 +410,7 @@ async fn dispatch(
         | Command::Disconnect
         | Command::Mcp { .. }
         | Command::AgentGuide
+        | Command::Agents
         | Command::Identity { .. } => {}
     }
     Ok(ExitCode::SUCCESS)

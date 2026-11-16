@@ -18,6 +18,10 @@ impl CaptureLevel {
                 | EventKind::PossiblyStalled { .. }
                 | EventKind::CheckpointCreated { .. }
                 | EventKind::ServerStarted { .. }
+                | EventKind::MetricReported { .. }
+                // A coding agent's tool calls and turns are read from its screen.
+                | EventKind::AgentActivity { .. }
+                | EventKind::AgentTurnFinished { .. }
         );
         match kind {
             EventKind::CommandStarted { .. } | EventKind::CommandFinished { .. } => {

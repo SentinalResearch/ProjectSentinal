@@ -132,3 +132,61 @@ fn command_gated_engine_never_calls_an_idle_shell_stalled() {
     let after_command = engine.observe(&Observation::metrics(Timestamp(1_301_000), 1.0, Some(1.0)));
     assert!(after_command.events.is_empty());
 }
+
+#[test]
+fn a_server_start_line_from_any_program_is_a_server_started_event() {
+    let mut engine = EventEngine::new(None, Vec::new());
+    for (line, expected_port, expected_url) in [
+        (
+            "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)",
+            Some(8000),
+            Some("http://0.0.0.0:8000"),
+        ),
+        ("INFO:     Listening on :8080", Some(8080), None),
+        ("Server started on port 3000", Some(3000), None),
+        (
+            "listening at http://127.0.0.1:5000",
+            Some(5000),
+            Some("http://127.0.0.1:5000"),
+        ),
+        // The port is the number after the address's last colon, never a
+        // part of the address or of a timestamp before the phrase.
+        ("Listening on 127.0.0.1:8080", Some(8080), None),
+        ("server is listening on 10.0.0.5:3000", Some(3000), None),
+        (
+            "2026-11-08T12:00:01Z INFO listening on [::]:9000",
+            Some(9000),
+            None,
+        ),
+        ("listening on 0.0.0.0:8081, pid 4123", Some(8081), None),
+    ] {
+        let update = engine.observe(&Observation::output(Timestamp(0), line));
+        assert!(
+            update.events.contains(&EventKind::ServerStarted {
+                port: expected_port,
+                url: expected_url.map(str::to_string),
+            }),
+            "missing SERVER_STARTED for: {line}"
+        );
+    }
+}
+
+#[test]
+fn ordinary_output_is_not_a_server_start() {
+    let mut engine = EventEngine::new(None, Vec::new());
+    for line in [
+        "listening to music",
+        "the server is not responding",
+        "port 8080 is already in use",
+        "loading model weights",
+    ] {
+        let update = engine.observe(&Observation::output(Timestamp(0), line));
+        assert!(
+            !update
+                .events
+                .iter()
+                .any(|e| matches!(e, EventKind::ServerStarted { .. })),
+            "false SERVER_STARTED for: {line}"
+        );
+    }
+}

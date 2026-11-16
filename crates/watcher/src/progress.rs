@@ -3,6 +3,10 @@
 //! Only explicit counters count: a tqdm bar, a leading `[i/n]`, or a known
 //! unit word followed by `i/n` or `i of n`. A bare fraction ("accuracy
 //! 41/50", a date) is never progress, because nothing says it is a count.
+//!
+//! Programs can also print one explicit API line that is parsed first, ahead
+//! of adapters and the fallback: `::sentinal progress current=3 total=50
+//! unit=task` or `::sentinal metric name=loss value=0.81`.
 
 /// Words that name what a counter counts.
 const UNITS: &[&str] = &[
@@ -27,6 +31,98 @@ const UNITS: &[&str] = &[
     "prompt",
     "test",
 ];
+
+/// Maximum length of a metric name in a `::sentinal metric` line.
+const MAX_METRIC_NAME_CHARS: usize = 64;
+/// Maximum length of a progress unit in a `::sentinal progress` line.
+const MAX_UNIT_CHARS: usize = 32;
+
+/// A name or unit: letters, digits, `_`, `-` and `.`, nothing a terminal or a
+/// page could misread.
+fn safe_word(word: &str, max_chars: usize) -> bool {
+    !word.is_empty()
+        && word.chars().count() <= max_chars
+        && word
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+}
+
+/// What a `::sentinal` API line asks the watcher to do.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum ExplicitLine {
+    /// `::sentinal progress current=N total=M [unit=U]`
+    Progress {
+        current: u64,
+        total: Option<u64>,
+        unit: String,
+    },
+    /// `::sentinal metric name=X value=Y`
+    Metric { name: String, value: f64 },
+}
+
+/// Parse one explicit `::sentinal` API line, or `None` for anything else.
+///
+/// Malformed lines return `None` and are shown as normal output. The line is
+/// untrusted output: it may only set progress and metrics.
+pub(crate) fn explicit_line(line: &str) -> Option<ExplicitLine> {
+    let rest = line.trim_start().strip_prefix("::sentinal ")?;
+    let mut parts = rest.split_whitespace();
+    match parts.next()? {
+        "progress" => parse_progress(parts),
+        "metric" => parse_metric(parts),
+        _ => None,
+    }
+}
+
+/// `current=3 total=50 unit=task` (total and unit optional).
+fn parse_progress<'a, I: Iterator<Item = &'a str>>(parts: I) -> Option<ExplicitLine> {
+    let mut current = None;
+    let mut total = None;
+    let mut unit = None;
+    // A field that is present but malformed rejects the whole line.
+    for part in parts {
+        if let Some(value) = part.strip_prefix("current=") {
+            current = Some(value.parse::<u64>().ok()?);
+        } else if let Some(value) = part.strip_prefix("total=") {
+            total = Some(value.parse::<u64>().ok()?);
+        } else if let Some(value) = part.strip_prefix("unit=") {
+            if !safe_word(value, MAX_UNIT_CHARS) {
+                return None;
+            }
+            unit = Some(value.to_string());
+        }
+    }
+    let current = current?;
+    if let Some(total) = total {
+        if current > total {
+            return None;
+        }
+    }
+    Some(ExplicitLine::Progress {
+        current,
+        total,
+        unit: unit.unwrap_or_else(|| "item".to_string()),
+    })
+}
+
+/// `name=loss value=0.81`.
+fn parse_metric<'a, I: Iterator<Item = &'a str>>(parts: I) -> Option<ExplicitLine> {
+    let mut name = None;
+    let mut value = None;
+    for part in parts {
+        if let Some(v) = part.strip_prefix("name=") {
+            name = Some(v.to_string());
+        } else if let Some(v) = part.strip_prefix("value=") {
+            value = Some(v.parse::<f64>().ok()?);
+        }
+    }
+    let name = name?;
+    let value = value?;
+    if !value.is_finite() || !safe_word(&name, MAX_METRIC_NAME_CHARS) {
+        return None;
+    }
+    Some(ExplicitLine::Metric { name, value })
+}
 
 /// `(current, total, unit)` when `line` reports explicit progress.
 pub(crate) fn fallback_progress(line: &str) -> Option<(u64, u64, String)> {
@@ -99,7 +195,7 @@ fn number(token: &str) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::fallback_progress;
+    use super::{explicit_line, fallback_progress, ExplicitLine};
 
     #[test]
     fn counters_are_found_and_bare_fractions_are_not() {
@@ -118,5 +214,54 @@ mod tests {
         assert_eq!(fallback_progress("41/50 correct"), None);
         assert_eq!(fallback_progress("task 2026/11/03"), None);
         assert_eq!(fallback_progress(""), None);
+    }
+
+    #[test]
+    fn explicit_progress_line_is_parsed() {
+        assert_eq!(
+            explicit_line("::sentinal progress current=3 total=50 unit=task"),
+            Some(ExplicitLine::Progress {
+                current: 3,
+                total: Some(50),
+                unit: "task".into(),
+            })
+        );
+        assert_eq!(
+            explicit_line("::sentinal progress current=10"),
+            Some(ExplicitLine::Progress {
+                current: 10,
+                total: None,
+                unit: "item".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn explicit_metric_line_is_parsed() {
+        assert_eq!(
+            explicit_line("::sentinal metric name=loss value=0.81"),
+            Some(ExplicitLine::Metric {
+                name: "loss".into(),
+                value: 0.81,
+            })
+        );
+    }
+
+    #[test]
+    fn malformed_explicit_lines_are_ignored() {
+        assert_eq!(explicit_line("::sentinal progress current=5 total=3"), None);
+        assert_eq!(explicit_line("::sentinal progress"), None);
+        assert_eq!(explicit_line("::sentinal metric name=loss value=NaN"), None);
+        assert_eq!(explicit_line("::sentinal metric name= value=1.0"), None);
+        assert_eq!(explicit_line("::sentinal unknown foo=bar"), None);
+        assert_eq!(explicit_line("::sentinal"), None);
+        assert_eq!(explicit_line("normal output"), None);
+        assert_eq!(
+            explicit_line(&format!(
+                "::sentinal metric name={} value=1.0",
+                "x".repeat(65)
+            )),
+            None
+        );
     }
 }

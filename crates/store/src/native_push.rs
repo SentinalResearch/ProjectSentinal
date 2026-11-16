@@ -11,8 +11,6 @@ use protocol::{
 use rusqlite::{params, OptionalExtension, Row, Transaction};
 use serde::{de::DeserializeOwned, Serialize};
 
-const CONTROL_DEDUP_MS: i64 = 5 * 60 * 1_000;
-
 /// Values required to enqueue one worker notification intent.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewNotificationIntentOutbox {
@@ -543,13 +541,7 @@ fn accept_one_intent(
 ) -> Result<(), StoreError> {
     let category = intent.facts.category();
     let category_text = enum_name(category)?;
-    let bypass_dedup = matches!(
-        category,
-        NotificationCategory::Completed | NotificationCategory::Failed
-    );
-    let duplicate: bool = if bypass_dedup {
-        false
-    } else {
+    let duplicate: bool = if let Some(window) = category.dedup_window_ms() {
         transaction.query_row(
             "SELECT EXISTS(SELECT 1 FROM control_notification_intents
               WHERE machine_id=?1 AND session_id=?2 AND category=?3
@@ -558,10 +550,12 @@ fn accept_one_intent(
                 batch.machine_id.0,
                 to_sql_id(intent.session_id.0)?,
                 category_text,
-                now.0.saturating_sub(CONTROL_DEDUP_MS),
+                now.0.saturating_sub(window),
             ],
             |row| row.get(0),
         )?
+    } else {
+        false
     };
     let decision = if duplicate {
         "DEDUPLICATED"

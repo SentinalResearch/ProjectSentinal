@@ -1,0 +1,8 @@
+{
+  "name": "sentinal-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Entry package for /design-sync: re-exports the web app's shared components so they can be bundled as a library. Not used by the app build.",
+  "types": "types/design-system/index.d.ts"
+}

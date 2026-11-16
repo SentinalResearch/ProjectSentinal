@@ -71,6 +71,11 @@ const NEXT_EVENT_ID: &str = "SELECT MAX(COALESCE((SELECT MAX(id) FROM events), 0
 /// Thread-safe connection to one terminal-agent SQLite database.
 pub struct Store {
     pub(crate) connection: Mutex<Connection>,
+    /// How far each projection outbox (`machine_id`, `source_epoch`) has been
+    /// read for upload. Compaction never rewrites a change at or below it,
+    /// because the acknowledgement for that upload would delete the rewrite
+    /// before it was sent. In memory: after a restart nothing is in flight.
+    pub(crate) projection_read_through: Mutex<std::collections::HashMap<(String, String), u64>>,
 }
 
 /// Create the database file as `0600` and tighten an existing one, before
@@ -123,6 +128,7 @@ impl Store {
         }
         Ok(Store {
             connection: Mutex::new(connection),
+            projection_read_through: Mutex::new(std::collections::HashMap::new()),
         })
     }
 

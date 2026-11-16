@@ -177,7 +177,8 @@ function DesktopHistory() {
                 onClick={clickable ? () => navigate(`/app/sessions/${entry.sessionId}`) : undefined}
               >
                 <span className={styles.tagCell}>
-                  <StateTag state={state} size="sm" iconOnly />
+                  {/* Line variant: in a dense list the solid block reads as a missing icon; the glyph + color carry the state. */}
+                  <StateTag state={state} size="sm" variant="line" iconOnly />
                 </span>
                 <span className={`${styles.command} mono`}>
                   {entry.command}

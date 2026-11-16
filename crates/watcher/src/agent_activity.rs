@@ -52,8 +52,8 @@ pub fn working_line(line: &str) -> bool {
     line.contains("esc to interrupt") || line.contains("esc to cancel")
 }
 
-/// A tool call: Claude Code's `⏺ Name(args)`, Gemini CLI's `✓ Name args`,
-/// or aider's `Applied edit to file`.
+/// A tool call: Claude Code's `⏺ Name(args)`, `⏺ Running N shell command…`,
+/// Gemini CLI's `✓ Name args`, or aider's `Applied edit to file`.
 pub fn tool_line(line: &str) -> Option<(AgentAction, String)> {
     let text = line.trim();
     if let Some(file) = text.strip_prefix("Applied edit to ") {
@@ -61,6 +61,10 @@ pub fn tool_line(line: &str) -> Option<(AgentAction, String)> {
     }
     if let Some(rest) = text.strip_prefix(['⏺', '●']) {
         let rest = rest.trim_start();
+        // Claude Code's newer wording: `Running 1 shell command…`
+        if let Some(command) = running_shell_command(rest) {
+            return Some((AgentAction::RanCommand, detail(command)));
+        }
         let open = rest.find('(')?;
         let name = &rest[..open];
         let args = rest[open + 1..].trim_end();
@@ -79,6 +83,23 @@ pub fn tool_line(line: &str) -> Option<(AgentAction, String)> {
         return Some((action_for(name, args.trim()), detail(args)));
     }
     None
+}
+
+/// `Running 1 shell command…` or `Running 3 shell commands…` → the count and noun.
+fn running_shell_command(text: &str) -> Option<&str> {
+    let rest = text.strip_prefix("Running ")?;
+    let (count, rest) = rest.split_once(' ')?;
+    if !count.chars().all(|c| c.is_ascii_digit()) || count.is_empty() {
+        return None;
+    }
+    let rest = rest
+        .strip_suffix('…')
+        .or_else(|| rest.strip_suffix("..."))?;
+    if rest == "shell command" || rest == "shell commands" {
+        Some(text)
+    } else {
+        None
+    }
 }
 
 /// One or two capitalised words of letters: `Bash`, `Web Search`.
@@ -205,6 +226,9 @@ pub struct AgentTurn {
     // A redraw repeats the live region; each call and error counts once a turn.
     seen_tools: HashSet<(AgentAction, String)>,
     seen_errors: HashSet<String>,
+    // What the last screen showed: a line that stays visible is not new.
+    screen_tools: HashSet<(AgentAction, String)>,
+    screen_errors: HashSet<String>,
     tokens: Option<u64>,
     cost_usd: Option<f64>,
 }
@@ -235,6 +259,55 @@ impl AgentTurn {
             }
             _ => Vec::new(),
         }
+    }
+
+    /// Read one screen. A tool call or error counts when it first appears,
+    /// not again while it stays visible, so a redraw or a later turn with the
+    /// old lines still on screen does not count them twice.
+    pub fn screen(&mut self, at: Timestamp, lines: &[String]) -> Vec<EventKind> {
+        let mut tools = HashSet::new();
+        let mut errors = HashSet::new();
+        let mut events = Vec::new();
+        for line in lines {
+            if working_line(line) {
+                self.working = true;
+                self.last_working_at = Some(at);
+            }
+            if let Some(usage) = usage_line(line) {
+                self.tokens = usage.tokens.or(self.tokens);
+                self.cost_usd = usage.cost_usd.or(self.cost_usd);
+            }
+            if let Some(message) = api_error(line) {
+                if !self.screen_errors.contains(&message)
+                    && !errors.contains(&message)
+                    && self.seen_errors.insert(message.clone())
+                {
+                    events.push(EventKind::ErrorDetected {
+                        message: message.clone(),
+                    });
+                }
+                errors.insert(message);
+                continue;
+            }
+            if let Some((action, detail)) = tool_line(line) {
+                let key = (action, detail);
+                if !self.screen_tools.contains(&key)
+                    && !tools.contains(&key)
+                    && self.seen_tools.insert(key.clone())
+                {
+                    self.turn_tools += 1;
+                    self.total_tools += 1;
+                    events.push(EventKind::AgentActivity {
+                        action: key.0,
+                        detail: key.1.clone(),
+                    });
+                }
+                tools.insert(key);
+            }
+        }
+        self.screen_tools = tools;
+        self.screen_errors = errors;
+        events
     }
 
     /// Time passed. A turn ends once the working line has been gone for a

@@ -27,4 +27,12 @@ describe("MetricsChart", () => {
     render(<MetricsChart range="DAY" samples={[]} />);
     expect(screen.getByText("No samples for the last 24 hours yet.")).toBeInTheDocument();
   });
+
+  it("draws a marker for a single sample, so a one-sample chart is not an empty box", () => {
+    const { container } = render(<MetricsChart range="HOUR" samples={[{ at: 0, cpuPct: 42 }]} />);
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg!.querySelectorAll("circle").length).toBe(1);
+    expect(screen.queryByText("No samples for the last hour yet.")).not.toBeInTheDocument();
+  });
 });

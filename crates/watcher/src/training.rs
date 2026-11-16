@@ -279,7 +279,7 @@ fn scalar(line: &str, key: &str) -> Option<f64> {
     let mut offset = 0;
     while let Some(found) = lower[offset..].find(key) {
         let index = offset + found;
-        if key == "loss" && index >= 4 && &lower[index - 4..index] == "val_" {
+        if key == "loss" && index >= 4 && lower.get(index - 4..index) == Some("val_") {
             offset = index + key.len();
             continue;
         }

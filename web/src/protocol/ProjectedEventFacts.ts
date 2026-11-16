@@ -85,4 +85,16 @@ export type ProjectedEventFacts =
      * Tool calls in that turn.
      */
     tool_uses: number;
+  }
+  | {
+    "category": "METRIC_REPORTED";
+    /**
+     * An allowlisted metric name, or `metric`: a name the program printed
+     * never reaches the control.
+     */
+    name: string;
+    /**
+     * The value.
+     */
+    value: number;
   };

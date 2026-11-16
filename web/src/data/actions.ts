@@ -22,9 +22,21 @@ export function choiceKeysAllowed(keys: string): boolean {
   return /^(?:\r|\u001b|[0-9A-Za-z]\r?)$/.test(keys);
 }
 
+/**
+ * Agents whose menus are chosen with arrows and Enter, where a digit is not a
+ * verified answer. The watcher does not report which option the marker is on,
+ * so arrows cannot be counted safely either: these are answered in the terminal.
+ */
+const ARROW_MENU_AGENTS = new Set(["VIBE"]);
+
+function arrowMenu(session?: Session): boolean {
+  return session?.codingAgent !== undefined && ARROW_MENU_AGENTS.has(session.codingAgent.agent);
+}
+
 /** Send one offered answer. Anything but a choice key is refused here too. */
-export function answerChoice(sessionId: string, choice: PromptChoice): Promise<void> {
+export function answerChoice(sessionId: string, choice: PromptChoice, session?: Session): Promise<void> {
   if (!choiceKeysAllowed(choice.keys)) return Promise.reject(new Error("not an answer key"));
+  if (arrowMenu(session)) return Promise.reject(new Error("answer this menu in the terminal"));
   return dataAdapter.sendInput(sessionId, choice.keys);
 }
 
@@ -43,6 +55,7 @@ const YES_NO = /\[\s*y(es)?\s*\/\s*n(o)?\s*\]|\(\s*y\s*\/\s*n\s*\)/i;
 export function canAnswer(session: Session): boolean {
   if (session.state !== "WAITING" || !session.prompt) return false;
   if (!captureCapabilities(captureOf(session)).canSendInput) return false;
+  if (arrowMenu(session)) return false;
   return offeredChoices(session).length > 0 || YES_NO.test(session.prompt);
 }
 

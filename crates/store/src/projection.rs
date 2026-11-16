@@ -12,7 +12,13 @@ use rusqlite::{params, OptionalExtension, Transaction};
 pub const DEFAULT_PROJECTION_OUTBOX_ROWS: u32 = 20_000;
 /// Default maximum encoded projection bytes.
 pub const DEFAULT_PROJECTION_OUTBOX_BYTES: u64 = 16 * 1024 * 1024;
-const MAX_PROJECTION_SNAPSHOT_CHUNKS: u32 = 16;
+/// A worker keeps up to 34 records a Session (the Session, its metrics and its
+/// last 32 Events), and nothing prunes old Sessions yet, so a snapshot must fit
+/// thousands of Sessions: 1,024 chunks of 128 is 131,072 records. What the
+/// control stages is bounded by bytes instead.
+const MAX_PROJECTION_SNAPSHOT_CHUNKS: u32 = 1_024;
+/// Most snapshot bytes the control stages for one Machine before the final chunk.
+const MAX_PROJECTION_SNAPSHOT_BYTES: i64 = 64 * 1024 * 1024;
 const MAX_CONTROL_EVENTS_PER_SESSION: u32 = 32;
 const MAX_CONTROL_EVENTS_PER_MACHINE: u32 = 10_000;
 const MAX_CONTROL_CHANGE_REVISIONS: u32 = 1_000;
@@ -90,8 +96,9 @@ impl Store {
                 got: cursor,
             });
         }
+        let read_through = self.projection_read_through(machine_id, source_epoch);
         if let Some((existing_cursor, replacement)) =
-            compactable_change(&transaction, machine_id, source_epoch, change)?
+            compactable_change(&transaction, machine_id, source_epoch, change, read_through)?
         {
             let replacement_json = serde_json::to_string(&replacement)?;
             let replacement_bytes = replacement_json.len() as u64;
@@ -254,9 +261,35 @@ impl Store {
                 |row| row.get::<_, String>(0),
             )?
             .collect::<Result<Vec<_>, _>>()?;
-        json.iter()
+        let changes = json
+            .iter()
             .map(|value| serde_json::from_str(value).map_err(StoreError::from))
-            .collect()
+            .collect::<Result<Vec<ProjectionChange>, _>>()?;
+        if let Some(last) = changes.last() {
+            self.mark_projection_read(machine_id, source_epoch, last.cursor());
+        }
+        Ok(changes)
+    }
+
+    /// The highest outbox cursor read for upload and not yet known acknowledged.
+    fn projection_read_through(&self, machine_id: &MachineId, source_epoch: &str) -> u64 {
+        self.projection_read_through
+            .lock()
+            .ok()
+            .and_then(|read| {
+                read.get(&(machine_id.0.clone(), source_epoch.to_string()))
+                    .copied()
+            })
+            .unwrap_or(0)
+    }
+
+    fn mark_projection_read(&self, machine_id: &MachineId, source_epoch: &str, cursor: u64) {
+        if let Ok(mut read) = self.projection_read_through.lock() {
+            let entry = read
+                .entry((machine_id.0.clone(), source_epoch.to_string()))
+                .or_insert(0);
+            *entry = (*entry).max(cursor);
+        }
     }
 
     /// Return the worker's bounded current projection for a full resynchronization.
@@ -276,6 +309,13 @@ impl Store {
                 row.get::<_, String>(0)
             })?
             .collect::<Result<Vec<_>, _>>()?;
+        // The snapshot stands for every change so far; its acknowledgement
+        // removes them all, so none may be rewritten while it uploads.
+        if let Some((epoch, current, _, _)) = worker_state(&connection, machine_id)? {
+            if epoch == source_epoch {
+                self.mark_projection_read(machine_id, source_epoch, current);
+            }
+        }
         values
             .into_iter()
             .map(|json| serde_json::from_str(&json).map_err(StoreError::from))
@@ -481,6 +521,21 @@ impl Store {
                 ));
             }
         }
+        let records_json = serde_json::to_string(records)?;
+        let staged_bytes: i64 = transaction.query_row(
+            "SELECT COALESCE(SUM(LENGTH(records_json)),0) FROM control_projection_snapshot_chunks
+             WHERE machine_id=?1 AND source_epoch=?2 AND snapshot_id=?3 AND chunk_index<?4",
+            params![machine_id.0, source_epoch, snapshot_id, chunk_index],
+            |row| row.get(0),
+        )?;
+        let chunk_bytes = i64::try_from(records_json.len()).unwrap_or(i64::MAX);
+        if staged_bytes.saturating_add(chunk_bytes) > MAX_PROJECTION_SNAPSHOT_BYTES {
+            return Ok(resync(
+                source_epoch,
+                committed,
+                ProjectionResyncReason::CursorMismatch,
+            ));
+        }
         transaction.execute(
             "INSERT OR REPLACE INTO control_projection_snapshot_chunks(
                 machine_id,source_epoch,snapshot_id,chunk_index,snapshot_cursor,
@@ -492,7 +547,7 @@ impl Store {
                 snapshot_id,
                 chunk_index,
                 to_sql_id(*snapshot_cursor)?,
-                serde_json::to_string(records)?,
+                records_json,
                 sent_at.0,
                 at.0
             ],
@@ -801,15 +856,18 @@ fn compactable_change(
     machine_id: &MachineId,
     source_epoch: &str,
     incoming: &ProjectionChange,
+    read_through: u64,
 ) -> Result<Option<(u64, ProjectionChange)>, StoreError> {
+    // Only changes not yet read for upload may be rewritten.
     let mut statement = transaction.prepare(
         "SELECT cursor,change_json FROM projection_outbox
-         WHERE machine_id=?1 AND source_epoch=?2 ORDER BY cursor",
+         WHERE machine_id=?1 AND source_epoch=?2 AND cursor>?3 ORDER BY cursor",
     )?;
     let rows = statement
-        .query_map(params![machine_id.0, source_epoch], |row| {
-            Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?))
-        })?
+        .query_map(
+            params![machine_id.0, source_epoch, to_sql_id(read_through)?],
+            |row| Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?)),
+        )?
         .collect::<Result<Vec<_>, _>>()?;
     for (cursor, json) in rows.into_iter().rev() {
         let existing: ProjectionChange = serde_json::from_str(&json)?;

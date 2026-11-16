@@ -469,3 +469,41 @@ fn an_agent_finishing_its_turn_says_so_on_every_channel() {
         None
     );
 }
+
+#[test]
+fn each_new_question_and_each_finished_turn_notifies() {
+    let root = private_root("questions");
+    write_config(&root, "http://127.0.0.1:2586", None);
+    let store = store_with_session();
+    let now = Arc::new(AtomicI64::new(1_000));
+    let clock_now = now.clone();
+    let (service, _) = service(
+        &root,
+        store.clone(),
+        Arc::new(move || Timestamp(clock_now.load(Ordering::SeqCst))),
+    );
+    let question = |id| {
+        event(
+            id,
+            EventKind::WaitingForInput {
+                prompt: Some("Do you want to proceed?".into()),
+                options: Vec::new(),
+            },
+        )
+    };
+    let enqueue = |event: Event, at: i64| {
+        store.insert_event(&event).unwrap();
+        now.store(at, Ordering::SeqCst);
+        service.enqueue(&event, CaptureLevel::Full).unwrap()
+    };
+    assert!(enqueue(question(1), 1_000));
+    // A redraw of the same wait a moment later is still one notification.
+    assert!(!enqueue(question(2), 6_000));
+    // The next question, two minutes later, is a new reason to look.
+    assert!(enqueue(question(3), 121_000));
+    // Every finished agent turn, however close together.
+    let turn = |id| event(id, EventKind::AgentTurnFinished { tool_uses: 2 });
+    assert!(enqueue(turn(4), 130_000));
+    assert!(enqueue(turn(5), 160_000));
+    let _ = fs::remove_dir_all(root);
+}
