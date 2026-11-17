@@ -8,46 +8,14 @@
   color: var(--text-1);
 }
 
-.dotGrid {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(circle, var(--line-strong) 1px, transparent 1.4px);
-  background-size: 24px 24px;
-  opacity: 0.28;
-  -webkit-mask-image: radial-gradient(ellipse 50% 55% at 50% 42%, #000 0%, transparent 100%);
-  mask-image: radial-gradient(ellipse 50% 55% at 50% 42%, #000 0%, transparent 100%);
-}
-
-.header {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 64px;
-  padding: 0 28px;
-}
-
-.headerBtn {
-  height: 36px;
-  padding: 0 10px;
-  border: 0;
-  background: transparent;
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 600;
-}
-.headerBtn:hover {
-  color: var(--text-1);
-}
-
 .main {
   position: relative;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px 24px 56px;
+  /* Clears the fixed live island. */
+  padding: var(--shell-top) 24px 56px;
 }
 
 .frame {

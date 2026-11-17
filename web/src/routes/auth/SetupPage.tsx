@@ -36,7 +36,13 @@ export function SetupPage() {
   }
 
   return (
-    <AuthLayout mode="setup" mark={<AuthMark mode="setup" busy={busy} ok={ok} />} foot={FOOT} hideOverflow={ok}>
+    <AuthLayout
+      mode="setup"
+      mark={<AuthMark mode="setup" busy={busy} ok={ok} />}
+      island={{ tone: "ok", status: "First run" }}
+      foot={FOOT}
+      hideOverflow={ok}
+    >
       <form className={styles.form} onSubmit={handleSubmit}>
         <Input
           label="Machine token"

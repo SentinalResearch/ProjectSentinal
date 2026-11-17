@@ -14,6 +14,7 @@ export interface AuthMarkProps {
 function dotColor(mode: AuthMode): string {
   if (mode === "wrong" || mode === "locked") return "var(--s-failed)";
   if (mode === "expired") return "var(--s-waiting)";
+  if (mode === "unreachable") return "var(--s-disconnected-fg)";
   return "var(--accent)";
 }
 

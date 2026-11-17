@@ -1,23 +1,29 @@
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 
-import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
 import { useSequentialTyping } from "../../hooks/useTypedText";
+import { AuthIsland, type IslandTone } from "./AuthIsland";
 import styles from "./AuthLayout.module.css";
 import { AUTH_COPY, type AuthMode } from "./copy";
 
 export interface AuthLayoutProps {
   mode: AuthMode;
   mark: ReactNode;
-  foot: string;
+  /** What the live island says about this screen, e.g. "Signed out" or "Locked · 04:52". */
+  island: { tone: IslandTone; status: ReactNode };
+  /** Small print under the right column; omitted when the screen has none. */
+  foot?: string;
   children: ReactNode;
   /** True while the success (grow) mark animation plays, so the ×140 scale can't cause scrollbar jank. */
   hideOverflow?: boolean;
 }
 
-export function AuthLayout({ mode, mark, foot, children, hideOverflow = false }: AuthLayoutProps) {
-  const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
+/**
+ * The startup and sign-in frame: flat ground, the mark and a typed headline on
+ * the left, the form or checks on the right, and the live island on top.
+ */
+export function AuthLayout({ mode, mark, island, foot, children, hideOverflow = false }: AuthLayoutProps) {
+  const { latencyMs, reachable } = useAuth();
   const copy = AUTH_COPY[mode];
   // No resetKey: the hook already restarts when the copy text itself changes,
   // and login/wrong share identical copy so a wrong attempt doesn't re-trigger typing.
@@ -26,15 +32,7 @@ export function AuthLayout({ mode, mark, foot, children, hideOverflow = false }:
 
   return (
     <div className={styles.root} style={{ overflowY: hideOverflow ? "hidden" : "auto" }}>
-      <div className={styles.dotGrid} aria-hidden="true" />
-      <header className={styles.header}>
-        <button type="button" className={styles.headerBtn} onClick={() => navigate("/")}>
-          ← Home
-        </button>
-        <button type="button" className={styles.headerBtn} onClick={toggleTheme}>
-          {theme === "light" ? "Dark theme" : "Light theme"}
-        </button>
-      </header>
+      <AuthIsland tone={island.tone} status={island.status} latencyMs={reachable ? latencyMs : null} />
       <main className={styles.main}>
         <div className={styles.frame}>
           <div className={styles.left}>
@@ -55,7 +53,7 @@ export function AuthLayout({ mode, mark, foot, children, hideOverflow = false }:
           </div>
           <div className={styles.right}>
             {children}
-            <span className={styles.foot}>{foot}</span>
+            {foot !== undefined && <span className={styles.foot}>{foot}</span>}
           </div>
         </div>
       </main>

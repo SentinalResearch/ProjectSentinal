@@ -1,17 +1,18 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { SetupPage } from "./routes/auth/SetupPage";
 import { LoginPage } from "./routes/auth/LoginPage";
+import { StartupPage } from "./routes/auth/StartupPage";
 import { AppShell } from "./routes/app/AppShell";
 import { APP_PAGES } from "./routes/app/pages";
-import { LandingPage } from "./routes/landing/LandingPage";
 import { PublicAuthGuard, RequireAuth } from "./routes/guards";
 
 export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        {/* Startup: reaches the server, then hands off to sign-in, first run or the app. */}
+        <Route path="/" element={<StartupPage />} />
 
         <Route element={<PublicAuthGuard />}>
           <Route path="/login" element={<LoginPage />} />
@@ -31,7 +32,7 @@ export function AppRouter() {
           </Route>
         </Route>
 
-        <Route path="*" element={<LandingPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

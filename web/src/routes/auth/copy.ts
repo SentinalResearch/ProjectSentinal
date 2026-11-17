@@ -1,4 +1,6 @@
-export type AuthMode = "login" | "wrong" | "locked" | "expired" | "setup";
+import { config } from "../../data/config";
+
+export type AuthMode = "startup" | "unreachable" | "login" | "wrong" | "locked" | "expired" | "setup";
 
 export interface AuthCopy {
   overline: string;
@@ -7,23 +9,32 @@ export interface AuthCopy {
   overlineColor: string;
 }
 
+const SIGN_IN: AuthCopy = {
+  overline: "SIGN IN",
+  title: "Welcome back",
+  body: "Enter the admin password for this Sentinal server.",
+  overlineColor: "var(--text-3)",
+};
+
 export const AUTH_COPY: Record<AuthMode, AuthCopy> = {
-  login: {
-    overline: "SIGN IN",
-    title: "Welcome back",
-    body: "Enter the admin password for this Sentinal server.",
+  startup: {
+    overline: "STARTING",
+    title: "Sentinal",
+    body: "Control plane for your terminal sessions.",
     overlineColor: "var(--text-3)",
   },
-  wrong: {
-    overline: "SIGN IN",
-    title: "Welcome back",
-    body: "Enter the admin password for this Sentinal server.",
+  unreachable: {
+    overline: "DISCONNECTED",
+    title: "Can't reach the server",
+    body: "Nothing answered at this address. Check that Sentinal is running, then try again.",
     overlineColor: "var(--text-3)",
   },
+  login: SIGN_IN,
+  wrong: SIGN_IN,
   locked: {
     overline: "LOCKED",
     title: "Too many attempts",
-    body: "Sign-in is paused after 3 incorrect passwords. Your sessions keep running.",
+    body: `Sign-in is paused after ${config.loginMaxAttempts} incorrect passwords. Your sessions keep running.`,
     overlineColor: "var(--s-failed-fg)",
   },
   expired: {

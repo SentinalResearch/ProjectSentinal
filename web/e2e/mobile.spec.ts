@@ -214,13 +214,15 @@ test.describe("phone 390×844", () => {
     await expectNoBrowserCredential(page);
   });
 
-  test("public landing on a phone", async ({ page }) => {
+  test("startup hands a signed-out phone to sign-in", async ({ page }) => {
     await page.context().clearCookies();
     await page.goto("/");
-    await expect(page.getByRole("group", { name: "Get started" })).toBeVisible();
-    await expect(page.getByText("04 / 04")).toBeAttached();
+    await expect(page.getByRole("list", { name: "Startup checks" })).toBeVisible();
+    await shot(page, "a1-startup");
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    await shot(page, "a1-landing");
+    await shot(page, "a2-sign-in");
   });
 });
 

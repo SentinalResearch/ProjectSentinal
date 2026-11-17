@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useAuth } from "../../context/AuthContext";
 import { config } from "../../data/config";
-import { AuthLayout } from "./AuthLayout";
+import { AuthLayout, type AuthLayoutProps } from "./AuthLayout";
 import { AuthMark } from "./AuthMark";
 import styles from "./LoginPage.module.css";
 import type { AuthMode } from "./copy";
@@ -19,10 +19,22 @@ function formatClock(ms: number): string {
   return `${mm}:${ss}`;
 }
 
+/** What the live island says for each sign-in state. */
+export function islandFor(
+  mode: AuthMode,
+  { reachable, attemptsLeft, clock }: { reachable: boolean; attemptsLeft: number; clock: string | null },
+): AuthLayoutProps["island"] {
+  if (!reachable) return { tone: "off", status: "Unreachable" };
+  if (mode === "locked") return { tone: "failed", status: clock === null ? "Locked" : `Locked · ${clock}` };
+  if (mode === "wrong") return { tone: "failed", status: `${attemptsLeft} ${attemptsLeft === 1 ? "try" : "tries"} left` };
+  if (mode === "expired") return { tone: "waiting", status: "Sign-in expired" };
+  return { tone: "ok", status: "Signed out" };
+}
+
 const FOOT = "Signed-in browsers stay signed in until you sign out or the session expires.";
 
 export function LoginPage() {
-  const { status, attempts, lockUntil, message, login, clearLock } = useAuth();
+  const { status, attempts, lockUntil, message, reachable, login, clearLock } = useAuth();
   const mode = modeFromStatus(status);
 
   const [pw, setPw] = useState("");
@@ -62,6 +74,12 @@ export function LoginPage() {
 
   const locked = status === "locked";
   const attemptsLeft = Math.max(0, config.loginMaxAttempts - attempts);
+  const lockMinutes = Math.round(config.loginLockMs / 60_000);
+  const island = islandFor(mode, {
+    reachable,
+    attemptsLeft,
+    clock: locked && lockUntil !== null ? formatClock(lockUntil - now) : null,
+  });
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -78,6 +96,7 @@ export function LoginPage() {
     <AuthLayout
       mode={mode}
       mark={<AuthMark mode={mode} busy={busy} ok={ok} shaking={shaking} />}
+      island={island}
       foot={FOOT}
       hideOverflow={ok}
     >
@@ -125,7 +144,7 @@ export function LoginPage() {
           {mode === "wrong" && (
             <span className={styles.errorText}>
               {message ??
-                `Incorrect password. ${attemptsLeft} ${attemptsLeft === 1 ? "attempt" : "attempts"} left before a 5-minute lock.`}
+                `Incorrect password. ${attemptsLeft} ${attemptsLeft === 1 ? "attempt" : "attempts"} left before a ${lockMinutes}-minute lock.`}
             </span>
           )}
         </div>

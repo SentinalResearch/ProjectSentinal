@@ -6,6 +6,12 @@ import type { AuthState } from "../data/types";
 
 interface AuthContextValue extends AuthState {
   loading: boolean;
+  /** False when the last status check could not reach the daemon at all. */
+  reachable: boolean;
+  /** Round-trip time of the last status check, for the startup screen and auth island. */
+  latencyMs: number | null;
+  /** Re-run the status check (the startup screen's "Try again"). */
+  retry: () => void;
   login: (password: string) => Promise<AuthState>;
   setup: (bootstrapToken: string, password: string) => Promise<AuthState>;
   logout: () => Promise<void>;
@@ -23,18 +29,27 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: "signedOut", attempts: 0, lockUntil: null });
   const [loading, setLoading] = useState(true);
+  const [reachable, setReachable] = useState(true);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [checkId, setCheckId] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    const started = performance.now();
+    setLoading(true);
     dataAdapter.auth
       .getState()
       .then((next) => {
-        if (!cancelled) setState(next);
+        if (cancelled) return;
+        setState(next);
+        setReachable(true);
+        setLatencyMs(Math.round(performance.now() - started));
       })
       .catch(() => {
-        if (!cancelled) {
-          setState({ status: "signedOut", attempts: 0, lockUntil: null, message: "Could not reach the daemon." });
-        }
+        if (cancelled) return;
+        setState({ status: "signedOut", attempts: 0, lockUntil: null, message: "Could not reach the daemon." });
+        setReachable(false);
+        setLatencyMs(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -42,7 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [checkId]);
+
+  const retry = useCallback(() => setCheckId((id) => id + 1), []);
 
   useEffect(() => {
     const expire = () => setState({ status: "expired", attempts: 0, lockUntil: null });
@@ -87,8 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ ...state, loading, login, setup, logout, markExpired, clearLock }),
-    [state, loading, login, setup, logout, markExpired, clearLock],
+    () => ({ ...state, loading, reachable, latencyMs, retry, login, setup, logout, markExpired, clearLock }),
+    [state, loading, reachable, latencyMs, retry, login, setup, logout, markExpired, clearLock],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
