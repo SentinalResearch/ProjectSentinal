@@ -7,6 +7,7 @@ import {
   codingAgentName,
   formatEventTime,
   machineSummary,
+  sessionDisplayName,
   sessionElapsedMs,
 } from "./format";
 
@@ -60,5 +61,23 @@ describe("AI coding agents (6.1)", () => {
       "12 tool calls · 120k tokens · $1.25",
     );
     expect(agentUsageText({ agent: "AIDER", working: false, toolUses: 1, tokens: 312 })).toBe("1 tool call · 312 tokens");
+  });
+});
+
+describe("sessionDisplayName (P5, X20)", () => {
+  const claude = { agent: "CLAUDE" as const, working: false, toolUses: 0 };
+
+  it("prefers the title, then agent and folder", () => {
+    expect(sessionDisplayName({ id: 4, title: "train base", codingAgent: claude })).toBe("train base");
+    expect(sessionDisplayName({ id: 4, cwd: "/home/me/src/sentinal", codingAgent: claude })).toBe("Claude Code · sentinal");
+  });
+
+  it("tells agent Sessions apart when no folder is known, as on the control dashboard", () => {
+    expect(sessionDisplayName({ id: 4, codingAgent: claude })).toBe("Claude Code · Session 4");
+    expect(sessionDisplayName({ id: 7, codingAgent: claude })).not.toBe(sessionDisplayName({ id: 4, codingAgent: claude }));
+  });
+
+  it("falls back to Session N", () => {
+    expect(sessionDisplayName({ id: 9 })).toBe("Session 9");
   });
 });

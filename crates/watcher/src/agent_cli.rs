@@ -222,7 +222,7 @@ impl WatcherAdapter for AgentCliAdapter {
                 self.refresh_summary();
                 events
             }
-            ObservationKind::ProcessSample(_) => Vec::new(),
+            ObservationKind::ProcessSample(_) | ObservationKind::Input => Vec::new(),
         }
     }
 

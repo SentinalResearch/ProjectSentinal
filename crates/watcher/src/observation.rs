@@ -44,6 +44,9 @@ pub enum ObservationKind {
     CommandFinished(Command),
     /// A clock tick used for quiet-time decisions.
     Tick,
+    /// A person (or agent) sent input to the Session: an answer, keys, a paste.
+    /// Only the fact, never the bytes.
+    Input,
     /// What the terminal screen shows now.
     Screen {
         /// Each row of text.
@@ -90,6 +93,14 @@ impl Observation {
         Observation {
             at,
             kind: ObservationKind::Screen { rows, alternate },
+        }
+    }
+
+    /// Build the fact that input was sent to the Session.
+    pub fn input(at: Timestamp) -> Self {
+        Observation {
+            at,
+            kind: ObservationKind::Input,
         }
     }
 

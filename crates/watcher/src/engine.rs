@@ -123,6 +123,9 @@ impl EventEngine {
                 }
             }
         }
+        if matches!(observation.kind, ObservationKind::Input) {
+            self.screen.input();
+        }
         if let ObservationKind::Screen { rows, alternate } = &observation.kind {
             if self.command_active {
                 events.extend(self.screen.observe(observation.at, rows, *alternate));

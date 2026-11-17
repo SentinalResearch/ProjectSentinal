@@ -11,7 +11,9 @@
 //!
 //! A question is reported once it has stayed on screen for a moment, and it ends
 //! only when it has left the screen: never by a timer or other output, because a
-//! program redraws its status line while it waits. Terminal text is data.
+//! program redraws its status line while it waits. After input it ends as soon
+//! as it leaves, so the same question asked again is reported again. Terminal
+//! text is data.
 
 use crate::agent_cli::{clean, is_hint, letter_choices, option_line, MARKERS};
 use protocol::{event::MAX_PROMPT_OPTIONS, EventKind, PromptOption, Timestamp};
@@ -40,6 +42,9 @@ pub(crate) struct ScreenPrompts {
     pending: Option<(ScreenQuestion, Timestamp)>,
     current: Option<ScreenQuestion>,
     missing_since: Option<Timestamp>,
+    /// Input arrived while `current` was asked: once it leaves the screen it was
+    /// answered, so it ends at once and the same question again is a new one (X18).
+    answered: bool,
     alternate: bool,
 }
 
@@ -52,6 +57,13 @@ impl ScreenPrompts {
     /// Whether a full-screen program has the terminal, so lines mean little.
     pub(crate) fn alternate(&self) -> bool {
         self.alternate
+    }
+
+    /// Input was sent to the Session.
+    pub(crate) fn input(&mut self) {
+        if self.current.is_some() {
+            self.answered = true;
+        }
     }
 
     /// The Command ended, so does anything it was asking.
@@ -71,9 +83,10 @@ impl ScreenPrompts {
             self.pending = None;
             if self.current.is_some() {
                 let since = *self.missing_since.get_or_insert(at);
-                if at.0.saturating_sub(since.0) >= GONE_MS {
+                if self.answered || at.0.saturating_sub(since.0) >= GONE_MS {
                     self.current = None;
                     self.missing_since = None;
+                    self.answered = false;
                 }
             }
             return Vec::new();
@@ -89,6 +102,7 @@ impl ScreenPrompts {
             {
                 self.pending = None;
                 self.current = Some(found.clone());
+                self.answered = false;
                 vec![EventKind::WaitingForInput {
                     prompt: Some(found.question),
                     options: found.options,

@@ -125,7 +125,8 @@ export function codingAgentName(agent: CodingAgentView["agent"]): string {
 /**
  * Display name for a Session: its title, else the agent name plus the project
  * folder ("Claude Code · sentinal") when a coding agent runs in it, else
- * "Session N" (P5).
+ * "Session N" (P5). The control's dashboard projection carries no paths, so
+ * there an agent Session is "Claude Code · Session N" (X20).
  */
 export function sessionDisplayName(session: {
   id: string | number;
@@ -138,7 +139,7 @@ export function sessionDisplayName(session: {
   if (session.codingAgent) {
     const folder = session.cwd?.split("/").filter(Boolean).pop();
     const agent = codingAgentName(session.codingAgent.agent);
-    return folder ? `${agent} · ${folder}` : agent;
+    return `${agent} · ${folder ?? `Session ${session.id}`}`;
   }
   return `Session ${session.id}`;
 }

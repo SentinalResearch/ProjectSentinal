@@ -110,7 +110,9 @@ impl WatcherAdapter for GenericAdapter {
                 self.state.stalled = false;
                 Vec::new()
             }
-            ObservationKind::ProcessSample(_) | ObservationKind::Screen { .. } => Vec::new(),
+            ObservationKind::ProcessSample(_)
+            | ObservationKind::Screen { .. }
+            | ObservationKind::Input => Vec::new(),
         }
     }
 

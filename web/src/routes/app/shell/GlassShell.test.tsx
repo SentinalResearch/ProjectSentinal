@@ -98,6 +98,28 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
     expect(signal).toHaveBeenCalledWith(expect.any(String), "SIGINT");
   });
 
+  it("delete asks first: focus starts on Cancel, Tab stays in the dialog, Escape cancels", async () => {
+    const remove = vi.spyOn(dataAdapter, "deleteSession").mockResolvedValue();
+    renderShell("/app/overview");
+    await islandReady();
+    const user = userEvent.setup();
+
+    await user.keyboard("/");
+    await user.keyboard("delete ");
+    await waitFor(() => expect(screen.getByRole("option", { selected: true })).toHaveTextContent(/^delete /));
+    await user.keyboard("{Enter}");
+
+    const dialog = await screen.findByRole("dialog", { name: /^Delete .*\?$/ });
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    for (let i = 0; i < 4; i += 1) {
+      await user.tab();
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    }
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: /^Delete / })).not.toBeInTheDocument();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it("the page name drops down the main places, and Search opens the prompt", async () => {
     renderShell("/app/history");
     const island = await islandReady();

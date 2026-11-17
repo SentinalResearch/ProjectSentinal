@@ -108,6 +108,14 @@ impl SessionManager {
                 source,
             });
         }
+        // The watcher learns only that input arrived, never what it was: a
+        // question that leaves the screen afterwards was answered (X18).
+        super::tasks::apply_observation(
+            session_id,
+            &handle,
+            self.inner.store.as_deref(),
+            watcher::Observation::input((self.inner.config.clock)()),
+        );
         Ok(())
     }
 

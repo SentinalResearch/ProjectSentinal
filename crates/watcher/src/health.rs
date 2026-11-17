@@ -65,7 +65,8 @@ impl HealthTracker {
             }
             ObservationKind::ProcessSample(_)
             | ObservationKind::Tick
-            | ObservationKind::Screen { .. } => {}
+            | ObservationKind::Screen { .. }
+            | ObservationKind::Input => {}
         }
         for event in events {
             self.apply_event(event);

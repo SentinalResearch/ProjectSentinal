@@ -132,6 +132,27 @@ fn it_ends_when_it_leaves_the_screen_and_a_new_one_is_reported() {
 }
 
 #[test]
+fn the_same_question_asked_again_right_after_an_answer_is_reported_again() {
+    // X18: answer, the agent runs the tool, and asks the identical question
+    // again within a second. Before, that second question was never reported.
+    let mut e = engine("claude");
+    look(&mut e, 0, CLAUDE);
+    assert!(asked(&look(&mut e, 1_000, CLAUDE).0).is_some());
+    e.observe(&Observation::input(Timestamp(1_200)));
+    assert!(
+        !look(&mut e, 1_300, "⏺ Bash(uname -a)\n  ⎿ Darwin").1,
+        "answered"
+    );
+    look(&mut e, 1_500, CLAUDE);
+    let (events, waiting) = look(&mut e, 2_400, CLAUDE);
+    assert!(waiting);
+    assert!(
+        asked(&events).is_some(),
+        "the repeated question is a new one"
+    );
+}
+
+#[test]
 fn a_half_drawn_or_changing_menu_is_not_a_question_yet() {
     let mut e = engine("claude");
     let half = CLAUDE.replace("   3. No\n", "");

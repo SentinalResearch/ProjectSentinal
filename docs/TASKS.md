@@ -150,15 +150,20 @@ fails without it. Items marked *(v2.10.0)* are also in production.
       control's notification tables; every warning line is an Event
 - [ ] X17 The projection recorder decodes every stored Session twice a second
       and re-records all of them on each restart (`projection_runtime.rs:32`)
-- [ ] X18 A second identical question within 1 s of the first ending is not
-      reported (`screen_prompt.rs:82`)
+- [x] X18 A second identical question within 1 s of the first ending was not
+      reported. The daemon now tells the watcher that input arrived (never the
+      bytes); a question that leaves the screen after input ends at once, so
+      the same question again is new — `watcher/tests/screen_prompt.rs`
 - [x] X19 Marked menus allowed 8 options; the protocol and web cap at 6. A
       marked menu now offers its first 6 rows, like a numbered menu —
       `watcher/tests/screen_prompt.rs`
-- [ ] X20 The control dashboard names every agent Session just "Claude Code"
-      (`sessionDisplayName` has no folder there)
-- [ ] X21 The delete dialog in `usePromptActions.tsx` has no Escape handling or
-      focus trap (the `}const` line in `web/src/data/format.ts` is fixed)
+- [x] X20 The control dashboard named every agent Session just "Claude Code".
+      Now "Claude Code · Session N" (`data/format.test.ts`). Showing the folder
+      there needs the projection to carry it: a protocol and privacy change,
+      **owner to decide**
+- [x] X21 The prompt's delete dialog had no Escape handling or focus trap. It
+      is now a `ConfirmDialog`, which traps Tab, returns focus to its opener,
+      and for delete starts on Cancel — `shell/GlassShell.test.tsx`
 - [ ] X22 Browser logins live only in memory and end on every daemon restart
 - [ ] X23 A panic in the watcher still ends the PTY reader; catch it there so
       one bad line can never stop a Session being read

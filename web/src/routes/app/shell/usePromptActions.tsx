@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { answerPrompt } from "../../../data/actions";
@@ -76,41 +77,19 @@ export function usePromptActions(): {
         machineName={targetMachine?.name ?? target?.machine ?? ""}
         onClose={() => setInterrupting(null)}
       />
-      {deletingSession && (
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-label="Delete Session"
-          style={{
-            position: "fixed",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 1000,
-          }}
-        >
-          <div style={{ background: "var(--bg-1)", padding: "24px", borderRadius: "8px", maxWidth: "400px" }}>
-            <h2>Delete {deletingSession.name}?</h2>
-            <p>This permanently erases the Session and its output. This cannot be undone.</p>
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "16px" }}>
-              <button type="button" onClick={() => setDeleting(null)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void removal.remove([deletingSession.id]);
-                  setDeleting(null);
-                }}
-              >
-                Delete permanently
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(deletingSession)}
+        overline="DELETE PERMANENTLY"
+        question={`Delete ${deletingSession?.name ?? ""}?`}
+        consequence="This erases the Session and its saved output. It cannot be undone."
+        confirmLabel="Delete permanently"
+        focusCancel
+        onConfirm={() => {
+          if (deletingSession) void removal.remove([deletingSession.id]);
+          setDeleting(null);
+        }}
+        onCancel={() => setDeleting(null)}
+      />
       {newSession.chooser}
     </>
   );
