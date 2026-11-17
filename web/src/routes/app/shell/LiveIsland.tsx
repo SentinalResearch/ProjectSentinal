@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { DevBadge } from "../../../components/DevBadge";
 import { SentinalMark } from "../../../components/SentinalMark";
-import { ThemeSwitch } from "../../../components/ThemeSwitch";
+import { ThemeChoice } from "../../../components/ThemeSwitch";
 import { dataAdapter } from "../../../data";
 import { answerPrompt } from "../../../data/actions";
 import { useLiveData } from "../../../data/LiveDataContext";
@@ -66,9 +66,10 @@ export function LiveIsland({
             className={styles.tickerItem}
             data-state={item.state}
             onClick={() => navigate(`/app/sessions/${item.sessionId}`)}
+            title={item.text}
           >
             <span className={styles.square} aria-hidden="true" />
-            {item.text}
+            <span className={styles.tickerText}>{item.text}</span>
           </button>
         </span>
       ))}
@@ -76,7 +77,15 @@ export function LiveIsland({
   );
 
   return (
-    <nav className={styles.island} aria-label="Sentinal">
+    <nav
+      className={styles.island}
+      aria-label="Sentinal"
+      title="Click or press / to search"
+      onClick={(event) => {
+        // The island is the search: a click on its body (not on one of its controls) opens it.
+        if (!(event.target as HTMLElement).closest("button, a, [role='group'], [role='alertdialog']")) onOpenPrompt();
+      }}
+    >
       <button type="button" className={styles.logo} onClick={() => navigate("/app/overview")} title="Overview">
         <SentinalMark size={18} />
       </button>
@@ -84,6 +93,7 @@ export function LiveIsland({
       <PlacesMenu
         triggerClass={styles.location}
         onSearch={() => onOpenPrompt()}
+        footer={<ThemeChoice />}
         label={`You are on ${where.kind === "session" ? `${where.machine} › ${where.title}` : where.name}. Go somewhere`}
       >
         {where.kind === "session" ? (
@@ -160,14 +170,8 @@ export function LiveIsland({
         aria-label="Open the prompt"
         aria-keyshortcuts={IS_MAC ? "Meta+K /" : "Control+K /"}
       >
-        <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" />
-          <path d="M20 20l-3.5-3.5" />
-        </svg>
-        <span className={styles.searchText} aria-hidden="true">Search or type a command</span>
-        <span className={styles.shortcut}>{IS_MAC ? "⌘K" : "Ctrl K"}</span>
+        /
       </button>
-      <ThemeSwitch />
     </nav>
   );
 }

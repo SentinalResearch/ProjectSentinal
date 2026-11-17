@@ -20,11 +20,14 @@ export function PlacesMenu({
   label,
   triggerClass,
   onSearch,
+  footer,
   children,
 }: {
   label: string;
   triggerClass: string;
   onSearch?: () => void;
+  /** Shown under the places, e.g. the theme choice. */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   const { pathname, search } = useLocation();
@@ -133,6 +136,7 @@ export function PlacesMenu({
               </span>
             </button>
           )}
+          {footer && <div className={styles.footer}>{footer}</div>}
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useOptionalTheme } from "../context/ThemeContext";
+import { useOptionalTheme, type ThemePreference } from "../context/ThemeContext";
 import styles from "./ThemeSwitch.module.css";
 
 /**
@@ -29,5 +29,33 @@ export function ThemeSwitch({ className }: { className?: string }) {
         </svg>
       )}
     </button>
+  );
+}
+
+const CHOICES: Array<{ value: ThemePreference; label: string }> = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "Auto" },
+];
+
+/** Light / Dark / Auto as one segmented choice (the island's menu). */
+export function ThemeChoice() {
+  const theme = useOptionalTheme();
+  if (!theme) return null;
+  return (
+    <div className={styles.choice} role="radiogroup" aria-label="Theme">
+      {CHOICES.map((choice) => (
+        <button
+          key={choice.value}
+          type="button"
+          role="radio"
+          aria-checked={theme.preference === choice.value}
+          className={styles.choiceItem}
+          onClick={() => theme.setPreference(choice.value)}
+        >
+          {choice.label}
+        </button>
+      ))}
+    </div>
   );
 }

@@ -81,6 +81,13 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
     expect(button).toHaveFocus();
   });
 
+  it("is the search: a click on the island's body opens the prompt", async () => {
+    renderShell("/app/history");
+    const island = await islandReady();
+    await userEvent.setup().click(island);
+    expect(screen.getByRole("dialog", { name: "Prompt" })).toBeInTheDocument();
+  });
+
   it("kill never interrupts directly: it opens the Ctrl-C confirmation", async () => {
     const signal = vi.spyOn(dataAdapter, "sendSignal").mockResolvedValue();
     renderShell("/app/overview");

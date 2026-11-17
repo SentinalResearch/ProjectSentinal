@@ -92,3 +92,9 @@
     min-height: 46px;
   }
 }
+
+.footer {
+  margin-top: 4px;
+  padding: 8px 4px 2px;
+  border-top: 1px solid var(--glass-edge);
+}
