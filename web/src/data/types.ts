@@ -73,7 +73,19 @@ export interface SessionHealth {
  * [time, event kind, detail, at] — kind is one of EventKind (see protocol/EventKind.ts) plus free-form ones
  * used only in the mock (e.g. WARNING). `at` (Unix ms) orders events across Sessions; fixtures may omit it.
  */
-export type SessionEvent = [time: string, kind: string, detail: string, at?: number];
+export type SessionEvent = [time: string, kind: string, detail: string, at?: number, inferred?: boolean];
+
+/**
+ * A one-line account of what a terminal is doing. `inferred` when the
+ * intelligence layer read it off the screen (a guess, AGENTS.md: proposed
+ * Events are marked inferred) rather than Sentinal knowing it.
+ */
+export interface SessionSummary {
+  text: string;
+  /** Unix ms. */
+  at?: number;
+  inferred: boolean;
+}
 
 export interface Session {
   id: string;
@@ -103,6 +115,8 @@ export interface Session {
   /** The AI coding agent running here (6.1). */
   codingAgent?: CodingAgentView;
   events?: SessionEvent[];
+  /** What it is doing, in a line; see SessionSummary. */
+  summary?: SessionSummary;
   /** How the Session entered Sentinal; absent means UI. */
   origin?: SessionOrigin;
   /** What Sentinal can observe; absent means FULL. Authorization is enforced by the daemon. */

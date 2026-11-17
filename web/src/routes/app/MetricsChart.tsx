@@ -12,11 +12,15 @@ const RANGE_TEXT: Record<MetricRangeKey, string> = {
 
 type SeriesKey = "cpuPct" | "ramPct" | "gpuPct" | "vramPct";
 
-const SERIES: { key: SeriesKey; label: string; color: string }[] = [
-  { key: "cpuPct", label: "CPU", color: "var(--accent-fg)" },
-  { key: "ramPct", label: "RAM", color: "var(--s-running-fg)" },
-  { key: "gpuPct", label: "GPU", color: "var(--s-waiting-fg)" },
-  { key: "vramPct", label: "VRAM", color: "var(--s-created-fg)" },
+/**
+ * Sentinal colours, not state colours (green and yellow mean "running" and
+ * "waiting" elsewhere): blue and ink, told apart by line style as well.
+ */
+const SERIES: { key: SeriesKey; label: string; color: string; dash?: string; width: number }[] = [
+  { key: "cpuPct", label: "CPU", color: "var(--accent)", width: 2 },
+  { key: "ramPct", label: "RAM", color: "var(--text-1)", width: 1.5 },
+  { key: "gpuPct", label: "GPU", color: "var(--accent)", dash: "6 4", width: 2 },
+  { key: "vramPct", label: "VRAM", color: "var(--text-3)", dash: "1.5 4", width: 2 },
 ];
 
 function timeLabel(at: number, range: MetricRangeKey): string {
@@ -67,10 +71,19 @@ export function MetricsChart({ samples, range }: { samples: MachineMetricSample[
               .join(" ");
             return (
               <g key={series.key}>
-                <polyline points={points} fill="none" stroke={series.color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-                {/* A one-point polyline renders nothing; the markers keep single-sample series visible. */}
-                {seriesSamples.map((sample) => (
-                  <circle key={sample.at} cx={x(sample.at)} cy={y(sample[series.key] ?? 0)} r="2.5" fill={series.color} />
+                <polyline
+                  points={points}
+                  fill="none"
+                  stroke={series.color}
+                  strokeWidth={series.width}
+                  strokeDasharray={series.dash}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+                {/* One marker on the latest value: "now" (and the only mark when there is one sample). */}
+                {seriesSamples.slice(-1).map((sample) => (
+                  <circle key={sample.at} cx={x(sample.at)} cy={y(sample[series.key] ?? 0)} r="3" fill={series.color} />
                 ))}
               </g>
             );
@@ -101,7 +114,9 @@ export function MetricsChart({ samples, range }: { samples: MachineMetricSample[
             return (
               <tr key={series.key}>
                 <th scope="row">
-                  <span className={styles.legendSwatch} style={{ background: series.color }} />
+                  <svg className={styles.legendSwatch} width="18" height="6" viewBox="0 0 18 6" aria-hidden="true">
+                    <line x1="1" y1="3" x2="17" y2="3" stroke={series.color} strokeWidth={series.width} strokeDasharray={series.dash} strokeLinecap="round" />
+                  </svg>
                   {series.label}
                 </th>
                 <td className="mono">{percent(latest[series.key])}</td>

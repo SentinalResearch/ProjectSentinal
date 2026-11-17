@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { DotField, type DotSignal } from "../../components/DotField";
 import { useAuth } from "../../context/AuthContext";
 import { useSequentialTyping } from "../../hooks/useTypedText";
 import { AuthIsland, type IslandTone } from "./AuthIsland";
@@ -16,13 +17,15 @@ export interface AuthLayoutProps {
   children: ReactNode;
   /** True while the success (grow) mark animation plays, so the ×140 scale can't cause scrollbar jank. */
   hideOverflow?: boolean;
+  /** What the background dots show: checking, a wrong attempt, success. */
+  signal?: DotSignal;
 }
 
 /**
  * The startup and sign-in frame: flat ground, the mark and a typed headline on
  * the left, the form or checks on the right, and the live island on top.
  */
-export function AuthLayout({ mode, mark, island, foot, children, hideOverflow = false }: AuthLayoutProps) {
+export function AuthLayout({ mode, mark, island, foot, children, hideOverflow = false, signal = "idle" }: AuthLayoutProps) {
   const { latencyMs, reachable } = useAuth();
   const copy = AUTH_COPY[mode];
   // No resetKey: the hook already restarts when the copy text itself changes,
@@ -32,11 +35,14 @@ export function AuthLayout({ mode, mark, island, foot, children, hideOverflow = 
 
   return (
     <div className={styles.root} style={{ overflowY: hideOverflow ? "hidden" : "auto" }}>
+      <DotField signal={signal} />
       <AuthIsland tone={island.tone} status={island.status} latencyMs={reachable ? latencyMs : null} />
       <main className={styles.main}>
         <div className={styles.frame}>
           <div className={styles.left}>
-            <div className={styles.markSlot}>{mark}</div>
+            <div className={styles.markSlot} data-dots-origin>
+              {mark}
+            </div>
             <div className={styles.copy}>
               <span className={styles.overline} style={{ color: copy.overlineColor }}>
                 {"> "}

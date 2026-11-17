@@ -76,3 +76,20 @@ export function noAnswerReason(session: Session): string | null {
 export function canInterrupt(session: Session): boolean {
   return INTERRUPTIBLE.has(session.state) && captureCapabilities(captureOf(session)).canSendInput;
 }
+
+/** How long End waits for Ctrl-C to stop the program before closing the terminal. */
+export const END_GRACE_MS = 2_000;
+
+/**
+ * End a terminal (design L2): Ctrl-C first so the program can stop cleanly,
+ * then, if it is still live, close the shell. Its output is kept.
+ */
+export async function endSession(
+  sessionId: string,
+  stillLive: () => boolean,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<void> {
+  await dataAdapter.sendSignal(sessionId, "SIGINT");
+  await wait(END_GRACE_MS);
+  if (stillLive()) await dataAdapter.sendSignal(sessionId, "KILL");
+}

@@ -176,9 +176,12 @@
   font-size: 13px;
 }
 
+/* A short sample of the series' own line (colour and dash). */
 .legendSwatch {
-  width: 10px;
-  height: 3px;
+  width: 18px;
+  height: 6px;
+  flex: none;
+  overflow: visible;
 }
 
 .list {

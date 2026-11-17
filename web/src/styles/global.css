@@ -115,3 +115,53 @@ pre,
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * The Dynamic Island's look, shared by every island (app, sign-in, phone):
+ * one black pill in both themes. It sets its own colour tokens so whatever
+ * sits inside reads light-on-black on any page.
+ */
+.island-ink {
+  --text-1: #f2f2f0;
+  --text-2: #a6a6a2;
+  --text-3: #8a8a86;
+  --bg-0: #0a0a0a;
+  --bg-1: #1a1a1d;
+  --line: rgba(255, 255, 255, 0.18);
+  --chip: rgba(255, 255, 255, 0.1);
+  --chip-hover: rgba(255, 255, 255, 0.16);
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --accent-fg: #8c9eff;
+  --destructive-fg: #ff6b61;
+  --s-running-fg: #29d35f;
+  --s-waiting-fg: #ffd000;
+  --s-stalled-fg: #ff8a00;
+  --s-failed-fg: #ff3b2f;
+  background: #0a0a0a;
+  color: var(--text-1);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 32px -14px rgba(0, 0, 0, 0.55);
+}
+
+/* Light theme: the island turns white with ink text, so it follows the theme
+   switch instead of staying black. A soft shadow, not a dark smudge. */
+[data-theme="light"] .island-ink {
+  --text-1: #0a0a0a;
+  --text-2: #4a4a46;
+  --text-3: #5e5e5a;
+  --bg-0: #ffffff;
+  --bg-1: #ffffff;
+  --line: rgba(10, 10, 10, 0.14);
+  --chip: rgba(10, 10, 10, 0.06);
+  --chip-hover: rgba(10, 10, 10, 0.11);
+  --glass-edge: rgba(10, 10, 10, 0.1);
+  --glass-bg: rgba(10, 10, 10, 0.04);
+  --accent-fg: #2a44e0;
+  --destructive-fg: #c4210f;
+  --s-running-fg: #0a7030;
+  --s-waiting-fg: #7d5b00;
+  --s-stalled-fg: #9a4b00;
+  --s-failed-fg: #c4210f;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(10, 10, 10, 0.08), 0 8px 22px -12px rgba(10, 10, 10, 0.28);
+}

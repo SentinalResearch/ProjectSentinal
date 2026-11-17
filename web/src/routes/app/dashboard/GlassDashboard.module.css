@@ -28,19 +28,14 @@
 
 /* ── Left: the number and the devices ───────────────────── */
 
-/* The number sits under the date; the device line closes the column, which
-   never grows taller than a comfortable screen (tall windows kept a gap). */
+/* Top to bottom: the date, the device line, then the number. No stretching,
+   so nothing drifts on tall or narrow windows. */
 .side {
   position: sticky;
   top: var(--shell-top);
-  min-height: min(calc(100vh - var(--shell-top) - 56px), 760px);
   display: flex;
   flex-direction: column;
-  gap: 40px;
-}
-
-.devices {
-  margin-top: auto;
+  gap: 28px;
 }
 
 .dateRow {
@@ -95,8 +90,9 @@
 }
 
 .devices {
-  padding-top: 16px;
+  padding: 12px 0;
   border-top: 1.5px solid var(--text-1);
+  border-bottom: 1px solid var(--line);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -498,6 +494,93 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Done (design L1): quiet rows; Open, Hide and Delete show on hover or focus. */
+.linkQuiet,
+.linkAccent {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.linkQuiet {
+  color: var(--text-2);
+}
+.linkQuiet:hover {
+  color: var(--text-1);
+}
+.linkAccent {
+  color: var(--accent-fg);
+  font-weight: 500;
+}
+.linkAccent:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+:is(.linkQuiet, .linkAccent):focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+.doneRow {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  margin: 0 -12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: inset 0 -1px 0 var(--line);
+  cursor: pointer;
+}
+.doneRow:hover,
+.doneRow:focus-within {
+  background: var(--chip);
+  box-shadow: none;
+}
+
+.doneActions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.doneRow:hover .doneActions,
+.doneRow:focus-within .doneActions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .doneActions {
+    opacity: 1;
+  }
+}
+.doneActions .pill {
+  height: 30px;
+  padding: 0 12px;
+}
+
+.dangerQuiet {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 15px;
+  background: transparent;
+  color: var(--destructive-fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.dangerQuiet:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.dangerQuiet:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
 }
 
 /* Narrower windows: one column, the number on top. Kept last so it wins. */

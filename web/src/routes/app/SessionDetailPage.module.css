@@ -7,6 +7,7 @@
    container). A grid, never flex-wrap: a wrapped sticky full-height terminal
    would cover the content below it. */
 .split {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
@@ -131,6 +132,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
@@ -440,11 +442,11 @@
   align-items: stretch;
 }
 
-/* Full-height terminal; the 76 px spacer keeps it clear of the island. */
+/* The terminal runs top to bottom: the island centres over the details side, so no spacer. */
 .split[data-glass] .terminalColumn {
   position: relative;
   height: 100%;
-  padding-top: 76px;
+  padding-top: 0;
   border-right: 0;
   --term-key-height: 40px;
 }

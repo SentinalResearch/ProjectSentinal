@@ -36,6 +36,7 @@ function displayTime(time: string): string {
 export function EventsList({ events, sessionNames, title = "Events", showHead = true }: EventsListProps) {
   const combined = events.map((event, i) => ({ event, sessionName: sessionNames?.[i] }));
   const newestFirst = [...combined].reverse();
+  const anyGuess = events.some((event) => event[4] === true);
   return (
     <div className={styles.wrap}>
       {showHead && (
@@ -47,24 +48,35 @@ export function EventsList({ events, sessionNames, title = "Events", showHead = 
       {newestFirst.length === 0 ? (
         <span className={styles.empty}>No events yet.</span>
       ) : (
-        newestFirst.map(({ event: [time, kind, detail], sessionName }, i) => {
+        newestFirst.map(({ event: [time, kind, detail, , inferred], sessionName }, i) => {
           const color = eventColor(kind);
           return (
-            <div key={`${time}-${kind}-${i}`} className={styles.row}>
+            <div key={`${time}-${kind}-${i}`} className={styles.row} data-inferred={inferred || undefined}>
               <span className={styles.time}>{displayTime(time)}</span>
-              <span className={styles.square} style={{ background: color.square }} />
+              {inferred ? (
+                <span className={styles.guess} title="Sentinal thinks: read off the screen by the local model, not known for sure" />
+              ) : (
+                <span className={styles.square} style={{ background: color.square }} />
+              )}
               <span className={styles.body}>
                 <span className={styles.typeRow}>
                   <span className={styles.type} style={{ color: color.text }} title={kind}>
                     {eventKindLabel(kind)}
                   </span>
                   {sessionName && <span className={styles.who}>{sessionName}</span>}
+                  {inferred && <span className={styles.guessLabel}>Sentinal thinks</span>}
                 </span>
                 {detail ? <span className={styles.detail}>{detail}</span> : null}
               </span>
             </div>
           );
         })
+      )}
+      {anyGuess && (
+        <p className={styles.legend}>
+          <span className={styles.guess} aria-hidden="true" /> Sentinal thinks: read off the screen by the local model. Guesses never alert or act on
+          their own.
+        </p>
       )}
     </div>
   );

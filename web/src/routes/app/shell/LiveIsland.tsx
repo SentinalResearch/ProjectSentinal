@@ -1,18 +1,21 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { DevBadge } from "../../../components/DevBadge";
 import { SentinalMark } from "../../../components/SentinalMark";
 import { ThemeChoice } from "../../../components/ThemeSwitch";
 import { dataAdapter } from "../../../data";
-import { answerPrompt } from "../../../data/actions";
+import { answerPrompt, endSession } from "../../../data/actions";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Session } from "../../../data/types";
+import { IslandInbox, useUnreadCount } from "./IslandInbox";
 import { islandLocation } from "./location";
 import { PlacesMenu } from "./PlacesMenu";
 import type { BackEntry } from "./SheetStage";
 import { islandFocus, needCount, tickerItems } from "./ticker";
 import styles from "./LiveIsland.module.css";
+
+const FINISHED: ReadonlySet<string> = new Set(["COMPLETED", "FAILED", "INTERRUPTED"]);
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -24,12 +27,15 @@ const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(naviga
 export function LiveIsland({
   onOpenPrompt,
   interrupting = null,
+  ending = false,
   onCloseInterrupt,
   back = [],
 }: {
   onOpenPrompt: (prefill?: string) => void;
   /** A Kill… waiting for confirmation: the island asks before sending Ctrl-C. */
   interrupting?: Session | null;
+  /** The confirm ends the terminal (Ctrl-C, then close its shell) instead of only Ctrl-C. */
+  ending?: boolean;
   onCloseInterrupt?: () => void;
   /** Pages you can go back to, newest first. */
   back?: BackEntry[];
@@ -44,7 +50,25 @@ export function LiveIsland({
   const [setAside, setSetAside] = useState<ReadonlySet<string>>(() => new Set());
   const focus = islandFocus(terminals, setAside);
   const machineName = (id: string) => machines.find((machine) => machine.id === id)?.name ?? id;
-  const anchorX = useIslandAnchor(pathname);
+  const islandRef = useRef<HTMLElement>(null);
+  const unread = useUnreadCount(terminals);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  // A click outside the island closes the inbox.
+  useEffect(() => {
+    if (!inboxOpen) return;
+    const away = (event: PointerEvent) => {
+      if (!islandRef.current?.contains(event.target as Node)) setInboxOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [inboxOpen]);
+  const latestSessions = useRef(sessions);
+  latestSessions.current = sessions;
+  const stillLive = (id: string) => {
+    const state = latestSessions.current.find((session) => session.id === id)?.state;
+    return state !== undefined && !FINISHED.has(state);
+  };
+  const anchorX = useIslandAnchor(pathname, islandRef);
 
   // Measure the full ticker off-screen; collapse when it would not fit.
   const measure = useRef<HTMLSpanElement>(null);
@@ -83,7 +107,8 @@ export function LiveIsland({
 
   return (
     <nav
-      className={styles.island}
+      ref={islandRef}
+      className={`${styles.island} island-ink`}
       style={anchorX === null ? undefined : { left: `${anchorX}px` }}
       aria-label="Sentinal"
       title="Click or press / to search"
@@ -92,6 +117,7 @@ export function LiveIsland({
         if (!(event.target as HTMLElement).closest("button, a, [role='group'], [role='alertdialog']")) onOpenPrompt();
       }}
     >
+      <div className={styles.row}>
       <button type="button" className={styles.logo} onClick={() => navigate("/app/overview")} title="Overview">
         <SentinalMark size={18} />
       </button>
@@ -113,32 +139,8 @@ export function LiveIsland({
           <span className={styles.title}>{where.name}</span>
         )}
       </PlacesMenu>
-      {(interrupting || focus.kind !== "idle" || items.length > 0) && <span className={styles.divider} aria-hidden="true" />}
-      {interrupting ? (
-        <IslandConfirm session={interrupting} machineName={machineName(interrupting.machine)} onClose={() => onCloseInterrupt?.()} />
-      ) : focus.kind === "answer" ? (
-        <span className={styles.answer} role="group" aria-label={`${focus.session.name} asks`}>
-          <button type="button" className={styles.answerName} onClick={() => navigate(`/app/sessions/${focus.session.id}`)}>
-            {`${focus.session.name} asks`}
-          </button>
-          <span className={styles.answerPrompt}>{focus.session.prompt}</span>
-          <button type="button" className={styles.answerYes} onClick={() => void answerPrompt(focus.session.id, "y")} aria-label={`y, answer ${focus.session.name}`}>
-            y
-          </button>
-          <button type="button" className={styles.answerNo} onClick={() => void answerPrompt(focus.session.id, "n")} aria-label={`n, answer ${focus.session.name}`}>
-            n
-          </button>
-          <button
-            type="button"
-            className={styles.answerLater}
-            onClick={() => setSetAside((previous) => new Set(previous).add(focus.session.id))}
-            aria-label={`Not now, keep ${focus.session.name} in the list`}
-            title="Not now"
-          >
-            ×
-          </button>
-        </span>
-      ) : focus.kind === "progress" ? (
+      {(focus.kind !== "idle" || items.length > 0 || needs > 0) && <span className={styles.divider} aria-hidden="true" />}
+      {focus.kind === "progress" && !interrupting ? (
         <button
           type="button"
           className={styles.progress}
@@ -170,6 +172,18 @@ export function LiveIsland({
       <span ref={measure} className={styles.measure} aria-hidden="true">
         {ticker}
       </span>
+      {(unread > 0 || inboxOpen) && (
+        <button
+          type="button"
+          className={styles.unread}
+          aria-expanded={inboxOpen}
+          aria-label={unread > 0 ? `${unread} unread notification${unread === 1 ? "" : "s"}` : "Notifications"}
+          title="Notifications"
+          onClick={() => setInboxOpen((open) => !open)}
+        >
+          {unread > 0 ? unread : "×"}
+        </button>
+      )}
       <button
         type="button"
         className={styles.promptButton}
@@ -179,6 +193,45 @@ export function LiveIsland({
       >
         /
       </button>
+      </div>
+      {/* Grows down, never sideways: a question or a Kill confirm drops in under the row. */}
+      {(interrupting || inboxOpen || focus.kind === "answer") && (
+        <div className={styles.drop} data-inbox={(inboxOpen && !interrupting) || undefined}>
+          {interrupting ? (
+            <IslandConfirm
+              session={interrupting}
+              machineName={machineName(interrupting.machine)}
+              ending={ending}
+              stillLive={() => stillLive(interrupting.id)}
+              onClose={() => onCloseInterrupt?.()}
+            />
+          ) : inboxOpen ? (
+            <IslandInbox terminals={terminals} machineName={machineName} onClose={() => setInboxOpen(false)} />
+          ) : focus.kind === "answer" ? (
+        <span className={styles.answer} role="group" aria-label={`${focus.session.name} asks`}>
+          <button type="button" className={styles.answerName} onClick={() => navigate(`/app/sessions/${focus.session.id}`)}>
+            {`${focus.session.name} asks`}
+          </button>
+          <span className={styles.answerPrompt}>{focus.session.prompt}</span>
+          <button type="button" className={styles.answerYes} onClick={() => void answerPrompt(focus.session.id, "y")} aria-label={`y, answer ${focus.session.name}`}>
+            y
+          </button>
+          <button type="button" className={styles.answerNo} onClick={() => void answerPrompt(focus.session.id, "n")} aria-label={`n, answer ${focus.session.name}`}>
+            n
+          </button>
+          <button
+            type="button"
+            className={styles.answerLater}
+            onClick={() => setSetAside((previous) => new Set(previous).add(focus.session.id))}
+            aria-label={`Not now, keep ${focus.session.name} in the list`}
+            title="Not now"
+          >
+            ×
+          </button>
+        </span>
+          ) : null}
+        </div>
+      )}
     </nav>
   );
 }
@@ -208,16 +261,30 @@ function ProgressRing({ percent }: { percent: number }) {
  * Kill… confirmed in place (nothing interrupts on one click). Focus starts on
  * Cancel, the safe choice; Escape cancels.
  */
-function IslandConfirm({ session, machineName, onClose }: { session: Session; machineName: string; onClose: () => void }) {
+function IslandConfirm({
+  session,
+  machineName,
+  ending,
+  stillLive,
+  onClose,
+}: {
+  session: Session;
+  machineName: string;
+  ending: boolean;
+  stillLive: () => boolean;
+  onClose: () => void;
+}) {
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     cancel.current?.focus();
   }, [session.id]);
+  const question = ending ? `End ${session.name}?` : `Kill ${session.name}?`;
   return (
     <span
       className={styles.confirm}
+      data-ending={ending || undefined}
       role="alertdialog"
-      aria-label={`Send Ctrl-C to ${session.name}?`}
+      aria-label={ending ? `End ${session.name}?` : `Send Ctrl-C to ${session.name}?`}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
@@ -225,20 +292,23 @@ function IslandConfirm({ session, machineName, onClose }: { session: Session; ma
         }
       }}
     >
-      <span className={styles.confirmQuestion}>Kill {session.name}?</span>
-      <span className={styles.confirmDetail}>sends Ctrl-C on {machineName}</span>
+      <span className={styles.confirmQuestion}>{question}</span>
+      <span className={styles.confirmDetail}>
+        {ending ? `Ctrl-C, then closes the terminal on ${machineName}. Its output is kept.` : `sends Ctrl-C on ${machineName}`}
+      </span>
       <button ref={cancel} type="button" className={styles.confirmCancel} onClick={onClose}>
-        Cancel
+        {ending ? "Keep running" : "Cancel"}
       </button>
       <button
         type="button"
         className={styles.confirmKill}
         onClick={() => {
-          void dataAdapter.sendSignal(session.id, "SIGINT");
+          if (ending) void endSession(session.id, stillLive).catch(() => undefined);
+          else void dataAdapter.sendSignal(session.id, "SIGINT");
           onClose();
         }}
       >
-        Send Ctrl-C
+        {ending ? "End" : "Send Ctrl-C"}
       </button>
     </span>
   );
@@ -247,32 +317,34 @@ function IslandConfirm({ session, machineName, onClose }: { session: Session; ma
 /**
  * Where the island centres itself: over the current page's `data-island-anchor`
  * element when it has one (the Session page's details side, so the island
- * never sits on the terminal), else the window's centre (null).
+ * never sits on the terminal), else the window's centre (null). Pages mount
+ * after the island and move on resize, so it keeps measuring: after every
+ * render, on resize, and on a light timer; it only updates when the spot moves.
  */
-function useIslandAnchor(pathname: string): number | null {
+function useIslandAnchor(pathname: string, island: RefObject<HTMLElement | null>): number | null {
   const [x, setX] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    let anchor: Element | null = null;
-    const measure = () => {
-      anchor = document.querySelector("[data-current] [data-island-anchor]");
-      if (!anchor) {
-        setX(null);
-        return;
-      }
-      const box = anchor.getBoundingClientRect();
-      setX(box.width > 0 ? Math.round(box.left + box.width / 2) : null);
-    };
-    measure();
-    // The page may render its anchor a moment later; and it moves on resize.
-    const frame = requestAnimationFrame(measure);
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    if (anchor && observer) observer.observe(anchor);
-    window.addEventListener("resize", measure);
+  const [, setTick] = useState(0);
+  const measure = () => {
+    const anchor = document.querySelector("[data-current] [data-island-anchor]");
+    const box = anchor?.getBoundingClientRect();
+    let next = box && box.width > 0 ? box.left + box.width / 2 : null;
+    // Never past an edge: keep the whole island inside the window, 16 px in.
+    if (next !== null) {
+      const half = (island.current?.offsetWidth ?? 0) / 2;
+      next = Math.round(Math.min(window.innerWidth - 16 - half, Math.max(16 + half, next)));
+    }
+    setX((previous) => (previous === next ? previous : next));
+  };
+  useLayoutEffect(measure);
+  useEffect(() => {
+    const again = () => setTick((tick) => tick + 1);
+    window.addEventListener("resize", again);
+    const timer = setInterval(measure, 500);
     return () => {
-      cancelAnimationFrame(frame);
-      observer?.disconnect();
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", again);
+      clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
   return x;
 }

@@ -99,6 +99,7 @@ export function LoginPage() {
       island={island}
       foot={FOOT}
       hideOverflow={ok}
+      signal={ok ? "ok" : busy ? "busy" : shaking ? "error" : "idle"}
     >
       <form className={styles.form} onSubmit={handleSubmit}>
         {mode === "expired" && (

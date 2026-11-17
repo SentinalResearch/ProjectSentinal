@@ -42,6 +42,7 @@ export function SetupPage() {
       island={{ tone: "ok", status: "First run" }}
       foot={FOOT}
       hideOverflow={ok}
+      signal={ok ? "ok" : busy ? "busy" : error ? "error" : "idle"}
     >
       <form className={styles.form} onSubmit={handleSubmit}>
         <Input

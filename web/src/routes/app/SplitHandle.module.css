@@ -1,0 +1,61 @@
+/* A 12 px hit area on the seam; the visible line appears on hover and while dragging. */
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  width: 12px;
+  margin-left: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--line);
+  transition: background 120ms, width 120ms;
+}
+
+.handle:hover::before,
+.handle:active::before,
+.handle:focus-visible::before {
+  width: 2px;
+  background: var(--accent);
+}
+
+.handle:focus-visible {
+  outline: none;
+}
+
+/* A small pill in the middle so the seam reads as something you can move. */
+.grip {
+  position: relative;
+  width: 6px;
+  height: 40px;
+  border-radius: 3px;
+  background: var(--line-strong);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.handle:hover .grip,
+.handle:active .grip,
+.handle:focus-visible .grip {
+  opacity: 1;
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .handle::before,
+  .grip {
+    transition: none;
+  }
+}

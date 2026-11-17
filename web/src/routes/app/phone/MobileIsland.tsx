@@ -30,7 +30,7 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
     const subtitle = where.kind === "session" ? [where.machine, session?.cwd].filter(Boolean).join(" · ") : null;
     const goBack = () => (key !== "default" ? navigate(-1) : navigate(back.parentPath, { replace: true }));
     return (
-      <nav className={styles.island} aria-label="Sentinal" data-docked={docked || undefined}>
+      <nav className={`${styles.island} island-ink`} aria-label="Sentinal" data-docked={docked || undefined}>
         <button type="button" className={styles.back} onClick={goBack} aria-label={`Back to ${back.parentLabel}`}>
           <span aria-hidden="true">‹</span>
         </button>
@@ -46,7 +46,7 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
 
   const name = pathname.startsWith("/app/split") ? "Terminals" : where.kind === "page" ? where.name : where.title;
   return (
-    <nav className={styles.island} aria-label="Sentinal" data-docked={docked || undefined}>
+    <nav className={`${styles.island} island-ink`} aria-label="Sentinal" data-docked={docked || undefined}>
       <Link to="/app/overview" className={styles.logo} aria-label="Overview">
         <SentinalMark size={18} />
       </Link>

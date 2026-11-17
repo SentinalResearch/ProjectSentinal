@@ -398,6 +398,7 @@
 }
 
 .primaryButton {
+  white-space: nowrap;
   flex: 1;
   border: 0;
   background: var(--accent);

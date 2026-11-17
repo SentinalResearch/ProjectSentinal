@@ -13,6 +13,7 @@ import { InterruptConfirm } from "../InterruptConfirm";
 import { MachinePanel } from "../MachinePanel";
 import { useShell } from "../shell/ShellContext";
 import { useSessionRemoval } from "../useSessionRemoval";
+import { DoneSection } from "./DoneSection";
 import { awayFeed } from "./feed";
 import styles from "./GlassDashboard.module.css";
 
@@ -72,24 +73,6 @@ export function GlassDashboard() {
           <span className={styles.muted}>{date}</span>
         </div>
 
-        <header className={styles.hero}>
-          <h1 className={styles.heroTitle}>
-            {loading ? (
-              "Loading…"
-            ) : needs.length > 0 ? (
-              <>
-                <span className={styles.count}>{needs.length}</span>{" "}
-                <span className={styles.words}>
-                  need{needs.length === 1 ? "s" : ""} <span className={styles.accent}>you.</span>
-                </span>
-              </>
-            ) : (
-              <span className={styles.quiet}>All quiet.</span>
-            )}
-          </h1>
-          <p className={styles.summary}>{summary}</p>
-        </header>
-
         <nav className={styles.devices} aria-label="Devices">
           <button type="button" className={styles.device} aria-pressed={!scoped} onClick={() => scopeTo(null)}>
             All
@@ -110,6 +93,25 @@ export function GlassDashboard() {
             </button>
           ))}
         </nav>
+
+        <header className={styles.hero}>
+          <h1 className={styles.heroTitle}>
+            {loading ? (
+              "Loading…"
+            ) : needs.length > 0 ? (
+              <>
+                <span className={styles.count}>{needs.length}</span>{" "}
+                <span className={styles.words}>
+                  need{needs.length === 1 ? "s" : ""} <span className={styles.accent}>you.</span>
+                </span>
+              </>
+            ) : (
+              <span className={styles.quiet}>All quiet.</span>
+            )}
+          </h1>
+          <p className={styles.summary}>{summary}</p>
+        </header>
+
       </div>
 
       <div className={styles.main}>
@@ -161,6 +163,8 @@ export function GlassDashboard() {
             onScope={scoped ? undefined : () => scopeTo(machine.id)}
           />
         ))}
+
+        <DoneSection sessions={scopedSessions} machineName={machineName} now={now} onOpen={open} />
 
         {scoped && <MachinePanel machine={scoped} sessions={scopedSessions} />}
 

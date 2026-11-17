@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { AgentBadge } from "../../components/AgentBadge";
@@ -7,8 +7,10 @@ import { OutputSearchToggle } from "../../components/OutputSearchToggle";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
 import { dataAdapter } from "../../data";
-import { answerPrompt, INTERRUPTIBLE } from "../../data/actions";
+import { answerPrompt, endSession, INTERRUPTIBLE } from "../../data/actions";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { InterruptConfirm } from "./InterruptConfirm";
+import { lifecycle } from "../../data/lifecycle";
 import { useShell } from "./shell/ShellContext";
 import { resolveSessionLineage } from "../../data/lineage";
 import type { Session } from "../../data/types";
@@ -27,8 +29,10 @@ import { isReadOnlyTerminalState } from "../../terminal/lifecycle";
 import { EventsList } from "./EventsList";
 import { HealthCard } from "./HealthCard";
 import { SessionTopBlock } from "./SessionTopBlock";
+import { SummaryLine } from "./SummaryLine";
 import { SessionHistoryTerminals } from "./SessionHistoryTerminals";
 import { SessionRemoveActions } from "./SessionRemoveActions";
+import { SplitHandle, useSessionSplit } from "./SplitHandle";
 import { SessionCommands } from "./SessionCommands";
 import { ResourceBars } from "./ResourceBars";
 import styles from "./SessionDetailPage.module.css";
@@ -53,11 +57,18 @@ function DesktopSessionDetail() {
   const navigate = useNavigate();
   const { machines, sessions, loading } = useLiveData();
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const glass = useShell() !== null;
+  const shell = useShell();
+  const glass = shell !== null;
+  // The terminal's share of the page; the divider resizes it (desktop shell only).
+  const splitRef = useRef<HTMLDivElement>(null);
+  const [split, setSplit] = useSessionSplit();
   const [attached, setAttached] = useState(false);
   const [continuing, setContinuing] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
 
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
   const session = sessions.find((s) => s.id === id);
   const machine = session ? machines.find((m) => m.id === session.machine) : undefined;
   const machineName = machine?.name ?? session?.machine ?? "";
@@ -65,6 +76,11 @@ function DesktopSessionDetail() {
   // Reduced-capture Sessions never attach, so they otherwise never get a fresh
   // authoritative fetch from their owning worker — fields the control
   // projection omits (e.g. cwd) would never arrive without this.
+  // Opening a terminal marks it seen and reads its notifications (design L3).
+  useEffect(() => {
+    if (session) lifecycle.markSeen(session);
+  }, [session?.id, session?.state, session?.updatedAt]);
+
   useEffect(() => {
     if (!session || captureOf(session) === "FULL") return;
     void dataAdapter.refreshSessionDetail(session.id);
@@ -128,6 +144,15 @@ function DesktopSessionDetail() {
     .filter(Boolean)
     .join(" · ");
 
+  // End: Ctrl-C, then close the shell (design L2). Also for an idle shell.
+  const canEnd = latestCapabilities.canSendInput && !readOnlyLatest(latest.state);
+
+  function askEnd() {
+    if (!canEnd) return;
+    if (shell?.requestEnd) shell.requestEnd(latest);
+    else setEndOpen(true);
+  }
+
   function askCtrlC() {
     if (canInterrupt) setConfirmOpen(true);
   }
@@ -161,7 +186,13 @@ function DesktopSessionDetail() {
   const sectionLabel = SECTION_LABELS[capture];
 
   return (
-    <div className={styles.split} data-glass={glass || undefined} data-full-bleed={glass || undefined}>
+    <div
+      ref={splitRef}
+      className={styles.split}
+      data-glass={glass || undefined}
+      data-full-bleed={glass || undefined}
+      style={glass ? { gridTemplateColumns: `${split}% minmax(0, 1fr)` } : undefined}
+    >
       <section
         className={styles.terminalColumn}
         aria-label={sectionLabel.charAt(0) + sectionLabel.slice(1).toLowerCase()}
@@ -196,6 +227,8 @@ function DesktopSessionDetail() {
           </div>
         )}
       </section>
+
+      {glass && <SplitHandle container={splitRef} split={split} onChange={setSplit} />}
 
       <section className={styles.details} aria-label="Session details" data-island-anchor>
         <nav className={styles.breadcrumb} aria-label="Breadcrumb">
@@ -255,6 +288,11 @@ function DesktopSessionDetail() {
                 Ctrl‑C…
               </button>
             )}
+            {canEnd && (
+              <button type="button" className={styles.ctrlCButton} onClick={askEnd}>
+                End terminal…
+              </button>
+            )}
             {canContinue && (
               <button
                 type="button"
@@ -293,6 +331,7 @@ function DesktopSessionDetail() {
         {lineageError && <p className={styles.continueError} role="alert">{lineageError}</p>}
         {continueError && <p className={styles.continueError} role="alert">{continueError}</p>}
 
+        {session.summary && <SummaryLine summary={session.summary} />}
         <SessionTopBlock
           session={session}
           kind={kind}
@@ -312,6 +351,19 @@ function DesktopSessionDetail() {
         <EventsList events={session.events ?? []} />
       </section>
 
+      <ConfirmDialog
+        open={endOpen}
+        overline={`END · ${machineName.toUpperCase()}`}
+        question={`End ${latest.name}?`}
+        consequence="Sends Ctrl-C, then closes the terminal if it is still open. Its output is kept and it moves to Done."
+        confirmLabel="End"
+        onConfirm={() => {
+          setEndOpen(false);
+          const id = latest.id;
+          void endSession(id, () => !readOnlyLatest(sessionsRef.current.find((entry) => entry.id === id)?.state)).catch(() => undefined);
+        }}
+        onCancel={() => setEndOpen(false)}
+      />
       <InterruptConfirm
         session={confirmOpen ? latest : undefined}
         machineName={machineName}
@@ -319,4 +371,9 @@ function DesktopSessionDetail() {
       />
     </div>
   );
+}
+
+/** A Session that has ended (or is unknown): nothing left to end. */
+function readOnlyLatest(state: string | undefined): boolean {
+  return state === undefined || state === "COMPLETED" || state === "FAILED" || state === "INTERRUPTED";
 }

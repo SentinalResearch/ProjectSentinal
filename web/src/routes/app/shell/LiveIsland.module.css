@@ -4,42 +4,43 @@
  * menu) reads as light-on-black whatever the page theme is.
  */
 .island {
-  --text-1: #f2f2f0;
-  --text-2: #a6a6a2;
-  --text-3: #8a8a86;
-  --bg-0: #0a0a0a;
-  --bg-1: #1a1a1d;
-  --line: rgba(255, 255, 255, 0.18);
-  --chip: rgba(255, 255, 255, 0.1);
-  --chip-hover: rgba(255, 255, 255, 0.16);
-  --glass-edge: rgba(255, 255, 255, 0.14);
-  --glass-bg: rgba(255, 255, 255, 0.08);
-  --accent-fg: #8c9eff;
-  --destructive-fg: #ff6b61;
-  --s-running-fg: #29d35f;
-  --s-waiting-fg: #ffd000;
-  --s-stalled-fg: #ff8a00;
-  --s-failed-fg: #ff3b2f;
   position: fixed;
   top: var(--island-top);
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
-  height: var(--island-height);
   max-width: calc(100vw - 32px);
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 8px 0 16px;
-  background: #0a0a0a;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 32px -14px rgba(0, 0, 0, 0.55);
+  flex-direction: column;
   border-radius: var(--radius-glass);
-  color: var(--text-1);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   /* Clicking the island itself opens search. */
   cursor: text;
-  transition: padding 200ms var(--ease-out), left 250ms var(--ease-out);
+  transition: left 250ms var(--ease-out);
+}
+
+/* The always-there row: back, place, status, "/". */
+.row {
+  height: var(--island-height);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px 0 16px;
+}
+
+/* What drops in under the row. It takes the row's width (never widens the
+   island) and wraps onto two lines instead. */
+.drop {
+  width: 0;
+  min-width: 100%;
+  padding: 2px 10px 12px 16px;
+  animation: drop 220ms var(--ease-out) both;
+}
+
+@keyframes drop {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
 }
 
 .island :where(button) {
@@ -180,7 +181,7 @@
   justify-content: center;
   padding: 0 8px;
   border-radius: 14px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--text-3);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -205,8 +206,6 @@
 
 /* ── Island focus: answer, progress, confirm ───────────── */
 
-.answer,
-.confirm,
 .progress {
   display: flex;
   align-items: center;
@@ -215,6 +214,23 @@
   font-size: 13px;
   white-space: nowrap;
   animation: enter 200ms ease-out both;
+}
+
+/* Line 1: who asks. Line 2: the question and the answers. */
+.answer,
+.confirm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.answerName,
+.confirmQuestion {
+  grid-column: 1 / -1;
+  justify-self: start;
+  text-align: left;
 }
 
 .answerName {
@@ -229,9 +245,8 @@
 }
 
 .answerPrompt {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-1);
@@ -287,8 +302,8 @@
   font-weight: 200;
 }
 
-.confirm {
-  padding: 2px 0;
+.confirmDetail {
+  min-width: 0;
 }
 
 .confirmQuestion {
@@ -313,9 +328,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .answer,
-  .confirm,
-  .progress {
+  .progress,
+  .drop {
     animation: none;
   }
 }
@@ -362,7 +376,7 @@
   flex-direction: column;
   border-radius: 14px;
   background: var(--bg-1);
-  box-shadow: 0 0 0 1px var(--glass-edge), 0 18px 40px -16px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 0 1px var(--glass-edge), 0 18px 40px -16px rgba(0, 0, 0, 0.35);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
@@ -418,4 +432,202 @@
   .backMenu {
     transition: none;
   }
+}
+
+/* Room for a question or a confirm even when the row itself is short. */
+.island:has(.drop) {
+  min-width: min(400px, calc(100vw - 32px));
+}
+
+/* End (design L2): the longer note gets its own line, the buttons sit under it on the right. */
+.confirm[data-ending] .confirmDetail {
+  grid-column: 1 / -1;
+  line-height: 18px;
+}
+.confirm[data-ending] .confirmCancel {
+  grid-column: 3;
+}
+.confirm[data-ending] .confirmKill {
+  grid-column: 4;
+}
+
+/* Unread notifications (design L3): a small blue count; opens the inbox. */
+.unread {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.unread[aria-expanded="true"] {
+  background: var(--chip-hover);
+  color: var(--text-1);
+}
+
+.island:has(.drop[data-inbox]) {
+  min-width: min(440px, calc(100vw - 32px));
+  cursor: default;
+}
+.drop[data-inbox] {
+  padding: 0 0 6px;
+}
+
+.inbox {
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.inboxHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 16px 8px;
+}
+.inboxTitle {
+  font-weight: 600;
+  color: var(--text-1);
+}
+.inboxNew {
+  margin-left: 4px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.inboxFilters {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 8px;
+}
+.inboxFilter {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  background: var(--chip);
+  color: var(--text-1);
+  font-size: 12px;
+}
+.inboxFilter[aria-pressed="true"] {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+
+.inboxGroup {
+  margin: 0;
+  padding: 10px 16px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.inboxList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inboxRow {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 16px;
+}
+.inboxRow[data-unread] {
+  background: color-mix(in srgb, var(--accent-fg) 8%, transparent);
+}
+
+.inboxSquare {
+  width: 7px;
+  height: 7px;
+  background: var(--text-3);
+}
+.inboxSquare[data-state="FAILED"] { background: var(--s-failed-fg); }
+.inboxSquare[data-state="WAITING"] { background: var(--s-waiting-fg); }
+.inboxSquare[data-state="STALLED"] { background: var(--s-stalled-fg); }
+.inboxSquare[data-state="COMPLETED"] { background: var(--s-running-fg); }
+.inboxRow:not([data-unread]) .inboxSquare { opacity: 0.45; }
+
+.inboxText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+.inboxName,
+.inboxMeta {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inboxName {
+  color: var(--text-2);
+  font-size: 14px;
+}
+.inboxRow[data-unread] .inboxName {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.inboxMeta {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.inboxLink {
+  color: var(--accent-fg);
+  font-size: 13px;
+  font-weight: 500;
+}
+.inboxLink:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+
+.inboxClear {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  color: var(--text-3);
+  font-size: 15px;
+}
+.inboxClear:hover {
+  background: var(--chip);
+  color: var(--text-1);
+}
+
+.inboxEmpty {
+  margin: 0;
+  padding: 12px 16px;
+  color: var(--text-3);
+  white-space: normal;
+}
+
+.inboxFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 10px 16px 6px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

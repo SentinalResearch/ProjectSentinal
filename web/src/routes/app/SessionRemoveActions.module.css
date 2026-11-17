@@ -1,10 +1,7 @@
-/* Its own line, so it never squeezes the page's other buttons. */
+/* Its buttons join the page's own row and wrap with it, so they never
+   stack out of line next to the others. */
 .actions {
-  flex-basis: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  display: contents;
 }
 
 .error {
@@ -12,4 +9,11 @@
   margin: 0;
   color: var(--err, #d33);
   font-size: 13px;
+}
+
+.fate {
+  align-self: center;
+  font-size: 13px;
+  color: var(--text-3);
+  white-space: nowrap;
 }

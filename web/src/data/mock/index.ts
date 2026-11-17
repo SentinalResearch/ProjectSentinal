@@ -8,8 +8,17 @@ import { acquireLiveUpdates, resolvePrompt } from "./live";
 import { mockComplete, mockSearch } from "./search";
 import { delay, emit, findSession, store, subscribe as subscribeStore, updateSession, appendEvent } from "./store";
 
-let passwordHash: string | null = null;
-store.auth.status = "setup";
+/**
+ * Demo convenience (`.env.demo` sets VITE_DEMO_AUTO_SIGN_IN=true): the mock
+ * starts signed in, so testing the UI needs no machine token or password.
+ * Mock data only; a real daemon's sign-in is never bypassed. After signing
+ * out, the demo password is DEMO_PASSWORD.
+ */
+export const DEMO_PASSWORD = "demo-password-123";
+const autoSignIn = import.meta.env.VITE_DEMO_AUTO_SIGN_IN === "true";
+
+let passwordHash: string | null = autoSignIn ? DEMO_PASSWORD : null;
+store.auth.status = autoSignIn ? "signedIn" : "setup";
 
 const CONNECT_DELAY_MS = 5000;
 

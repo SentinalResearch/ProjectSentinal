@@ -29,10 +29,26 @@ interface Fixtures {
 
 const fixtures = raw as unknown as Fixtures;
 
+/**
+ * Demo of the intelligence layer (design L4): what a local model might have
+ * read off the stalled run's screen, marked as guesses.
+ */
+const MOCK_GUESSES: Record<string, Pick<Session, "summary" | "events">> = {
+  compression: {
+    summary: { text: "Compressing shard 14 of 40; no output for 6 minutes, disk is busy.", inferred: true },
+    events: [
+      ["13:20", "COMMAND_STARTED", "python compress.py --shards 40"],
+      ["13:52", "PROGRESS", "shard 14/40", undefined, true],
+      ["14:07", "WARNING", "disk write slow, 3 MB/s", undefined, true],
+    ],
+  },
+};
+
 function cloneSessions(): Session[] {
   return fixtures.sessions.map((s) => ({
     ...structuredClone(s),
     events: s.events ? (structuredClone(s.events) as SessionEvent[]) : undefined,
+    ...(MOCK_GUESSES[s.id] ? structuredClone(MOCK_GUESSES[s.id]) : {}),
   }));
 }
 

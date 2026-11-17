@@ -35,22 +35,22 @@ export function HealthChart({ title, metric, points }: { title: string; metric: 
       <div className={chart.chartPlot}>
         <svg role="img" aria-label={title} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" className={chart.chartSvg}>
           <line x1="0" x2={WIDTH} y1={HEIGHT / 2} y2={HEIGHT / 2} className={chart.gridLine} vectorEffect="non-scaling-stroke" />
-          <polyline points={line("p95")} fill="none" stroke="var(--s-waiting-fg)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          <polyline points={line("p50")} fill="none" stroke="var(--accent-fg)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          <polyline points={line("p95")} fill="none" stroke="var(--text-3)" strokeWidth="1.5" strokeDasharray="5 4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          <polyline points={line("p50")} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
           {/* A one-point polyline renders nothing; the markers keep single-sample series visible. */}
           {points.map((point) => (
-            <circle key={point.at} cx={x(point.at)} cy={y(point.p50)} r="2.5" fill="var(--accent-fg)" />
+            <circle key={point.at} cx={x(point.at)} cy={y(point.p50)} r="2.5" fill="var(--accent)" />
           ))}
         </svg>
       </div>
       <figcaption className={styles.legend}>
         <span>{title}</span>
         <span>
-          <i className={styles.swatch} style={{ background: "var(--accent-fg)" }} aria-hidden="true" />
+          <i className={styles.swatch} style={{ background: "var(--accent)" }} aria-hidden="true" />
           median {formatValue(metric, latest.p50)}
         </span>
         <span>
-          <i className={styles.swatch} style={{ background: "var(--s-waiting-fg)" }} aria-hidden="true" />
+          <i className={styles.swatch} style={{ background: "repeating-linear-gradient(90deg, var(--text-3) 0 5px, transparent 5px 9px)" }} aria-hidden="true" />
           p95 {formatValue(metric, latest.p95)}
         </span>
         <span>top {formatValue(metric, top / 1.1)}</span>

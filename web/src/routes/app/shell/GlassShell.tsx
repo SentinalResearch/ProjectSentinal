@@ -22,6 +22,8 @@ export function GlassShell() {
   const [prompt, setPrompt] = useState<{ text: string } | null>(null);
   // A Kill… waiting for its confirmation in the island.
   const [interrupting, setInterrupting] = useState<Session | null>(null);
+  // Whether that confirm ends the terminal or only sends Ctrl-C.
+  const [ending, setEnding] = useState(false);
   // Pages you can go back to, newest first (shown in the island).
   const [back, setBack] = useState<BackEntry[]>([]);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -54,13 +56,32 @@ export function GlassShell() {
     if (perform(suggestion, options) === "keep-focus") returnFocus.current?.focus?.();
   }
 
-  const value = useMemo<ShellValue>(() => ({ openPrompt, requestInterrupt: setInterrupting }), [openPrompt]);
+  const value = useMemo<ShellValue>(
+    () => ({
+      openPrompt,
+      requestInterrupt: (session) => {
+        setEnding(false);
+        setInterrupting(session);
+      },
+      requestEnd: (session) => {
+        setEnding(true);
+        setInterrupting(session);
+      },
+    }),
+    [openPrompt],
+  );
 
   return (
     <ShellContext.Provider value={value}>
       <div className={styles.shell}>
         <div className={styles.glow} aria-hidden="true" />
-        <LiveIsland onOpenPrompt={openPrompt} interrupting={interrupting} onCloseInterrupt={() => setInterrupting(null)} back={back} />
+        <LiveIsland
+          onOpenPrompt={openPrompt}
+          interrupting={interrupting}
+          ending={ending}
+          onCloseInterrupt={() => setInterrupting(null)}
+          back={back}
+        />
         <main className={styles.main} id="main" inert={prompt ? true : undefined}>
           <SheetStage onBackChange={setBack} />
         </main>

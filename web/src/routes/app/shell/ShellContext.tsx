@@ -8,6 +8,8 @@ export interface ShellValue {
   openPrompt(prefill?: string): void;
   /** Ask, in the island, before sending Ctrl-C to a Session. */
   requestInterrupt?(session: Session): void;
+  /** Ask, in the island, before ending a terminal: Ctrl-C, then close its shell. */
+  requestEnd?(session: Session): void;
 }
 
 export const ShellContext = createContext<ShellValue | null>(null);

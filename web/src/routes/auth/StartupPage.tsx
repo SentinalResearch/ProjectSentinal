@@ -76,6 +76,7 @@ export function StartupPage() {
           : { tone: loading ? "pending" : "ok", status: loading ? "Connecting…" : "Connected" }
       }
       foot={unreachable ? undefined : "Nothing about your machines is shown until you sign in."}
+      signal={loading ? "busy" : unreachable ? "error" : "idle"}
     >
       <ol className={styles.checks} aria-label="Startup checks" aria-live="polite">
         {checks.map((check) => (

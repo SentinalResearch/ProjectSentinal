@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { appTitle } from "../../components/DevBadge";
 import { LiveDataProvider } from "../../data/LiveDataContext";
 import { useIsPhone } from "../../hooks/useViewport";
+import { AutoClear } from "./AutoClear";
 import { GlassShell } from "./shell/GlassShell";
 import { PhoneShell } from "./phone/PhoneShell";
 
@@ -16,5 +17,10 @@ export function AppShell() {
   useEffect(() => {
     document.title = appTitle();
   }, []);
-  return <LiveDataProvider>{isPhone ? <PhoneShell /> : <GlassShell />}</LiveDataProvider>;
+  return (
+    <LiveDataProvider>
+      <AutoClear />
+      {isPhone ? <PhoneShell /> : <GlassShell />}
+    </LiveDataProvider>
+  );
 }

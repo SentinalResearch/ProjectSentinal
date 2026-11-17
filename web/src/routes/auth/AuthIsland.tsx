@@ -26,14 +26,14 @@ export function serverHost(daemonUrl: string = defaultDaemonHttpUrl(), pageHost:
 }
 
 /**
- * The pre-sign-in live island: the glass pill from the app shell, showing only
+ * The pre-sign-in island: the same black Dynamic Island as the app, showing only
  * the server and the sign-in state. Nothing about machines or sessions is
  * shown until the user has signed in.
  */
 export function AuthIsland({ tone, status, latencyMs = null }: AuthIslandProps) {
   const { theme, toggleTheme } = useTheme();
   return (
-    <header className={styles.island} aria-label="Sentinal status">
+    <header className={`${styles.island} island-ink`} aria-label="Sentinal status">
       <span className={styles.brand}>
         <SentinalMark size={18} />
         <span className={styles.name}>Sentinal</span>

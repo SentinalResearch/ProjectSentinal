@@ -1,4 +1,4 @@
-/* Pre-sign-in live island (GLASS_SPEC §3–4): the one glass element on the auth screens. */
+/* Pre-sign-in island: the same black Dynamic Island as in the app (`island-ink`). */
 .island {
   position: fixed;
   top: var(--island-top);
@@ -11,21 +11,11 @@
   align-items: center;
   gap: 14px;
   padding: 0 6px 0 18px;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 0 0 1px var(--glass-edge), var(--glass-shadow);
   border-radius: var(--radius-glass);
-  color: var(--text-1);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .island {
-    background: color-mix(in srgb, var(--bg-1) 92%, transparent);
-  }
-}
 
 .brand {
   display: flex;
