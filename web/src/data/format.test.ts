@@ -5,6 +5,7 @@ import {
   agentFinishedText,
   agentUsageText,
   codingAgentName,
+  eventKindLabel,
   formatEventTime,
   machineSummary,
   sessionDisplayName,
@@ -79,5 +80,18 @@ describe("sessionDisplayName (P5, X20)", () => {
 
   it("falls back to Session N", () => {
     expect(sessionDisplayName({ id: 9 })).toBe("Session 9");
+  });
+});
+
+describe("eventKindLabel", () => {
+  it("names known Event kinds in words", () => {
+    expect(eventKindLabel("CHECKPOINT_CREATED")).toBe("Checkpoint saved");
+    expect(eventKindLabel("PROGRESS_UPDATED")).toBe("Progress");
+    expect(eventKindLabel("WAITING_FOR_INPUT")).toBe("Waiting for input");
+  });
+
+  it("falls back to sentence case for a kind it does not know", () => {
+    expect(eventKindLabel("NEW_THING_HAPPENED")).toBe("New thing happened");
+    expect(eventKindLabel("")).toBe("Event");
   });
 });

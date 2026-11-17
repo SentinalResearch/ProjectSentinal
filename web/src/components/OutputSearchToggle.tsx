@@ -28,7 +28,8 @@ export function OutputSearchToggle({ session }: { session: Session }) {
       <input type="checkbox" checked={enabled} onChange={(event) => void change(event.target.checked)} />
       <span>
         Searchable output
-        <span className={styles.hint}> · search may read this Session's saved output, with secrets hidden</span>
+        <br />
+        <span className={styles.hint}>Search may read this Session's saved output, with secrets hidden.</span>
       </span>
       {error && (
         <span className={styles.error} role="alert">

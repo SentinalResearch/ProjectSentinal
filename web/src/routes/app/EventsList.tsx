@@ -1,4 +1,4 @@
-import { eventColor, formatEventTime } from "../../data/format";
+import { eventColor, eventKindLabel, formatEventTime } from "../../data/format";
 import type { SessionEvent } from "../../data/types";
 import styles from "./EventsList.module.css";
 
@@ -55,8 +55,8 @@ export function EventsList({ events, sessionNames, title = "Events", showHead = 
               <span className={styles.square} style={{ background: color.square }} />
               <span className={styles.body}>
                 <span className={styles.typeRow}>
-                  <span className={styles.type} style={{ color: color.text }}>
-                    {kind}
+                  <span className={styles.type} style={{ color: color.text }} title={kind}>
+                    {eventKindLabel(kind)}
                   </span>
                   {sessionName && <span className={styles.who}>{sessionName}</span>}
                 </span>

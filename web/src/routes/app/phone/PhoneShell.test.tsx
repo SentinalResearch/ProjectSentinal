@@ -66,8 +66,8 @@ describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
     setViewport(390);
     renderShell("/app/overview");
     const island = screen.getByRole("navigation", { name: "Sentinal" });
-    expect(within(island).getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
-    expect(within(island).getByText("Dashboard", { selector: "span" })).toBeInTheDocument();
+    expect(within(island).getByRole("link", { name: "Overview" })).toBeInTheDocument();
+    expect(within(island).getByText("Overview", { selector: "span" })).toBeInTheDocument();
     expect(await within(island).findByRole("link", { name: /^\d+ need you$/ })).toBeInTheDocument();
     expect(within(island).getByRole("link", { name: /failed$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open the prompt" })).toHaveTextContent("go, run, find, y / n…");

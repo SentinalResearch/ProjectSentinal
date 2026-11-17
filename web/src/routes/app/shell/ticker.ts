@@ -1,3 +1,4 @@
+import { canAnswer, offeredChoices } from "../../../data/actions";
 import { needsAttention } from "../../../data/format";
 import type { Session } from "../../../data/types";
 
@@ -42,6 +43,36 @@ export function tickerItems(terminals: Session[], limit = 3): TickerItem[] {
       state: session.state,
       text: `${shortName(session.name)} ${session.state === "RUNNING" ? progressText(session) : WORD[session.state]}`,
     }));
+}
+
+/** What the island shows in its middle, by priority. */
+export type IslandFocus =
+  | { kind: "answer"; session: Session }
+  | { kind: "ticker" }
+  | { kind: "progress"; session: Session; percent: number }
+  | { kind: "idle" };
+
+/**
+ * A yes/no question you can answer from the island beats the ticker (it is
+ * the one thing you can finish in place); then anything that needs you; then
+ * the running job with progress that is closest to done; else nothing.
+ */
+export function islandFocus(terminals: Session[], skipAnswer: ReadonlySet<string> = new Set()): IslandFocus {
+  const asking = terminals.find(
+    (session) =>
+      !session.dismissed &&
+      !skipAnswer.has(session.id) &&
+      canAnswer(session) &&
+      offeredChoices(session).length === 0,
+  );
+  if (asking) return { kind: "answer", session: asking };
+  if (needCount(terminals) > 0) return { kind: "ticker" };
+  const withPercent = terminals
+    .filter((session) => session.state === "RUNNING" && session.progress && session.progress.total > 0)
+    .map((session) => ({ session, percent: Math.round((session.progress!.current / session.progress!.total) * 100) }))
+    .sort((left, right) => right.percent - left.percent);
+  const top = withPercent[0];
+  return top ? { kind: "progress", session: top.session, percent: top.percent } : { kind: "idle" };
 }
 
 /** How many Sessions need the owner (the collapsed "N need you" chip). */

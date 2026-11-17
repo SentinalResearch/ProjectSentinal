@@ -27,7 +27,7 @@
   height: calc(var(--safe-top) + 44px);
   padding: var(--safe-top) 8px 0 4px;
   border-radius: 0;
-  background: #0c0c0c;
+  background: var(--term-bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: inset 0 -1px 0 var(--line);

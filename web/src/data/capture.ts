@@ -89,6 +89,11 @@ const ORIGINS: Record<SessionOrigin, string> = {
 };
 
 /** Display name of how a Session entered Sentinal; absent means UI. */
+/** Started from the UI with full capture: the ordinary case, which dense lists leave unbadged. */
+export function isDefaultCapture(session: Pick<Session, "capture" | "origin">): boolean {
+  return (session.origin ?? "UI") === "UI" && (session.capture ?? "FULL") === "FULL";
+}
+
 export function originLabel(origin: SessionOrigin | undefined): string {
   return ORIGINS[origin ?? "UI"];
 }

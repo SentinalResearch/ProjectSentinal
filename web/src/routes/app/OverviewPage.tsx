@@ -45,10 +45,9 @@ function onActivateKey(handler: () => void) {
 export function OverviewPage() {
   const isPhone = useIsPhone();
   const glass = useShell() !== null;
-  const [searchParams] = useSearchParams();
   if (isPhone) return <PhoneOverview />;
-  // Under the glass shell the dashboard is GLASS_SPEC.md §7; a Machine's page stays as it is.
-  if (glass && !searchParams.get("machine")) return <GlassDashboard />;
+  // Under the shell the dashboard handles `?machine=` itself: the device line scopes it in place.
+  if (glass) return <GlassDashboard />;
   return <DesktopOverview />;
 }
 

@@ -175,7 +175,9 @@ function RecipeCatalogView({ id }: { id?: string }) {
                         type="button"
                         className={styles.resetBtn}
                         disabled={isDefault}
-                        style={{ color: isDefault ? "var(--text-3)" : "var(--accent-fg)" }}
+                        aria-hidden={isDefault || undefined}
+                        tabIndex={isDefault ? -1 : undefined}
+                        style={{ visibility: isDefault ? "hidden" : "visible", color: "var(--accent-fg)" }}
                         onClick={() => setValues((v) => ({ ...v, [key]: recipe.params[key] }))}
                       >
                         Reset

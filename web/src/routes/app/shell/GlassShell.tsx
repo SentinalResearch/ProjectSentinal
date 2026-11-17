@@ -6,6 +6,7 @@ import { SheetStage } from "./SheetStage";
 import { typingInto } from "./typing";
 import { usePromptActions } from "./usePromptActions";
 import type { PromptSuggestion } from "./promptGrammar";
+import type { Session } from "../../../data/types";
 import { ShellContext, type ShellValue } from "./ShellContext";
 import styles from "./GlassShell.module.css";
 
@@ -19,6 +20,8 @@ import styles from "./GlassShell.module.css";
 export function GlassShell() {
   const { perform, dialogs } = usePromptActions();
   const [prompt, setPrompt] = useState<{ text: string } | null>(null);
+  // A Kill… waiting for its confirmation in the island.
+  const [interrupting, setInterrupting] = useState<Session | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
 
   const openPrompt = useCallback((prefill = "") => {
@@ -49,13 +52,13 @@ export function GlassShell() {
     if (perform(suggestion, options) === "keep-focus") returnFocus.current?.focus?.();
   }
 
-  const value = useMemo<ShellValue>(() => ({ openPrompt }), [openPrompt]);
+  const value = useMemo<ShellValue>(() => ({ openPrompt, requestInterrupt: setInterrupting }), [openPrompt]);
 
   return (
     <ShellContext.Provider value={value}>
       <div className={styles.shell}>
         <div className={styles.glow} aria-hidden="true" />
-        <LiveIsland onOpenPrompt={openPrompt} />
+        <LiveIsland onOpenPrompt={openPrompt} interrupting={interrupting} onCloseInterrupt={() => setInterrupting(null)} />
         <main className={styles.main} id="main" inert={prompt ? true : undefined}>
           <SheetStage />
         </main>

@@ -7,8 +7,8 @@ export type IslandLocation =
   | { kind: "session"; machine: string; title: string; sessionId: string };
 
 const PAGES: Array<[RegExp, string]> = [
-  [/^\/app\/?$/, "Dashboard"],
-  [/^\/app\/overview\/?$/, "Dashboard"],
+  [/^\/app\/?$/, "Overview"],
+  [/^\/app\/overview\/?$/, "Overview"],
   [/^\/app\/split\/?$/, "Split view"],
   [/^\/app\/history\/?$/, "History"],
   [/^\/app\/recipes(\/.*)?$/, "Recipes"],

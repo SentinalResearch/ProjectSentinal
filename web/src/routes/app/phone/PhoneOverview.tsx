@@ -66,7 +66,7 @@ export function PhoneOverview() {
 
   return (
     <div className={styles.page}>
-      <PageTitle>Dashboard</PageTitle>
+      <PageTitle>Overview</PageTitle>
       <p className={styles.overline}>
         {time} · {terminals.length} session{terminals.length === 1 ? "" : "s"} ·{" "}
         {online} machine{online === 1 ? "" : "s"}

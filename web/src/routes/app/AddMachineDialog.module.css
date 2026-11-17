@@ -180,7 +180,7 @@
 
 .error {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--s-failed-fg);
 }
 
@@ -191,7 +191,7 @@
 }
 
 .machineId {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-2);
   overflow-wrap: anywhere;
 }

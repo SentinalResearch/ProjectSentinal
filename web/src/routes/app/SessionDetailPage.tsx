@@ -214,9 +214,11 @@ function DesktopSessionDetail() {
           <div className={styles.headerText}>
             <div className={styles.titleRow}>
               <h1 className={styles.title}>{root.name}</h1>
-              <span className={styles.generationMarker}>
-                Generation {lineage.selectedIndex + 1} of {lineage.ordered.length}
-              </span>
+              {lineage.ordered.length > 1 && (
+                <span className={styles.generationMarker}>
+                  Generation {lineage.selectedIndex + 1} of {lineage.ordered.length}
+                </span>
+              )}
               <StateTag state={session.state} exitUnknown={unknownExit} />
               <CaptureBadge capture={capture} origin={session.origin} />
               {session.codingAgent && <AgentBadge agent={session.codingAgent} usage />}

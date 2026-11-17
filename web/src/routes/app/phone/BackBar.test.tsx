@@ -42,7 +42,7 @@ describe("BackBar (the phone island's ‹ back, MOBILE_GLASS_SPEC §1)", () => {
     renderAt("/app/sessions/rtx:1", routes);
     await userEvent.setup().click(screen.getByRole("button", { name: "Back to Overview" }));
     expect(screen.queryByRole("button", { name: "Back to Overview" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Overview" })).toBeInTheDocument();
   });
 
   it("a swipe from the left edge goes back; a swipe that starts mid-screen or drifts vertically does not", async () => {

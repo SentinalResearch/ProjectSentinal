@@ -1,30 +1,32 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AgentBadge } from "../../../components/AgentBadge";
-import { AttentionCard, GlassPanel } from "../../../components/glass/Glass";
-import { StateTag } from "../../../components/StateTag";
-import { dataAdapter } from "../../../data";
-import { answerPrompt, canAnswer, canInterrupt, offeredChoices } from "../../../data/actions";
 import { PromptChoices } from "../../../components/PromptChoices";
-import { exitUnknown } from "../../../data/capture";
-import { extractPort, formatSessionFact, machineSummary, needsAttention, sessionKind } from "../../../data/format";
+import { StateIcon } from "../../../components/StateIcon";
+import { dataAdapter } from "../../../data";
+import { answerPrompt, canAnswer, canInterrupt, noAnswerReason, offeredChoices } from "../../../data/actions";
+import { extractPort, formatSessionFact, machineSummary, needsAttention } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Machine, MachineMetricSample, Session } from "../../../data/types";
 import { InterruptConfirm } from "../InterruptConfirm";
-import { useSessionRemoval } from "../useSessionRemoval";
+import { MachinePanel } from "../MachinePanel";
 import { useShell } from "../shell/ShellContext";
+import { useSessionRemoval } from "../useSessionRemoval";
 import { awayFeed } from "./feed";
-import { recordSample, sparkBars, type SparkHistory } from "./spark";
 import styles from "./GlassDashboard.module.css";
 
-const SAMPLE_MS = 3_000;
 const LOAD_MS = 30_000;
 
-/** The glass dashboard (GLASS_SPEC.md §7), desktop ≥ 1024 px. */
+/**
+ * The desktop dashboard (≥ 1024 px), in the quiet "Option A" style: one big
+ * number for what needs you, the devices as one line of text that scopes the
+ * page to a Machine, then plain ruled lists. Search lives in the island.
+ */
 export function GlassDashboard() {
   const navigate = useNavigate();
   const shell = useShell();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { machines, terminals, hidden, loading } = useLiveData();
   const [interrupting, setInterrupting] = useState<Session | null>(null);
   // 6.1: show only Sessions running an AI coding agent. A Session counts as an
@@ -36,112 +38,154 @@ export function GlassDashboard() {
     (session.promptOptions !== undefined && session.promptOptions.length > 0);
   const shown = (session: Session) => !agentsOnly || isAgentSession(session);
   const now = useClock();
-  const sparks = useSparkHistory(terminals);
   const load = useMachineLoad(machines);
 
-  const needs = terminals.filter((session) => needsAttention(session) && shown(session));
+  // The device line scopes the whole page to one Machine (`?machine=`).
+  const scopeId = searchParams.get("machine");
+  const scoped = scopeId ? machines.find((machine) => machine.id === scopeId) : undefined;
+  const inScope = (session: Session) => !scoped || session.machine === scoped.id;
+  const scopeTo = (id: string | null) => setSearchParams(id ? { machine: id } : {});
+
+  const scopedSessions = terminals.filter(inScope);
+  const needs = scopedSessions.filter((session) => needsAttention(session) && shown(session));
+  const laneMachines = scoped ? [scoped] : machines;
   const online = machines.filter((machine) => machine.status === "ONLINE").length;
-  const feed = useMemo(() => awayFeed(terminals, machines), [terminals, machines]);
+  const feed = useMemo(
+    () => awayFeed(terminals.filter(inScope), laneMachines),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [terminals, machines, scoped?.id],
+  );
   const since = feed.filter((item) => item.time).at(-1)?.time.slice(0, 5);
   const machineName = (id: string) => machines.find((machine) => machine.id === id)?.name ?? id;
   const open = (id: string) => navigate(`/app/sessions/${encodeURIComponent(id)}`);
 
-  const date = new Date(now).toLocaleString(undefined, { weekday: "long", hour: "2-digit", minute: "2-digit", hour12: false });
+  const date = new Date(now).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  const summary = scoped
+    ? `${scopedSessions.length} session${scopedSessions.length === 1 ? "" : "s"} on ${scoped.name}. ${STATUS_WORD[scoped.status]}.`
+    : `${terminals.length} session${terminals.length === 1 ? "" : "s"} on ${online} machine${online === 1 ? "" : "s"}.${needs.length > 0 ? " The rest are fine." : ""}`;
 
   return (
     <div className={styles.page}>
-      <div className={styles.main}>
-        <header className={styles.header}>
-          <div className={styles.overlineRow}>
-            <p className={styles.overline}>
-              {date} · {terminals.length} session{terminals.length === 1 ? "" : "s"} on {online} machine{online === 1 ? "" : "s"}
-            </p>
-            {/* A view filter, kept apart from the prompt hint below. */}
-            <button
-              type="button"
-              className={styles.filter}
-              aria-pressed={agentsOnly}
-              aria-label="AI agents only"
-              title="Show only Sessions running an AI coding agent: the Command started one, or the screen showed its prompt or menu"
-              onClick={() => setAgentsOnly((only) => !only)}
-            >
-              AI agents
-            </button>
-          </div>
-          <div className={styles.heroRow}>
-            <h1 className={styles.hero}>{loading ? "Loading…" : needs.length > 0 ? `${needs.length} need${needs.length === 1 ? "s" : ""} you.` : "All quiet."}</h1>
-            {shell && (
-              <button type="button" className={styles.hint} onClick={() => shell.openPrompt()}>
-                press <kbd>/</kbd> to do anything
-              </button>
+      <div className={styles.side}>
+        <div className={styles.dateRow}>
+          <span>Sentinal</span>
+          <span className={styles.muted}>{date}</span>
+        </div>
+
+        <header className={styles.hero}>
+          <h1 className={styles.heroTitle}>
+            {loading ? (
+              "Loading…"
+            ) : needs.length > 0 ? (
+              <>
+                <span className={styles.count}>{needs.length}</span>{" "}
+                <span className={styles.words}>
+                  need{needs.length === 1 ? "s" : ""} <span className={styles.accent}>you.</span>
+                </span>
+              </>
+            ) : (
+              <span className={styles.quiet}>All quiet.</span>
             )}
-          </div>
+          </h1>
+          <p className={styles.summary}>{summary}</p>
         </header>
 
-        {needs.length > 0 && (
-          <section className={styles.needs} aria-labelledby="needs-you-heading">
-            <h2 id="needs-you-heading" className={styles.visuallyHidden}>
-              Needs you
-            </h2>
-            {needs.map((session) => (
-              <NeedsCard
-                key={session.id}
-                session={session}
-                machineName={machineName(session.machine)}
-                onOpen={() => open(session.id)}
-                onInterrupt={() => setInterrupting(session)}
-              />
-            ))}
-          </section>
-        )}
-
-        <div className={styles.lanes}>
+        <nav className={styles.devices} aria-label="Devices">
+          <button type="button" className={styles.device} aria-pressed={!scoped} onClick={() => scopeTo(null)}>
+            All
+          </button>
           {machines.map((machine) => (
-            <MachineLane
+            <button
               key={machine.id}
-              machine={machine}
-              sessions={terminals.filter((session) => session.machine === machine.id && onLane(session) && shown(session))}
-              emptyNote={agentsOnly ? "No AI agents." : "No Sessions."}
-              sparks={sparks}
-              load={load[machine.id]}
-              onOpen={open}
-              onOpenMachine={() => navigate(`/app/overview?machine=${encodeURIComponent(machine.id)}`)}
-            />
+              type="button"
+              className={styles.device}
+              aria-pressed={scoped?.id === machine.id}
+              data-online={machine.status === "ONLINE" || undefined}
+              onClick={() => scopeTo(machine.id)}
+              title={`${machine.name} · ${STATUS_WORD[machine.status]}`}
+            >
+              <span className={styles.deviceDot} aria-hidden="true" />
+              {machine.name}
+              <span className={styles.visuallyHidden}> · {STATUS_WORD[machine.status]}</span>
+            </button>
           ))}
-        </div>
+        </nav>
       </div>
 
-      <GlassPanel as="aside" className={styles.feed} aria-label="While you were away">
-        <div className={styles.feedHead}>
-          <h2 className={styles.feedTitle}>While you were away</h2>
-          {since && <span className={styles.feedSince}>since {since}</span>}
-        </div>
-        {hidden.length > 0 && (
-          <button type="button" className={styles.chip} onClick={() => navigate("/app/sessions/hidden")}>
-            Hidden Sessions ({hidden.length})
-          </button>
-        )}
-        {feed.length === 0 && <p className={styles.feedEmpty}>Nothing new.</p>}
-        <ol className={styles.feedList}>
-          {feed.map((item) => (
-            <li key={item.id}>
+      <div className={styles.main}>
+        <section className={styles.section} aria-labelledby="needs-you-heading">
+          <div className={styles.sectionHead}>
+            <h2 id="needs-you-heading" className={styles.sectionTitle}>
+              Needs you
+            </h2>
+            <span className={styles.sectionTools}>
+              {hidden.length > 0 && (
+                <button type="button" className={styles.link} onClick={() => navigate("/app/sessions/hidden")}>
+                  Hidden ({hidden.length})
+                </button>
+              )}
+              {/* A view filter for the whole page. */}
               <button
                 type="button"
-                className={styles.feedItem}
-                disabled={!item.sessionId}
-                onClick={() => item.sessionId && open(item.sessionId)}
+                className={styles.pill}
+                aria-pressed={agentsOnly}
+                aria-label="AI agents only"
+                title="Show only Sessions running an AI coding agent: the Command started one, or the screen showed its prompt or menu"
+                onClick={() => setAgentsOnly((only) => !only)}
               >
-                <span className={styles.feedTime}>{item.time.slice(0, 5)}</span>
-                <span className={styles.feedSquare} style={{ background: item.square }} aria-hidden="true" />
-                <span className={styles.feedText}>
-                  <span className={styles.feedHeadline}>{item.headline}</span>
-                  <span className={styles.feedDetail}>{item.detail}</span>
-                </span>
+                AI agents
               </button>
-            </li>
+            </span>
+          </div>
+          {needs.length === 0 && !loading && <p className={styles.empty}>Nothing needs you{scoped ? ` on ${scoped.name}` : ""}.</p>}
+          {needs.map((session) => (
+            <NeedsRow
+              key={session.id}
+              session={session}
+              machineName={machineName(session.machine)}
+              onOpen={() => open(session.id)}
+              // Under the shell the island asks; elsewhere the dialog does.
+              onInterrupt={() => (shell?.requestInterrupt ? shell.requestInterrupt(session) : setInterrupting(session))}
+            />
           ))}
-        </ol>
-      </GlassPanel>
+        </section>
+
+        {laneMachines.map((machine) => (
+          <MachineLane
+            key={machine.id}
+            machine={machine}
+            sessions={terminals.filter((session) => session.machine === machine.id && onLane(session) && shown(session))}
+            emptyNote={agentsOnly ? "No AI agents." : "No Sessions."}
+            load={load[machine.id]}
+            onOpen={open}
+            onScope={scoped ? undefined : () => scopeTo(machine.id)}
+          />
+        ))}
+
+        {scoped && <MachinePanel machine={scoped} sessions={scopedSessions} />}
+
+        <aside className={styles.section} aria-label="While you were away">
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>While you were away</h2>
+            {since && <span className={styles.muted}>since {since}</span>}
+          </div>
+          {feed.length === 0 && <p className={styles.empty}>Nothing new.</p>}
+          <ol className={styles.feedList}>
+            {feed.map((item) => (
+              <li key={item.id}>
+                <button type="button" className={styles.feedItem} disabled={!item.sessionId} onClick={() => item.sessionId && open(item.sessionId)}>
+                  <span className={styles.feedTime}>{item.time.slice(0, 5)}</span>
+                  <span className={styles.feedSquare} style={{ background: item.square }} aria-hidden="true" />
+                  <span className={styles.feedText}>
+                    <span className={styles.feedHeadline}>{item.headline}</span>
+                    <span className={styles.feedDetail}>{item.detail}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </aside>
+      </div>
 
       <InterruptConfirm
         session={interrupting ?? undefined}
@@ -152,7 +196,7 @@ export function GlassDashboard() {
   );
 }
 
-/** How a lane names a Machine that is not online. */
+/** How the dashboard names a Machine's connection. */
 export const STATUS_WORD: Record<Machine["status"], string> = {
   ONLINE: "Online",
   OFFLINE: "Offline",
@@ -166,8 +210,7 @@ export function onLane(session: Session): boolean {
   return session.state !== "COMPLETED" && session.state !== "INTERRUPTED";
 }
 
-
-function NeedsCard({
+function NeedsRow({
   session,
   machineName,
   onOpen,
@@ -186,186 +229,178 @@ function NeedsCard({
     event.stopPropagation();
     handler();
   };
-  return (
-    // The title is the card's one "open" control; the rest of the card is a
-    // larger mouse target for it (no button nested in a button).
-    <AttentionCard as="article" state={session.state} className={styles.needCard} data-wide={offeredChoices(session).length > 0 || undefined} aria-labelledby={titleId} onClick={onOpen}>
-      <div className={styles.needTop}>
-        <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
-        {session.codingAgent && <AgentBadge agent={session.codingAgent} />}
-        <span className={styles.needWhere}>
-          {machineName}
-          {session.runningFor ? ` · ${session.runningFor}` : ""}
-        </span>
-      </div>
-      <h3 className={styles.needTitle} id={titleId}>
-        <button
-          type="button"
-          className={styles.titleButton}
-          onClick={stop(onOpen)}
-          aria-label={`${session.name}, ${session.state.toLowerCase()} on ${machineName}`}
-        >
-          {session.name}
-        </button>
-      </h3>
+  const answerable = session.state === "WAITING" && canAnswer(session);
+  const choices = answerable && offeredChoices(session).length > 0;
+  const reason = noAnswerReason(session);
+  const where = `${machineName}${session.runningFor ? ` · ${session.runningFor}` : ""}`;
 
-      {session.state === "WAITING" && canAnswer(session) && offeredChoices(session).length > 0 ? (
-        <div className={styles.choiceColumn}>
-          <span className={styles.well}>{session.prompt}</span>
-          <PromptChoices session={session} />
-          <button type="button" className={styles.chip} onClick={stop(onOpen)}>
-            Open terminal
+  return (
+    // The title is the row's one "open" control; the rest of the row is a
+    // larger mouse target for it (no button nested in a button).
+    <article className={styles.needRow} aria-labelledby={titleId} onClick={onOpen}>
+      <StateIcon state={session.state} />
+      <div className={styles.needBody}>
+        <h3 className={styles.needTitle} id={titleId}>
+          <button
+            type="button"
+            className={styles.titleButton}
+            onClick={stop(onOpen)}
+            aria-label={`${session.name}, ${session.state.toLowerCase()} on ${machineName}`}
+          >
+            {session.name}
           </button>
-        </div>
-      ) : session.state === "WAITING" && canAnswer(session) ? (
-        <div className={styles.answerRow}>
-          <span className={styles.well}>{session.prompt}</span>
-          <button type="button" className={styles.yes} onClick={stop(() => void answerPrompt(session.id, "y"))} aria-label={`Answer y to ${session.name}`}>
-            y
-          </button>
-          <button type="button" className={styles.no} onClick={stop(() => void answerPrompt(session.id, "n"))} aria-label={`Answer n to ${session.name}`}>
-            n
-          </button>
-        </div>
-      ) : (
-        <>
-          <p className={styles.needFact}>{session.state === "WAITING" ? (session.prompt ?? "Waiting for input") : fact}</p>
-          <div className={styles.actions}>
-            {session.state === "STALLED" ? (
-              <>
-                <button type="button" className={styles.chip} onClick={stop(onOpen)}>
-                  Open terminal
-                </button>
-                {canInterrupt(session) && (
-                  <button type="button" className={styles.danger} onClick={stop(onInterrupt)}>
-                    Kill…
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <button type="button" className={styles.chip} onClick={stop(onOpen)}>
-                  Open
-                </button>
-                {session.state === "FAILED" && (
-                  <button
-                    type="button"
-                    className={styles.chip}
-                    disabled={removal.busy}
-                    onClick={stop(() => void removal.hide([session.id]))}
-                    aria-label={`Hide ${session.name}`}
-                  >
-                    Hide
-                  </button>
-                )}
-                {session.state === "FAILED" && session.command && (
-                  <button
-                    type="button"
-                    className={styles.chip}
-                    onClick={stop(() =>
-                      navigate(`/app/history?${new URLSearchParams({ q: session.command ?? "", result: "ok" }).toString()}`),
-                    )}
-                  >
-                    Last passing run
-                  </button>
-                )}
-              </>
-            )}
+          {session.codingAgent && <AgentBadge agent={session.codingAgent} />}
+        </h3>
+        {session.state === "WAITING" && session.prompt ? (
+          <p className={styles.needMeta}>
+            <span className={styles.mono}>{session.prompt}</span> · {where}
+          </p>
+        ) : (
+          <p className={styles.needMeta}>
+            {where} · {session.state === "WAITING" ? "Waiting for input" : fact}
+          </p>
+        )}
+        {reason && <p className={styles.needNote}>{reason}</p>}
+        {choices && (
+          <div className={styles.choices} onClick={(event) => event.stopPropagation()}>
+            <PromptChoices session={session} />
           </div>
-          {removal.error && (
-            <p className={styles.needFact} role="alert">
-              {removal.error}
-            </p>
-          )}
-        </>
-      )}
-    </AttentionCard>
+        )}
+        {removal.error && (
+          <p className={styles.needNote} role="alert">
+            {removal.error}
+          </p>
+        )}
+      </div>
+
+      <div className={styles.actions}>
+        {answerable && !choices ? (
+          <>
+            <button type="button" className={styles.yes} onClick={stop(() => void answerPrompt(session.id, "y"))} aria-label={`Answer y to ${session.name}`}>
+              y
+            </button>
+            <button type="button" className={styles.no} onClick={stop(() => void answerPrompt(session.id, "n"))} aria-label={`Answer n to ${session.name}`}>
+              n
+            </button>
+          </>
+        ) : session.state === "STALLED" ? (
+          <>
+            <button type="button" className={styles.pill} onClick={stop(onOpen)}>
+              Open terminal
+            </button>
+            {canInterrupt(session) && (
+              <button type="button" className={styles.danger} onClick={stop(onInterrupt)}>
+                Kill…
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button type="button" className={styles.primary} onClick={stop(onOpen)}>
+              {choices ? "Open terminal" : "Open"}
+            </button>
+            {session.state === "FAILED" && session.command && (
+              <button
+                type="button"
+                className={styles.pill}
+                onClick={stop(() => navigate(`/app/history?${new URLSearchParams({ q: session.command ?? "", result: "ok" }).toString()}`))}
+              >
+                Last passing run
+              </button>
+            )}
+            {session.state === "FAILED" && (
+              <button
+                type="button"
+                className={styles.quietButton}
+                disabled={removal.busy}
+                onClick={stop(() => void removal.hide([session.id]))}
+                aria-label={`Hide ${session.name}`}
+              >
+                Hide
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </article>
   );
 }
 
 function MachineLane({
   machine,
   sessions,
-  sparks,
   load,
   onOpen,
-  onOpenMachine,
+  onScope,
   emptyNote,
 }: {
   machine: Machine;
   sessions: Session[];
-  sparks: SparkHistory;
   load: MachineMetricSample | undefined;
   onOpen: (id: string) => void;
-  onOpenMachine: () => void;
+  onScope?: () => void;
   emptyNote: string;
 }) {
   const online = machine.status === "ONLINE";
-  const bars: Array<[string, number | undefined]> =
+  const meters: Array<[string, number | undefined]> =
     load?.gpuPct !== undefined
       ? [["GPU", load.gpuPct], ["VRAM", load.vramPct]]
       : [["CPU", load?.cpuPct], ["RAM", load?.ramPct]];
   return (
-    <GlassPanel className={styles.lane} data-offline={online ? undefined : true} aria-label={machine.name}>
-      <div className={styles.laneInfo}>
-        <button type="button" className={styles.laneName} onClick={onOpenMachine}>
-          <span className={styles.laneSquare} data-online={online || undefined} aria-hidden="true" />
-          {machine.name}
-        </button>
-        <span className={styles.laneHardware}>{machineSummary(machine)}</span>
-        {online && (
-          <div className={styles.meters}>
-            {bars.map(([label, value]) => (
-              <span key={label} className={styles.meter} title={value === undefined ? `${label} unknown` : `${label} ${Math.round(value)} %`}>
-                <span className={styles.meterLabel}>{label}</span>
-                <span className={styles.meterTrack}>
-                  <span
-                    className={styles.meterFill}
-                    data-high={(value ?? 0) >= 90 || undefined}
-                    style={{ width: `${Math.min(100, Math.max(0, value ?? 0))}%` }}
-                  />
-                </span>
-              </span>
-            ))}
-          </div>
+    <section className={styles.section} data-offline={online ? undefined : true} aria-label={machine.name}>
+      <div className={styles.sectionHead}>
+        {onScope ? (
+          <button type="button" className={styles.laneName} onClick={onScope}>
+            {machine.name}
+          </button>
+        ) : (
+          <h2 className={styles.sectionTitle}>{machine.name}</h2>
         )}
+        <span className={styles.laneMeta}>
+          {online &&
+            meters
+              .filter(([, value]) => value !== undefined)
+              .map(([label, value]) => (
+                <span key={label} data-high={(value ?? 0) >= 90 || undefined} className={styles.meterText}>
+                  {label} {Math.round(value ?? 0)} %
+                </span>
+              ))}
+          <span className={styles.muted}>{machineSummary(machine)}</span>
+        </span>
       </div>
       {/* An unreachable Machine keeps its last snapshot visible (milestone 4.A), dimmed, under one note. */}
-      <div className={styles.cards}>
-        {!online && (
-          <p className={styles.laneNote}>
-            {STATUS_WORD[machine.status]} · {machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "not seen yet"} · sessions
-            resume when it reconnects
-          </p>
-        )}
-        {online && sessions.length === 0 && <p className={styles.laneNote}>{emptyNote}</p>}
-        {sessions.map((session) => (
-          <LaneCard key={session.id} session={session} samples={sparks[session.id]} onOpen={() => onOpen(session.id)} />
-        ))}
-      </div>
-    </GlassPanel>
+      {!online && (
+        <p className={styles.empty}>
+          {STATUS_WORD[machine.status]} · {machine.lastSeen ? `last seen ${machine.lastSeen} ago` : "not seen yet"} · sessions resume when it
+          reconnects
+        </p>
+      )}
+      {online && sessions.length === 0 && <p className={styles.empty}>{emptyNote}</p>}
+      {sessions.map((session) => (
+        <LaneRow key={session.id} session={session} onOpen={() => onOpen(session.id)} />
+      ))}
+    </section>
   );
 }
 
-function LaneCard({ session, samples, onOpen }: { session: Session; samples?: Array<number | null>; onOpen: () => void }) {
-  const training = sessionKind(session) === "training";
+function LaneRow({ session, onOpen }: { session: Session; onOpen: () => void }) {
   const port = extractPort(session);
-  const progress = session.progress && session.progress.total > 0 ? `${Math.round((session.progress.current / session.progress.total) * 100)} %` : null;
-  const corner = progress ?? (port ? `:${port}` : null) ?? session.runningFor ?? (session.cwd ? session.cwd.replace(/^.*\/(?=[^/]+$)/, "~/") : "");
-  const bars = sparkBars(samples);
+  const percent = session.progress && session.progress.total > 0 ? Math.round((session.progress.current / session.progress.total) * 100) : null;
+  const corner = percent !== null ? `${percent} %` : (port ? `:${port}` : null) ?? session.runningFor ?? "";
   return (
-    <button type="button" className={styles.laneCard} data-focus={training || undefined} onClick={onOpen}>
-      <span className={styles.laneCardTop}>
-        <StateTag state={session.state} size="sm" exitUnknown={exitUnknown(session)} />
-        <span className={styles.laneCorner}>{corner}</span>
-      </span>
+    <button type="button" className={styles.laneRow} onClick={onOpen} aria-label={`${session.name}, ${session.state.toLowerCase()}${corner ? `, ${corner}` : ""}`}>
+      <StateIcon state={session.state} size={20} />
       <span className={styles.laneTitle}>{session.name}</span>
       {session.codingAgent && <AgentBadge agent={session.codingAgent} />}
-      <span className={styles.spark} data-state={training ? "FOCUS" : session.state} aria-hidden="true">
-        {bars.map((height, index) => (
-          <span key={index} className={height === null ? styles.dash : styles.bar} style={height === null ? undefined : { height: `${Math.round(height * 100)}%` }} />
-        ))}
-      </span>
+      <span className={styles.laneCommand}>{session.command ?? session.cwd ?? ""}</span>
+      {percent !== null ? (
+        <span className={styles.progress} aria-hidden="true">
+          <span className={styles.progressFill} style={{ width: `${percent}%` }} />
+        </span>
+      ) : (
+        <span />
+      )}
+      <span className={styles.laneCorner}>{corner}</span>
     </button>
   );
 }
@@ -378,23 +413,6 @@ export function useClock(): number {
     return () => clearInterval(timer);
   }, []);
   return now;
-}
-
-/** The last 20 samples of each Session's activity, taken every 3 s. */
-function useSparkHistory(sessions: Session[]): SparkHistory {
-  const [history, setHistory] = useState<SparkHistory>(() => recordSample({}, sessions));
-  // One steady timer reading the newest Sessions: live updates must not reset it.
-  const latest = useRef(sessions);
-  useEffect(() => {
-    latest.current = sessions;
-    // First data: draw a sample now rather than three seconds later.
-    setHistory((previous) => (Object.keys(previous).length === 0 && sessions.length > 0 ? recordSample(previous, sessions) : previous));
-  }, [sessions]);
-  useEffect(() => {
-    const timer = setInterval(() => setHistory((previous) => recordSample(previous, latest.current)), SAMPLE_MS);
-    return () => clearInterval(timer);
-  }, []);
-  return history;
 }
 
 /** Each online Machine's most recent load sample, refreshed every 30 s. */

@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 import { StateTag } from "../../../components/StateTag";
-import { answerPrompt, offeredChoices } from "../../../data/actions";
+import { answerPrompt, noAnswerReason, offeredChoices } from "../../../data/actions";
 import { PromptChoices } from "../../../components/PromptChoices";
 import { captureCapabilities, captureOf } from "../../../data/capture";
 import type { Machine, Session } from "../../../data/types";
@@ -47,6 +47,7 @@ export function NeedsYouCard({ session, machine }: { session: Session; machine?:
           )}
         </div>
       )}
+      {noAnswerReason(session) && <p className={styles.noAnswer}>{noAnswerReason(session)}</p>}
       {session.state === "WAITING" && canAnswer && (
         <div className={styles.choicePad}>
           <PromptChoices session={session} />

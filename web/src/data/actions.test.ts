@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { answerChoice, answerPrompt, canAnswer, canInterrupt } from "./actions";
+import { answerChoice, answerPrompt, canAnswer, canInterrupt, noAnswerReason } from "./actions";
 import { dataAdapter } from "./index";
 import type { Session } from "./types";
 
@@ -21,6 +21,23 @@ describe("answering a prompt", () => {
     expect(canAnswer({ ...waiting, prompt: undefined })).toBe(false);
     expect(canAnswer({ ...waiting, capture: "PROCESS_LOG" })).toBe(false);
     expect(canAnswer({ ...waiting, state: "RUNNING" })).toBe(false);
+  });
+});
+
+describe("noAnswerReason", () => {
+  it("says why a watched-only Session cannot be answered here", () => {
+    expect(noAnswerReason({ ...waiting, capture: "PROCESS_LOG" })).toBe(
+      "Sentinal only watches this one. Answer it in its own terminal.",
+    );
+  });
+
+  it("is null when the card can answer, or nothing is waiting", () => {
+    expect(noAnswerReason(waiting)).toBeNull();
+    expect(noAnswerReason({ ...waiting, state: "RUNNING" })).toBeNull();
+  });
+
+  it("points free-text prompts to the terminal", () => {
+    expect(noAnswerReason({ ...waiting, prompt: "Password:" })).toBe("Answer it in the terminal.");
   });
 });
 

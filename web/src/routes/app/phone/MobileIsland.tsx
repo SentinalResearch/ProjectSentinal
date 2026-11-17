@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { DevBadge } from "../../../components/DevBadge";
 import { SentinalMark } from "../../../components/SentinalMark";
+import { ThemeSwitch } from "../../../components/ThemeSwitch";
 import { useLiveData } from "../../../data/LiveDataContext";
 import { islandLocation } from "../shell/location";
 import { PlacesMenu } from "../shell/PlacesMenu";
@@ -46,7 +47,7 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
   const name = pathname.startsWith("/app/split") ? "Terminals" : where.kind === "page" ? where.name : where.title;
   return (
     <nav className={styles.island} aria-label="Sentinal" data-docked={docked || undefined}>
-      <Link to="/app/overview" className={styles.logo} aria-label="Dashboard">
+      <Link to="/app/overview" className={styles.logo} aria-label="Overview">
         <SentinalMark size={18} />
       </Link>
       <DevBadge />
@@ -65,6 +66,7 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
           {needs}
         </Link>
       )}
+      <ThemeSwitch />
     </nav>
   );
 }

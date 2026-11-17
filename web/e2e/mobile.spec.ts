@@ -14,7 +14,7 @@ async function signIn(page: Page) {
   await shot(page, "b1-sign-in");
   await field.fill(password);
   await page.getByRole("button", { name: /Sign in/ }).click();
-  await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Overview" })).toBeVisible();
 }
 
 /** Nothing scrolls sideways except the deliberate chip rows and key bar, which scroll inside themselves. */
@@ -66,7 +66,7 @@ test.describe("phone 390×844", () => {
     // No tab bar or menu: a glass island on top and a prompt pill at the bottom.
     const island = page.getByRole("navigation", { name: "Sentinal" });
     await expect(page.getByRole("navigation", { name: "Tabs" })).toHaveCount(0);
-    await expect(island.getByRole("link", { name: "Dashboard" })).toBeVisible();
+    await expect(island.getByRole("link", { name: "Overview" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open the prompt" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await shot(page, "m1-dashboard");
@@ -103,7 +103,7 @@ test.describe("phone 390×844", () => {
     // A swipe from the left edge goes back, like the island's ‹.
     const sessionUrl = page.url();
     await swipeFromLeftEdge(page);
-    await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Dashboard" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Overview" })).toBeVisible();
     await page.goto(sessionUrl);
     await expect(page.getByRole("list", { name: "Metrics" })).toBeVisible();
 
@@ -147,7 +147,7 @@ test.describe("phone 390×844", () => {
     await expect(page.getByText(/Session missing/)).toBeVisible();
     await shot(page, "b3-missing");
     await page.getByRole("button", { name: "Back to Overview" }).click();
-    await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Dashboard" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Sentinal" }).getByRole("link", { name: "Overview" })).toBeVisible();
   });
 
   test("Terminals, History filters, Recipes, Settings, and theme", async ({ page }) => {

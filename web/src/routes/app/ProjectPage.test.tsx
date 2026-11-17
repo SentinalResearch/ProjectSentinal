@@ -33,7 +33,7 @@ describe("ProjectPage", () => {
     expect(await screen.findByRole("heading", { name: "TIM" })).toBeInTheDocument();
     // "Qwen Training" appears both as a session row and next to its events in the journal.
     expect((await screen.findAllByText("Qwen Training")).length).toBeGreaterThanOrEqual(2);
-    expect((await screen.findAllByText("PROGRESS")).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText("Progress")).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows a not-found state for an unknown project slug", async () => {

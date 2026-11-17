@@ -59,6 +59,19 @@ export function canAnswer(session: Session): boolean {
   return offeredChoices(session).length > 0 || YES_NO.test(session.prompt);
 }
 
+/**
+ * Why a WAITING Session cannot be answered from a card, in one line, or null
+ * when it can (or is not waiting). Without it the card looks broken.
+ */
+export function noAnswerReason(session: Session): string | null {
+  if (session.state !== "WAITING" || canAnswer(session)) return null;
+  if (!captureCapabilities(captureOf(session)).canSendInput) {
+    return "Sentinal only watches this one. Answer it in its own terminal.";
+  }
+  if (arrowMenu(session)) return "This menu needs the arrow keys. Answer it in the terminal.";
+  return "Answer it in the terminal.";
+}
+
 /** A live Session that accepts Ctrl-C (the daemon still enforces it). */
 export function canInterrupt(session: Session): boolean {
   return INTERRUPTIBLE.has(session.state) && captureCapabilities(captureOf(session)).canSendInput;

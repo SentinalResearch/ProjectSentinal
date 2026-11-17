@@ -67,7 +67,7 @@
   --glow-accent: rgba(61,90,254,.16);
 }
 [data-theme="light"] {
-  --bg-app: #F2F1EC; --bg-deep: #E9E8E2;
+  --bg-app: #E8E8E6; --bg-deep: #DEDEDC; /* Option A: quiet light grey */
   --destructive-fg: #C4210F;
   --glass-bg: rgba(255,255,255,.62);
   --glass-bg-strong: rgba(255,255,255,.72);

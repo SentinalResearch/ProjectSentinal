@@ -291,7 +291,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-2);
 }
 
@@ -611,6 +611,6 @@
 }
 
 .rowError {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--s-failed-fg);
 }

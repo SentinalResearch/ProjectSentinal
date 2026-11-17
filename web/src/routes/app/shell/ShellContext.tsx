@@ -1,9 +1,13 @@
 import { createContext, useContext } from "react";
 
+import type { Session } from "../../../data/types";
+
 /** What any page under the glass shell can ask of it. */
 export interface ShellValue {
   /** Open the prompt, optionally prefilled (e.g. "go "). */
   openPrompt(prefill?: string): void;
+  /** Ask, in the island, before sending Ctrl-C to a Session. */
+  requestInterrupt?(session: Session): void;
 }
 
 export const ShellContext = createContext<ShellValue | null>(null);

@@ -1,14 +1,19 @@
 .toggle {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12.5px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
+  row-gap: 4px;
+  font-size: 13px;
+  line-height: 18px;
   color: var(--text-2);
   cursor: pointer;
 }
 
 .toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
   accent-color: var(--accent-fg);
 }
 
@@ -17,5 +22,6 @@
 }
 
 .error {
+  grid-column: 2;
   color: var(--s-failed-fg);
 }

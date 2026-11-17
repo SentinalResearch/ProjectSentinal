@@ -173,6 +173,35 @@ export function agentUsageText(view: CodingAgentView): string {
   return parts.join(" · ");
 }
 
+const EVENT_LABELS: Record<string, string> = {
+  COMMAND_STARTED: "Command started",
+  COMMAND_FINISHED: "Command finished",
+  PROCESS_STARTED: "Process started",
+  PROCESS_EXITED: "Process exited",
+  PROGRESS: "Progress",
+  PROGRESS_UPDATED: "Progress",
+  WARNING: "Warning",
+  WARNING_DETECTED: "Warning",
+  ERROR: "Error",
+  ERROR_DETECTED: "Error",
+  RESOURCE_HIGH: "Resource high",
+  WAITING_FOR_INPUT: "Waiting for input",
+  POSSIBLY_STALLED: "Possibly stalled",
+  CHECKPOINT_CREATED: "Checkpoint saved",
+  SERVER_STARTED: "Server started",
+  AGENT_ACTIVITY: "Agent activity",
+  AGENT_TURN_FINISHED: "Agent turn finished",
+  METRIC_REPORTED: "Metric",
+};
+
+/** An Event kind in words: `CHECKPOINT_CREATED` → "Checkpoint saved"; unknown kinds in sentence case. */
+export function eventKindLabel(kind: string): string {
+  const known = EVENT_LABELS[kind];
+  if (known) return known;
+  const words = kind.toLowerCase().replace(/_/g, " ").trim();
+  return words.length === 0 ? "Event" : words[0].toUpperCase() + words.slice(1);
+}
+
 /** See SentinalSession.dc.html's `evColor` map — routine events fall back to the neutral pair. */
 export function eventColor(kind: string): EventColor {
   return EVENT_COLORS[kind] ?? DEFAULT_EVENT_COLOR;

@@ -11,6 +11,7 @@ const style = {
   fontSize: "11px",
   letterSpacing: "0.04em",
   flex: "none",
+  alignSelf: "flex-start",
 } as const;
 
 /** Marks a feature backed by the mock adapter rather than a real API. Dev builds only. */

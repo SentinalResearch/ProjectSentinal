@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Machine, Session } from "../../../data/types";
 import { islandLocation } from "./location";
-import { needCount, tickerItems } from "./ticker";
+import { islandFocus, needCount, tickerItems } from "./ticker";
 
 function session(id: string, state: Session["state"], extra: Partial<Session> = {}): Session {
   return { id, machine: "rtx", name: id, state, ...extra };
@@ -47,7 +47,7 @@ describe("island location", () => {
   const sessions = [session("rtx:7", "RUNNING", { name: "Qwen Training", project: "TIM" })];
 
   it("names pages", () => {
-    expect(islandLocation("/app/overview", "", machines, sessions)).toEqual({ kind: "page", name: "Dashboard" });
+    expect(islandLocation("/app/overview", "", machines, sessions)).toEqual({ kind: "page", name: "Overview" });
     expect(islandLocation("/app/settings/machines", "", machines, sessions)).toEqual({ kind: "page", name: "Settings" });
     expect(islandLocation("/app/overview", "?machine=rtx", machines, sessions)).toEqual({ kind: "page", name: "RTX-PC" });
     expect(islandLocation("/app/projects/tim", "", machines, sessions)).toEqual({ kind: "page", name: "#TIM" });
@@ -60,5 +60,33 @@ describe("island location", () => {
       machine: "RTX-PC",
       title: "Qwen Training",
     });
+  });
+});
+
+describe("island focus", () => {
+  it("puts a yes/no question you can answer first", () => {
+    const focus = islandFocus([
+      session("pytest", "FAILED"),
+      session("npm", "WAITING", { prompt: "Continue? [y/N]" }),
+    ]);
+    expect(focus).toEqual({ kind: "answer", session: expect.objectContaining({ id: "npm" }) });
+  });
+
+  it("falls back to the ticker when the question was set aside or cannot be answered here", () => {
+    const sessions = [session("npm", "WAITING", { prompt: "Continue? [y/N]" }), session("log", "WAITING", { prompt: "Password:" })];
+    expect(islandFocus(sessions, new Set(["npm"]))).toEqual({ kind: "ticker" });
+  });
+
+  it("shows the running job closest to done when nothing needs you", () => {
+    const focus = islandFocus([
+      session("a", "RUNNING", { progress: { current: 20, total: 100, unit: "epoch" } }),
+      session("b", "RUNNING", { progress: { current: 7, total: 8, unit: "epoch" } }),
+      session("shell", "IDLE"),
+    ]);
+    expect(focus).toEqual({ kind: "progress", session: expect.objectContaining({ id: "b" }), percent: 88 });
+  });
+
+  it("is idle when nothing runs or needs you", () => {
+    expect(islandFocus([session("shell", "IDLE")])).toEqual({ kind: "idle" });
   });
 });

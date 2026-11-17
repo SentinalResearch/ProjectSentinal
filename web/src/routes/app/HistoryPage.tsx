@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { CaptureBadge } from "../../components/CaptureBadge";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
+import { isDefaultCapture } from "../../data/capture";
 import { slugifyProject } from "../../data/format";
 import { useLiveData } from "../../data/LiveDataContext";
 import { useIsPhone } from "../../hooks/useViewport";
@@ -181,10 +182,21 @@ function DesktopHistory() {
                   <StateTag state={state} size="sm" variant="line" iconOnly />
                 </span>
                 <span className={styles.commandCell}>
-                  <span className={`${styles.command} mono`} title={entry.command}>
-                    {entry.command}
-                  </span>
-                  {session && <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />}
+                  {clickable ? (
+                    <Link
+                      to={`/app/sessions/${entry.sessionId}`}
+                      className={`${styles.command} ${styles.commandLink} mono`}
+                      title={entry.command}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {entry.command}
+                    </Link>
+                  ) : (
+                    <span className={`${styles.command} mono`} title={entry.command}>
+                      {entry.command}
+                    </span>
+                  )}
+                  {session && !isDefaultCapture(session) && <CaptureBadge capture={session.capture ?? "FULL"} origin={session.origin} />}
                   {entry.ok === true && entry.machine && (
                     <button
                       type="button"
