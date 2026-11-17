@@ -28,14 +28,19 @@
 
 /* ── Left: the number and the devices ───────────────────── */
 
+/* The number sits under the date; the device line closes the column, which
+   never grows taller than a comfortable screen (tall windows kept a gap). */
 .side {
   position: sticky;
   top: var(--shell-top);
-  min-height: calc(100vh - var(--shell-top) - 56px);
+  min-height: min(calc(100vh - var(--shell-top) - 56px), 760px);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: 40px;
+}
+
+.devices {
+  margin-top: auto;
 }
 
 .dateRow {

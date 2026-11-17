@@ -39,7 +39,7 @@
   white-space: nowrap;
   /* Clicking the island itself opens search. */
   cursor: text;
-  transition: padding 200ms var(--ease-out);
+  transition: padding 200ms var(--ease-out), left 250ms var(--ease-out);
 }
 
 .island :where(button) {
@@ -317,5 +317,105 @@
   .confirm,
   .progress {
     animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .island {
+    transition: none;
+  }
+}
+
+/* ── Back: where you came from, in the island ───────────── */
+
+.back {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.backPill {
+  height: 30px;
+  max-width: 160px;
+  padding: 0 12px 0 10px;
+  border-radius: 15px;
+  background: var(--chip);
+  color: var(--text-2);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backPill:hover {
+  background: var(--chip-hover);
+  color: var(--text-1);
+}
+
+/* Earlier pages drop down on hover or keyboard focus; still reachable by Tab. */
+.backMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 200px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--bg-1);
+  box-shadow: 0 0 0 1px var(--glass-edge), 0 18px 40px -16px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 140ms, transform 140ms var(--ease-out);
+}
+
+.back:hover .backMenu,
+.back:focus-within .backMenu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+/* A bridge so moving from the pill to the menu does not close it. */
+.backMenu::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+}
+
+.backItem {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 9px;
+  color: var(--text-1);
+  font-size: 13px;
+  text-align: left;
+}
+
+.backItem:hover {
+  background: var(--chip);
+}
+
+.backDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 4px;
+  background: var(--text-3);
+}
+.backDot[data-state="RUNNING"] { background: var(--s-running-fg); }
+.backDot[data-state="WAITING"] { background: var(--s-waiting-fg); }
+.backDot[data-state="STALLED"] { background: var(--s-stalled-fg); }
+.backDot[data-state="FAILED"] { background: var(--s-failed-fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .backMenu {
+    transition: none;
   }
 }

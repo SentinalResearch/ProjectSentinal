@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, type CSSProperties } from "react";
+import { memo, useEffect, useState } from "react";
 import { useLocation, useNavigate, useNavigationType, useRoutes } from "react-router-dom";
 
 import { useLiveData } from "../../../data/LiveDataContext";
@@ -7,31 +7,31 @@ import { typingInto } from "./typing";
 import { islandLocation } from "./location";
 import { nextStack, type PageFrame, type SheetStack } from "./sheetStack";
 import styles from "./SheetStage.module.css";
+import type { Session } from "../../../data/types";
 
 let frames = 0;
 const newKey = () => `frame-${(frames += 1)}`;
-
-/** Visible width of the newest sheet's sliver, and of each older one (§6). */
-const FIRST_SLIVER = 72;
-const NEXT_SLIVER = 40;
-const OVERLAP = 18;
-const OPACITY = [0.85, 0.55, 0.3];
-
-function reserved(count: number): number {
-  return count === 0 ? 0 : FIRST_SLIVER + NEXT_SLIVER * (count - 1);
-}
 
 function href(frame: PageFrame): string {
   return `${frame.pathname}${frame.search}`;
 }
 
+/** A page you left, as the island's back pill and history list show it. */
+export interface BackEntry {
+  key: string;
+  href: string;
+  label: string;
+  /** The Session's state when the page is a Session. */
+  state?: Session["state"];
+}
+
 /**
- * The routed pages under the glass shell, with back history as sheets on the
- * right edge (GLASS_SPEC.md §6). A page you leave stays mounted — hidden and
- * inert — so restoring it keeps its scroll position and terminal attachment.
- * Click a sheet or press ⌘[ to bring it forward.
+ * The routed pages under the glass shell. A page you leave stays mounted —
+ * hidden and inert — so going back keeps its scroll position and terminal
+ * attachment. Back history takes no page space: the island shows it
+ * (`onBackChange`); ⌘[ goes back.
  */
-export function SheetStage() {
+export function SheetStage({ onBackChange }: { onBackChange?: (entries: BackEntry[]) => void }) {
   const location = useLocation();
   const action = useNavigationType();
   const navigate = useNavigate();
@@ -64,48 +64,32 @@ export function SheetStage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [stack.sheets, navigate]);
 
-  const count = stack.sheets.length;
-  const right = reserved(count);
+  // Tell the island what you can go back to, newest first.
+  const entries: BackEntry[] = stack.sheets.map((sheet) => {
+    const where = islandLocation(sheet.pathname, sheet.search, machines, sessions);
+    return {
+      key: sheet.key,
+      href: href(sheet),
+      label: where.kind === "session" ? where.title : where.name,
+      state: where.kind === "session" ? sessions.find((entry) => entry.id === where.sessionId)?.state : undefined,
+    };
+  });
+  const signature = JSON.stringify(entries);
+  useEffect(() => {
+    onBackChange?.(entries);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature, onBackChange]);
+
   // Stable DOM order (creation order) so frames move between roles without remounting.
   const all = [stack.current, ...stack.sheets].sort(
     (left, right) => Number(left.key.split("-")[1]) - Number(right.key.split("-")[1]),
   );
 
   return (
-    <div className={styles.stage} style={{ "--sheets-width": `${right}px` } as CSSProperties}>
-      {all.map((frame) => {
-        const current = frame.key === stack.current.key;
-        return (
-          <Frame key={frame.key} frame={frame} current={current} raised={current && count > 0} />
-        );
-      })}
-      {stack.sheets.map((sheet, depth) => {
-        const where = islandLocation(sheet.pathname, sheet.search, machines, sessions);
-        const label = where.kind === "session" ? where.title : where.name;
-        const start = depth === 0 ? 0 : FIRST_SLIVER + NEXT_SLIVER * (depth - 1);
-        const width = depth === 0 ? FIRST_SLIVER : NEXT_SLIVER;
-        return (
-          <button
-            key={sheet.key}
-            type="button"
-            className={styles.sliver}
-            style={{
-              right: `${right - start - width}px`,
-              width: `${width + OVERLAP}px`,
-              opacity: OPACITY[depth] ?? 0.3,
-              zIndex: 9 - depth,
-            }}
-            onClick={() => navigate(href(sheet))}
-            aria-label={`Back to ${label}`}
-            aria-keyshortcuts={depth === 0 ? "Meta+BracketLeft" : undefined}
-            title={depth === 0 ? `${label} (⌘[)` : label}
-          >
-            <span className={styles.label} aria-hidden="true">
-              {label}
-            </span>
-          </button>
-        );
-      })}
+    <div className={styles.stage}>
+      {all.map((frame) => (
+        <Frame key={frame.key} frame={frame} current={frame.key === stack.current.key} />
+      ))}
     </div>
   );
 }
@@ -114,7 +98,7 @@ export function SheetStage() {
  * One page rendered for its own location; hidden and inert while it is a sheet.
  * Memoised: live-data changes re-render the stage, never every mounted page.
  */
-const Frame = memo(function Frame({ frame, current, raised }: { frame: PageFrame; current: boolean; raised: boolean }) {
+const Frame = memo(function Frame({ frame, current }: { frame: PageFrame; current: boolean }) {
   const page = useRoutes(APP_PAGES, {
     pathname: frame.pathname,
     search: frame.search,
@@ -126,7 +110,6 @@ const Frame = memo(function Frame({ frame, current, raised }: { frame: PageFrame
     <div
       className={styles.frame}
       data-current={current || undefined}
-      data-raised={raised || undefined}
       inert={current ? undefined : true}
       aria-hidden={current ? undefined : true}
     >

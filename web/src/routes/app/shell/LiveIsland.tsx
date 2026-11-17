@@ -10,6 +10,7 @@ import { useLiveData } from "../../../data/LiveDataContext";
 import type { Session } from "../../../data/types";
 import { islandLocation } from "./location";
 import { PlacesMenu } from "./PlacesMenu";
+import type { BackEntry } from "./SheetStage";
 import { islandFocus, needCount, tickerItems } from "./ticker";
 import styles from "./LiveIsland.module.css";
 
@@ -24,11 +25,14 @@ export function LiveIsland({
   onOpenPrompt,
   interrupting = null,
   onCloseInterrupt,
+  back = [],
 }: {
   onOpenPrompt: (prefill?: string) => void;
   /** A Kill… waiting for confirmation: the island asks before sending Ctrl-C. */
   interrupting?: Session | null;
   onCloseInterrupt?: () => void;
+  /** Pages you can go back to, newest first. */
+  back?: BackEntry[];
 }) {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
@@ -40,6 +44,7 @@ export function LiveIsland({
   const [setAside, setSetAside] = useState<ReadonlySet<string>>(() => new Set());
   const focus = islandFocus(terminals, setAside);
   const machineName = (id: string) => machines.find((machine) => machine.id === id)?.name ?? id;
+  const anchorX = useIslandAnchor(pathname);
 
   // Measure the full ticker off-screen; collapse when it would not fit.
   const measure = useRef<HTMLSpanElement>(null);
@@ -79,6 +84,7 @@ export function LiveIsland({
   return (
     <nav
       className={styles.island}
+      style={anchorX === null ? undefined : { left: `${anchorX}px` }}
       aria-label="Sentinal"
       title="Click or press / to search"
       onClick={(event) => {
@@ -90,6 +96,7 @@ export function LiveIsland({
         <SentinalMark size={18} />
       </button>
       <DevBadge />
+      {back.length > 0 && <BackPill back={back} onGo={(entry) => navigate(entry.href)} />}
       <PlacesMenu
         triggerClass={styles.location}
         onSearch={() => onOpenPrompt()}
@@ -233,6 +240,71 @@ function IslandConfirm({ session, machineName, onClose }: { session: Session; ma
       >
         Send Ctrl-C
       </button>
+    </span>
+  );
+}
+
+/**
+ * Where the island centres itself: over the current page's `data-island-anchor`
+ * element when it has one (the Session page's details side, so the island
+ * never sits on the terminal), else the window's centre (null).
+ */
+function useIslandAnchor(pathname: string): number | null {
+  const [x, setX] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    let anchor: Element | null = null;
+    const measure = () => {
+      anchor = document.querySelector("[data-current] [data-island-anchor]");
+      if (!anchor) {
+        setX(null);
+        return;
+      }
+      const box = anchor.getBoundingClientRect();
+      setX(box.width > 0 ? Math.round(box.left + box.width / 2) : null);
+    };
+    measure();
+    // The page may render its anchor a moment later; and it moves on resize.
+    const frame = requestAnimationFrame(measure);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    if (anchor && observer) observer.observe(anchor);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [pathname]);
+  return x;
+}
+
+/**
+ * Going back, in the island instead of on the page's edge: "‹ Recipes" goes
+ * back one (⌘[ too); hover or focus shows the earlier pages.
+ */
+function BackPill({ back, onGo }: { back: BackEntry[]; onGo: (entry: BackEntry) => void }) {
+  const [newest, ...earlier] = back;
+  return (
+    <span className={styles.back}>
+      <button
+        type="button"
+        className={styles.backPill}
+        onClick={() => onGo(newest)}
+        aria-label={`Back to ${newest.label}`}
+        aria-keyshortcuts="Meta+BracketLeft"
+        title={`Back to ${newest.label} (⌘[)`}
+      >
+        {`‹ ${newest.label}`}
+      </button>
+      {earlier.length > 0 && (
+        <span className={styles.backMenu} role="group" aria-label="Earlier pages">
+          {earlier.slice(0, 4).map((entry) => (
+            <button key={entry.key} type="button" className={styles.backItem} onClick={() => onGo(entry)} aria-label={`Back to ${entry.label}`}>
+              {entry.state ? <span className={styles.backDot} data-state={entry.state} aria-hidden="true" /> : <span className={styles.backDot} aria-hidden="true" />}
+              {entry.label}
+            </button>
+          ))}
+        </span>
+      )}
     </span>
   );
 }

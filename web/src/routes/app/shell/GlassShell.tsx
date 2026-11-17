@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LiveIsland } from "./LiveIsland";
 import { PromptBar } from "./PromptBar";
-import { SheetStage } from "./SheetStage";
+import { SheetStage, type BackEntry } from "./SheetStage";
 import { typingInto } from "./typing";
 import { usePromptActions } from "./usePromptActions";
 import type { PromptSuggestion } from "./promptGrammar";
@@ -22,6 +22,8 @@ export function GlassShell() {
   const [prompt, setPrompt] = useState<{ text: string } | null>(null);
   // A Kill… waiting for its confirmation in the island.
   const [interrupting, setInterrupting] = useState<Session | null>(null);
+  // Pages you can go back to, newest first (shown in the island).
+  const [back, setBack] = useState<BackEntry[]>([]);
   const returnFocus = useRef<HTMLElement | null>(null);
 
   const openPrompt = useCallback((prefill = "") => {
@@ -58,9 +60,9 @@ export function GlassShell() {
     <ShellContext.Provider value={value}>
       <div className={styles.shell}>
         <div className={styles.glow} aria-hidden="true" />
-        <LiveIsland onOpenPrompt={openPrompt} interrupting={interrupting} onCloseInterrupt={() => setInterrupting(null)} />
+        <LiveIsland onOpenPrompt={openPrompt} interrupting={interrupting} onCloseInterrupt={() => setInterrupting(null)} back={back} />
         <main className={styles.main} id="main" inert={prompt ? true : undefined}>
-          <SheetStage />
+          <SheetStage onBackChange={setBack} />
         </main>
         {prompt && <PromptBar initialText={prompt.text} onClose={closePrompt} onChoose={choose} />}
         {dialogs}

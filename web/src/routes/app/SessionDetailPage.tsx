@@ -197,7 +197,7 @@ function DesktopSessionDetail() {
         )}
       </section>
 
-      <section className={styles.details} aria-label="Session details">
+      <section className={styles.details} aria-label="Session details" data-island-anchor>
         <nav className={styles.breadcrumb} aria-label="Breadcrumb">
           <button
             type="button"
