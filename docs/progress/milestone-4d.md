@@ -690,9 +690,9 @@ Approval of this proposal specifically approves:
 
 | Role | Known Machine / address | OS/browser | Tailscale | Candidate release | Machine ID | Result |
 |---|---|---|---|---|---|---|
-| Control | Mac mini / `100.93.101.56` | macOS 27.0.1 / browser to record | 1.102.4 | pre-candidate `0.0.1` | `01M3YT9V…` | control health OK; two Web Push deliveries accepted; candidate rebuild pending |
-| Worker | MacBook / `100.66.29.67` | macOS / to record | online; version to record | registry reports `0.0.1` | `01M40Q6X…` | direct health OK; real worker Event/push pending |
-| Worker | Linux / `100.74.239.89` | Pop!_OS / browser N/A | offline on 2026-10-07; version to record | registry reports `0.0.1` | `01M40Q7C…` | direct health timed out; acceptance pending |
+| Control | Mac mini / `100.64.1.11` | macOS 27.0.1 / browser to record | 1.102.4 | pre-candidate `0.0.1` | `01M3YT9V…` | control health OK; two Web Push deliveries accepted; candidate rebuild pending |
+| Worker | MacBook / `100.64.1.12` | macOS / to record | online; version to record | registry reports `0.0.1` | `01M40Q6X…` | direct health OK; real worker Event/push pending |
+| Worker | Linux / `100.64.1.10` | Pop!_OS / browser N/A | offline on 2026-10-07; version to record | registry reports `0.0.1` | `01M40Q7C…` | direct health timed out; acceptance pending |
 | Phone PWA | owner phone | OS/Safari to record | to record | production PWA | subscription ID redacted | one real notification received by owner; click/routing and restart evidence pending |
 | Second device | unavailable unless supplied | to record | to record | pending | redacted | unavailable/pending |
 

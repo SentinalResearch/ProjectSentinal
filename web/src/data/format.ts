@@ -141,7 +141,9 @@ export function sessionDisplayName(session: {
     return folder ? `${agent} · ${folder}` : agent;
   }
   return `Session ${session.id}`;
-}const AGENT_ACTION_WORDS: Record<AgentAction, string> = {
+}
+
+const AGENT_ACTION_WORDS: Record<AgentAction, string> = {
   RAN_COMMAND: "ran",
   RAN_TESTS: "ran tests",
   EDITED_FILE: "edited",

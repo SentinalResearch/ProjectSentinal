@@ -145,7 +145,7 @@ fn worker_reports_a_session(control: &ControlService) {
                     capabilities: vec![MachineCapability::Sessions],
                 },
                 endpoint: LinkEndpoint {
-                    address: "100.74.239.89".into(),
+                    address: "100.64.1.10".into(),
                     port: 7420,
                     dns_name: None,
                 },

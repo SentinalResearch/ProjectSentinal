@@ -27,7 +27,7 @@ class FakeResponse:
 
 class RunModelTest(unittest.TestCase):
     def test_normalizes_bare_and_versioned_base_urls(self):
-        self.assertEqual(run_model.normalize_base_url("100.74.239.89:8343/"), "http://100.74.239.89:8343/v1")
+        self.assertEqual(run_model.normalize_base_url("100.64.1.10:8343/"), "http://100.64.1.10:8343/v1")
         self.assertEqual(run_model.normalize_base_url("https://models.example/v1/"), "https://models.example/v1")
 
     def test_converts_eval_functions_to_openai_tools(self):

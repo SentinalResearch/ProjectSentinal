@@ -283,7 +283,7 @@ async fn projection_route_accepts_the_advertised_body_limit() {
                     capabilities: vec![],
                 },
                 endpoint: LinkEndpoint {
-                    address: "100.74.239.89".into(),
+                    address: "100.64.1.10".into(),
                     port: 7420,
                     dns_name: None,
                 },

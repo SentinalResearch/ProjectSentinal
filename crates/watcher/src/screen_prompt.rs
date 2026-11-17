@@ -119,6 +119,7 @@ pub(crate) fn find_question(rows: &[String]) -> Option<ScreenQuestion> {
 
 /// A marked list of 2–8 short rows under a question, where one row carries a
 /// selection marker (`❯ Yes` / `  No`) and a key hint says how to choose.
+/// At most [`MAX_PROMPT_OPTIONS`] of the rows are offered as answers.
 /// Plain text is never a menu: a marker and a hint are both required.
 fn marked_menu(lines: &[String], last: usize) -> Option<ScreenQuestion> {
     // Skip trailing hint/empty lines to find the actual menu rows.
@@ -174,8 +175,11 @@ fn marked_menu(lines: &[String], last: usize) -> Option<ScreenQuestion> {
     }
     let first = candidates.first()?.0;
     let question = question_above(lines, first, true)?;
+    // The protocol carries at most MAX_PROMPT_OPTIONS answers. Like a numbered
+    // menu, offer the first ones; the rest are still answered in the terminal.
     let options = candidates
         .iter()
+        .take(MAX_PROMPT_OPTIONS)
         .enumerate()
         .map(|(position, (_, label, _))| PromptOption::new(label, &(position + 1).to_string()))
         .collect::<Option<Vec<_>>>()?;

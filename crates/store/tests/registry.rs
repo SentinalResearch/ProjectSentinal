@@ -36,7 +36,7 @@ fn machine(id: &str, name: &str) -> RegistryRow {
         daemon_version: Some("0.0.1".into()),
         capabilities: vec![MachineCapability::Sessions],
         endpoint: Some(LinkEndpoint {
-            address: "100.74.239.89".into(),
+            address: "100.64.1.10".into(),
             port: 7420,
             dns_name: None,
         }),

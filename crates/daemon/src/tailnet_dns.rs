@@ -163,7 +163,7 @@ mod tests {
 
     fn status() -> serde_json::Value {
         json!({
-            "Self": {"DNSName": "worker.tailnet.ts.net.", "TailscaleIPs": ["100.88.176.80"]},
+            "Self": {"DNSName": "worker.tailnet.ts.net.", "TailscaleIPs": ["100.64.1.13"]},
             "Peer": {
                 "nodekey:a": {"DNSName": "Control-One.tailnet.ts.net.", "TailscaleIPs": ["fd7a:115c:a1e0::5", "100.124.0.101"]},
                 "nodekey:b": {"DNSName": "lan.tailnet.ts.net.", "TailscaleIPs": ["192.168.1.5"]}
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(control.len(), 2);
         assert_eq!(
             peer_addresses(&status, "worker.tailnet.ts.net.")[0].to_string(),
-            "100.88.176.80"
+            "100.64.1.13"
         );
         assert!(
             peer_addresses(&status, "lan.tailnet.ts.net").is_empty(),

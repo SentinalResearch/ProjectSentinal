@@ -97,7 +97,7 @@ Supported targets and honest refusals:
 
 ```text
 $ sentinal setup
-Sentinal 0.1.18 (abc1234) · Linux x86_64 · Tailscale: sentinal-pilot.tail….ts.net (100.88.176.80)
+Sentinal 0.1.18 (abc1234) · Linux x86_64 · Tailscale: sentinal-pilot.tail….ts.net (100.64.1.13)
 
 What is this Machine?
   1) Create my Sentinal control      (this Machine serves the dashboard and packages)
@@ -223,19 +223,19 @@ peer cannot claim an approval.
 // worker → control   POST /api/v1/pairing/requests            (unauthenticated, via Serve)
 {"machine":{"machine_id":"01M40Q6XMY22VM973434SCPS90","display_name":"Sohith's MacBook","os":"MACOS",
             "daemon_version":"0.1.18","capabilities":["SESSIONS","EVENTS","METRICS","ADOPT"]},
- "endpoint":{"address":"100.66.29.67","port":7420,"dns_name":"sohiths-macbook-pro.tail….ts.net"},
+ "endpoint":{"address":"100.64.1.12","port":7420,"dns_name":"sohiths-macbook-pro.tail….ts.net"},
  "request_secret_sha256":"<64 hex>","worker_nonce":"<32 hex>"}
 → 201 {"request_id":"pr_01K2A7…","control_machine_id":"01K2CTRL…","control_nonce":"<32 hex>",
        "expires_at":1791900600000,"poll_after_ms":2000}
 → 409 {"code":"MACHINE_ALREADY_LINKED"}  → 429 {"code":"PAIRING_BUSY"}  → 404 {"code":"NOT_CONTROL"}
 
-// control → worker   GET http://100.66.29.67:7420/api/v1/pairing/proof/pr_01K2A7…
+// control → worker   GET http://100.64.1.12:7420/api/v1/pairing/proof/pr_01K2A7…
 {"request_id":"pr_01K2A7…","request_secret_sha256":"<same 64 hex>","control_machine_id":"01K2CTRL…"}
 
 // owner → control    GET /api/v1/pairing/requests            (owner Session, Origin checked)
 {"requests":[{"request_id":"pr_01K2A7…","state":"PENDING","expires_at":1791900600000,
   "claimed":{"display_name":"Sohith's MacBook","machine_id":"01M40Q6X…","os":"MACOS","daemon_version":"0.1.18"},
-  "tailscale":{"node":"sohiths-macbook-pro","login":"sohithvishnu@","os":"macOS","address":"100.66.29.67"},
+  "tailscale":{"node":"sohiths-macbook-pro","login":"sohithvishnu@","os":"macOS","address":"100.64.1.12"},
   "existing_machine":null,
   "verification_words":["amber","otter","cedar","lumen"]}]}
 // existing_machine is present when the claimed ID is in the registry as REVOKED/DISCONNECTED:

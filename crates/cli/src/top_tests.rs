@@ -29,7 +29,7 @@ fn snapshot(sessions: Vec<Session>) -> TopSnapshot {
             kernel_version: None,
             daemon_version: "0.1.12".into(),
             started_at: Timestamp(NOW - 3 * 3_600_000 - 12 * 60_000),
-            bind: "100.74.239.89:7420".into(),
+            bind: "100.64.1.10:7420".into(),
             link: None,
             processes: vec![SessionProcesses {
                 session_id: SessionId(12),

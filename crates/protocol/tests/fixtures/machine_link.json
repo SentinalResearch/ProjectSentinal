@@ -31,7 +31,7 @@
         "role": "WORKER",
         "status": "OFFLINE",
         "last_seen": 1790900590000,
-        "endpoint": { "address": "100.74.239.89", "port": 7420, "dns_name": "pop-os.example.ts.net" },
+        "endpoint": { "address": "100.64.1.10", "port": 7420, "dns_name": "pop-os.example.ts.net" },
         "os": "LINUX",
         "daemon_version": "0.0.1",
         "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
@@ -73,7 +73,7 @@
       "daemon_version": "0.0.1",
       "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"]
     },
-    "endpoint": { "address": "100.74.239.89", "port": 7420, "dns_name": "pop-os.example.ts.net" },
+    "endpoint": { "address": "100.64.1.10", "port": 7420, "dns_name": "pop-os.example.ts.net" },
     "control_credential": "1111111111111111111111111111111111111111111111111111111111111111"
   },
   "exchange_response": {
@@ -88,7 +88,7 @@
     "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
     "sequence": 42,
     "sent_at": 1790900590000,
-    "endpoint": { "address": "100.74.239.89", "port": 7420, "dns_name": null },
+    "endpoint": { "address": "100.64.1.10", "port": 7420, "dns_name": null },
     "daemon_version": "0.0.1",
     "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"]
   },
@@ -106,7 +106,7 @@
     "machine_id": "01J9Z3K8V6Q2T7M4X5C0RNB8DA",
     "sequence": 43,
     "sent_at": 1790900620000,
-    "endpoint": { "address": "100.74.239.89", "port": 7420, "dns_name": null },
+    "endpoint": { "address": "100.64.1.10", "port": 7420, "dns_name": null },
     "daemon_version": "0.3.0",
     "capabilities": ["SESSIONS", "EVENTS", "METRICS", "ADOPT"],
     "health": {

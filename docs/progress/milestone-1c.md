@@ -54,9 +54,9 @@ Status: complete, including the real two-host acceptance run on 2026-09-30.
   tests, TypeScript generation, and all four shell validation suites.
 - `just test-e2e` passed: 3 Playwright scenarios use `VITE_DATA=api`, proxy to
   one fake worker, authenticate, attach over WebSocket, replay, and Continue.
-- Real control Machine: macOS 27.0 arm64, Tailscale `100.93.101.56`.
+- Real control Machine: macOS 27.0 arm64, Tailscale `100.64.1.11`.
 - Real worker Machine: Pop!_OS 24.04, Linux
-  `6.18.7-76061807-generic` x86_64, Tailscale `100.74.239.89`, verified worker
+  `6.18.7-76061807-generic` x86_64, Tailscale `100.64.1.10`, verified worker
   release `0.1.5`. Tested repository commit:
   `7e3cc20831255d18ec74d1de58f8a8e4cfc41e4c`.
 - The first run exposed `Linger=no`: closing the SSH login stopped the systemd
@@ -64,8 +64,8 @@ Status: complete, including the real two-host acceptance run on 2026-09-30.
   `INTERRUPTED`. After `sudo loginctl enable-linger "$USER"`, daemon PID
   `58321` and Python PID `60021` survived CLI detach and SSH disconnect.
   `docs/SETUP.md` now documents this Linux prerequisite.
-- `just control WORKER_IP=100.74.239.89` served the real API UI at
-  `http://100.93.101.56:5173`. The owner completed bootstrap authentication,
+- `just control WORKER_IP=100.64.1.10` served the real API UI at
+  `http://100.64.1.11:5173`. The owner completed bootstrap authentication,
   confirmed there was no `MOCK` badge, attached to Session `2`, observed live
   output, sent Ctrl-C, ran `echo SENTINAL_BROWSER_INPUT_OK`, and detached the
   pane.
@@ -93,8 +93,8 @@ worker$ sudo loginctl enable-linger "$USER"
 worker$ loginctl show-user "$USER" -p Linger
 worker$ sentinal update --check
 worker$ sentinal update
-control$ curl http://100.74.239.89:7420/api/v1/health
-control$ just control WORKER_IP=100.74.239.89
+control$ curl http://100.64.1.10:7420/api/v1/health
+control$ just control WORKER_IP=100.64.1.10
 worker$ sentinal watch -t "Handoff acceptance" -- python3 -u /tmp/sentinal-two-host-long-job.py
 # Ctrl+J detached the first CLI.
 worker$ sentinal ls

@@ -29,7 +29,7 @@ cat >"$fake_bin/tailscale" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
   status) echo 'Tailscale is stopped.'; exit 1 ;;
-  ip) echo '100.93.101.56' ;;
+  ip) echo '100.64.1.11' ;;
   *) exit 2 ;;
 esac
 EOF

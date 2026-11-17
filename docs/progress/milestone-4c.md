@@ -441,9 +441,9 @@ candidate inventory and must be reconfirmed on the exact release commit:
 
 | Role | Known candidate | Must record on candidate |
 |---|---|---|
-| Control | arm64 Mac Mini, `100.93.101.56`, Tailnet HTTPS origin already configured | macOS/build, Tailscale version, Machine ID, Sentinal commit/version |
-| macOS worker | MacBook Pro, `100.66.29.67`; prior Tailscale CLI `1.102.4` | macOS/build, browser, Tailscale version, Machine ID, installed release |
-| Linux worker | x86_64 Pop!_OS 24.04, `100.74.239.89` | OS/kernel, Tailscale version, Machine ID, installed release |
+| Control | arm64 Mac Mini, `100.64.1.11`, Tailnet HTTPS origin already configured | macOS/build, Tailscale version, Machine ID, Sentinal commit/version |
+| macOS worker | MacBook Pro, `100.64.1.12`; prior Tailscale CLI `1.102.4` | macOS/build, browser, Tailscale version, Machine ID, installed release |
+| Linux worker | x86_64 Pop!_OS 24.04, `100.64.1.10` | OS/kernel, Tailscale version, Machine ID, installed release |
 | Phone | not yet supplied | OS/version, browser/version, ntfy native app or web client/version, PWA install mode |
 
 Unavailable platform coverage will be named rather than inferred. Sanitized

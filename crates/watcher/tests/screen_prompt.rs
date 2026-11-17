@@ -233,6 +233,28 @@ fn a_marked_unnumbered_menu_is_a_question() {
 }
 
 #[test]
+fn a_marked_menu_offers_at_most_the_protocol_s_six_answers() {
+    let rows: Vec<String> = (1..=8)
+        .map(|i| format!("{} model {i}", if i == 1 { "❯" } else { " " }))
+        .collect();
+    let screen = format!(
+        "Which model?\n{}\n\n↑↓ to navigate · Enter to select",
+        rows.join("\n")
+    );
+    let mut e = engine("some-agent");
+    look(&mut e, 0, &screen);
+    let (events, waiting) = look(&mut e, 1_000, &screen);
+    assert!(waiting);
+    let (question, options) = asked(&events).unwrap();
+    assert_eq!(question, "Which model?");
+    let labels: Vec<&str> = options.iter().map(|option| option.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        ["model 1", "model 2", "model 3", "model 4", "model 5", "model 6"]
+    );
+}
+
+#[test]
 fn ordinary_text_is_never_a_marked_menu() {
     for screen in [
         // Plain text with a marker but no key hint.
@@ -241,6 +263,8 @@ fn ordinary_text_is_never_a_marked_menu() {
         "Choose:\n  Yes\n  No\n↑↓ navigate · Enter select",
         // Too many rows.
         &format!("Pick?\n{}\n↑↓ navigate", (0..10).map(|i| format!("  option {i}")).collect::<Vec<_>>().join("\n")),
+        // Too many rows, even with a marker: more than 8 short rows is a list, not a menu.
+        &format!("Pick?\n❯ option 0\n{}\n↑↓ navigate", (1..10).map(|i| format!("  option {i}")).collect::<Vec<_>>().join("\n")),
         // Only one row with a marker.
         "Sure?\n❯ Yes\n↑↓ navigate · Enter select",
         // Marker but rows are paragraphs.

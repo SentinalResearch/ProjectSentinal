@@ -178,7 +178,7 @@ mod tests {
             hostname: "pop-os".into(),
             os_version: Some("Pop!_OS 22.04".into()),
             kernel_version: Some("6.9".into()),
-            bind: "100.74.239.89:7420".into(),
+            bind: "100.64.1.10:7420".into(),
             started_at: Timestamp(5),
             daemon_version: "0.1.10".into(),
         }

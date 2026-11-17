@@ -196,7 +196,7 @@ Worker heartbeat capability:
   "machine_id": "01M40Q6XWORKER",
   "sequence": 82,
   "sent_at": 1791792000000,
-  "endpoint": {"address":"100.66.29.67","port":7420,"dns_name":"worker.tailnet.ts.net"},
+  "endpoint": {"address":"100.64.1.12","port":7420,"dns_name":"worker.tailnet.ts.net"},
   "daemon_version": "0.4.1",
   "capabilities": ["SESSIONS","EVENTS","METRICS","ADOPT"],
   "projection_sync": {

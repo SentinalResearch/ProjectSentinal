@@ -99,7 +99,7 @@ If the task changes the protocol and something is unclear, stop and ask.
 A review read about a third of the code. Every fix below has a test that
 fails without it. Items marked *(v2.10.0)* are also in production.
 
-### Fixed (uncommitted on `dev`)
+### Fixed (committed in `64117cf`)
 
 - [x] X1 Agent Events never left the engine: `supports_evidence` had no arm for
       `AgentActivity` / `AgentTurnFinished`, and the notification rules mapped
@@ -152,11 +152,13 @@ fails without it. Items marked *(v2.10.0)* are also in production.
       and re-records all of them on each restart (`projection_runtime.rs:32`)
 - [ ] X18 A second identical question within 1 s of the first ending is not
       reported (`screen_prompt.rs:82`)
-- [ ] X19 Marked menus allow 8 options; the protocol and web cap at 6
+- [x] X19 Marked menus allowed 8 options; the protocol and web cap at 6. A
+      marked menu now offers its first 6 rows, like a numbered menu —
+      `watcher/tests/screen_prompt.rs`
 - [ ] X20 The control dashboard names every agent Session just "Claude Code"
       (`sessionDisplayName` has no folder there)
 - [ ] X21 The delete dialog in `usePromptActions.tsx` has no Escape handling or
-      focus trap; `web/src/data/format.ts` has `}const` on one line
+      focus trap (the `}const` line in `web/src/data/format.ts` is fixed)
 - [ ] X22 Browser logins live only in memory and end on every daemon restart
 - [ ] X23 A panic in the watcher still ends the PTY reader; catch it there so
       one bad line can never stop a Session being read
@@ -191,11 +193,16 @@ passes; keepers in scope; `adopt` stays read-only.
 ### T0. Watcher and daemon fixes
 
 Found by reading; the first five were also reproduced by running the code.
+Several are the same bugs as X1–X13 above and were fixed there (`64117cf`):
+T0.1 = X1, T0.2 = X2, T0.7 = X12, T0.9 = X7, T0.10 = X8, T0.13 = X5 + X6.
+T0.4's port half is X9 (one Event per line is still open); T0.8's 8-option
+half is X19, its other halves are X18 and X10. Still open: T0.3 (X23),
+T0.5, T0.6 (X14), T0.11, T0.12 (X15).
 
-- [ ] T0.1 Agent Events are dropped: `supports_evidence` has no case for
+- [x] T0.1 Agent Events are dropped: `supports_evidence` has no case for
       `AgentActivity` / `AgentTurnFinished` (`crates/protocol/src/evidence.rs`),
       so no agent activity and no "agent finished" notification
-- [ ] T0.2 Panic on a training line with a multi-byte character before
+- [x] T0.2 Panic on a training line with a multi-byte character before
       `loss` (`crates/watcher/src/training.rs:282`)
 - [ ] T0.3 A watcher panic stops the PTY reader for that Session
       (`crates/daemon/src/session_manager/tasks.rs`)
@@ -205,19 +212,19 @@ Found by reading; the first five were also reproduced by running the code.
       during an approval dialog (`agent_cli.rs`, `agent_activity.rs`)
 - [ ] T0.6 Health stays WARNING after a question is answered, and FAILED
       after one error line (`crates/watcher/src/health.rs`)
-- [ ] T0.7 `::sentinal` lines: metrics not rate limited, `unit` unbounded,
+- [x] T0.7 `::sentinal` lines: metrics not rate limited, `unit` unbounded,
       malformed fields half accepted (B2 said otherwise)
 - [ ] T0.8 Same question asked again within one second is not reported;
       marked menus allow 8 options, the protocol 6; marked row not reported
-- [ ] T0.9 A second question in the same Session within 5 minutes sends no
+- [x] T0.9 A second question in the same Session within 5 minutes sends no
       notification (worker and control both deduplicate). Likely the cause of
       the A3 item "notifications for questions sometimes never arrived"
-- [ ] T0.10 `kill` leaves the Command running forever in history and tells
+- [x] T0.10 `kill` leaves the Command running forever in history and tells
       no viewer
 - [ ] T0.11 No rate limit on warning and error Events
 - [ ] T0.12 One unreadable stored row fails the whole query (matters after a
       rollback from a newer release)
-- [ ] T0.13 Projection: an update can be lost when it is compacted into a
+- [x] T0.13 Projection: an update can be lost when it is compacted into a
       row already being uploaded; a worker with more than about 2,000
       records can never send a snapshot to a new control
 
@@ -377,6 +384,11 @@ restarts the daemon. Refuses to overwrite an existing file without
       `docs/progress/ui-pass.md`
 - [ ] Fix in the owner's priority order, one problem per change, each with a
       test where one is possible
+- [x] 2026-11-16 (`f4ef4c9`): History rows space the command, capture
+      badge and a styled Save as recipe button; Save as recipe uses the Input
+      component, says why an ID is invalid and why an offline Machine cannot
+      save; Diagnostics charts show one-sample series, have a median/p95 key,
+      a styled Machine picker and ruled incident rows
 - [ ] Known: question cards on the dashboard were hard to read (partly fixed by
       P0); notifications for questions sometimes never arrived; check this on
       production after v2.11.0, because dev never sends push
@@ -498,6 +510,9 @@ owner runs them:
 
 ## Open question for the owner
 
-- `crates/protocol/tests/fixtures/daemon_messages.json` contains an address in
-  the 100.x range. If it is a real Tailscale address, replace it with a
-  documentation address (`100.64.0.1`) and update the fixture.
+- Resolved 2026-11-16: four real Tailscale addresses (the pop-os worker, the
+  Mac Mini control, the MacBook and the pilot VM) were in fixtures, tests and
+  progress docs. They are now `100.64.1.10`–`100.64.1.13`. They remain in git
+  history. Unsure, left as is: `100.101.29.67` (pairing tests) and
+  `100.124.0.101` (`daemon/src/tailnet_dns.rs`, named Control-One); replace
+  them too if they are real.

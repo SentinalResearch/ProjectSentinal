@@ -97,8 +97,8 @@ fn control_urls_are_tailnet_https_origins_unless_development() {
         "http://127.0.0.1:7421"
     );
     assert_eq!(
-        validate_control_url("http://100.93.101.56:7420", development).unwrap(),
-        "http://100.93.101.56:7420"
+        validate_control_url("http://100.64.1.11:7420", development).unwrap(),
+        "http://100.64.1.11:7420"
     );
     assert!(validate_control_url("http://192.168.1.5:7420", development).is_err());
     assert!(validate_control_url("http://127.0.0.1:7421/?code=x", development).is_err());

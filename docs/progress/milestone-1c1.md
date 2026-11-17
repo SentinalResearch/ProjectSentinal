@@ -78,14 +78,14 @@ Status: complete 2026-09-30.
 - Fast package-service tests cover all four supported OS/architecture targets,
   manifest failures, bounded routes, traversal and symlink rejection,
   metadata-only audit, atomic publication, update, rollback, and preservation.
-- Real control: arm64 macOS 27.0 at `100.93.101.56`, Tailnet HTTPS origin
+- Real control: arm64 macOS 27.0 at `100.64.1.11`, Tailnet HTTPS origin
   `https://advanceds-mac-mini-1.tail17dafb.ts.net`, with Funnel disabled and
   package HTTP bound only to `127.0.0.1:7422`.
-- Real peer: x86_64 Pop!_OS 24.04 (kernel 6.18.7) at `100.74.239.89`.
+- Real peer: x86_64 Pop!_OS 24.04 (kernel 6.18.7) at `100.64.1.10`.
   Release `0.1.1` downloaded over Tailnet HTTPS, matched manifest length and
   SHA-256, installed to `~/.local`, enabled `sentinald.service`, and reported
   binaries/config/Tailscale/service `OK` plus `Pairing: UNPAIRED`.
-- The control Machine reached `http://100.74.239.89:7420/api/v1/health`; the
+- The control Machine reached `http://100.64.1.10:7420/api/v1/health`; the
   worker reported `Sentinal 0.1.1 is current` from `sentinal update --check`.
 - Uninstall removed programs/service while retaining the exact config and data
   directories and their inodes. Reinstall from the same HTTPS `install.sh`

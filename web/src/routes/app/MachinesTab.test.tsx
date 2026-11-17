@@ -37,7 +37,7 @@ function machine(overrides: Partial<RegistryMachine>): RegistryMachine {
     role: "WORKER",
     status: "ONLINE",
     last_seen: Date.now(),
-    endpoint: { address: "100.74.239.89", port: 7420, dns_name: null },
+    endpoint: { address: "100.64.1.10", port: 7420, dns_name: null },
     os: "LINUX",
     daemon_version: "0.0.1",
     capabilities: ["SESSIONS"],

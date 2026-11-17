@@ -37,7 +37,7 @@ including the real-shell matrix on macOS and Linux.
 - `scripts/tests/run-network-test.sh` passes with generated-config/proxy
   assertions and rejection of wildcard, LAN, out-of-range CGNAT, and invalid
   ports. It is part of `just check`.
-- `just network` discovered `100.93.101.56`, built and started `sentinald` on
+- `just network` discovered `100.64.1.11`, built and started `sentinald` on
   port 7420, and started Vite on port 5173. Direct daemon health and proxied
   frontend health both returned `{"ok":true,"version":1}`; the frontend root
   returned the Vite HTML page.
