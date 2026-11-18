@@ -488,9 +488,16 @@ holds credentials or settings must follow `config_dir`.
 
 1. Owner has tried P0 in `just dev`
 2. `just promote` (runs every check, merges `dev` into `main`, pushes nothing)
-3. Owner: `git checkout main && just ship 2.11.0`
-4. Update `sentinal-control-one` (the control) **before** the workers, because
+3. Owner: `sentinal backup create` on the control and on each worker (X15:
+   2.10 cannot read what 2.11 stores, so the backup is the rollback)
+4. Owner: `git checkout main && just ship 2.11.0`
+5. Owner: `gh release edit v2.11.0 --notes-file docs/releases/v2.11.0.md`
+   (the build leaves only the signing note as the release text, and controls
+   link to that page)
+6. Update `sentinal-control-one` (the control) **before** the workers, because
    of the protocol changes below
+
+Full notes: `docs/releases/v2.11.0.md`.
 
 ### Release notes so far (protocol changes since v2.10.0)
 
@@ -499,6 +506,9 @@ holds credentials or settings must follow `config_dir`.
 - `CodingAgent::VIBE`, `ANTIGRAVITY`; prompt option labels up to 160 characters
 - Store migrations 014 (`id_floors`) and 015 (`machine_instances`)
 - `METRIC_REPORTED` EventKind + `ProjectedEventFacts::MetricReported` (B2/B1)
+- Local `AGENT_STATE` (6.4) with `task`, `step`, `steps`, `eta_secs` (6.5);
+  `agent_state` and `sandbox` on Session / ProjectedSession (never stored)
+- `CREATE_SESSION.sandbox` (WATCH only)
 
 ## Other open items (older plans)
 
