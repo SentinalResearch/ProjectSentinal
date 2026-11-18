@@ -451,6 +451,18 @@ pub enum LocalRequest {
         /// One owner-visible line, at most 200 characters.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         detail: Option<String>,
+        /// The task, at most 80 characters (6.5).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        task: Option<String>,
+        /// The current step, at most `steps` (6.5).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        step: Option<u32>,
+        /// Steps in the plan, at most 10 000 (6.5).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        steps: Option<u32>,
+        /// The agent's guess of seconds left, at most 7 days (6.5).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        eta_secs: Option<u32>,
         /// The calling process as the OS reported it; set by the socket
         /// layer after decoding, never read from the wire.
         #[serde(skip)]
@@ -567,14 +579,26 @@ impl LocalRequest {
                 prefix, cwd, limit, ..
             } => crate::complete::validate_request(prefix, cwd.as_deref(), *limit),
             LocalRequest::AgentState {
-                session_id, detail, ..
+                session_id,
+                detail,
+                task,
+                step,
+                steps,
+                eta_secs,
+                ..
             } => {
                 if session_id.0 == 0 {
                     return Err(ProtocolError::InvalidIdentifier {
                         field: "session_id",
                     });
                 }
-                crate::agent_state::validate_agent_detail(detail.as_deref())
+                crate::agent_state::validate_agent_detail(detail.as_deref())?;
+                crate::agent_state::validate_agent_progress(
+                    task.as_deref(),
+                    *step,
+                    *steps,
+                    *eta_secs,
+                )
             }
         }
     }

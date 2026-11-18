@@ -27,6 +27,7 @@ export function PhoneOverview() {
   const [params, setParams] = useSearchParams();
   const shell = useShell();
   const { machines, terminals, hidden, loading } = useLiveData();
+  const agents = terminals.filter((session) => !session.dismissed && (session.codingAgent || session.agentState)).length;
   const removal = useSessionRemoval();
   const now = useClock();
   const load = useMachineLoad(machines);
@@ -176,6 +177,12 @@ export function PhoneOverview() {
       ))}
 
       {!needsOnly && <PhoneDone sessions={visible} machineName={machineName} now={now} />}
+
+      {!needsOnly && agents > 0 && (
+        <Link className={styles.hiddenLink} to="/app/agents">
+          {agents} agent{agents === 1 ? "" : "s"} · Task and progress ›
+        </Link>
+      )}
 
       {!needsOnly && hidden.length > 0 && (
         <Link className={styles.hiddenLink} to="/app/sessions/hidden">

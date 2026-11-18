@@ -70,9 +70,24 @@ impl SessionManager {
                 session_id,
                 status,
                 detail,
+                task,
+                step,
+                steps,
+                eta_secs,
                 caller_pid,
             } => self
-                .report_agent_state(session_id, status, detail, caller_pid)
+                .report_agent_state(
+                    session_id,
+                    super::agent_state::AgentReport {
+                        status: Some(status),
+                        detail,
+                        task,
+                        step,
+                        steps,
+                        eta_secs,
+                    },
+                    caller_pid,
+                )
                 .map(|session| LocalResponse::Session {
                     session: Box::new(session),
                 }),
@@ -111,7 +126,8 @@ fn error_code(error: &SessionManagerError) -> LocalErrorCode {
         | SessionManagerError::ShellPidMismatch { .. }
         | SessionManagerError::AgentCallerUnknown
         | SessionManagerError::AgentOutsideSession { .. } => LocalErrorCode::Forbidden,
-        SessionManagerError::AgentReportsNotTaken(_) => LocalErrorCode::InvalidRequest,
+        SessionManagerError::AgentReportsNotTaken(_)
+        | SessionManagerError::AgentProgressInvalid(_) => LocalErrorCode::InvalidRequest,
         SessionManagerError::SequenceConflict { .. }
         | SessionManagerError::AlreadyAdopted { .. } => LocalErrorCode::Conflict,
         SessionManagerError::AdoptSelf(_) | SessionManagerError::InvalidLog { .. } => {

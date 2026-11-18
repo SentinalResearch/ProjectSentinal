@@ -271,9 +271,14 @@ fn projection_carries_the_agent_state_and_sandbox_but_never_a_bad_detail() {
     );
     session.sandbox = true;
     session.agent_state = Some(Box::new(protocol::AgentReportedState {
-        status: protocol::AgentStatus::Blocked,
         detail: Some("needs approval for cargo test".into()),
-        reported_at: Timestamp(20),
+        task: Some("migrate tests".into()),
+        step: Some(3),
+        steps: Some(8),
+        eta_secs: Some(720),
+        task_started_at: Some(Timestamp(12)),
+        estimated_left_secs: Some(900),
+        ..protocol::AgentReportedState::new(protocol::AgentStatus::Blocked, Timestamp(20))
     }));
     let projected = ProjectedSession::from_session(&session);
     assert!(projected.sandbox);
@@ -284,8 +289,11 @@ fn projection_carries_the_agent_state_and_sandbox_but_never_a_bad_detail() {
 
     // A detail that slipped past validation is dropped, the status kept.
     session.agent_state.as_mut().unwrap().detail = Some("bad\x1b]0;title\x07".into());
+    session.agent_state.as_mut().unwrap().task = Some("bad\x1b[2Jtask".into());
     let projected = ProjectedSession::from_session(&session);
     let state = projected.agent_state.unwrap();
     assert_eq!(state.status, protocol::AgentStatus::Blocked);
     assert_eq!(state.detail, None);
+    assert_eq!(state.task, None, "a bad task is dropped, the steps kept");
+    assert_eq!(state.step, Some(3));
 }

@@ -356,6 +356,7 @@ pub(super) fn apply_observation(
     store: Option<&Store>,
     observation: watcher::Observation,
 ) {
+    super::agent_state::flush_due(handle, observation.at);
     let update = match handle.watcher.lock() {
         Ok(mut engine) => engine.observe(&observation),
         Err(_) => {
@@ -411,6 +412,24 @@ pub(super) fn apply_observation(
             return;
         }
     };
+    // 6.5: a `::sentinal task` / `state` line takes the same in-memory path
+    // as `sentinal agent-state`; it is the Session's own output, so no caller
+    // check, but only live FULL Sessions take it.
+    if let Some(line) = update.agent_line {
+        if !reduced && !session.state.is_finished() {
+            let report = super::agent_state::AgentReport {
+                status: line.status,
+                detail: None,
+                task: line.task,
+                step: line.step,
+                steps: line.steps,
+                eta_secs: line.eta_secs,
+            };
+            if let Err(error) = super::agent_state::submit(handle, None, report, observation.at) {
+                tracing::debug!(session = session_id.0, %error, "agent line ignored");
+            }
+        }
+    }
     let events = update
         .events
         .into_iter()

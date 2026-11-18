@@ -217,6 +217,10 @@ impl ProjectedSession {
                     detail: state.detail.clone().filter(|detail| {
                         crate::agent_state::validate_agent_detail(Some(detail)).is_ok()
                     }),
+                    task: state.task.clone().filter(|task| {
+                        crate::agent_state::validate_agent_progress(Some(task), None, None, None)
+                            .is_ok()
+                    }),
                     ..state.clone()
                 }),
             sandbox: session.sandbox,

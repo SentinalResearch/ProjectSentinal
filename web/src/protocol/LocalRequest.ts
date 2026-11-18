@@ -173,6 +173,22 @@ export type LocalRequest =
      * One owner-visible line, at most 200 characters.
      */
     detail?: string | null;
+    /**
+     * The task, at most 80 characters (6.5).
+     */
+    task?: string | null;
+    /**
+     * The current step, at most `steps` (6.5).
+     */
+    step?: number | null;
+    /**
+     * Steps in the plan, at most 10 000 (6.5).
+     */
+    steps?: number | null;
+    /**
+     * The agent's guess of seconds left, at most 7 days (6.5).
+     */
+    eta_secs?: number | null;
   }
   | {
     "type": "COMPLETE";

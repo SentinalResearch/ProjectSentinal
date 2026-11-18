@@ -1,5 +1,6 @@
 import { Navigate, type RouteObject } from "react-router-dom";
 
+import { AgentsPage } from "./AgentsPage";
 import { HiddenSessionsPage } from "./HiddenSessionsPage";
 import { HistoryPage } from "./HistoryPage";
 import { OverviewPage } from "./OverviewPage";
@@ -24,6 +25,7 @@ export const APP_PAGES: RouteObject[] = [
   { path: "sessions/:id/terminal", element: <SessionTerminalRoute /> },
   { path: "split", element: <SplitViewPage /> },
   { path: "projects/:id", element: <ProjectPage /> },
+  { path: "agents", element: <AgentsPage /> },
   { path: "history", element: <HistoryPage /> },
   { path: "recipes", element: <RecipesPage /> },
   { path: "recipes/:id", element: <RecipesPage /> },

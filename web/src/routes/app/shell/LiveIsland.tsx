@@ -171,21 +171,30 @@ export function LiveIsland({
           className={styles.progress}
           onClick={() => navigate(`/app/sessions/${focus.session.id}`)}
           aria-label={
-            focus.session.progress?.inferred
-              ? `${focus.session.name}, about ${focus.percent} % done (Sentinal thinks, read off the screen)`
-              : `${focus.session.name}, ${focus.percent} % done`
+            focus.reported
+              ? `${focus.session.agentState?.task ?? focus.session.name}, ${focus.reported.label} (${focus.reported.who} says, not measured)`
+              : focus.session.progress?.inferred
+                ? `${focus.session.name}, about ${focus.percent} % done (Sentinal thinks, read off the screen)`
+                : `${focus.session.name}, ${focus.percent} % done`
           }
+          title={focus.reported ? `Reported by ${focus.reported.who}, not measured by Sentinal` : undefined}
         >
-          <ProgressRing percent={focus.percent} guess={focus.session.progress?.inferred} />
-          <span className={styles.progressName}>{focus.session.name}</span>
+          <ProgressRing percent={focus.percent} guess={focus.session.progress?.inferred} reported={Boolean(focus.reported)} />
+          <span className={styles.progressName}>{focus.reported ? (focus.session.agentState?.task ?? focus.session.name) : focus.session.name}</span>
           <span className={styles.progressPercent}>
             {focus.session.progress?.inferred ? "≈ " : ""}
             {focus.percent} %
           </span>
-          {focus.session.progress && (
+          {focus.reported ? (
             <span className={styles.progressDetail}>
-              {focus.session.progress.unit} {focus.session.progress.current}/{focus.session.progress.total}
+              {focus.reported.who} says · {focus.reported.label}
             </span>
+          ) : (
+            focus.session.progress && (
+              <span className={styles.progressDetail}>
+                {focus.session.progress.unit} {focus.session.progress.current}/{focus.session.progress.total}
+              </span>
+            )
           )}
         </button>
       ) : (
@@ -305,10 +314,20 @@ export function LiveIsland({
 }
 
 /** A small ring that fills with the job's progress. */
-function ProgressRing({ percent, guess = false }: { percent: number; guess?: boolean }) {
+function ProgressRing({ percent, guess = false, reported = false }: { percent: number; guess?: boolean; reported?: boolean }) {
   const circumference = 2 * Math.PI * 8;
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" className={styles.ring} data-guess={guess || undefined}>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      className={styles.ring}
+      data-guess={guess || undefined}
+      data-reported={reported || undefined}
+    >
+      {/* An agent's own step count (6.5) gets a solid outline, like every report. */}
+      {reported && <circle cx="10" cy="10" r="9.4" fill="none" stroke="var(--text-2)" strokeWidth="0.8" />}
       {/* A guess from the intelligence layer gets a dashed track, like every guess. */}
       <circle cx="10" cy="10" r="8" fill="none" stroke={guess ? "var(--accent-fg)" : "var(--line)"} strokeWidth={guess ? 1.2 : 2.5} strokeDasharray={guess ? "2 2" : undefined} />
       <circle

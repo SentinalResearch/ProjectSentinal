@@ -244,6 +244,9 @@ pub enum ProtocolError {
     /// An agent's reported detail broke the rules (never repeats the text).
     #[error("agent detail {0}")]
     InvalidAgentDetail(&'static str),
+    /// An agent's reported task, steps or ETA broke the rules (6.5).
+    #[error("agent progress: {0}")]
+    InvalidAgentProgress(&'static str),
 }
 
 impl From<serde_json::Error> for ProtocolError {

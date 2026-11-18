@@ -60,7 +60,11 @@ pub mod time;
 pub mod training;
 pub mod worker_update;
 
-pub use agent_state::{AgentReportedState, AgentStatus, MAX_AGENT_DETAIL_CHARS};
+pub use agent_state::{parse_agent_eta, validate_agent_progress};
+pub use agent_state::{
+    AgentReportedState, AgentStatus, MAX_AGENT_DETAIL_CHARS, MAX_AGENT_ETA_SECS, MAX_AGENT_STEPS,
+    MAX_AGENT_TASK_CHARS,
+};
 pub use auth::{
     AuthChangePasswordRequest, AuthFailure, AuthFailureCode, AuthLoginRequest, AuthSession,
     AuthSessionInfo, AuthSetupRequest, AuthStatus,

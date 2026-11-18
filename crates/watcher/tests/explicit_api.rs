@@ -179,3 +179,84 @@ fn malformed_or_oversized_fields_reject_the_whole_line() {
         );
     }
 }
+
+// ---- Milestone 6.5: `::sentinal task` and `::sentinal state` ----
+
+fn agent_line(engine: &mut EventEngine, line: &str) -> watcher::EngineUpdate {
+    engine.observe(&Observation::output(Timestamp(0), line))
+}
+
+#[test]
+fn a_task_line_reports_task_steps_and_eta_without_an_event() {
+    let mut engine = engine("./migrate.sh");
+    let update = agent_line(
+        &mut engine,
+        "::sentinal task name=migrate-tests step=3 steps=8 eta=12m",
+    );
+    assert!(update.events.is_empty(), "never a stored Event");
+    assert!(!update.waiting, "never changes lifecycle state");
+    assert_eq!(
+        update.agent_line,
+        Some(watcher::AgentLine {
+            status: None,
+            task: Some("migrate-tests".into()),
+            step: Some(3),
+            steps: Some(8),
+            eta_secs: Some(720),
+        })
+    );
+}
+
+#[test]
+fn a_task_name_may_be_quoted_and_steps_are_optional() {
+    let mut engine = engine("./migrate.sh");
+    let update = agent_line(
+        &mut engine,
+        r#"::sentinal task name="migrate tests" eta=90s"#,
+    );
+    let line = update.agent_line.unwrap();
+    assert_eq!(line.task.as_deref(), Some("migrate tests"));
+    assert_eq!(
+        (line.step, line.steps, line.eta_secs),
+        (None, None, Some(90))
+    );
+    let update = agent_line(&mut engine, "::sentinal task name=build eta=2h");
+    assert_eq!(update.agent_line.unwrap().eta_secs, Some(7_200));
+}
+
+#[test]
+fn a_state_line_reports_the_status() {
+    let mut engine = engine("./migrate.sh");
+    for (value, status) in [
+        ("working", protocol::AgentStatus::Working),
+        ("blocked", protocol::AgentStatus::Blocked),
+        ("waiting", protocol::AgentStatus::Waiting),
+        ("done", protocol::AgentStatus::Done),
+    ] {
+        let update = agent_line(&mut engine, &format!("::sentinal state value={value}"));
+        assert_eq!(update.agent_line.unwrap().status, Some(status));
+        assert!(update.events.is_empty());
+    }
+}
+
+#[test]
+fn malformed_or_out_of_bounds_agent_lines_are_ignored() {
+    let mut engine = engine("./migrate.sh");
+    for line in [
+        "::sentinal task step=3 steps=8",
+        "::sentinal task name=x step=9 steps=8",
+        "::sentinal task name=x steps=10001",
+        "::sentinal task name=x step=three",
+        "::sentinal task name=x eta=8d",
+        "::sentinal task name=x eta=169h",
+        "::sentinal task name=x eta=soon",
+        &format!("::sentinal task name={}", "t".repeat(81)),
+        r#"::sentinal task name="unclosed"#,
+        "::sentinal state value=finished",
+        "::sentinal state",
+    ] {
+        let update = agent_line(&mut engine, line);
+        assert_eq!(update.agent_line, None, "{line}");
+        assert!(update.events.is_empty(), "{line}");
+    }
+}

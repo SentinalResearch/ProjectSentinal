@@ -9,6 +9,7 @@ export interface NavPlace {
 export const NAV_PLACES: NavPlace[] = [
   { label: "Overview", to: "/app/overview", word: "dashboard" },
   { label: "Terminals", to: "/app/split", word: "split" },
+  { label: "Agents", to: "/app/agents", word: "agents" },
   { label: "Machines", to: "/app/settings/machines", word: "machines" },
   { label: "History", to: "/app/history", word: "history" },
   { label: "Recipes", to: "/app/recipes", word: "recipes" },

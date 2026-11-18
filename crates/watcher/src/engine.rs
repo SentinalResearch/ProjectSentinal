@@ -24,6 +24,8 @@ pub struct EngineUpdate {
     pub adapter_state: Option<AdapterState>,
     /// Whether the program is waiting for a person (a prompt, 6.1).
     pub waiting: bool,
+    /// A `::sentinal task` or `state` line from this observation (6.5).
+    pub agent_line: Option<crate::progress::AgentLine>,
 }
 
 /// Pure per-Session engine combining Generic and Command-specific adapters.
@@ -99,6 +101,7 @@ impl EventEngine {
         }
         let capture = self.capture;
         let mut events = self.process_events(observation);
+        let mut agent_line = None;
         // Explicit ::sentinal API lines are parsed first, ahead of adapters
         // and the fallback counter. Once a Session prints one, it is trusted
         // over guesses for that Session.
@@ -120,6 +123,7 @@ impl EventEngine {
                     crate::progress::ExplicitLine::Metric { name, value } => {
                         events.push(EventKind::MetricReported { name, value });
                     }
+                    crate::progress::ExplicitLine::Agent(line) => agent_line = Some(line),
                 }
             }
         }
@@ -190,6 +194,7 @@ impl EventEngine {
             health,
             adapter_state,
             waiting,
+            agent_line,
         }
     }
 

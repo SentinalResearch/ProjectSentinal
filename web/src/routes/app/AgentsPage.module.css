@@ -1,0 +1,271 @@
+/* The Agents view (6.5), in the quiet style: thin title, hairline rows, pills. */
+.page {
+  max-width: 1080px;
+  padding: 40px 48px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  margin: 0;
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.accent {
+  color: var(--accent-fg);
+}
+
+.muted {
+  color: var(--text-3);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill,
+.yes,
+.no {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 16px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pill {
+  background: var(--chip);
+  color: var(--text-1);
+}
+.pill:hover {
+  background: var(--chip-hover);
+}
+.pill[aria-pressed="true"] {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+.pill:focus-visible,
+.yes:focus-visible,
+.no:focus-visible,
+.titleButton:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+.pillCount {
+  margin-left: 6px;
+  opacity: 0.6;
+}
+
+.yes,
+.no {
+  width: 44px;
+  padding: 0;
+  font-family: var(--font-mono);
+}
+.yes {
+  background: var(--text-1);
+  color: var(--bg-0);
+  font-weight: 700;
+}
+.no {
+  background: var(--chip);
+  color: var(--text-1);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.groupHead {
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1.5px solid var(--text-1);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 15px;
+  font-weight: 600;
+}
+.groupHead .muted {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rowTitle {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.titleButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.titleButton:hover {
+  text-decoration: underline;
+}
+
+.who {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-2);
+}
+
+.status {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-2);
+}
+.status[data-status="WORKING"],
+.status[data-status="RUNNING"] {
+  color: var(--s-running-fg);
+}
+.status[data-status="BLOCKED"],
+.status[data-status="WAITING"] {
+  color: var(--s-waiting-fg);
+}
+.status[data-status="FAILED"] {
+  color: var(--s-failed-fg);
+}
+
+.meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.facts {
+  margin: 2px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* A claim by the agent: solid outline, like every reported value. */
+.reported {
+  padding: 1px 8px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--line-strong, var(--line));
+}
+
+.choices {
+  margin-top: 6px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.percent {
+  min-width: 48px;
+  text-align: right;
+  font-size: 22px;
+  font-weight: 200;
+  letter-spacing: -0.02em;
+}
+
+.percent[data-quiet] {
+  color: var(--text-3);
+}
+
+.empty {
+  padding: 32px 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+}
+.empty p {
+  margin: 0 0 6px;
+}
+.empty code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* Phone: the same rows, tighter, actions under the text. */
+@media (max-width: 640px) {
+  .page {
+    padding: 20px 16px 96px;
+    gap: 18px;
+  }
+  .title {
+    font-size: 30px;
+    line-height: 34px;
+  }
+  .row {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+  .actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+  .percent {
+    min-width: 0;
+    text-align: left;
+    font-size: 18px;
+  }
+  .meta {
+    white-space: normal;
+  }
+}

@@ -131,12 +131,15 @@ async fn dispatch(
             let _ = out.write_all(crate::AGENT_GUIDE.as_bytes());
             return Ok(ExitCode::SUCCESS);
         }
-        Command::AgentSkill => {
-            let _ = out.write_all(crate::AGENT_SKILL.as_bytes());
-            return Ok(ExitCode::SUCCESS);
+        Command::AgentSkill { install, file } => {
+            if !install {
+                let _ = out.write_all(crate::AGENT_SKILL.as_bytes());
+                return Ok(ExitCode::SUCCESS);
+            }
+            return Ok(crate::skill_install::run(file.as_deref(), out, err));
         }
-        Command::AgentState { status, detail } => {
-            return Ok(crate::agent_state_command::run(status, detail, err).await);
+        Command::AgentState { report } => {
+            return Ok(crate::agent_state_command::run(report, err).await);
         }
         Command::Mcp {
             control,
@@ -438,7 +441,7 @@ async fn dispatch(
         | Command::Mcp { .. }
         | Command::AgentGuide
         | Command::Agents
-        | Command::AgentSkill
+        | Command::AgentSkill { .. }
         | Command::AgentState { .. }
         | Command::Identity { .. } => {}
     }

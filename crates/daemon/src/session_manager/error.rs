@@ -237,4 +237,7 @@ pub enum SessionManagerError {
     /// Only FULL Sessions that are still running take agent reports.
     #[error("Session {0} does not take agent reports (not a live FULL Session)")]
     AgentReportsNotTaken(SessionId),
+    /// A report's progress does not fit what the agent reported before (6.5).
+    #[error("agent progress: {0}")]
+    AgentProgressInvalid(&'static str),
 }

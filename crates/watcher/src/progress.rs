@@ -58,6 +58,26 @@ pub(crate) enum ExplicitLine {
     },
     /// `::sentinal metric name=X value=Y`
     Metric { name: String, value: f64 },
+    /// `::sentinal task name=… [step=N steps=M] [eta=12m]` or
+    /// `::sentinal state value=working|blocked|waiting|done` (6.5).
+    Agent(AgentLine),
+}
+
+/// What a script says about its own task through a `::sentinal task` or
+/// `state` line (6.5). Applied like `sentinal agent-state`: shown, never
+/// stored as an Event, and never a change of lifecycle state.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AgentLine {
+    /// From a `state` line; a `task` line leaves the status as it was.
+    pub status: Option<protocol::AgentStatus>,
+    /// From `name=`, at most 80 characters; may be double-quoted.
+    pub task: Option<String>,
+    /// `step=`, at most `steps`.
+    pub step: Option<u32>,
+    /// `steps=`, at most 10 000.
+    pub steps: Option<u32>,
+    /// `eta=` (`90s`, `12m`, `2h`), at most 7 days.
+    pub eta_secs: Option<u32>,
 }
 
 /// Parse one explicit `::sentinal` API line, or `None` for anything else.
@@ -70,8 +90,73 @@ pub(crate) fn explicit_line(line: &str) -> Option<ExplicitLine> {
     match parts.next()? {
         "progress" => parse_progress(parts),
         "metric" => parse_metric(parts),
+        "state" => parse_state(parts),
+        "task" => parse_task(rest.trim_start().strip_prefix("task")?),
         _ => None,
     }
+}
+
+/// `value=working|blocked|waiting|done`.
+fn parse_state<'a, I: Iterator<Item = &'a str>>(parts: I) -> Option<ExplicitLine> {
+    let mut status = None;
+    for part in parts {
+        if let Some(value) = part.strip_prefix("value=") {
+            status = Some(match value {
+                "working" => protocol::AgentStatus::Working,
+                "blocked" => protocol::AgentStatus::Blocked,
+                "waiting" => protocol::AgentStatus::Waiting,
+                "done" => protocol::AgentStatus::Done,
+                _ => return None,
+            });
+        }
+    }
+    Some(ExplicitLine::Agent(AgentLine {
+        status: Some(status?),
+        ..AgentLine::default()
+    }))
+}
+
+/// `name=migrate-tests step=3 steps=8 eta=12m`; `name="two words"` is allowed.
+fn parse_task(rest: &str) -> Option<ExplicitLine> {
+    let mut line = AgentLine::default();
+    for (key, value) in fields(rest)? {
+        match key {
+            "name" => line.task = Some(value),
+            "step" => line.step = Some(value.parse().ok()?),
+            "steps" => line.steps = Some(value.parse().ok()?),
+            "eta" => line.eta_secs = Some(protocol::parse_agent_eta(&value)?),
+            _ => {}
+        }
+    }
+    line.task.as_ref()?;
+    protocol::validate_agent_progress(line.task.as_deref(), line.step, line.steps, line.eta_secs)
+        .ok()?;
+    Some(ExplicitLine::Agent(line))
+}
+
+/// Split `key=value key="quoted value"` pairs; `None` for an unclosed quote.
+fn fields(text: &str) -> Option<Vec<(&str, String)>> {
+    let mut out = Vec::new();
+    let mut rest = text.trim_start();
+    while !rest.is_empty() {
+        let (key, after) = rest.split_once('=')?;
+        if key.contains(char::is_whitespace) {
+            // A bare word without `=`: skip it like other API lines do.
+            let skip = key.find(char::is_whitespace).unwrap_or(key.len());
+            rest = rest[skip..].trim_start();
+            continue;
+        }
+        let (value, next) = if let Some(quoted) = after.strip_prefix('"') {
+            let end = quoted.find('"')?;
+            (quoted[..end].to_string(), &quoted[end + 1..])
+        } else {
+            let end = after.find(char::is_whitespace).unwrap_or(after.len());
+            (after[..end].to_string(), &after[end..])
+        };
+        out.push((key, value));
+        rest = next.trim_start();
+    }
+    Some(out)
 }
 
 /// `current=3 total=50 unit=task` (total and unit optional).

@@ -148,6 +148,8 @@ struct SessionHandle {
     initial_command: Mutex<Option<Vec<u8>>>,
     /// Sequence bookkeeping for Commands reported by an external shell hook.
     shell_reports: Mutex<external::ShellReports>,
+    /// Agent report rate limit, held report and step history (6.4, 6.5).
+    agent: Mutex<agent_state::AgentTrack>,
     /// Set by the first successful attach.
     attached: Arc<AtomicBool>,
     /// Active read-only tail of an adopted process's log.
@@ -186,8 +188,6 @@ struct SessionManagerInner {
     projects: crate::projects::Projects,
     /// Whether adopted log tails poll on a background timer (tests drive them).
     log_tail_polling: bool,
-    /// When each Session's last agent report was accepted (6.4 rate limit).
-    agent_reports: Mutex<HashMap<SessionId, Timestamp>>,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -261,7 +261,6 @@ impl SessionManager {
                 watcher_adapters: Vec::new(),
                 projects: crate::projects::Projects::default(),
                 log_tail_polling: true,
-                agent_reports: Mutex::new(HashMap::new()),
             }),
         }
     }

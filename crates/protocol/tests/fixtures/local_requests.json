@@ -57,5 +57,18 @@
       "session_id": 128,
       "status": "WORKING"
     }
+  },
+  {
+    "version": 1,
+    "payload": {
+      "type": "AGENT_STATE",
+      "session_id": 128,
+      "status": "WORKING",
+      "detail": "editing the fixtures",
+      "task": "migrate tests",
+      "step": 3,
+      "steps": 8,
+      "eta_secs": 720
+    }
   }
 ]

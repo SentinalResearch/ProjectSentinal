@@ -15,6 +15,31 @@ export type AgentReportedState = {
    */
   detail?: string | null;
   /**
+   * The task the agent says it is on, e.g. `"migrate tests"` (6.5).
+   */
+  task?: string | null;
+  /**
+   * The step the agent says it is on (6.5).
+   */
+  step?: number | null;
+  /**
+   * How many steps the agent says its plan has (6.5).
+   */
+  steps?: number | null;
+  /**
+   * The agent's own guess of seconds left, as it reported it (6.5).
+   */
+  eta_secs?: number | null;
+  /**
+   * When the daemon first saw the current `task`; set by the daemon only (6.5).
+   */
+  task_started_at?: Timestamp | null;
+  /**
+   * Sentinal's own estimate of seconds left from the pace of recent
+   * steps; set by the daemon only, absent until two steps were seen (6.5).
+   */
+  estimated_left_secs?: number | null;
+  /**
    * When the daemon accepted the report.
    */
   reported_at: Timestamp;

@@ -1,4 +1,5 @@
 import { canAnswer, offeredChoices } from "../../../data/actions";
+import { agentPercent, reporterName } from "../../../data/agentState";
 import { needsAttention } from "../../../data/format";
 import type { Session } from "../../../data/types";
 
@@ -20,9 +21,17 @@ function shortName(name: string): string {
   return name.length > MAX_NAME ? `${name.slice(0, MAX_NAME - 1)}…` : name;
 }
 
+/** A running agent's reported steps as a percent (6.5), while it says it is working. */
+function reportedPercent(session: Session): number | undefined {
+  return session.state === "RUNNING" && session.agentState?.status === "WORKING" ? agentPercent(session.agentState) : undefined;
+}
+
 function progressText(session: Session): string | null {
   const progress = session.progress;
-  if (!progress || progress.total <= 0) return null;
+  if (!progress || progress.total <= 0) {
+    const reported = reportedPercent(session);
+    return reported === undefined ? null : `${reported} %`;
+  }
   return `${Math.round((progress.current / progress.total) * 100)} %`;
 }
 
@@ -53,7 +62,13 @@ export function tickerItems(terminals: Session[], limit = 3): TickerItem[] {
 export type IslandFocus =
   | { kind: "answer"; session: Session }
   | { kind: "ticker" }
-  | { kind: "progress"; session: Session; percent: number }
+  | {
+      kind: "progress";
+      session: Session;
+      percent: number;
+      /** Set when the percent is the agent's own step count (6.5), not measured. */
+      reported?: { who: string; label: string };
+    }
   | { kind: "idle" };
 
 /**
@@ -71,12 +86,26 @@ export function islandFocus(terminals: Session[], skipAnswer: ReadonlySet<string
   );
   if (asking) return { kind: "answer", session: asking };
   if (needCount(terminals) > 0) return { kind: "ticker" };
-  const withPercent = terminals
+  const measured = terminals
     .filter((session) => session.state === "RUNNING" && session.progress && session.progress.total > 0)
-    .map((session) => ({ session, percent: Math.round((session.progress!.current / session.progress!.total) * 100) }))
-    .sort((left, right) => right.percent - left.percent);
-  const top = withPercent[0];
-  return top ? { kind: "progress", session: top.session, percent: top.percent } : { kind: "idle" };
+    .map((session) => ({ session, percent: Math.round((session.progress!.current / session.progress!.total) * 100) }));
+  const reported = terminals
+    .filter((session) => !session.dismissed && !(session.progress && session.progress.total > 0))
+    .flatMap((session) => {
+      const percent = reportedPercent(session);
+      const state = session.agentState;
+      return percent === undefined || !state
+        ? []
+        : [
+            {
+              session,
+              percent,
+              reported: { who: reporterName(session.codingAgent), label: `step ${state.step} of ${state.steps}` },
+            },
+          ];
+    });
+  const top = [...measured, ...reported].sort((left, right) => right.percent - left.percent)[0];
+  return top ? { kind: "progress", ...top } : { kind: "idle" };
 }
 
 /** How many Sessions need the owner (the collapsed "N need you" chip). */

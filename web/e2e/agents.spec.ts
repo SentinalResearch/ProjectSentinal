@@ -36,7 +36,7 @@ test("an agent token made in Settings works through sentinal mcp and stops when 
   test.setTimeout(180_000);
   await signIn(page);
   await page.goto("/app/settings/agents");
-  await expect(page.getByRole("heading", { name: "Agents" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agent access" })).toBeVisible();
 
   await page.getByLabel("Name").fill("e2e-claude");
   await page.getByLabel("Level").selectOption("OBSERVE");

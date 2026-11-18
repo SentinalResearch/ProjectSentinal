@@ -100,9 +100,44 @@ const DEMO_REPORTING_AGENT: Session = {
   state: "RUNNING",
   runningFor: "18m",
   codingAgent: { agent: "CODEX", working: true, toolUses: 31 },
-  agentState: { status: "BLOCKED", detail: "needs the staging API key to run the metrics test", reportedAt: Date.now() },
+  agentState: {
+    status: "BLOCKED",
+    detail: "needs the staging API key to run the metrics test",
+    task: "metrics endpoint",
+    step: 5,
+    steps: 7,
+    taskStartedAt: Date.now() - 18 * 60_000,
+    reportedAt: Date.now(),
+  },
   sandbox: true,
   origin: "WATCH",
+  capture: "FULL",
+  updatedAt: Date.now(),
+};
+
+/** An agent reporting steps and an ETA (6.5), beside Sentinal's own pace. */
+const DEMO_PROGRESS_AGENT: Session = {
+  id: "claude-core",
+  machine: "mini",
+  name: "claude · core",
+  command: "claude",
+  cwd: "~/code/core",
+  project: "core",
+  state: "RUNNING",
+  runningFor: "4m",
+  codingAgent: { agent: "CLAUDE", working: true, toolUses: 22 },
+  agentState: {
+    status: "WORKING",
+    detail: "editing the fixtures",
+    task: "migrate tests",
+    step: 3,
+    steps: 8,
+    etaSecs: 720,
+    estimatedLeftSecs: 900,
+    taskStartedAt: Date.now() - 4 * 60_000,
+    reportedAt: Date.now(),
+  },
+  origin: "UI",
   capture: "FULL",
   updatedAt: Date.now(),
 };
@@ -115,7 +150,7 @@ function cloneSessions(): Session[] {
     ...(MOCK_GUESSES[s.id] ? structuredClone(MOCK_GUESSES[s.id]) : {}),
     ...(demo && DEMO_GUESSES[s.id] ? structuredClone(DEMO_GUESSES[s.id]) : {}),
   }));
-  return demo ? [...sessions, structuredClone(DEMO_AGENT), structuredClone(DEMO_REPORTING_AGENT)] : sessions;
+  return demo ? [...sessions, structuredClone(DEMO_AGENT), structuredClone(DEMO_REPORTING_AGENT), structuredClone(DEMO_PROGRESS_AGENT)] : sessions;
 }
 
 // QUESTION: fixtures.json's `history` array only carries {ok, command, duration} —

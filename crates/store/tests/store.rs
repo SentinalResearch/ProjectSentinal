@@ -634,9 +634,11 @@ fn an_agent_report_is_never_stored_but_the_sandbox_flag_is() {
     let mut running = session(4, SessionState::Running);
     running.sandbox = true;
     running.agent_state = Some(Box::new(protocol::AgentReportedState {
-        status: protocol::AgentStatus::Working,
         detail: Some("migrating tests".into()),
-        reported_at: Timestamp(103),
+        task: Some("migrate tests".into()),
+        step: Some(3),
+        steps: Some(8),
+        ..protocol::AgentReportedState::new(protocol::AgentStatus::Working, Timestamp(103))
     }));
     store.insert_session(&running).unwrap();
     store.update_session(&running).unwrap();

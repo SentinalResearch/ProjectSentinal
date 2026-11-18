@@ -120,7 +120,7 @@ export function AgentsTab() {
     <>
       <header className={styles.tabHeader}>
         <div className={styles.tabHeaderText}>
-          <h2 className={styles.tabTitle}>Agents</h2>
+          <h2 className={styles.tabTitle}>Agent access</h2>
           <span className={styles.tabSubtitle}>
             Tokens for AI agents such as Claude Code. Each has its own level and
             can be revoked at once. No agent can type into a terminal, run

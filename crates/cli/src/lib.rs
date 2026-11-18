@@ -29,6 +29,7 @@ pub mod release;
 pub mod release_args;
 pub mod session_env;
 pub mod setup;
+pub mod skill_install;
 pub mod top;
 pub mod update;
 mod update_guard;

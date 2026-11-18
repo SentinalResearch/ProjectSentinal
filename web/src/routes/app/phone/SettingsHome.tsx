@@ -54,6 +54,15 @@ export function PhoneSettingsHome() {
         </section>
       )}
 
+      <section aria-label="Places">
+        <div className={styles.sectionHead}>Places</div>
+        <Link className={styles.linkRow} to="/app/agents">
+          <span className={styles.rowTitle}>Agents</span>
+          <span className={styles.rowMeta}>Task, steps and time left</span>
+          <span className={styles.chevron} aria-hidden="true">›</span>
+        </Link>
+      </section>
+
       <section aria-label="Settings">
         <div className={styles.sectionHead}>Settings</div>
         <Link className={styles.linkRow} to="/app/settings/machines">
@@ -64,7 +73,7 @@ export function PhoneSettingsHome() {
           <span className={styles.chevron} aria-hidden="true">›</span>
         </Link>
         <Link className={styles.linkRow} to="/app/settings/agents">
-          <span className={styles.rowTitle}>Agents</span>
+          <span className={styles.rowTitle}>Agent access</span>
           <span className={styles.rowMeta}>AI agent tokens and levels</span>
           <span className={styles.chevron} aria-hidden="true">›</span>
         </Link>

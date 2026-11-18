@@ -58,6 +58,10 @@ fn session_contract() {
         &load("session_agent_state.json"),
         "session_agent_state.json",
     );
+    assert_round_trip::<Session>(
+        &load("session_agent_state_progress.json"),
+        "session_agent_state_progress.json",
+    );
 }
 
 #[test]

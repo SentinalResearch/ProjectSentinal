@@ -4,7 +4,7 @@ Status: **approved by the owner on 2026-11-17** (all five decisions in
 "Decisions for the owner").
 
 Progress: **6.4 is built** (2026-11-18); see
-`docs/progress/milestone-6.4.md`. 6.5 has not started.
+`docs/progress/milestone-6.4.md`. The 6.5 review's seven changes were approved on 2026-11-18, and 6.5 is built; see `docs/progress/milestone-6.5.md`.
 
 ## The idea in one paragraph
 
@@ -175,6 +175,79 @@ UI: an **Agents** view (Project → task rows, filters All / Needs you /
 Working / Done), an island progress ring for a working agent with steps, and
 the same rows on the phone. Design: canvas page "Borrow · intelligence ·
 agents", board B2.
+
+### 6.5 review against the code after 6.4 (2026-11-18)
+
+The proposal above still fits: `AGENT_STATE`, `AgentReportedState`, the
+caller check, the in-memory rule and the "says" chip all landed as designed,
+and the new fields are additive. Checking it against the code turned up
+seven changes. Each needs the owner's approval before tests or code.
+
+1. **Script lines must not become stored Events.** Today every
+   `::sentinal` line becomes an `EventKind` (`crates/watcher/src/engine.rs`),
+   and Events are written to the store and feed notification rules. A new
+   Event kind would break both "never stored" and "no new notification
+   kinds". Change: the watcher returns `::sentinal task` / `state` lines as
+   a separate `agent_line` field on `EngineUpdate`, not as an Event. The
+   daemon (`session_manager/tasks.rs`, where it already reads
+   `update.waiting`) applies it through the same in-memory path as the CLI,
+   with the same bounds and the same rate limit. No caller check is needed,
+   because the line comes from the Session's own output. If both paths
+   report, the latest report wins.
+2. **The 500 ms limit must not lose the last step.** 6.4 quietly drops a
+   report sent within 500 ms of the last one. With steps, a quick
+   "step 8 of 8" followed by `done` could leave "step 7 of 8" showing
+   forever. Change: keep the newest dropped report and apply it when the
+   window ends. That is still at most two updates per second per Session.
+3. **A report keeps the progress it does not mention.** In 6.4 each
+   report replaces the whole state. If an agent sends `--status blocked
+   --detail …` in the middle of a task, a full replace would wipe its task
+   and steps. Change:
+   - When a report leaves out `task`, `step`, `steps` or `eta_secs`, the
+     earlier value is kept.
+   - `detail` and `status` are always replaced, as in 6.4.
+   - A different `task` starts fresh: it resets `task_started_at`, the
+     step history and the ETA.
+   - Everything still clears when the Command ends.
+4. **The pace estimate, exactly:**
+   - The daemon records when each new step is first reported, keeping the
+     last six times.
+   - The estimate is the median time per step between those times ×
+     (`steps` − `step`). It is absent until two different steps have been
+     reported, so one step is never a pace. (Built this way; the approved
+     text said "two increases", which would wait one step longer.)
+   - History resets when the task changes, when `steps` changes, or when
+     `step` goes backwards.
+   - It is computed when a report arrives. The UI shows it as "about 15 m
+     at this pace" without counting it down, so it never claims more than
+     it knows.
+5. **Name clash with Settings → Agents.** Settings already has an
+   "Agents" tab for agent *tokens* (`AgentsTab.tsx`, Milestone 6.0).
+   Change: the new view is **Agents** at `/app/agents` and owns the
+   search verb `agents`. The Settings tab is renamed **Agent access**,
+   with the search verb `agent access`. Only the label changes; the tab
+   works as before.
+6. **`agent-skill --install` cannot be confirmed by an agent.**
+   - The command prints the exact diff to `AGENTS.md` / `CLAUDE.md`.
+   - It writes only after a `y` typed on a real terminal.
+   - Without a terminal (an agent's tool call), it prints the diff, writes
+     nothing and exits 1.
+   - There is deliberately no `--yes`.
+   - It changes only the text between `<!-- sentinal:agent-skill -->`
+     markers, and adds the markers at the end of the file if they are
+     missing.
+7. **Grouping:** `Session.project_id` exists, so the Agents view groups by
+   Project, then by cwd. No protocol change is needed for it.
+
+Wire additions (all optional, `PROTOCOL_VERSION` stays 1):
+
+| On | Field | Set by |
+|---|---|---|
+| `LocalRequest::AgentState`, `AgentReportedState` | `task`, `step`, `steps`, `eta_secs` | the agent (validated) |
+| `AgentReportedState` | `task_started_at`, `estimated_left_secs` | the daemon only; never read from a request |
+
+New fixtures will be added deliberately: an `AGENT_STATE` request with
+progress fields, and `session_agent_state_progress.json`.
 
 ## Decisions for the owner
 

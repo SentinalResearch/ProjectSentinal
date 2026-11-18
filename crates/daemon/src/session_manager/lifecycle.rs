@@ -331,6 +331,7 @@ impl SessionManager {
             watcher_ids: self.inner.tracker_ids.clone(),
             initial_command: Mutex::new(initial_command),
             shell_reports: Mutex::default(),
+            agent: Mutex::default(),
             attached: Arc::new(AtomicBool::new(false)),
             log_tail: Mutex::new(None),
             adopted_tree: Mutex::default(),

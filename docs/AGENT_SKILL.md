@@ -23,8 +23,32 @@ sentinal agent-state --status done    --detail "3 files changed, tests pass"
 - `done`: you finished what you were asked to do. Say what changed.
 
 The detail is one line, at most 200 characters, shown to the owner. Never put
-secrets, tokens, or file contents in it. Report again when the state changes;
-updates closer than half a second apart are dropped.
+secrets, tokens, or file contents in it. Report again when the state changes.
+Updates closer than half a second apart are merged: the newest one is shown
+when the half second is up.
+
+## Show progress on long tasks
+
+When a task will take more than a few minutes, say how many steps your plan
+has when you start, and report again after each step:
+
+```sh
+sentinal agent-state --status working --task "migrate tests" --step 1 --of 8
+sentinal agent-state --status working --task "migrate tests" --step 3 --of 8 --eta 12m
+sentinal agent-state --status blocked --detail "need the staging API key"
+```
+
+- `--task` names the task (at most 80 characters). A new name starts a new
+  task: its time on task starts again.
+- `--step N --of M`: the step you are on and how many there are. A report
+  that leaves them out keeps the last ones, so a `blocked` report in the
+  middle of a task keeps its progress.
+- `--eta` is your honest guess of time left (`90s`, `12m`, `2h`). Leave it
+  out if you do not know. It stands until you report a different step.
+- Report `blocked` with the reason as soon as you wait on the owner.
+
+The owner sees "claude says ~12 m" beside Sentinal's own estimate from your
+pace ("about 15 m at this pace"). Neither is shown as fact.
 
 ## Run work in its own folder
 

@@ -1,0 +1,29 @@
+{
+  "id": 129,
+  "machine_id": "rtx-pc",
+  "project_id": "tim",
+  "title": "claude",
+  "shell": "/bin/zsh",
+  "cwd": "~/Projects/TIM",
+  "state": "RUNNING",
+  "current_command": 8193,
+  "origin": "UI",
+  "capture": "FULL",
+  "pid": 4243,
+  "process_started_at": 1790000000000,
+  "exit_code": null,
+  "log": null,
+  "created_at": 1790000000000,
+  "updated_at": 1790000120000,
+  "agent_state": {
+    "status": "WORKING",
+    "detail": "editing the fixtures",
+    "task": "migrate tests",
+    "step": 3,
+    "steps": 8,
+    "eta_secs": 720,
+    "task_started_at": 1790592160000,
+    "estimated_left_secs": 900,
+    "reported_at": 1790592400000
+  }
+}

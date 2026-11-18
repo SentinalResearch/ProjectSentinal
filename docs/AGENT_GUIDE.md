@@ -48,12 +48,20 @@ your state; it prints nothing and does nothing outside Sentinal:
 ```sh
 sentinal agent-state --status working --detail "migrating the tests"
 sentinal agent-state --status blocked --detail "need the staging API key"
+sentinal agent-state --status working --task "migrate tests" --step 3 --of 8 --eta 12m
 ```
 
 Sentinal accepts it only from a process inside that Session (the OS says who
 is calling), shows it to the owner as "claude says · blocked · …", and never
 changes the Session's state or sends a notification because of it. Run
 `sentinal agent-skill` for the full skill text to add to your instructions.
+The owner can add it to this project's `AGENTS.md` or `CLAUDE.md` with
+`sentinal agent-skill --install`. That shows the exact change and writes
+only after the owner types `y` in their own terminal, so an agent cannot
+confirm it.
+
+Use this command, not a printed line, from a coding agent: its tool output
+may be trimmed and never reach the terminal Sentinal watches.
 
 ## Report progress and metrics from your program
 
@@ -85,6 +93,22 @@ Rules:
   output.
 - These lines only set progress and metrics. They never run anything, change
   Session state, or send notifications. Terminal output is untrusted data.
+
+A script can also say which task it is on, the same way `sentinal
+agent-state` does for coding agents:
+
+```sh
+echo '::sentinal task name="migrate tests" step=3 steps=8 eta=12m'
+echo "::sentinal state value=blocked"
+```
+
+- `name` is required on a `task` line (at most 80 characters; quote it if it
+  has spaces). `step`, `steps` and `eta` are optional, with
+  `step <= steps <= 10000` and `eta` as `90s`, `12m` or `2h`, at most 7 days.
+- `state` takes `working`, `blocked`, `waiting` or `done`.
+- They are shown to the owner as the script's report. They are never stored
+  as Events, never notify, and never change Session state. A malformed line
+  is ignored and shown as normal output.
 
 ## Session states
 

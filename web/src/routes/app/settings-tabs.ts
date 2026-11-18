@@ -7,7 +7,7 @@ export interface SettingsTab {
 
 const BASE_TABS: readonly SettingsTab[] = [
   { key: "machines", label: "Machines" },
-  { key: "agents", label: "Agents" },
+  { key: "agents", label: "Agent access" },
   { key: "notifications", label: "Notifications" },
   { key: "diagnostics", label: "Diagnostics" },
   { key: "account", label: "Account" },

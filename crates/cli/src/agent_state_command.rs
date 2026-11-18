@@ -1,12 +1,15 @@
 //! `sentinal agent-state`: an agent inside a Session tells the owner what it
-//! is doing (Milestone 6.4).
+//! is doing (Milestone 6.4) and how far along it is (6.5).
 //!
 //! It sends one `AGENT_STATE` over the private local socket within 50 ms and
 //! prints nothing. Outside a Session, or when the daemon is down, it exits 0
 //! quietly, like the shell hooks, so an agent can always call it.
 
 use crate::hook_report::{exchange, socket_path, REPORT_DEADLINE};
-use protocol::{agent_state::validate_agent_detail, AgentStatus, LocalRequest, SessionId};
+use protocol::{
+    agent_state::validate_agent_detail, parse_agent_eta, validate_agent_progress, AgentStatus,
+    LocalRequest, SessionId,
+};
 use std::{io::Write, path::PathBuf, process::ExitCode};
 
 /// The states an agent may report.
@@ -33,14 +36,50 @@ impl From<StatusArg> for AgentStatus {
     }
 }
 
+/// What `sentinal agent-state` reports.
+#[derive(Debug, Clone, PartialEq, Eq, clap::Args)]
+pub struct Report {
+    /// What you are doing.
+    #[arg(long, value_enum)]
+    pub status: StatusArg,
+    /// One owner-visible line (at most 200 characters, no secrets).
+    #[arg(long)]
+    pub detail: Option<String>,
+    /// The task you are on, e.g. "migrate tests" (at most 80 characters).
+    #[arg(long)]
+    pub task: Option<String>,
+    /// The step you are on now.
+    #[arg(long)]
+    pub step: Option<u32>,
+    /// How many steps your plan has.
+    #[arg(long = "of", value_name = "STEPS")]
+    pub steps: Option<u32>,
+    /// Your honest guess of time left: 90s, 12m or 2h (at most 7 days).
+    #[arg(long = "eta", value_name = "TIME", value_parser = eta)]
+    pub eta_secs: Option<u32>,
+}
+
+fn eta(text: &str) -> Result<u32, String> {
+    parse_agent_eta(text).ok_or_else(|| "use 90s, 12m or 2h, at most 7 days".to_string())
+}
+
 /// The request to send, `Ok(None)` when not inside a Session, or the reason
 /// the arguments are invalid.
 pub fn build_request(
     session_id: Option<&str>,
-    status: StatusArg,
-    detail: Option<String>,
+    report: Report,
 ) -> Result<Option<LocalRequest>, String> {
+    let Report {
+        status,
+        detail,
+        task,
+        step,
+        steps,
+        eta_secs,
+    } = report;
     validate_agent_detail(detail.as_deref()).map_err(|error| error.to_string())?;
+    validate_agent_progress(task.as_deref(), step, steps, eta_secs)
+        .map_err(|error| error.to_string())?;
     let Some(id) = session_id
         .and_then(|value| value.trim().parse::<u64>().ok())
         .filter(|id| *id > 0)
@@ -51,14 +90,18 @@ pub fn build_request(
         session_id: SessionId(id),
         status: status.into(),
         detail,
+        task,
+        step,
+        steps,
+        eta_secs,
         caller_pid: None,
     }))
 }
 
 /// Run `sentinal agent-state`; never writes to stdout.
-pub async fn run(status: StatusArg, detail: Option<String>, err: &mut dyn Write) -> ExitCode {
+pub async fn run(report: Report, err: &mut dyn Write) -> ExitCode {
     let session_id = std::env::var("SENTINAL_SESSION_ID").ok();
-    let request = match build_request(session_id.as_deref(), status, detail) {
+    let request = match build_request(session_id.as_deref(), report) {
         Ok(Some(request)) => request,
         Ok(None) => return ExitCode::SUCCESS,
         Err(reason) => {
@@ -81,17 +124,35 @@ pub async fn run(status: StatusArg, detail: Option<String>, err: &mut dyn Write)
 mod tests {
     use super::*;
 
+    fn report(status: StatusArg, detail: Option<String>) -> Report {
+        Report {
+            status,
+            detail,
+            task: None,
+            step: None,
+            steps: None,
+            eta_secs: None,
+        }
+    }
+
     #[test]
     fn inside_a_session_it_builds_a_report_without_naming_the_caller() {
-        let request = build_request(Some("7"), StatusArg::Blocked, Some("needs the key".into()))
-            .unwrap()
-            .unwrap();
+        let request = build_request(
+            Some("7"),
+            report(StatusArg::Blocked, Some("needs the key".into())),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(
             request,
             LocalRequest::AgentState {
                 session_id: SessionId(7),
                 status: AgentStatus::Blocked,
                 detail: Some("needs the key".into()),
+                task: None,
+                step: None,
+                steps: None,
+                eta_secs: None,
                 caller_pid: None,
             }
         );
@@ -100,13 +161,16 @@ mod tests {
     #[test]
     fn outside_a_session_it_does_nothing() {
         for value in [None, Some(""), Some("abc"), Some("0")] {
-            assert_eq!(build_request(value, StatusArg::Working, None), Ok(None));
+            assert_eq!(
+                build_request(value, report(StatusArg::Working, None)),
+                Ok(None)
+            );
         }
     }
 
     #[test]
     fn a_bad_detail_is_an_error_even_outside_a_session() {
-        assert!(build_request(None, StatusArg::Done, Some("bell\x07".into())).is_err());
-        assert!(build_request(Some("7"), StatusArg::Done, Some("x".repeat(201))).is_err());
+        assert!(build_request(None, report(StatusArg::Done, Some("bell\x07".into()))).is_err());
+        assert!(build_request(Some("7"), report(StatusArg::Done, Some("x".repeat(201)))).is_err());
     }
 }

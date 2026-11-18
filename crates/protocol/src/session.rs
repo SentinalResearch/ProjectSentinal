@@ -426,11 +426,7 @@ mod tests {
 
     #[test]
     fn an_agent_report_clears_when_the_command_or_session_ends_but_not_while_waiting() {
-        let report = crate::AgentReportedState {
-            status: crate::AgentStatus::Working,
-            detail: None,
-            reported_at: Timestamp(5),
-        };
+        let report = crate::AgentReportedState::new(crate::AgentStatus::Working, Timestamp(5));
         let mut session = session_in(SessionState::Running);
         session.agent_state = Some(Box::new(report.clone()));
         session

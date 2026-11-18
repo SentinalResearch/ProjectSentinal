@@ -105,3 +105,35 @@ describe("agents that report themselves blocked (6.4)", () => {
     expect(needCount(terminals)).toBe(1);
   });
 });
+
+describe("agents that report steps (6.5)", () => {
+  const agent = (id: string, step: number, steps: number, extra: Partial<Session> = {}): Session => ({
+    id,
+    machine: "m",
+    name: id,
+    state: "RUNNING",
+    codingAgent: { agent: "CLAUDE", working: true, toolUses: 1 },
+    agentState: { status: "WORKING", task: "migrate tests", step, steps, reportedAt: 1 },
+    ...extra,
+  });
+
+  it("get a progress ring in the island, marked as what claude says", () => {
+    expect(islandFocus([agent("claude", 3, 8)])).toEqual({
+      kind: "progress",
+      session: expect.objectContaining({ id: "claude" }),
+      percent: 38,
+      reported: { who: "claude", label: "step 3 of 8" },
+    });
+  });
+
+  it("compete with measured progress on how close to done they are", () => {
+    const focus = islandFocus([agent("claude", 3, 8), session("train", "RUNNING", { progress: { current: 9, total: 10, unit: "epoch" } })]);
+    expect(focus).toEqual({ kind: "progress", session: expect.objectContaining({ id: "train" }), percent: 90 });
+    expect(tickerItems([agent("claude", 3, 8)]).map((item) => item.text)).toEqual(["claude 38 %"]);
+  });
+
+  it("do not ring when blocked or without a plan", () => {
+    expect(islandFocus([agent("a", 3, 8, { agentState: { status: "BLOCKED", step: 3, steps: 8, reportedAt: 1 } })]).kind).not.toBe("progress");
+    expect(islandFocus([agent("b", 0, 0)])).toEqual({ kind: "idle" });
+  });
+});

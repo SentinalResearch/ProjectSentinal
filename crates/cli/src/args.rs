@@ -74,18 +74,23 @@ pub enum Command {
     Agents,
     /// Print the skill file an AI agent can add to its own instructions.
     #[command(alias = "skill")]
-    AgentSkill,
+    AgentSkill {
+        /// Add or update the skill in this project's AGENTS.md or CLAUDE.md,
+        /// after showing you the exact change and asking on your terminal.
+        #[arg(long)]
+        install: bool,
+        /// The instructions file to change instead of AGENTS.md / CLAUDE.md.
+        #[arg(long, requires = "install", value_name = "FILE")]
+        file: Option<PathBuf>,
+    },
     /// From inside a Session: tell the owner what you, an AI agent, are doing.
     ///
     /// Prints nothing and exits 0 when not inside Sentinal or when the daemon
     /// is down, so it is always safe to call.
     AgentState {
-        /// What you are doing.
-        #[arg(long, value_enum)]
-        status: crate::agent_state_command::StatusArg,
-        /// One owner-visible line (at most 200 characters, no secrets).
-        #[arg(long)]
-        detail: Option<String>,
+        /// What to report.
+        #[command(flatten)]
+        report: crate::agent_state_command::Report,
     },
     /// Serve Sentinal's agent tools to an MCP client over stdio (Claude Code, Claude Desktop, …).
     ///

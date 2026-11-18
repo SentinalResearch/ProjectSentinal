@@ -25,3 +25,4 @@ pub use framing::LineFramer;
 pub use generic::{GenericAdapter, GenericState};
 pub use health::HealthTracker;
 pub use observation::{MetricsObservation, Observation, ObservationKind, ProcessObservation};
+pub use progress::AgentLine;

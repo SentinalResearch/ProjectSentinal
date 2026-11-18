@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AgentBadge } from "../../../components/AgentBadge";
 import { AgentStateChip } from "../../../components/AgentStateChip";
+import { agentPercent } from "../../../data/agentState";
 import { LearnTip } from "../../../components/LearnTip";
 import { PromptChoices } from "../../../components/PromptChoices";
 import { StateIcon } from "../../../components/StateIcon";
@@ -398,7 +399,11 @@ function MachineLane({
 
 function LaneRow({ session, onOpen }: { session: Session; onOpen: () => void }) {
   const port = extractPort(session);
-  const percent = session.progress && session.progress.total > 0 ? Math.round((session.progress.current / session.progress.total) * 100) : null;
+  const measured = session.progress && session.progress.total > 0 ? Math.round((session.progress.current / session.progress.total) * 100) : null;
+  // 6.5: a working agent's own step count fills the bar when nothing is measured.
+  const reported =
+    measured === null && session.state === "RUNNING" && session.agentState?.status === "WORKING" ? agentPercent(session.agentState) : undefined;
+  const percent = measured ?? reported ?? null;
   const guess = session.progress?.inferred === true;
   const corner = percent !== null ? `${guess ? "≈ " : ""}${percent} %` : (port ? `:${port}` : null) ?? session.runningFor ?? "";
   return (
@@ -410,7 +415,7 @@ function LaneRow({ session, onOpen }: { session: Session; onOpen: () => void }) 
         {session.agentState ? <AgentStateChip session={session} compact /> : (session.command ?? session.cwd ?? "")}
       </span>
       {percent !== null ? (
-        <span className={styles.progress} aria-hidden="true">
+        <span className={styles.progress} aria-hidden="true" data-reported={reported !== undefined || undefined}>
           <span className={styles.progressFill} style={{ width: `${percent}%` }} />
         </span>
       ) : (
