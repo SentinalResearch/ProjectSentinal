@@ -21,7 +21,9 @@ impl SessionManager {
                 title,
             } => self
                 .register_shell(pid, &shell, &cwd, title)
-                .map(|session| LocalResponse::Session { session }),
+                .map(|session| LocalResponse::Session {
+                    session: Box::new(session),
+                }),
             LocalRequest::ShellCommandStarted {
                 session_id,
                 pid,
@@ -35,7 +37,9 @@ impl SessionManager {
                     Some(command) => Ok(LocalResponse::Command { command }),
                     None => self
                         .session(session_id)
-                        .map(|session| LocalResponse::Session { session }),
+                        .map(|session| LocalResponse::Session {
+                            session: Box::new(session),
+                        }),
                 }),
             LocalRequest::ShellCommandFinished {
                 session_id,
@@ -49,7 +53,9 @@ impl SessionManager {
                     Some(command) => Ok(LocalResponse::Command { command }),
                     None => self
                         .session(session_id)
-                        .map(|session| LocalResponse::Session { session }),
+                        .map(|session| LocalResponse::Session {
+                            session: Box::new(session),
+                        }),
                 }),
             LocalRequest::AdoptProcess {
                 pid,
@@ -57,7 +63,19 @@ impl SessionManager {
                 log_path,
             } => self
                 .adopt_process(pid, title, log_path)
-                .map(|session| LocalResponse::Session { session }),
+                .map(|session| LocalResponse::Session {
+                    session: Box::new(session),
+                }),
+            LocalRequest::AgentState {
+                session_id,
+                status,
+                detail,
+                caller_pid,
+            } => self
+                .report_agent_state(session_id, status, detail, caller_pid)
+                .map(|session| LocalResponse::Session {
+                    session: Box::new(session),
+                }),
             // Machine identity and control links belong to the link manager.
             LocalRequest::GetIdentity
             | LocalRequest::ConnectControl { .. }
@@ -90,7 +108,10 @@ fn error_code(error: &SessionManagerError) -> LocalErrorCode {
         }
         SessionManagerError::ProcessNotOwned { .. }
         | SessionManagerError::NotShellHook(_)
-        | SessionManagerError::ShellPidMismatch { .. } => LocalErrorCode::Forbidden,
+        | SessionManagerError::ShellPidMismatch { .. }
+        | SessionManagerError::AgentCallerUnknown
+        | SessionManagerError::AgentOutsideSession { .. } => LocalErrorCode::Forbidden,
+        SessionManagerError::AgentReportsNotTaken(_) => LocalErrorCode::InvalidRequest,
         SessionManagerError::SequenceConflict { .. }
         | SessionManagerError::AlreadyAdopted { .. } => LocalErrorCode::Conflict,
         SessionManagerError::AdoptSelf(_) | SessionManagerError::InvalidLog { .. } => {

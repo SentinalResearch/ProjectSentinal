@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { AgentBadge } from "../../components/AgentBadge";
 import { CaptureBadge } from "../../components/CaptureBadge";
+import { AgentStateChip, SandboxBadge } from "../../components/AgentStateChip";
 import { OutputSearchToggle } from "../../components/OutputSearchToggle";
 import { MockBadge } from "../../components/MockBadge";
 import { StateTag } from "../../components/StateTag";
@@ -30,6 +31,7 @@ import { EventsList } from "./EventsList";
 import { HealthCard } from "./HealthCard";
 import { SessionTopBlock } from "./SessionTopBlock";
 import { SummaryLine } from "./SummaryLine";
+import { Suggestions } from "./Suggestions";
 import { SessionHistoryTerminals } from "./SessionHistoryTerminals";
 import { SessionRemoveActions } from "./SessionRemoveActions";
 import { SplitHandle, useSessionSplit } from "./SplitHandle";
@@ -252,8 +254,9 @@ function DesktopSessionDetail() {
                   Generation {lineage.selectedIndex + 1} of {lineage.ordered.length}
                 </span>
               )}
-              <StateTag state={session.state} exitUnknown={unknownExit} />
+              <StateTag state={session.state} exitUnknown={unknownExit} variant={glass ? "line" : undefined} />
               <CaptureBadge capture={capture} origin={session.origin} />
+              <SandboxBadge session={session} />
               {session.codingAgent && <AgentBadge agent={session.codingAgent} usage />}
               {hasHealth && (
                 <span
@@ -267,6 +270,11 @@ function DesktopSessionDetail() {
             </div>
             {session.command && <span className={styles.command}>{session.command}</span>}
             <span className={styles.meta}>{meta}</span>
+            {session.agentState && (
+              <span>
+                <AgentStateChip session={session} />
+              </span>
+            )}
             {capture !== "FULL" && (
               <span className={styles.captureLine} role="note">
                 {captureExplanation(capture)}
@@ -332,6 +340,7 @@ function DesktopSessionDetail() {
         {continueError && <p className={styles.continueError} role="alert">{continueError}</p>}
 
         {session.summary && <SummaryLine summary={session.summary} />}
+        <Suggestions session={session} />
         <SessionTopBlock
           session={session}
           kind={kind}

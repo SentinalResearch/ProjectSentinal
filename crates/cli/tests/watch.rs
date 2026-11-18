@@ -59,6 +59,8 @@ fn bare_watch_has_no_title_or_command() {
         Command::Watch {
             title: None,
             detach: false,
+            sandbox: false,
+            cwd: None,
             command: None
         }
     ));
@@ -127,6 +129,7 @@ fn plan_uses_current_cwd_dimensions_shell_and_watch_origin() {
             title: Some("Job".into()),
             command: Some(command),
             env: Some(vec![("PATH".into(), "/opt/homebrew/bin:/usr/bin".into())]),
+            sandbox: false,
         })
     );
 }
@@ -446,4 +449,50 @@ fn detach_needs_a_command() {
         parse(&["sentinal", "watch", "-d", "--", "make"]),
         Command::Watch { detach: true, .. }
     ));
+}
+
+// ---- sandbox (6.4) ---------------------------------------------------------
+
+#[test]
+fn sandbox_and_its_cwd_parse_and_cwd_needs_sandbox() {
+    assert!(matches!(
+        parse(&[
+            "sentinal",
+            "watch",
+            "--sandbox",
+            "--cwd",
+            "scratch",
+            "--",
+            "make"
+        ]),
+        Command::Watch {
+            sandbox: true,
+            cwd: Some(_),
+            ..
+        }
+    ));
+    assert!(cli::args::Cli::try_parse_from(["sentinal", "watch", "--cwd", "scratch"]).is_err());
+}
+
+#[test]
+fn a_sandbox_request_drops_the_terminal_cwd_unless_one_is_given() {
+    let WatchPlan::Create(planned) =
+        plan_watch(None, Some(vec!["make".into()]), &context()).unwrap()
+    else {
+        panic!("expected a plan to create");
+    };
+    match cli::watch::into_sandbox(planned.clone(), None).unwrap() {
+        ClientRequest::CreateSession { cwd, sandbox, .. } => {
+            assert!(sandbox);
+            assert_eq!(cwd, None, "the daemon picks the sandbox folder");
+        }
+        other => panic!("{other:?}"),
+    }
+    match cli::watch::into_sandbox(planned, Some(std::path::Path::new("/tmp/scratch"))).unwrap() {
+        ClientRequest::CreateSession { cwd, sandbox, .. } => {
+            assert!(sandbox);
+            assert_eq!(cwd.as_deref(), Some("/tmp/scratch"));
+        }
+        other => panic!("{other:?}"),
+    }
 }

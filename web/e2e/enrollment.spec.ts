@@ -183,7 +183,8 @@ test("two workers enroll, rename, and revoke independently with no secret in the
     ...linkSecrets(env("SENTINAL_E2E_WORKER_B_ROOT")),
   ];
   for (const secret of secrets) expect(stored).not.toContain(secret);
-  // The owner Session is HttpOnly; JavaScript storage contains only preferences.
-  expect(Object.keys(JSON.parse(stored)).sort()).toEqual(["sentinal.theme"]);
+  // The owner Session is HttpOnly; JavaScript storage contains only preferences:
+  // theme, the learning tip's state, and notification read / auto-clear choices.
+  expect(Object.keys(JSON.parse(stored)).sort()).toEqual(["sentinal.learn", "sentinal.lifecycle", "sentinal.theme"]);
   expect(browserSockets.every((url) => new URL(url).searchParams.get("token") === null)).toBe(true);
 });

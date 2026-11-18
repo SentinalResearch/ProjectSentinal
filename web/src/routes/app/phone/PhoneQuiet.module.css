@@ -1,0 +1,349 @@
+/* P1 · the phone dashboard in the quiet style (Option A, like desktop T1).
+   The shell already clears the island and the prompt pill. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 0 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.dateRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+/* One line of devices; it scrolls sideways rather than wrapping. */
+.devices {
+  display: flex;
+  gap: 16px;
+  padding: 2px 0;
+  border-top: 1.5px solid var(--text-1);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.devices::-webkit-scrollbar {
+  display: none;
+}
+
+.device {
+  flex: none;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.device[aria-pressed="true"] {
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+.device:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+.deviceDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1.2px var(--text-3);
+}
+.device[data-online] .deviceDot {
+  background: var(--s-running-fg);
+  box-shadow: none;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.heroTitle {
+  margin: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  font-weight: 300;
+}
+
+.count {
+  font-size: 120px;
+  line-height: 92px;
+  font-weight: 200;
+  letter-spacing: -0.06em;
+}
+
+.words {
+  padding-bottom: 6px;
+  font-size: 22px;
+  font-weight: 300;
+}
+
+.accent {
+  color: var(--accent-fg);
+}
+
+.summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.filter {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.link {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.link:disabled {
+  opacity: 0.5;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+.section[data-offline] {
+  opacity: 0.6;
+}
+
+.sectionHeadRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1.5px solid var(--text-1);
+}
+.sectionHeadRow .sectionHead {
+  border-bottom: 0;
+}
+
+.sectionHead {
+  margin: 0;
+  padding: 0 0 8px;
+  border-bottom: 1.5px solid var(--text-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.row {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rowBody,
+.rowLink {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowTitle {
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta,
+.rowMetaMono {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rowMetaMono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.choices {
+  padding-top: 6px;
+}
+
+.answers {
+  display: flex;
+  gap: 6px;
+}
+
+.yes,
+.no {
+  width: 46px;
+  height: 38px;
+  border: 0;
+  border-radius: 19px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  cursor: pointer;
+}
+.yes {
+  background: var(--text-1);
+  color: var(--bg-0);
+  font-weight: 700;
+}
+.no {
+  background: var(--chip);
+  color: var(--text-1);
+}
+
+.quiet {
+  min-height: 40px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chevron {
+  color: var(--text-3);
+}
+
+.laneRow {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+
+.laneBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.percent {
+  width: 46px;
+  flex: none;
+  font-size: 22px;
+  font-weight: 200;
+}
+.percentSign {
+  font-size: 12px;
+}
+
+.bar {
+  height: 2px;
+  background: var(--line);
+}
+.barFill {
+  display: block;
+  height: 2px;
+  background: var(--accent);
+}
+
+.empty {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.hiddenLink {
+  min-height: 40px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* Done: swipe a row left for Hide and Delete…. */
+.swipe {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+
+.swipeActions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+}
+
+.swipeHide,
+.swipeDelete {
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.swipeHide {
+  width: 72px;
+  background: var(--chip-hover);
+  color: var(--text-1);
+}
+.swipeDelete {
+  width: 76px;
+  background: var(--destructive);
+  color: #ffffff;
+}
+.swipeHide:focus-visible,
+.swipeDelete:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: -2px;
+}
+
+.swipeFront {
+  position: relative;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-app);
+  transition: transform 200ms var(--ease-out, ease-out);
+  touch-action: pan-y;
+}
+
+:is(.yes, .no, .quiet, .link):focus-visible,
+.rowLink:focus-visible,
+.laneRow:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}

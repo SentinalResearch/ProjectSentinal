@@ -2,6 +2,8 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AgentBadge } from "../../../components/AgentBadge";
+import { AgentStateChip } from "../../../components/AgentStateChip";
+import { LearnTip } from "../../../components/LearnTip";
 import { PromptChoices } from "../../../components/PromptChoices";
 import { StateIcon } from "../../../components/StateIcon";
 import { dataAdapter } from "../../../data";
@@ -111,6 +113,8 @@ export function GlassDashboard() {
           </h1>
           <p className={styles.summary}>{summary}</p>
         </header>
+
+        <LearnTip onTry={shell ? () => shell.openPrompt() : undefined} />
 
       </div>
 
@@ -264,6 +268,11 @@ function NeedsRow({
             {where} · {session.state === "WAITING" ? "Waiting for input" : fact}
           </p>
         )}
+        {session.agentState && (
+          <p className={styles.needMeta}>
+            <AgentStateChip session={session} />
+          </p>
+        )}
         {reason && <p className={styles.needNote}>{reason}</p>}
         {choices && (
           <div className={styles.choices} onClick={(event) => event.stopPropagation()}>
@@ -390,13 +399,16 @@ function MachineLane({
 function LaneRow({ session, onOpen }: { session: Session; onOpen: () => void }) {
   const port = extractPort(session);
   const percent = session.progress && session.progress.total > 0 ? Math.round((session.progress.current / session.progress.total) * 100) : null;
-  const corner = percent !== null ? `${percent} %` : (port ? `:${port}` : null) ?? session.runningFor ?? "";
+  const guess = session.progress?.inferred === true;
+  const corner = percent !== null ? `${guess ? "≈ " : ""}${percent} %` : (port ? `:${port}` : null) ?? session.runningFor ?? "";
   return (
     <button type="button" className={styles.laneRow} onClick={onOpen} aria-label={`${session.name}, ${session.state.toLowerCase()}${corner ? `, ${corner}` : ""}`}>
       <StateIcon state={session.state} size={20} />
       <span className={styles.laneTitle}>{session.name}</span>
       {session.codingAgent && <AgentBadge agent={session.codingAgent} />}
-      <span className={styles.laneCommand}>{session.command ?? session.cwd ?? ""}</span>
+      <span className={styles.laneCommand}>
+        {session.agentState ? <AgentStateChip session={session} compact /> : (session.command ?? session.cwd ?? "")}
+      </span>
       {percent !== null ? (
         <span className={styles.progress} aria-hidden="true">
           <span className={styles.progressFill} style={{ width: `${percent}%` }} />

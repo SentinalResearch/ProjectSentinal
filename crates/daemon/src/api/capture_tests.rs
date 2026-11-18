@@ -81,6 +81,7 @@ async fn create_ui_session(state: &AppState) -> SessionId {
         title: None,
         command: None,
         env: None,
+        sandbox: false,
     };
     match dispatch(state, request).await {
         WsAction::Reply(DaemonMessage::SessionUpdated { session }) => session.id,

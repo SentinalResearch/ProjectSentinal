@@ -5,15 +5,26 @@ import { DevBadge } from "../../../components/DevBadge";
 import { SentinalMark } from "../../../components/SentinalMark";
 import { ThemeChoice } from "../../../components/ThemeSwitch";
 import { dataAdapter } from "../../../data";
-import { answerPrompt, endSession } from "../../../data/actions";
+import { answerPrompt, canAnswer, endSession, offeredChoices } from "../../../data/actions";
+import { inboxItems, lifecycle, useLifecycle } from "../../../data/lifecycle";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Session } from "../../../data/types";
 import { IslandInbox, useUnreadCount } from "./IslandInbox";
+import { OPEN_INBOX_EVENT } from "./usePromptActions";
 import { islandLocation } from "./location";
+import { usePopup } from "./usePopup";
 import { PlacesMenu } from "./PlacesMenu";
 import type { BackEntry } from "./SheetStage";
 import { islandFocus, needCount, tickerItems } from "./ticker";
 import styles from "./LiveIsland.module.css";
+
+const NOTICE_WORD: Partial<Record<Session["state"], string>> = {
+  FAILED: "failed",
+  STALLED: "stalled",
+  WAITING: "is waiting",
+  COMPLETED: "finished",
+  INTERRUPTED: "stopped",
+};
 
 const FINISHED: ReadonlySet<string> = new Set(["COMPLETED", "FAILED", "INTERRUPTED"]);
 
@@ -42,17 +53,29 @@ export function LiveIsland({
 }) {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-  const { machines, sessions, terminals } = useLiveData();
+  const { machines, sessions, terminals, loading } = useLiveData();
   const where = islandLocation(pathname, search, machines, sessions);
   const items = tickerItems(terminals);
   const needs = needCount(terminals);
   // Questions set aside with "Not now" go back to the ticker.
-  const [setAside, setSetAside] = useState<ReadonlySet<string>>(() => new Set());
-  const focus = islandFocus(terminals, setAside);
+  const focus = islandFocus(terminals);
+  // New notifications pop down for a few seconds, one at a time, then tuck
+  // into the inbox (still unread). Hovering the island holds the current one.
+  const life = useLifecycle();
+  const [hovering, setHovering] = useState(false);
+  const popup = usePopup(inboxItems(terminals, life), !loading, hovering);
+  const current = popup.current;
+  const asking = current && current.session.state === "WAITING" && canAnswer(current.session) && offeredChoices(current.session).length === 0 ? current.session : undefined;
+  const notice = current && !asking ? current : undefined;
   const machineName = (id: string) => machines.find((machine) => machine.id === id)?.name ?? id;
   const islandRef = useRef<HTMLElement>(null);
   const unread = useUnreadCount(terminals);
   const [inboxOpen, setInboxOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setInboxOpen(true);
+    window.addEventListener(OPEN_INBOX_EVENT, open);
+    return () => window.removeEventListener(OPEN_INBOX_EVENT, open);
+  }, []);
   // A click outside the island closes the inbox.
   useEffect(() => {
     if (!inboxOpen) return;
@@ -112,6 +135,8 @@ export function LiveIsland({
       style={anchorX === null ? undefined : { left: `${anchorX}px` }}
       aria-label="Sentinal"
       title="Click or press / to search"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
       onClick={(event) => {
         // The island is the search: a click on its body (not on one of its controls) opens it.
         if (!(event.target as HTMLElement).closest("button, a, [role='group'], [role='alertdialog']")) onOpenPrompt();
@@ -145,11 +170,18 @@ export function LiveIsland({
           type="button"
           className={styles.progress}
           onClick={() => navigate(`/app/sessions/${focus.session.id}`)}
-          aria-label={`${focus.session.name}, ${focus.percent} % done`}
+          aria-label={
+            focus.session.progress?.inferred
+              ? `${focus.session.name}, about ${focus.percent} % done (Sentinal thinks, read off the screen)`
+              : `${focus.session.name}, ${focus.percent} % done`
+          }
         >
-          <ProgressRing percent={focus.percent} />
+          <ProgressRing percent={focus.percent} guess={focus.session.progress?.inferred} />
           <span className={styles.progressName}>{focus.session.name}</span>
-          <span className={styles.progressPercent}>{focus.percent} %</span>
+          <span className={styles.progressPercent}>
+            {focus.session.progress?.inferred ? "≈ " : ""}
+            {focus.percent} %
+          </span>
           {focus.session.progress && (
             <span className={styles.progressDetail}>
               {focus.session.progress.unit} {focus.session.progress.current}/{focus.session.progress.total}
@@ -195,7 +227,7 @@ export function LiveIsland({
       </button>
       </div>
       {/* Grows down, never sideways: a question or a Kill confirm drops in under the row. */}
-      {(interrupting || inboxOpen || focus.kind === "answer") && (
+      {(interrupting || inboxOpen || current) && (
         <div className={styles.drop} data-inbox={(inboxOpen && !interrupting) || undefined}>
           {interrupting ? (
             <IslandConfirm
@@ -207,23 +239,59 @@ export function LiveIsland({
             />
           ) : inboxOpen ? (
             <IslandInbox terminals={terminals} machineName={machineName} onClose={() => setInboxOpen(false)} />
-          ) : focus.kind === "answer" ? (
-        <span className={styles.answer} role="group" aria-label={`${focus.session.name} asks`}>
-          <button type="button" className={styles.answerName} onClick={() => navigate(`/app/sessions/${focus.session.id}`)}>
-            {`${focus.session.name} asks`}
+          ) : notice ? (
+            <span className={styles.notice} role="status" aria-label={`New: ${notice.session.name}`} data-popup={notice.id}>
+              <span className={styles.noticeSquare} data-state={notice.session.state} aria-hidden="true" />
+              <button
+                type="button"
+                className={styles.noticeText}
+                onClick={() => {
+                  lifecycle.markRead([notice.id]);
+                  navigate(`/app/sessions/${encodeURIComponent(notice.session.id)}`);
+                }}
+              >
+                <span className={styles.noticeName}>
+                  {notice.session.name} {NOTICE_WORD[notice.session.state] ?? ""}
+                </span>
+                <span className={styles.noticeMeta}>{machineName(notice.session.machine)}</span>
+              </button>
+              <button
+                type="button"
+                className={styles.noticeOpen}
+                onClick={() => {
+                  lifecycle.markRead([notice.id]);
+                  navigate(`/app/sessions/${encodeURIComponent(notice.session.id)}`);
+                }}
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                className={styles.answerLater}
+                onClick={() => popup.dismiss(notice.id)}
+                aria-label={`Close, keep ${notice.session.name} in the inbox`}
+                title="Close (stays in the inbox)"
+              >
+                ×
+              </button>
+            </span>
+          ) : asking && current ? (
+        <span className={styles.answer} role="group" aria-label={`${asking.name} asks`} data-popup={current.id}>
+          <button type="button" className={styles.answerName} onClick={() => navigate(`/app/sessions/${asking.id}`)}>
+            {`${asking.name} asks`}
           </button>
-          <span className={styles.answerPrompt}>{focus.session.prompt}</span>
-          <button type="button" className={styles.answerYes} onClick={() => void answerPrompt(focus.session.id, "y")} aria-label={`y, answer ${focus.session.name}`}>
+          <span className={styles.answerPrompt}>{asking.prompt}</span>
+          <button type="button" className={styles.answerYes} onClick={() => void answerPrompt(asking.id, "y")} aria-label={`y, answer ${asking.name}`}>
             y
           </button>
-          <button type="button" className={styles.answerNo} onClick={() => void answerPrompt(focus.session.id, "n")} aria-label={`n, answer ${focus.session.name}`}>
+          <button type="button" className={styles.answerNo} onClick={() => void answerPrompt(asking.id, "n")} aria-label={`n, answer ${asking.name}`}>
             n
           </button>
           <button
             type="button"
             className={styles.answerLater}
-            onClick={() => setSetAside((previous) => new Set(previous).add(focus.session.id))}
-            aria-label={`Not now, keep ${focus.session.name} in the list`}
+            onClick={() => popup.dismiss(current.id)}
+            aria-label={`Not now, keep ${asking.name} in the list`}
             title="Not now"
           >
             ×
@@ -237,11 +305,12 @@ export function LiveIsland({
 }
 
 /** A small ring that fills with the job's progress. */
-function ProgressRing({ percent }: { percent: number }) {
+function ProgressRing({ percent, guess = false }: { percent: number; guess?: boolean }) {
   const circumference = 2 * Math.PI * 8;
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" className={styles.ring}>
-      <circle cx="10" cy="10" r="8" fill="none" stroke="var(--line)" strokeWidth="2.5" />
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" className={styles.ring} data-guess={guess || undefined}>
+      {/* A guess from the intelligence layer gets a dashed track, like every guess. */}
+      <circle cx="10" cy="10" r="8" fill="none" stroke={guess ? "var(--accent-fg)" : "var(--line)"} strokeWidth={guess ? 1.2 : 2.5} strokeDasharray={guess ? "2 2" : undefined} />
       <circle
         cx="10"
         cy="10"

@@ -434,3 +434,23 @@
 .moreButton:active {
   background: var(--bg-2);
 }
+
+/* Quiet style (UX pass): round pill chips, thin rules, line icons. */
+.chip {
+  border: 0;
+  border-radius: 18px;
+  background: var(--chip);
+  font-weight: 500;
+}
+.chip[aria-pressed="true"] {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+.groupHead {
+  border-bottom-width: 1.5px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.search {
+  border-radius: 22px;
+}

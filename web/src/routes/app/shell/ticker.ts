@@ -31,17 +31,21 @@ function progressText(session: Session): string | null {
  * Sessions that report progress), newest first within a state.
  */
 export function tickerItems(terminals: Session[], limit = 3): TickerItem[] {
+  // 6.4: a running agent that reports itself blocked is shown like a question
+  // (display only: it is not a need and sends no notification).
+  const blocked = (session: Session) => session.state === "RUNNING" && session.agentState?.status === "BLOCKED";
+  const rank = (session: Session) => (blocked(session) ? 1.5 : (PRIORITY[session.state] ?? 9));
   return terminals
-    .filter((session) => session.state in PRIORITY && !session.dismissed && (session.state !== "RUNNING" || progressText(session) !== null))
-    .sort(
-      (left, right) =>
-        (PRIORITY[left.state] ?? 9) - (PRIORITY[right.state] ?? 9) || (right.updatedAt ?? 0) - (left.updatedAt ?? 0),
+    .filter(
+      (session) =>
+        session.state in PRIORITY && !session.dismissed && (session.state !== "RUNNING" || blocked(session) || progressText(session) !== null),
     )
+    .sort((left, right) => rank(left) - rank(right) || (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
     .slice(0, limit)
     .map((session) => ({
       sessionId: session.id,
-      state: session.state,
-      text: `${shortName(session.name)} ${session.state === "RUNNING" ? progressText(session) : WORD[session.state]}`,
+      state: blocked(session) ? "WAITING" : session.state,
+      text: `${shortName(session.name)} ${blocked(session) ? "blocked" : session.state === "RUNNING" ? progressText(session) : WORD[session.state]}`,
     }));
 }
 

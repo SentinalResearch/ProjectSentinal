@@ -280,3 +280,9 @@
   outline: 2px solid var(--accent-fg);
   outline-offset: 2px;
 }
+
+/* Quiet style (UX pass): page titles are thin like the dashboard, not heavy. */
+.title {
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}

@@ -65,6 +65,7 @@ export function SessionTopBlock({
         <div className={styles.percentCol}>
           <div className={styles.percentRow}>
             <span className={styles.percentValue}>
+              {session.progress.inferred && <span className={styles.approx}>≈</span>}
               {pct}
               <span className={styles.percentSign}>%</span>
             </span>
@@ -72,6 +73,12 @@ export function SessionTopBlock({
               {unit} {current}/{total}
               <br />
               {session.runningFor && `running ${session.runningFor}`}
+              {session.progress.inferred && (
+                <span className={styles.guess}>
+                  <span className={styles.guessRing} aria-hidden="true" />
+                  Sentinal thinks · read off the screen
+                </span>
+              )}
             </span>
           </div>
           <div className={styles.progressTrack}>

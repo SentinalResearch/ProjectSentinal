@@ -184,7 +184,7 @@ impl Store {
                 to_sql_id(session.id.0)?,
                 state_name(session.state)?,
                 session.updated_at.0,
-                serde_json::to_string(session)?,
+                stored_session_json(session)?,
             ),
         )?;
         Ok(())
@@ -207,7 +207,7 @@ impl Store {
             (
                 state_name(session.state)?,
                 session.updated_at.0,
-                serde_json::to_string(session)?,
+                stored_session_json(session)?,
                 to_sql_id(session.id.0)?,
             ),
         )?;
@@ -284,7 +284,7 @@ impl Store {
                 (
                     state_name(session.state)?,
                     at.0,
-                    serde_json::to_string(&session)?,
+                    stored_session_json(&session)?,
                     to_sql_id(session.id.0)?,
                 ),
             )?;
@@ -383,4 +383,15 @@ fn state_name(state: SessionState) -> Result<String, StoreError> {
 
 pub(crate) fn to_sql_id(value: u64) -> Result<i64, StoreError> {
     i64::try_from(value).map_err(|_| StoreError::IdRange { value })
+}
+
+/// A Session as stored: what an agent reported (6.4) is a live moment and is
+/// never written, so a restart cannot show a stale "working".
+fn stored_session_json(session: &Session) -> Result<String, serde_json::Error> {
+    if session.agent_state.is_none() {
+        return serde_json::to_string(session);
+    }
+    let mut stored = session.clone();
+    stored.agent_state = None;
+    serde_json::to_string(&stored)
 }

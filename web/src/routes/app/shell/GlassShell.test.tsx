@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "../../../context/AuthContext";
+import { resetLifecycle } from "../../../data/lifecycle";
 import { ThemeProvider } from "../../../context/ThemeContext";
 import { dataAdapter } from "../../../data";
 import { resetViewport, setViewport } from "../../../test-viewport";
@@ -221,5 +222,20 @@ describe("glass shell prompt (GLASS_SPEC.md §5)", () => {
 
     await user.click(hit);
     expect(await screen.findByRole("button", { name: /You are on History/ })).toBeInTheDocument();
+  });
+
+  it("the newest notification pops under the island; × tucks it away and it stays unread in the inbox", async () => {
+    resetLifecycle();
+    renderShell("/app/history");
+    const island = await islandReady();
+    const user = userEvent.setup();
+    await waitFor(() => expect(island.querySelector("[data-popup]")).not.toBeNull());
+    const popup = island.querySelector("[data-popup]") as HTMLElement;
+    const id = popup.getAttribute("data-popup");
+    const unread = within(island).getByRole("button", { name: /unread notifications?$/ }).textContent;
+    await user.click(within(popup).getByRole("button", { name: /^(Not now|Close), keep / }));
+    expect(island.querySelector(`[data-popup="${id}"]`)).toBeNull();
+    expect(within(island).getByRole("button", { name: /unread notifications?$/ }).textContent).toBe(unread);
+    resetLifecycle();
   });
 });

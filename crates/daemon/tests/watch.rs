@@ -70,6 +70,7 @@ fn watch(command: Option<Vec<String>>) -> CreateSession {
         title: Some("Qwen Training".into()),
         command,
         env: None,
+        sandbox: false,
     }
 }
 

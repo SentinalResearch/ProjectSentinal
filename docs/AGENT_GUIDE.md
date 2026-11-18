@@ -40,6 +40,21 @@ sentinal top --json
 To wait, call `status` about every 30 s until the state changes. Do not read
 the screen or re-run the work to find out how it is going.
 
+## Tell the owner what you are doing (agents inside a Session)
+
+When `SENTINAL_SESSION_ID` is set, you run inside a Sentinal Session. Report
+your state; it prints nothing and does nothing outside Sentinal:
+
+```sh
+sentinal agent-state --status working --detail "migrating the tests"
+sentinal agent-state --status blocked --detail "need the staging API key"
+```
+
+Sentinal accepts it only from a process inside that Session (the OS says who
+is calling), shows it to the owner as "claude says · blocked · …", and never
+changes the Session's state or sends a notification because of it. Run
+`sentinal agent-skill` for the full skill text to add to your instructions.
+
 ## Report progress and metrics from your program
 
 A program watched by Sentinal can print one line to report progress or a

@@ -1,5 +1,6 @@
 import { captureCapabilities, captureOf } from "./capture";
 import { dataAdapter } from "./index";
+import { isBlanketAnswer, riskOf } from "./risk";
 import type { PromptChoice, Session } from "./types";
 
 /** States whose program can still take Ctrl-C. */
@@ -42,7 +43,12 @@ export function answerChoice(sessionId: string, choice: PromptChoice, session?: 
 
 /** The offered answers worth showing, or none when the program listed none. */
 export function offeredChoices(session: Session): PromptChoice[] {
-  return (session.promptOptions ?? []).filter((choice) => choiceKeysAllowed(choice.keys)).slice(0, 6);
+  // A hard-to-undo command never gets a blanket "don't ask again" from Sentinal.
+  const risky = riskOf(session.prompt) !== null;
+  return (session.promptOptions ?? [])
+    .filter((choice) => choiceKeysAllowed(choice.keys))
+    .filter((choice) => !(risky && isBlanketAnswer(choice.label)))
+    .slice(0, 6);
 }
 
 /** `[y/N]`, `(Y/n)`, `[yes/no]`: a key and Enter answers it. A bare `(yes/no)` wants the word typed. */

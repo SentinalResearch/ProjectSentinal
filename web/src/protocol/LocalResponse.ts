@@ -15,7 +15,7 @@ import type { WorkerHandoff } from "./WorkerHandoff";
 export type LocalResponse = {
   "type": "SESSION";
   /**
-   * Current Session state.
+   * Current Session state (boxed: it is far larger than the other replies).
    */
   session: Session;
 } | {

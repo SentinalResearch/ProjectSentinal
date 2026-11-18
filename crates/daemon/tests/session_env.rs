@@ -46,6 +46,7 @@ fn request(
         title: None,
         command: None,
         env,
+        sandbox: false,
     }
 }
 

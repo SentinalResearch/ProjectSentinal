@@ -106,6 +106,7 @@ async fn enter(urls: &[String], token_file: Option<PathBuf>, shell: &str, shell_
         title: None,
         command: None,
         env: crate::session_env::terminal_env(),
+        sandbox: false,
     };
     let created = within(ENTRY_DEADLINE, async {
         let mut client = DaemonClient::connect(urls, &token_file).await.ok()?;

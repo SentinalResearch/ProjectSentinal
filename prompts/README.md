@@ -44,8 +44,9 @@ model) to build the whole system, one milestone at a time.
 | 4.H | `11-milestone-4h-observability.md` | Pre-V1: continuous health measurements on the control, health page, shareable anonymised report |
 | 6.4 | `12-milestone-6d-agent-sandbox-state.md` | Agent sandbox Sessions, agent state reporting via local socket, agent skill file (V2) |
 | T | `13-terminal-upgrade-package.md` | Terminal upgrade package: watcher fixes, one size per Session, `libghostty-vt` screen, `sentinal watch` pick-up from any Machine, keepers (replaces the open parts of 4.G and R1) |
+| 6.5 | `14-milestone-6e-agent-progress.md` | Agents report task, step N of M and ETA; Agents view on desktop and phone (V2) |
 
-Milestones 1b.0, 4.0, 4.D, 4.D.1, 6.4, plus Reliability R1, begin with a
+Milestones 1b.0, 4.0, 4.D, 4.D.1, 6.4, 6.5, plus Reliability R1, begin with a
 mandatory human review. Paste the approval back into the same agent session;
 do not let the agent infer wire, pairing, push-security, projection privacy,
 dependency, local-socket, or PTY-ownership decisions.

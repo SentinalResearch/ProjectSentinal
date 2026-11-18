@@ -60,6 +60,17 @@ async function measure(page: Page): Promise<Layout> {
   });
 }
 
+function expectStacked(layout: Layout) {
+  // Full content width on top; the details start below it; nothing sideways.
+  expect(Math.abs(layout.terminal.left - layout.main.left)).toBeLessThanOrEqual(1);
+  expect(Math.abs(layout.terminal.right - layout.main.right)).toBeLessThanOrEqual(2);
+  expect(layout.terminal.height).toBeGreaterThanOrEqual(260);
+  expect(layout.terminal.height).toBeLessThan(layout.viewportHeight);
+  expect(layout.main.scrollWidth).toBeLessThanOrEqual(layout.main.clientWidth + 1);
+  expect(layout.host.scrollWidth).toBeLessThanOrEqual(layout.host.clientWidth + 1);
+  expect(layout.screenWidth).toBeLessThanOrEqual(layout.host.clientWidth + 1);
+}
+
 function expectHalves(layout: Layout) {
   // Full height, flush left in the content area, exactly half its width.
   expect(Math.abs(layout.terminal.top)).toBeLessThanOrEqual(1);
@@ -108,12 +119,16 @@ test("the terminal fills the left half and stays put while the details scroll", 
   expect(terminalColour).toBe("rgb(12, 12, 12)");
   await page.screenshot({ path: test.info().outputPath("session-1280-scrolled.png"), animations: "disabled" });
 
-  // Narrower desktop widths keep two halves with nothing hidden behind the terminal.
-  for (const width of [768, 1024]) {
-    await page.setViewportSize({ width, height: 800 });
-    await page.waitForTimeout(150);
-    expectHalves(await measure(page));
-  }
+  // 1024 px still splits in two halves with nothing hidden behind the terminal.
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.waitForTimeout(150);
+  expectHalves(await measure(page));
+
+  // Below 960 px (UX pass, 2026-11-17) halves squeezed the terminal to about
+  // 240 px: it now spans the full width on top, with the details below it.
+  await page.setViewportSize({ width: 768, height: 800 });
+  await page.waitForTimeout(150);
+  expectStacked(await measure(page));
 
   // xterm reflows: a narrower window gives a narrower screen, never a sideways scroll.
   await page.setViewportSize({ width: 1920, height: 900 });

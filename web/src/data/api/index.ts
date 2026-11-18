@@ -45,6 +45,7 @@ import { health, type createHealthCollector } from "../health";
 import { agentActionWord, agentFinishedText, formatEventTime, sessionDisplayName, sessionElapsedMs } from "../format";
 import { markLoad } from "../load-timing";
 import { mergeResults, resultFromHit, type SearchResult, type SearchResults } from "../search";
+import { mapAgentState } from "../agentState";
 
 export { AUTH_EXPIRED_EVENT, defaultDaemonHttpUrl, SESSION_TOKEN_KEY } from "./auth";
 
@@ -262,6 +263,8 @@ export function mapSession(session: WireSession): Session {
           costUsd: session.coding_agent.cost_usd ?? undefined,
         }
       : undefined,
+    agentState: mapAgentState(session.agent_state),
+    sandbox: session.sandbox || undefined,
     origin: session.origin,
     capture: session.capture,
     exitCode: session.exit_code,

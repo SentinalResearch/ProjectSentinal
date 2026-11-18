@@ -105,6 +105,11 @@ pub enum ClientRequest {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[cfg_attr(feature = "ts", ts(optional))]
         env: Option<Vec<(String, String)>>,
+        /// Start in its own working folder (`sentinal watch --sandbox`, 6.4).
+        /// Not a security boundary: the shell still runs as the owner.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<bool>", optional))]
+        sandbox: bool,
     },
     /// Continue one finished FULL Session as a distinct generation.
     ContinueSession {
@@ -265,6 +270,7 @@ impl ClientRequest {
                 title,
                 command,
                 env,
+                sandbox,
                 ..
             } => {
                 if !matches!(
@@ -275,6 +281,9 @@ impl ClientRequest {
                         origin: *origin,
                         capture: crate::CaptureLevel::Full,
                     });
+                }
+                if *sandbox && *origin != SessionOrigin::Watch {
+                    return Err(ProtocolError::SandboxNeedsWatch);
                 }
                 validate_optional_text("shell", shell.as_deref(), MAX_PATH_BYTES)?;
                 validate_optional_text("cwd", cwd.as_deref(), MAX_PATH_BYTES)?;
@@ -430,6 +439,24 @@ pub enum LocalRequest {
         /// Whether Machines are named.
         names: crate::health_report::ReportNames,
     },
+    /// An agent inside a Session reports what it is doing (6.4).
+    ///
+    /// The request names no process: the daemon asks the OS which process is
+    /// calling and accepts only one running inside `session_id`.
+    AgentState {
+        /// The Session the agent runs in (from `SENTINAL_SESSION_ID`).
+        session_id: SessionId,
+        /// What the agent says it is doing.
+        status: crate::AgentStatus,
+        /// One owner-visible line, at most 200 characters.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
+        /// The calling process as the OS reported it; set by the socket
+        /// layer after decoding, never read from the wire.
+        #[serde(skip)]
+        #[cfg_attr(feature = "ts", ts(skip))]
+        caller_pid: Option<u32>,
+    },
     /// Rank Command lines that start with `prefix` (5.A).
     Complete {
         /// The Session being typed into; its cwd and project apply.
@@ -539,6 +566,16 @@ impl LocalRequest {
             LocalRequest::Complete {
                 prefix, cwd, limit, ..
             } => crate::complete::validate_request(prefix, cwd.as_deref(), *limit),
+            LocalRequest::AgentState {
+                session_id, detail, ..
+            } => {
+                if session_id.0 == 0 {
+                    return Err(ProtocolError::InvalidIdentifier {
+                        field: "session_id",
+                    });
+                }
+                crate::agent_state::validate_agent_detail(detail.as_deref())
+            }
         }
     }
 }
@@ -581,8 +618,8 @@ pub enum LocalErrorCode {
 pub enum LocalResponse {
     /// A local Session was registered or found.
     Session {
-        /// Current Session state.
-        session: Session,
+        /// Current Session state (boxed: it is far larger than the other replies).
+        session: Box<Session>,
     },
     /// A local Command was recorded or updated.
     Command {
@@ -890,6 +927,7 @@ mod tests {
             title: None,
             command: None,
             env: None,
+            sandbox: false,
         };
         assert!(req.validate().is_err());
     }
@@ -975,6 +1013,7 @@ mod tests {
             title: None,
             command: Some(vec!["python".into(), "train.py".into()]),
             env: None,
+            sandbox: false,
         };
         assert!(request.validate().unwrap_err().to_string().contains("cwd"));
 
@@ -987,6 +1026,7 @@ mod tests {
             title: None,
             command: Some(Vec::new()),
             env: None,
+            sandbox: false,
         };
         assert!(empty.validate().unwrap_err().to_string().contains("argv"));
 
@@ -999,6 +1039,7 @@ mod tests {
             title: None,
             command: Some(vec![String::new()]),
             env: None,
+            sandbox: false,
         };
         assert!(executable
             .validate()

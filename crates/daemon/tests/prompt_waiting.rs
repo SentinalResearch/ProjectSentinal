@@ -91,6 +91,7 @@ impl Harness {
                 title: None,
                 command: None,
                 env: None,
+                sandbox: false,
             })
             .await
             .unwrap()

@@ -1,4 +1,5 @@
 import { answerChoice, offeredChoices } from "../data/actions";
+import { riskOf } from "../data/risk";
 import type { Session } from "../data/types";
 import styles from "./PromptChoices.module.css";
 
@@ -10,7 +11,15 @@ import styles from "./PromptChoices.module.css";
 export function PromptChoices({ session, onAnswered }: { session: Session; onAnswered?: () => void }) {
   const choices = offeredChoices(session);
   if (choices.length === 0) return null;
+  const risk = riskOf(session.prompt);
   return (
+    <>
+    {risk && (
+      <p className={styles.risk} role="note">
+        <span className={styles.riskDot} aria-hidden="true" />
+        This {risk}. Answer once; Sentinal never offers &ldquo;don&rsquo;t ask again&rdquo; for it.
+      </p>
+    )}
     <div className={styles.list} role="group" aria-label={`Answers for ${session.name}`}>
       {choices.map((choice, index) => {
         const no = /^(no|deny|cancel)\b/i.test(choice.label);
@@ -34,5 +43,6 @@ export function PromptChoices({ session, onAnswered }: { session: Session; onAns
         );
       })}
     </div>
+    </>
   );
 }

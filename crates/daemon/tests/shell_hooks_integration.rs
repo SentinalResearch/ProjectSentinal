@@ -47,6 +47,7 @@ async fn exercise(shell: &str) {
             title: None,
             command: None,
             env: None,
+            sandbox: false,
         })
         .await
         .unwrap();

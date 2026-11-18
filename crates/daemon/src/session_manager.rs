@@ -2,6 +2,7 @@
 
 mod adopt;
 mod adopted_log;
+mod agent_state;
 mod capture;
 mod continuation;
 mod error;
@@ -92,6 +93,8 @@ pub struct CreateSession {
     /// The starting terminal's environment (AUTO_WRAP and WATCH only); the
     /// shell starts from it instead of the daemon's environment.
     pub env: Option<Vec<(String, String)>>,
+    /// Start in `<data_dir>/sandbox/<id>/` unless `cwd` is given (6.4).
+    pub sandbox: bool,
 }
 
 /// A screen snapshot followed by a receiver for live terminal bytes.
@@ -183,6 +186,8 @@ struct SessionManagerInner {
     projects: crate::projects::Projects,
     /// Whether adopted log tails poll on a background timer (tests drive them).
     log_tail_polling: bool,
+    /// When each Session's last agent report was accepted (6.4 rate limit).
+    agent_reports: Mutex<HashMap<SessionId, Timestamp>>,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -256,6 +261,7 @@ impl SessionManager {
                 watcher_adapters: Vec::new(),
                 projects: crate::projects::Projects::default(),
                 log_tail_polling: true,
+                agent_reports: Mutex::new(HashMap::new()),
             }),
         }
     }

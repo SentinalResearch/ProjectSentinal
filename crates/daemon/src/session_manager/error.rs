@@ -223,4 +223,18 @@ pub enum SessionManagerError {
         /// Why it was refused.
         reason: String,
     },
+    /// The OS did not say which process sent an agent report.
+    #[error("the calling process of an agent report is unknown")]
+    AgentCallerUnknown,
+    /// An agent report came from a process outside the named Session.
+    #[error("process {pid} does not run inside Session {session_id}")]
+    AgentOutsideSession {
+        /// Calling process.
+        pid: u32,
+        /// Session named in the report.
+        session_id: SessionId,
+    },
+    /// Only FULL Sessions that are still running take agent reports.
+    #[error("Session {0} does not take agent reports (not a live FULL Session)")]
+    AgentReportsNotTaken(SessionId),
 }

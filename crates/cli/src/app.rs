@@ -131,6 +131,13 @@ async fn dispatch(
             let _ = out.write_all(crate::AGENT_GUIDE.as_bytes());
             return Ok(ExitCode::SUCCESS);
         }
+        Command::AgentSkill => {
+            let _ = out.write_all(crate::AGENT_SKILL.as_bytes());
+            return Ok(ExitCode::SUCCESS);
+        }
+        Command::AgentState { status, detail } => {
+            return Ok(crate::agent_state_command::run(status, detail, err).await);
+        }
         Command::Mcp {
             control,
             token_file,
@@ -287,10 +294,29 @@ async fn dispatch(
     if let Command::Watch {
         title,
         detach,
+        sandbox,
+        cwd,
         command,
     } = cli.command
     {
-        return watch(&urls, &token_file, title, detach, command, out, err).await;
+        let sandbox = sandbox.then(|| {
+            cwd.map(|dir| {
+                if dir.is_absolute() {
+                    dir
+                } else {
+                    std::env::current_dir()
+                        .map(|here| here.join(&dir))
+                        .unwrap_or(dir)
+                }
+            })
+        });
+        let options = WatchOptions {
+            title,
+            detach,
+            sandbox,
+            command,
+        };
+        return watch(&urls, &token_file, options, out, err).await;
     }
 
     let mut client = DaemonClient::connect(&urls, &token_file).await?;
@@ -320,6 +346,7 @@ async fn dispatch(
                 title: None,
                 command: None,
                 env: None,
+                sandbox: false,
             };
             match client.request(request).await? {
                 DaemonMessage::SessionUpdated { session } => {
@@ -411,20 +438,35 @@ async fn dispatch(
         | Command::Mcp { .. }
         | Command::AgentGuide
         | Command::Agents
+        | Command::AgentSkill
+        | Command::AgentState { .. }
         | Command::Identity { .. } => {}
     }
     Ok(ExitCode::SUCCESS)
 }
 
+/// What `sentinal watch` was asked to do.
+struct WatchOptions {
+    title: Option<String>,
+    detach: bool,
+    /// `Some(cwd)` for `--sandbox`, with `--cwd` if one was given.
+    sandbox: Option<Option<PathBuf>>,
+    command: Option<Vec<String>>,
+}
+
 async fn watch(
     urls: &[String],
     token_file: &std::path::Path,
-    title: Option<String>,
-    detach: bool,
-    command: Option<Vec<String>>,
+    options: WatchOptions,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<ExitCode, AppError> {
+    let WatchOptions {
+        title,
+        detach,
+        sandbox,
+        command,
+    } = options;
     let context = WatchContext {
         cwd: std::env::current_dir().map_err(AppError::Cwd)?,
         size: terminal_size(),
@@ -456,6 +498,10 @@ async fn watch(
             Ok(ExitCode::FAILURE)
         }
         WatchPlan::Create(request) => {
+            let request = match &sandbox {
+                Some(cwd) => crate::watch::into_sandbox(request, cwd.as_deref())?,
+                None => request,
+            };
             let (client, session) =
                 create_session(|| DaemonClient::connect(urls, token_file), request).await?;
             let id = session.id.0;

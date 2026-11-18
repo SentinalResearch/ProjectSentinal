@@ -1,0 +1,48 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 9px;
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px var(--line-strong, var(--line));
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+.chip[data-compact] {
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--text-3);
+}
+.chip[data-status="WORKING"] .dot { background: var(--s-running-fg); }
+.chip[data-status="BLOCKED"] .dot { background: var(--s-waiting-fg); }
+.chip[data-status="DONE"] .dot { background: var(--s-completed-fg, var(--s-running-fg)); }
+.chip[data-status="BLOCKED"] { color: var(--text-1); }
+
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sandbox {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--chip);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}

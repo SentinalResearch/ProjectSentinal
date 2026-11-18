@@ -92,6 +92,19 @@ describe("prompt grammar", () => {
     expect(first.action).toEqual({ kind: "navigate", to: "/app/split?sessions=mini%3A1,rtx%3A2" });
   });
 
+  it("end asks before ending a live terminal, never a finished one", () => {
+    const [first] = suggest("end qwen", index);
+    expect(first.command).toBe("end rtx-pc/qwen-training");
+    expect(first.action).toEqual({ kind: "end", sessionId: "rtx:3" });
+    expect(suggest("end old", index).some((s) => s.action.kind === "end")).toBe(false);
+  });
+
+  it("names the inbox and mark all read as actions", () => {
+    expect(suggest("inbox", index)[0].action).toEqual({ kind: "openInbox" });
+    expect(suggest("notifications", index).some((s) => s.action.kind === "openInbox")).toBe(true);
+    expect(suggest("mark all read", index)[0].action).toEqual({ kind: "markAllRead" });
+  });
+
   it("kill only asks — it opens the confirmation for a live Session", () => {
     const [first] = suggest("kill qwen", index);
     expect(first.action).toEqual({ kind: "kill", sessionId: "rtx:3" });

@@ -101,6 +101,7 @@ fn request() -> CreateSession {
         title: None,
         command: None,
         env: None,
+        sandbox: false,
     }
 }
 

@@ -101,6 +101,7 @@ async fn privacy_audit_integration() {
             title: None,
             command: None,
             env: None,
+            sandbox: false,
         })
         .await
         .unwrap();

@@ -1,11 +1,16 @@
-import { canAnswer as canAnswerPrompt } from "../../../data/actions";
+import { canAnswer as canAnswerPrompt, endSession } from "../../../data/actions";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { StateIcon } from "../../../components/StateIcon";
+import { lifecycle } from "../../../data/lifecycle";
+import { SummaryLine } from "../SummaryLine";
+import { Suggestions } from "../Suggestions";
 import { SessionRemoveActions } from "../SessionRemoveActions";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { AgentBadge } from "../../../components/AgentBadge";
 import { CaptureBadge } from "../../../components/CaptureBadge";
-import { StateTag } from "../../../components/StateTag";
+import { AgentStateChip, SandboxBadge } from "../../../components/AgentStateChip";
 import { dataAdapter } from "../../../data";
 import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../../data/capture";
 import { formatSessionDuration, healthColorSlug, lossOf } from "../../../data/format";
@@ -62,8 +67,30 @@ function MissingSession({ id, machines }: { id: string; machines: Machine[] }) {
   );
 }
 
+const ENDED = new Set(["COMPLETED", "FAILED", "INTERRUPTED"]);
+
+const STATE_WORD: Record<string, string> = {
+  CREATED: "Starting",
+  IDLE: "Idle",
+  RUNNING: "Running",
+  WAITING: "Waiting for you",
+  STALLED: "Stalled",
+  COMPLETED: "Finished",
+  FAILED: "Failed",
+  INTERRUPTED: "Stopped",
+};
+
 function SessionScreen({ session, machineName }: { session: Session; machineName: string }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
+  const { sessions } = useLiveData();
+  const canEnd = captureCapabilities(captureOf(session)).canSendInput && !ENDED.has(session.state);
+
+  // Opening a terminal marks it seen and reads its notifications.
+  useEffect(() => {
+    lifecycle.markSeen(session);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id, session.state, session.updatedAt]);
   const capture = captureOf(session);
   const capabilities = captureCapabilities(capture);
   const canInterrupt = capabilities.canSendInput && INTERRUPTIBLE.has(session.state);
@@ -95,8 +122,13 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
           </span>
           <h1 className={styles.detailTitle}>{session.name}</h1>
           <div className={styles.badges}>
-            <StateTag state={session.state} exitUnknown={exitUnknown(session)} />
+            <span className={styles.stateLine} data-state={session.state}>
+              <StateIcon state={session.state} size={16} />
+              {STATE_WORD[session.state] ?? session.state}
+              {exitUnknown(session) ? " · exit code unknown" : ""}
+            </span>
             <CaptureBadge capture={capture} origin={session.origin} />
+            <SandboxBadge session={session} />
             {session.codingAgent && <AgentBadge agent={session.codingAgent} usage />}
             {session.health && (
               <span className={styles.healthBadge} style={{ color: `var(--s-${healthColorSlug(session.health.overall)}-fg)` }}>
@@ -105,6 +137,7 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
             )}
             <span className="mono">{formatSessionDuration(session)}</span>
           </div>
+          {session.agentState && <AgentStateChip session={session} />}
           {session.command && <code className={`${styles.command} mono`}>{session.command}</code>}
           {capture !== "FULL" && (
             <p className={styles.muted} role="note">
@@ -128,8 +161,16 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
               Stop
             </button>
           )}
+          {canEnd && (
+            <button type="button" className={styles.endButton} onClick={() => setEndOpen(true)}>
+              End terminal…
+            </button>
+          )}
           <SessionRemoveActions session={session} />
         </div>
+
+        {session.summary && <SummaryLine summary={session.summary} />}
+        <Suggestions session={session} />
 
         {waiting ? (
           <WaitingPanel session={session} canAnswer={canAnswerPrompt(session)} />
@@ -151,6 +192,23 @@ function SessionScreen({ session, machineName }: { session: Session; machineName
       </div>
 
 
+      <ConfirmDialog
+        open={endOpen}
+        overline={`END · ${machineName.toUpperCase()}`}
+        question={`End ${session.name}?`}
+        consequence="Sends Ctrl-C, then closes the terminal if it is still open. Its output is kept and it moves to Done."
+        confirmLabel="End"
+        onConfirm={() => {
+          setEndOpen(false);
+          const id = session.id;
+          const live = () => {
+            const state = sessions.find((entry) => entry.id === id)?.state;
+            return state !== undefined && !ENDED.has(state);
+          };
+          void endSession(id, live).catch(() => undefined);
+        }}
+        onCancel={() => setEndOpen(false)}
+      />
       <ConfirmSignalSheet
         open={sheetOpen}
         session={session}
@@ -184,10 +242,14 @@ function ProgressAndMetrics({ session }: { session: Session }) {
     <>
       {percent !== undefined && progress && (
         <section aria-label="Progress" className={styles.progress}>
-          <span className={styles.bigNumber}>{percent} %</span>
+          <span className={styles.bigNumber}>
+            {progress.inferred ? "≈ " : ""}
+            {percent} %
+          </span>
           <span className="mono">
             {progress.unit} {progress.current}/{progress.total}
           </span>
+          {progress.inferred && <span className={styles.guessNote}>Sentinal thinks · read off the screen</span>}
           <div className={styles.track}>
             <div className={styles.fill} style={{ width: `${percent}%` }} />
           </div>
@@ -197,7 +259,7 @@ function ProgressAndMetrics({ session }: { session: Session }) {
         {cells.map((cell) => (
           <li key={cell.label} className={styles.metricCell}>
             <span className={styles.overline}>{cell.label}</span>
-            <span className={`${styles.metricValue} mono`}>{cell.value}</span>
+            <span className={styles.metricValue}>{cell.value}</span>
             {cell.foot && <span className={styles.muted}>{cell.foot}</span>}
           </li>
         ))}
@@ -267,15 +329,15 @@ function FailureDetail({ session }: { session: Session }) {
         <ul className={styles.statGrid} aria-label="Result">
           <li className={styles.metricCell}>
             <span className={styles.overline}>FAILED</span>
-            <span className={`${styles.metricValue} mono`}>{result.failed}</span>
+            <span className={styles.metricValue}>{result.failed}</span>
           </li>
           <li className={styles.metricCell}>
             <span className={styles.overline}>PASSED</span>
-            <span className={`${styles.metricValue} mono`}>{result.passed}</span>
+            <span className={styles.metricValue}>{result.passed}</span>
           </li>
           <li className={styles.metricCell}>
             <span className={styles.overline}>TIME</span>
-            <span className={`${styles.metricValue} mono`}>{result.duration}</span>
+            <span className={styles.metricValue}>{result.duration}</span>
           </li>
         </ul>
       )}

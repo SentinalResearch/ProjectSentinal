@@ -54,6 +54,10 @@ fn machine_contract() {
 #[test]
 fn session_contract() {
     assert_round_trip::<Session>(&load("session.json"), "session.json");
+    assert_round_trip::<Session>(
+        &load("session_agent_state.json"),
+        "session_agent_state.json",
+    );
 }
 
 #[test]
@@ -160,6 +164,7 @@ fn every_local_request_has_a_fixture() {
         "SHELL_COMMAND_STARTED",
         "SHELL_COMMAND_FINISHED",
         "ADOPT_PROCESS",
+        "AGENT_STATE",
     ];
     let requests = load("local_requests.json");
     let present: Vec<&str> = requests

@@ -68,6 +68,7 @@ impl SessionManager {
                 title: Some(title),
                 command: None,
                 env: None,
+                sandbox: false,
             },
             None,
             None,
@@ -92,6 +93,7 @@ impl SessionManager {
                 title,
                 command: None,
                 env: None,
+                sandbox: false,
             },
             source.project_id,
             Some(source_id),
@@ -124,7 +126,10 @@ impl SessionManager {
             Some(command) => Some(command),
             None => initial_command(request.origin, &shell, request.command.as_deref())?,
         };
-        let cwd = request
+        // 6.4: a sandbox without an explicit cwd gets its own folder once its ID is known.
+        let sandbox = request.sandbox;
+        let sandbox_folder = sandbox && request.cwd.is_none();
+        let mut cwd = request
             .cwd
             .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
             .unwrap_or_else(|| PathBuf::from("/"));
@@ -164,6 +169,15 @@ impl SessionManager {
             }
         };
         let id = SessionId(self.inner.next_id.fetch_add(1, Ordering::Relaxed));
+        if sandbox_folder {
+            let folder = sandbox_dir(&self.inner.config.data_dir, id);
+            ensure_private_dir(&folder).map_err(|source| SessionManagerError::File {
+                operation: "create sandbox folder",
+                path: folder.clone(),
+                source,
+            })?;
+            cwd = folder;
+        }
         shell_launch
             .env
             .push(("TERM".into(), "xterm-256color".into()));
@@ -200,6 +214,10 @@ impl SessionManager {
         shell_launch
             .env
             .push(("SENTINAL_SESSION_ID".into(), id.0.to_string()));
+        // 6.4: an agent can tell it may report with `sentinal agent-state`.
+        shell_launch
+            .env
+            .push(("SENTINAL_AGENT_API".into(), "1".into()));
         // Only the hook learns this secret, so output cannot forge shell signals.
         let osc_nonce = new_nonce().map_err(SessionManagerError::OscNonce)?;
         shell_launch.env.push((NONCE_ENV.into(), osc_nonce.clone()));
@@ -255,6 +273,7 @@ impl SessionManager {
         session.origin = request.origin;
         session.capture = CaptureLevel::Full;
         session.title = request.title;
+        session.sandbox = sandbox;
         session.pid = spawned.root_pid;
         session.continued_from = continued_from;
         if let Err(error) = session
@@ -463,4 +482,9 @@ fn initial_command(
     let mut line = render_command_line(argv, dialect)?.into_bytes();
     line.push(b'\r');
     Ok(Some(line))
+}
+
+/// A sandbox Session's own working folder; kept after it ends for the owner to review.
+pub(crate) fn sandbox_dir(data_dir: &std::path::Path, id: SessionId) -> PathBuf {
+    data_dir.join("sandbox").join(id.0.to_string())
 }

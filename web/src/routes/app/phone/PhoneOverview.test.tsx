@@ -21,9 +21,9 @@ describe("M1 · phone dashboard (MOBILE_GLASS_SPEC §2)", () => {
     vi.restoreAllMocks();
   });
 
-  it("leads with how many need you, a full-width waiting card, then a lane per Machine", async () => {
+  it("leads with how many need you, a waiting row with y/n, then a list per Machine", async () => {
     renderAt("/app/overview", routes);
-    expect(await screen.findByText(/^\d+ needs? you\.$/, {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^\d+ needs? you\.$/ }, { timeout: 5000 })).toBeInTheDocument();
     const needs = screen.getByRole("region", { name: "Needs you" });
     const waiting = within(needs).getByRole("article", { name: "npm install" });
     expect(within(waiting).getByRole("button", { name: "Answer y to npm install" })).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe("M1 · phone dashboard (MOBILE_GLASS_SPEC §2)", () => {
     renderAt("/app/overview?machine=mini", routes);
     expect(await screen.findByRole("region", { name: "Mac Mini" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "RTX-PC" })).not.toBeInTheDocument();
-    expect(screen.getByText(/^Mac Mini ·/)).toBeInTheDocument();
+    expect(screen.getByText(/^Mac Mini · \d+ sessions? ·/)).toBeInTheDocument();
   });
 
   it("dismisses a failed Session from Needs you on the phone too", async () => {
@@ -75,5 +75,15 @@ describe("M1 · phone dashboard (MOBILE_GLASS_SPEC §2)", () => {
     const needs = await screen.findByRole("region", { name: "Needs you" }, { timeout: 5000 });
     await userEvent.setup().click(within(needs).getByRole("button", { name: "Hide pytest" }));
     await vi.waitFor(() => expect(within(screen.getByRole("region", { name: "Needs you" })).queryByRole("link", { name: /pytest/ })).toBeNull(), { timeout: 3000 });
+  });
+
+  it("lists finished terminals under Done with Hide and a Delete that asks first", async () => {
+    renderAt("/app/overview", routes);
+    const done = await screen.findByRole("region", { name: "Done" }, { timeout: 5000 });
+    const name = within(done).getAllByRole("link")[0].textContent ?? "";
+    expect(within(done).getAllByRole("button", { name: /^Hide / }).length).toBeGreaterThan(0);
+    await userEvent.setup().click(within(done).getAllByRole("button", { name: /^Delete / })[0]);
+    expect(await screen.findByText(/^Permanently delete/)).toBeInTheDocument();
+    expect(name.length).toBeGreaterThan(0);
   });
 });

@@ -255,7 +255,7 @@ export function PromptBar({
             </button>
           ) : (
             <span className={styles.grammar} aria-hidden="true">
-              go · run · find · y · n · split · kill
+              go · run · find · y · n · end · inbox
             </span>
           )}
         </label>

@@ -101,12 +101,55 @@ pub fn plan_watch(
         title,
         command,
         env: context.env.clone(),
+        sandbox: false,
     };
     request.validate()?;
     if !context.interactive {
         return Err(WatchError::NotATerminal);
     }
     Ok(WatchPlan::Create(request))
+}
+
+/// Turn a planned Watch request into a sandbox one (`--sandbox`, 6.4): the
+/// daemon gives it its own folder unless `cwd` names one. The folder is a
+/// separate place to work, not a security boundary.
+pub fn into_sandbox(
+    request: ClientRequest,
+    cwd: Option<&std::path::Path>,
+) -> Result<ClientRequest, WatchError> {
+    let ClientRequest::CreateSession {
+        shell,
+        cols,
+        rows,
+        origin,
+        title,
+        command,
+        env,
+        ..
+    } = request
+    else {
+        return Ok(request);
+    };
+    let cwd = cwd
+        .map(|path| {
+            path.to_str()
+                .map(str::to_string)
+                .ok_or_else(|| WatchError::NonUtf8Cwd(path.to_path_buf()))
+        })
+        .transpose()?;
+    let request = ClientRequest::CreateSession {
+        shell,
+        cwd,
+        cols,
+        rows,
+        origin,
+        title,
+        command,
+        env,
+        sandbox: true,
+    };
+    request.validate()?;
+    Ok(request)
 }
 
 /// Connect and create the planned Session; the caller then attaches.

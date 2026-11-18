@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { noteSearchUsed } from "../../../components/LearnTip";
 import { LiveIsland } from "./LiveIsland";
 import { PromptBar } from "./PromptBar";
 import { SheetStage, type BackEntry } from "./SheetStage";
@@ -31,6 +32,7 @@ export function GlassShell() {
   const openPrompt = useCallback((prefill = "") => {
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setPrompt({ text: prefill });
+    noteSearchUsed();
   }, []);
 
   const closePrompt = useCallback(() => {

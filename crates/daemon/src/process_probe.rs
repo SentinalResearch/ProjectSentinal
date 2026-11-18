@@ -35,6 +35,10 @@ pub struct ProcessDetails {
 type IdentifyFn = dyn Fn(u32) -> Option<ProcessIdentity> + Send + Sync;
 type DetailsFn = dyn Fn(u32) -> ProcessDetails + Send + Sync;
 type DiscoverFn = dyn Fn(u32) -> Option<protocol::SessionLog> + Send + Sync;
+type ParentFn = dyn Fn(u32) -> Option<u32> + Send + Sync;
+
+/// How far up the process tree [`ProcessProbe::descends_from`] looks.
+const MAX_ANCESTRY_DEPTH: usize = 64;
 
 /// Looks up process identities for the daemon's own user.
 ///
@@ -46,6 +50,7 @@ pub struct ProcessProbe {
     identify: Arc<IdentifyFn>,
     details: Arc<DetailsFn>,
     discover_log: Arc<DiscoverFn>,
+    parent: Arc<ParentFn>,
 }
 
 impl std::fmt::Debug for ProcessProbe {
@@ -68,7 +73,17 @@ impl ProcessProbe {
             identify: Arc::new(identify),
             details: Arc::new(|_| ProcessDetails::default()),
             discover_log: Arc::new(|_| None),
+            parent: Arc::new(|_| None),
         }
+    }
+
+    /// Use `parent` to find a process's parent PID (agent reports, 6.4).
+    pub fn with_parents(
+        mut self,
+        parent: impl Fn(u32) -> Option<u32> + Send + Sync + 'static,
+    ) -> Self {
+        self.parent = Arc::new(parent);
+        self
     }
 
     /// Use `details` to describe processes (name, executable, cwd).
@@ -96,6 +111,7 @@ impl ProcessProbe {
             identify: Arc::new(|_| None),
             details: Arc::new(|_| ProcessDetails::default()),
             discover_log: Arc::new(|_| None),
+            parent: Arc::new(|_| None),
         }
     }
 
@@ -103,6 +119,7 @@ impl ProcessProbe {
     pub fn system(owner_uid: u32) -> Self {
         let system = Arc::new(Mutex::new(System::new()));
         let for_details = system.clone();
+        let for_parents = system.clone();
         Self::new(owner_uid, move |pid| {
             let mut system = system.lock().ok()?;
             let pid = Pid::from_u32(pid);
@@ -153,11 +170,38 @@ impl ProcessProbe {
             }
         })
         .with_log_discovery(crate::log_discovery::discover)
+        .with_parents(move |pid| {
+            let mut system = for_parents.lock().ok()?;
+            let pid = Pid::from_u32(pid);
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[pid]),
+                true,
+                ProcessRefreshKind::nothing(),
+            );
+            system.process(pid)?.parent().map(|parent| parent.as_u32())
+        })
     }
 
     /// The user whose processes may be registered, if the probe is usable.
     pub fn owner_uid(&self) -> Option<u32> {
         self.owner_uid
+    }
+
+    /// Whether `pid` is `root` or runs below it in the process tree.
+    ///
+    /// Unknown parents, loops, or a tree deeper than 64 levels answer `false`.
+    pub fn descends_from(&self, pid: u32, root: u32) -> bool {
+        let mut current = pid;
+        for _ in 0..=MAX_ANCESTRY_DEPTH {
+            if current == root {
+                return true;
+            }
+            match (self.parent)(current) {
+                Some(parent) if parent != current && parent != 0 => current = parent,
+                _ => return false,
+            }
+        }
+        false
     }
 
     /// Current identity of `pid`, or `None` when it does not exist.
@@ -180,6 +224,35 @@ impl ProcessProbe {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+
+    #[test]
+    fn the_system_probe_sees_the_real_parent_of_this_process() {
+        let probe = ProcessProbe::system(0);
+        let me = std::process::id();
+        let parent = std::os::unix::process::parent_id();
+        assert!(
+            probe.descends_from(me, parent),
+            "{me} should descend from {parent}"
+        );
+        assert!(
+            !probe.descends_from(parent, me),
+            "a parent is not its child's descendant"
+        );
+    }
+
+    #[test]
+    fn descends_from_walks_up_to_the_root_and_refuses_strangers_and_loops() {
+        let parents =
+            std::collections::HashMap::from([(30, 20), (20, 10), (40, 1), (50, 51), (51, 50)]);
+        let probe =
+            ProcessProbe::new(501, |_| None).with_parents(move |pid| parents.get(&pid).copied());
+        assert!(probe.descends_from(30, 10), "grandchild of the root");
+        assert!(probe.descends_from(10, 10), "the root itself");
+        assert!(!probe.descends_from(40, 10), "another tree");
+        assert!(!probe.descends_from(50, 10), "a loop ends");
+        assert!(!probe.descends_from(99, 10), "unknown process");
+        assert!(!ProcessProbe::unavailable().descends_from(30, 10));
+    }
     use super::*;
 
     #[test]

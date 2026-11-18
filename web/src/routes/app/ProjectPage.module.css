@@ -231,3 +231,9 @@
     padding: 48px 16px;
   }
 }
+
+/* Quiet style (UX pass): page titles are thin like the dashboard, not heavy. */
+.title {
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}

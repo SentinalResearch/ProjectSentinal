@@ -206,6 +206,16 @@ pub fn current_uid(path: &Path) -> Result<u32, LocalSocketError> {
         })
 }
 
+/// OS-reported process ID of a connected peer, or `None` when the OS cannot say.
+pub fn peer_pid(stream: &UnixStream) -> Option<u32> {
+    stream
+        .peer_cred()
+        .ok()
+        .and_then(|credentials| credentials.pid())
+        .and_then(|pid| u32::try_from(pid).ok())
+        .filter(|pid| *pid != 0)
+}
+
 /// OS-reported UID of a connected peer, or `None` when the OS cannot say.
 pub fn peer_uid(stream: &UnixStream, path: &Path) -> Option<u32> {
     match stream.peer_cred() {
@@ -299,11 +309,17 @@ pub async fn handle_connection(
         })?;
     let response = match std::str::from_utf8(&body) {
         Ok(json) => match Envelope::<LocalRequest>::decode(json) {
-            Ok(envelope) => match envelope.payload.validate() {
-                Ok(()) => match handler(envelope.payload).await {
-                    LocalResponse::Error { code, message } => local_error(code, message),
-                    response => response,
-                },
+            Ok(mut envelope) => match envelope.payload.validate() {
+                Ok(()) => {
+                    // 6.4: who is calling comes from the OS, never from the request.
+                    if let LocalRequest::AgentState { caller_pid, .. } = &mut envelope.payload {
+                        *caller_pid = peer_pid(&stream);
+                    }
+                    match handler(envelope.payload).await {
+                        LocalResponse::Error { code, message } => local_error(code, message),
+                        response => response,
+                    }
+                }
                 Err(error) => local_error(LocalErrorCode::InvalidRequest, error.to_string()),
             },
             Err(error) => local_error(LocalErrorCode::InvalidRequest, error.to_string()),

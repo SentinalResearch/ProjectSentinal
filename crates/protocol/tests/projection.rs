@@ -259,3 +259,33 @@ fn only_known_metric_names_reach_the_control() {
         }
     );
 }
+
+#[test]
+fn projection_carries_the_agent_state_and_sandbox_but_never_a_bad_detail() {
+    let mut session = Session::new(
+        SessionId(9),
+        MachineId("machine-a".into()),
+        "/bin/zsh",
+        "/work",
+        Timestamp(10),
+    );
+    session.sandbox = true;
+    session.agent_state = Some(Box::new(protocol::AgentReportedState {
+        status: protocol::AgentStatus::Blocked,
+        detail: Some("needs approval for cargo test".into()),
+        reported_at: Timestamp(20),
+    }));
+    let projected = ProjectedSession::from_session(&session);
+    assert!(projected.sandbox);
+    assert_eq!(
+        projected.agent_state.as_ref(),
+        session.agent_state.as_deref()
+    );
+
+    // A detail that slipped past validation is dropped, the status kept.
+    session.agent_state.as_mut().unwrap().detail = Some("bad\x1b]0;title\x07".into());
+    let projected = ProjectedSession::from_session(&session);
+    let state = projected.agent_state.unwrap();
+    assert_eq!(state.status, protocol::AgentStatus::Blocked);
+    assert_eq!(state.detail, None);
+}

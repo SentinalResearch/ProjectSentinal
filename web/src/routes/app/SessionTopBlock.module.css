@@ -340,3 +340,71 @@
   background: var(--glass-panel);
   box-shadow: inset 0 0 0 1px var(--glass-edge-soft);
 }
+
+/* Quiet style (UX pass): one big thin number, thin metric numbers on plain
+   ground, a 2 px progress line; state panels lose their heavy top bands. */
+:global([data-glass]) .percentValue {
+  font-weight: 200;
+}
+:global([data-glass]) .progressTrack {
+  height: 2px;
+  border-radius: 1px;
+}
+:global([data-glass]) .metricCol {
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:global([data-glass]) .metricLabel {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+:global([data-glass]) .metricValue {
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 300;
+}
+:global([data-glass]) .meterTrack {
+  height: 2px;
+}
+:global([data-glass]) .panel {
+  border-radius: 14px;
+  background: var(--chip);
+  box-shadow: none;
+}
+:global([data-glass]) .panelOverline {
+  font-weight: 600;
+}
+:global([data-glass]) .failed .panelOverline { color: var(--s-failed-fg); }
+:global([data-glass]) .waiting .panelOverline { color: var(--s-waiting-fg); }
+:global([data-glass]) .stalled .panelOverline { color: var(--s-stalled-fg); }
+:global([data-glass]) :is(.failedBig, .stalledBig) {
+  font-weight: 200;
+}
+
+/* Progress the intelligence layer read off the screen (design B3, example 1). */
+.approx {
+  margin-right: 0.12em;
+  color: var(--text-3);
+  font-size: 0.32em;
+  font-weight: 300;
+  vertical-align: 0.9em;
+}
+.guess {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-family: var(--font-sans, inherit);
+  font-size: 12px;
+  color: var(--accent-fg);
+}
+.guessRing {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border: 1.2px dashed var(--accent-fg);
+  border-radius: 50%;
+}

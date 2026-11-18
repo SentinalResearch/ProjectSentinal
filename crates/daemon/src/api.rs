@@ -201,6 +201,7 @@ impl AppState {
                 title,
                 command,
                 env,
+                sandbox,
             } => {
                 let request = CreateSession {
                     shell,
@@ -211,6 +212,7 @@ impl AppState {
                     title,
                     command,
                     env,
+                    sandbox,
                 };
                 match self.sessions.create(request).await {
                     Ok(session) => WsAction::Reply(DaemonMessage::SessionUpdated { session }),

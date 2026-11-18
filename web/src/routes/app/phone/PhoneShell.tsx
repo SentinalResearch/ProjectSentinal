@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
+import { noteSearchUsed } from "../../../components/LearnTip";
 import { PromptBar } from "../shell/PromptBar";
 import type { PromptSuggestion } from "../shell/promptGrammar";
 import { ShellContext, type ShellValue } from "../shell/ShellContext";
@@ -22,7 +23,10 @@ export function PhoneShell() {
   const { perform, dialogs } = usePromptActions();
   const pill = useRef<HTMLButtonElement>(null);
 
-  const openPrompt = useCallback((prefill = "") => setPrompt({ text: prefill }), []);
+  const openPrompt = useCallback((prefill = "") => {
+    setPrompt({ text: prefill });
+    noteSearchUsed();
+  }, []);
   const shell = useMemo<ShellValue>(() => ({ openPrompt }), [openPrompt]);
 
   function choose(suggestion: PromptSuggestion, options: { split: boolean }) {

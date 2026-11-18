@@ -53,3 +53,20 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Design B3, example 3: a hard-to-undo command is named before the answers. */
+.risk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--destructive-fg);
+}
+.riskDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  background: var(--s-failed-fg);
+}

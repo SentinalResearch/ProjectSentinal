@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { DevBadge } from "../../../components/DevBadge";
@@ -6,7 +7,9 @@ import { ThemeSwitch } from "../../../components/ThemeSwitch";
 import { useLiveData } from "../../../data/LiveDataContext";
 import { islandLocation } from "../shell/location";
 import { PlacesMenu } from "../shell/PlacesMenu";
-import { needCount, tickerItems } from "../shell/ticker";
+import { IslandInbox, useUnreadCount } from "../shell/IslandInbox";
+import { OPEN_INBOX_EVENT } from "../shell/usePromptActions";
+import { tickerItems } from "../shell/ticker";
 import type { IslandBack } from "./islandBack";
 import styles from "./MobileIsland.module.css";
 
@@ -22,7 +25,26 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
   const { machines, sessions, terminals } = useLiveData();
   const where = islandLocation(pathname, search, machines, sessions);
   const [top] = tickerItems(terminals, 1);
-  const needs = needCount(terminals);
+  const unread = useUnreadCount(terminals);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setInboxOpen(true);
+    window.addEventListener(OPEN_INBOX_EVENT, open);
+    return () => window.removeEventListener(OPEN_INBOX_EVENT, open);
+  }, []);
+  const islandRef = useRef<HTMLElement>(null);
+  const inboxRef = useRef<HTMLDivElement>(null);
+  const machineName = (id: string) => machines.find((machine) => machine.id === id)?.name ?? id;
+  // A tap outside the island and its inbox closes the inbox.
+  useEffect(() => {
+    if (!inboxOpen) return;
+    const away = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!islandRef.current?.contains(target) && !inboxRef.current?.contains(target)) setInboxOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [inboxOpen]);
 
   if (back) {
     const session = where.kind === "session" ? sessions.find((entry) => entry.id === where.sessionId) : undefined;
@@ -46,7 +68,8 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
 
   const name = pathname.startsWith("/app/split") ? "Terminals" : where.kind === "page" ? where.name : where.title;
   return (
-    <nav className={`${styles.island} island-ink`} aria-label="Sentinal" data-docked={docked || undefined}>
+    <>
+    <nav ref={islandRef} className={`${styles.island} island-ink`} aria-label="Sentinal" data-docked={docked || undefined}>
       <Link to="/app/overview" className={styles.logo} aria-label="Overview">
         <SentinalMark size={18} />
       </Link>
@@ -61,12 +84,24 @@ export function MobileIsland({ back, docked = false }: { back: IslandBack | null
           <span className={styles.tickerText}>{top.text}</span>
         </Link>
       )}
-      {needs > 0 && (
-        <Link to="/app/overview?needs=1" className={styles.needs} aria-label={`${needs} need you`}>
-          {needs}
-        </Link>
+      {(unread > 0 || inboxOpen) && (
+        <button
+          type="button"
+          className={styles.unread}
+          aria-expanded={inboxOpen}
+          aria-label={unread > 0 ? `${unread} unread notification${unread === 1 ? "" : "s"}` : "Notifications"}
+          onClick={() => setInboxOpen((open) => !open)}
+        >
+          {unread > 0 ? unread : "×"}
+        </button>
       )}
       <ThemeSwitch />
     </nav>
+    {inboxOpen && (
+      <div ref={inboxRef} className={`${styles.inboxPanel} island-ink`}>
+        <IslandInbox terminals={terminals} machineName={machineName} onClose={() => setInboxOpen(false)} />
+      </div>
+    )}
+    </>
   );
 }

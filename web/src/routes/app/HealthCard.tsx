@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { healthColorSlug } from "../../data/format";
 import type { SessionHealth } from "../../data/types";
 import styles from "./HealthCard.module.css";
@@ -47,7 +48,9 @@ export function HealthCard({ health, interrupted }: HealthCardProps) {
     <div className={styles.card}>
       <div className={styles.headRow} style={{ background: fill }}>
         <span className={styles.headLabel}>HEALTH</span>
-        <span className={styles.headValue}>{overall}</span>
+        <span className={styles.headValue} style={{ "--health-fg": `var(--s-${slug}-fg)` } as CSSProperties}>
+          {overall}
+        </span>
       </div>
       {rows
         .filter(([, value]) => value !== undefined)

@@ -207,6 +207,7 @@ mod sessions_and_completion {
             title: None,
             command: None,
             env: None,
+            sandbox: false,
         }
     }
 

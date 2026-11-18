@@ -168,7 +168,9 @@ fn answer(request: &LocalRequest) -> LocalResponse {
             );
             session.origin = SessionOrigin::ShellHook;
             session.pid = Some(*pid);
-            LocalResponse::Session { session }
+            LocalResponse::Session {
+                session: Box::new(session),
+            }
         }
         // Completion: two harmless lines for any non-empty prefix (5.A).
         LocalRequest::Complete { prefix, .. } => LocalResponse::Completions {

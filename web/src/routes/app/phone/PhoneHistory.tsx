@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { BottomSheet } from "../../../components/BottomSheet";
-import { StateTag } from "../../../components/StateTag";
+import { StateIcon } from "../../../components/StateIcon";
 import { slugifyProject } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { HistoryEntry } from "../../../data/types";
@@ -81,7 +81,8 @@ export function PhoneHistory() {
               return (
                 <li key={entry.id} className={styles.historyRow}>
                   <span className={styles.stateSquare}>
-                    <StateTag state={historyRowState(entry, session?.state)} size="sm" iconOnly />
+                    <StateIcon state={historyRowState(entry, session?.state)} size={20} />
+                    <span className={shell.visuallyHidden}>{historyRowState(entry, session?.state).toLowerCase()}</span>
                   </span>
                   <span className={styles.historyText}>
                     <span className={`${styles.historyCommand} mono`}>{entry.command}</span>

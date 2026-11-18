@@ -1,6 +1,7 @@
 //! Reusable command dispatch, parsing, and terminal framing for `sentinal`.
 
 pub mod adopt_command;
+pub mod agent_state_command;
 pub mod app;
 pub mod approval_command;
 pub mod args;
@@ -36,3 +37,6 @@ pub mod watch;
 
 /// The guide printed by `sentinal agent-guide`.
 pub const AGENT_GUIDE: &str = include_str!("../../../docs/AGENT_GUIDE.md");
+
+/// The skill file printed by `sentinal agent-skill` (6.4).
+pub const AGENT_SKILL: &str = include_str!("../../../docs/AGENT_SKILL.md");

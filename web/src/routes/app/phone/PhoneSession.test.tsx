@@ -35,6 +35,18 @@ describe("B3/B4/B5 · phone Session screens", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
   });
 
+  it("P3: End terminal asks first, sends Ctrl-C, then closes a shell that is still open", async () => {
+    const sendSignal = vi.spyOn(dataAdapter, "sendSignal").mockResolvedValue();
+    renderAt("/app/sessions/qwen", routes);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "End terminal…" }, { timeout: 5000 }));
+    expect(sendSignal).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "End" }));
+    expect(sendSignal).toHaveBeenCalledWith("qwen", "SIGINT");
+    // The mock ignores the signal, so the terminal is still live and End closes it.
+    await vi.waitFor(() => expect(sendSignal).toHaveBeenCalledWith("qwen", "KILL"), { timeout: 4000 });
+  });
+
   it("B3 / M6: Stop on a long job asks first; Cancel and a tap send nothing, a 600 ms hold interrupts", async () => {
     const sendSignal = vi.spyOn(dataAdapter, "sendSignal").mockResolvedValue();
     renderAt("/app/sessions/qwen", routes);

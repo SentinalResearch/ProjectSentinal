@@ -212,7 +212,7 @@ async fn adopt(socket: &Path, args: &[&str]) -> std::process::Output {
 #[tokio::test]
 async fn adopting_sends_one_local_request_and_prints_the_summary() {
     let fake = fake(LocalResponse::Session {
-        session: adopted(None),
+        session: Box::new(adopted(None)),
     });
     let output = adopt(&fake.socket, &["800", "-t", "Qwen"]).await;
     assert!(output.status.success(), "{output:?}");
@@ -231,7 +231,7 @@ async fn adopting_sends_one_local_request_and_prints_the_summary() {
 #[tokio::test]
 async fn a_relative_log_is_sent_as_an_absolute_path() {
     let fake = fake(LocalResponse::Session {
-        session: adopted(None),
+        session: Box::new(adopted(None)),
     });
     let dir = short_dir();
     std::fs::write(dir.join("train.log"), "x").unwrap();
@@ -279,7 +279,7 @@ async fn an_unreachable_daemon_adopts_nothing() {
 #[tokio::test]
 async fn a_bad_log_or_missing_target_is_rejected_before_contact() {
     let fake = fake(LocalResponse::Session {
-        session: adopted(None),
+        session: Box::new(adopted(None)),
     });
     let dir = short_dir();
     let output = adopt(&fake.socket, &["800", "--log", &dir.display().to_string()]).await;

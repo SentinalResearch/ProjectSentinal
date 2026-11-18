@@ -415,3 +415,10 @@
     transition: none;
   }
 }
+
+/* Quiet style (UX pass): page titles are thin like the dashboard, not heavy. */
+.title,
+.recipeTitle {
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}

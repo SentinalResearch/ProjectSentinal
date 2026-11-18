@@ -352,3 +352,5 @@ pages from the sheets on the right.
 - [ ] Fine-tune small model (FunctionGemma 270M / Qwen3-0.6B) for
       NL → tool call routing, then command classification, then triage
 - [ ] Heartbeat, journal, summaries
+- [x] 6.4 Agent state over the local socket, sandbox Sessions, agent skill file (`prompts/12-milestone-6d-agent-sandbox-state.md`; design `docs/AGENT_STATE_DESIGN.md`; report `docs/progress/milestone-6.4.md`)
+- [ ] 6.5 Agent task progress (task, step N of M, time on task, ETA) and the Agents view (`prompts/14-milestone-6e-agent-progress.md`; needs 6.4)

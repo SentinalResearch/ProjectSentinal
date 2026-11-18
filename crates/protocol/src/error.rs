@@ -238,6 +238,12 @@ pub enum ProtocolError {
     /// A pairing request had the wrong shape.
     #[error("invalid pairing request: {0}")]
     InvalidPairingRequest(&'static str),
+    /// Only `sentinal watch --sandbox` may start a sandbox Session (6.4).
+    #[error("only a WATCH Session can be a sandbox")]
+    SandboxNeedsWatch,
+    /// An agent's reported detail broke the rules (never repeats the text).
+    #[error("agent detail {0}")]
+    InvalidAgentDetail(&'static str),
 }
 
 impl From<serde_json::Error> for ProtocolError {

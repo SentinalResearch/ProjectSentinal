@@ -26,6 +26,7 @@
 //! - [`coding_agent`] — AI coding agents running in a Session (6.1)
 
 pub mod agent;
+pub mod agent_state;
 pub mod auth;
 pub mod coding_agent;
 pub mod command;
@@ -59,6 +60,7 @@ pub mod time;
 pub mod training;
 pub mod worker_update;
 
+pub use agent_state::{AgentReportedState, AgentStatus, MAX_AGENT_DETAIL_CHARS};
 pub use auth::{
     AuthChangePasswordRequest, AuthFailure, AuthFailureCode, AuthLoginRequest, AuthSession,
     AuthSessionInfo, AuthSetupRequest, AuthStatus,

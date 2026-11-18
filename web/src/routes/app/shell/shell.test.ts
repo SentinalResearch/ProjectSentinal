@@ -90,3 +90,18 @@ describe("island focus", () => {
     expect(islandFocus([session("shell", "IDLE")])).toEqual({ kind: "idle" });
   });
 });
+
+describe("agents that report themselves blocked (6.4)", () => {
+  const session = (id: string, extra: Partial<Session>): Session => ({ id, machine: "m", name: id, state: "RUNNING", ...extra });
+
+  it("appear in the island after failures and questions, but are not a need", () => {
+    const terminals = [
+      session("plain", {}),
+      session("claude", { agentState: { status: "BLOCKED", detail: "needs the key", reportedAt: 1 } }),
+      session("busy", { agentState: { status: "WORKING", reportedAt: 1 } }),
+      session("broken", { state: "FAILED" }),
+    ];
+    expect(tickerItems(terminals).map((item) => item.text)).toEqual(["broken failed", "claude blocked"]);
+    expect(needCount(terminals)).toBe(1);
+  });
+});

@@ -35,6 +35,7 @@ async fn persistent_session_integration() {
             title: None,
             command: None,
             env: None,
+            sandbox: false,
         })
         .await
         .unwrap();

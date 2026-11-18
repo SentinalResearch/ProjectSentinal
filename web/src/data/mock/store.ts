@@ -44,12 +44,78 @@ const MOCK_GUESSES: Record<string, Pick<Session, "summary" | "events">> = {
   },
 };
 
+/**
+ * The three intelligence examples (design B3), in the demo only so tests keep
+ * their fixed fixtures: progress read off an adopted run's log, a failure
+ * explained with a suggested command, and an agent asking to run a risky one.
+ */
+const DEMO_GUESSES: Record<string, Partial<Session>> = {
+  "adopted-train": {
+    progress: { current: 4300, total: 12000, unit: "step", inferred: true },
+    summary: { text: "Loss falling (0.412 → 0.401); last checkpoint step 4000; about 2 h 40 m left.", inferred: true },
+    events: [
+      ["09:10", "PROCESS_STARTED", "python train.py --resume"],
+      ["12:05", "CHECKPOINT_CREATED", "out/run7/step_4000.pt", undefined, true],
+      ["12:21", "PROGRESS", "step 4300/12000", undefined, true],
+    ],
+  },
+  pytest: {
+    summary: { text: "All 3 failures need atom_map, which was renamed in the last commit.", inferred: true },
+    suggestions: [
+      { command: "pytest tests/test_match.py -x", why: "re-runs only the failing file, stops at the first failure", inferred: true },
+      { command: "git log -1 --stat", why: "shows the commit that renamed atom_map", inferred: true },
+    ],
+  },
+};
+
+const DEMO_AGENT: Session = {
+  id: "claude-web",
+  machine: "mini",
+  name: "claude · website",
+  command: "claude",
+  cwd: "~/code/website",
+  project: "website",
+  state: "WAITING",
+  runningFor: "6m",
+  prompt: "Bash(rm -rf dist && pnpm build) Do you want to proceed?",
+  promptOptions: [
+    { label: "Yes", keys: "1" },
+    { label: "Yes, and don't ask again for rm commands", keys: "2" },
+    { label: "No, tell Claude what to do differently", keys: "3" },
+  ],
+  codingAgent: { agent: "CLAUDE", working: false, toolUses: 14 },
+  origin: "UI",
+  capture: "FULL",
+  updatedAt: Date.now(),
+};
+
+/** An agent reporting itself with `sentinal agent-state` (6.4), in a sandbox. */
+const DEMO_REPORTING_AGENT: Session = {
+  id: "codex-api",
+  machine: "rtx",
+  name: "codex · service-api",
+  command: "codex",
+  cwd: "~/.local/share/sentinal/sandbox/42",
+  project: "service-api",
+  state: "RUNNING",
+  runningFor: "18m",
+  codingAgent: { agent: "CODEX", working: true, toolUses: 31 },
+  agentState: { status: "BLOCKED", detail: "needs the staging API key to run the metrics test", reportedAt: Date.now() },
+  sandbox: true,
+  origin: "WATCH",
+  capture: "FULL",
+  updatedAt: Date.now(),
+};
+
 function cloneSessions(): Session[] {
-  return fixtures.sessions.map((s) => ({
+  const demo = import.meta.env.MODE !== "test";
+  const sessions: Session[] = fixtures.sessions.map((s) => ({
     ...structuredClone(s),
     events: s.events ? (structuredClone(s.events) as SessionEvent[]) : undefined,
     ...(MOCK_GUESSES[s.id] ? structuredClone(MOCK_GUESSES[s.id]) : {}),
+    ...(demo && DEMO_GUESSES[s.id] ? structuredClone(DEMO_GUESSES[s.id]) : {}),
   }));
+  return demo ? [...sessions, structuredClone(DEMO_AGENT), structuredClone(DEMO_REPORTING_AGENT)] : sessions;
 }
 
 // QUESTION: fixtures.json's `history` array only carries {ok, command, duration} —

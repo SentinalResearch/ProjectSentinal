@@ -15,6 +15,7 @@ pub const MAX_ENV_BYTES: usize = 512 * 1024;
 /// Variables the daemon sets itself for every Session; a client's values are dropped.
 pub const DAEMON_OWNED_VARS: &[&str] = &[
     "SENTINAL_SESSION_ID",
+    "SENTINAL_AGENT_API",
     "SENTINAL_AUTO_GUARD",
     "SENTINAL_OSC_NONCE",
     "TA_HOOK_DIR",

@@ -28,8 +28,16 @@ fn every_command_in_the_guide_parses() {
         if line.starts_with("```") {
             in_block = !in_block;
         } else if in_block && line.starts_with("sentinal ") {
-            let words = line.split_whitespace();
-            Cli::try_parse_from(words).unwrap_or_else(|error| panic!("{line}: {error}"));
+            // A quoted argument ("migrating the tests") is one word, as in a shell.
+            let mut words: Vec<String> = Vec::new();
+            for (index, part) in line.split('"').enumerate() {
+                if index % 2 == 1 {
+                    words.push(part.to_string());
+                } else {
+                    words.extend(part.split_whitespace().map(str::to_string));
+                }
+            }
+            Cli::try_parse_from(&words).unwrap_or_else(|error| panic!("{line}: {error}"));
             checked += 1;
         }
     }

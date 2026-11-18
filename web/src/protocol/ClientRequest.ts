@@ -49,6 +49,11 @@ export type ClientRequest =
      * the shell sees the same PATH and variables as that terminal.
      */
     env?: Array<[string, string]>;
+    /**
+     * Start in its own working folder (`sentinal watch --sandbox`, 6.4).
+     * Not a security boundary: the shell still runs as the owner.
+     */
+    sandbox?: boolean;
   }
   | {
     "type": "CONTINUE_SESSION";

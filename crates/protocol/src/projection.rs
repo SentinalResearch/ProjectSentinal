@@ -178,6 +178,12 @@ pub struct ProjectedSession {
     /// When the owner hid this finished Session; it stays searchable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dismissed_at: Option<Timestamp>,
+    /// What an agent running here last reported (6.4); its detail passes the title rules.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_state: Option<crate::AgentReportedState>,
+    /// Started as a sandbox Session (6.4).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sandbox: bool,
 }
 
 impl ProjectedSession {
@@ -203,6 +209,17 @@ impl ProjectedSession {
             exit_code: session.exit_code,
             coding_agent: session.coding_agent.as_deref().cloned(),
             dismissed_at: session.dismissed_at,
+            agent_state: session
+                .agent_state
+                .as_deref()
+                .map(|state| crate::AgentReportedState {
+                    // A detail that would not pass as a title is left out, not cut.
+                    detail: state.detail.clone().filter(|detail| {
+                        crate::agent_state::validate_agent_detail(Some(detail)).is_ok()
+                    }),
+                    ..state.clone()
+                }),
+            sandbox: session.sandbox,
         }
     }
 }

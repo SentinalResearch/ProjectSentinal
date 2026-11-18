@@ -10,6 +10,7 @@ import type { LiveEvent } from "../adapter";
 import type { Machine, MachineStatus, Session, SessionEvent, SessionHealth, SessionMetrics } from "../types";
 import { agentActionWord, agentFinishedText, formatEventTime, sessionDisplayName, sessionElapsedMs } from "../format";
 import { compositeId } from "./machine-connections";
+import { mapAgentState } from "../agentState";
 
 /** In-memory privacy-minimized dashboard projection. */
 export interface ProjectionView {
@@ -140,6 +141,8 @@ function mapSession(
     dismissed: session.dismissed_at ? true : undefined,
     ...(promptEvent === undefined ? {} : { promptEventId: promptEvent }),
     codingAgent,
+    agentState: mapAgentState(session.agent_state),
+    sandbox: session.sandbox || undefined,
     origin: session.origin,
     capture: session.capture,
     exitCode: session.exit_code,

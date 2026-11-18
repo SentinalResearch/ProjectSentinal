@@ -72,6 +72,21 @@ pub enum Command {
     /// Alias for `agent-guide`, so `sentinal help agents` prints the guide.
     #[command(name = "agents", hide = true)]
     Agents,
+    /// Print the skill file an AI agent can add to its own instructions.
+    #[command(alias = "skill")]
+    AgentSkill,
+    /// From inside a Session: tell the owner what you, an AI agent, are doing.
+    ///
+    /// Prints nothing and exits 0 when not inside Sentinal or when the daemon
+    /// is down, so it is always safe to call.
+    AgentState {
+        /// What you are doing.
+        #[arg(long, value_enum)]
+        status: crate::agent_state_command::StatusArg,
+        /// One owner-visible line (at most 200 characters, no secrets).
+        #[arg(long)]
+        detail: Option<String>,
+    },
     /// Serve Sentinal's agent tools to an MCP client over stdio (Claude Code, Claude Desktop, …).
     ///
     /// Needs an agent token from Settings → Agents, in SENTINAL_AGENT_TOKEN
@@ -209,6 +224,14 @@ pub enum Command {
         /// and scripts can run work under Sentinal.
         #[arg(short = 'd', long, requires = "command")]
         detach: bool,
+        /// Start in its own working folder (kept afterwards for review).
+        ///
+        /// Still runs as you: a separate place to work, not a security boundary.
+        #[arg(long)]
+        sandbox: bool,
+        /// With --sandbox: work in this folder instead of a new one.
+        #[arg(long, value_name = "DIR", requires = "sandbox")]
+        cwd: Option<PathBuf>,
         /// Command and arguments, passed exactly as given after `--`.
         #[arg(last = true, num_args = 1.., value_name = "COMMAND")]
         command: Option<Vec<String>>,

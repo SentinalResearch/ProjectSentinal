@@ -614,3 +614,28 @@
   font-size: 13px;
   color: var(--s-failed-fg);
 }
+
+/* Narrower windows (UX pass): the five-column table was cut off behind a
+   hidden sideways scroll. Each Machine becomes a small two-column card and
+   its buttons get their own line. */
+@media (max-width: 1180px) {
+  .machineHeadRow {
+    display: none;
+  }
+  .machineRow {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 16px;
+  }
+  .machineRow > :last-child {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+/* Quiet style (UX pass): page titles are thin like the dashboard, not heavy. */
+.asideTitle,
+.tabTitle {
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}

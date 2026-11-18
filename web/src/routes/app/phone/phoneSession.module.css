@@ -532,3 +532,162 @@
   line-height: 18px;
   color: var(--text-3);
 }
+
+/* P3 · the quiet style (Option A): thin numbers, no boxes, round pill buttons. */
+.detailTitle {
+  font-size: 32px;
+  line-height: 36px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.stateLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.stateLine[data-state="RUNNING"] { color: var(--s-running-fg); }
+.stateLine[data-state="WAITING"] { color: var(--s-waiting-fg); }
+.stateLine[data-state="STALLED"] { color: var(--s-stalled-fg); }
+.stateLine[data-state="FAILED"] { color: var(--s-failed-fg); }
+
+.healthBadge {
+  padding: 0;
+  box-shadow: none;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+.command {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.progress {
+  padding-bottom: 14px;
+  border-bottom: 1.5px solid var(--text-1);
+}
+
+.bigNumber {
+  font-size: 88px;
+  line-height: 76px;
+  font-weight: 200;
+  letter-spacing: -0.05em;
+}
+
+.track {
+  height: 2px;
+}
+.fill {
+  background: var(--accent);
+}
+
+.metricGrid,
+.statGrid {
+  gap: 16px 20px;
+  border: 0;
+  background: transparent;
+}
+
+.metricCell {
+  padding: 0;
+  background: transparent;
+}
+
+.metricValue {
+  font-family: var(--font-sans, inherit);
+  font-size: 26px;
+  font-weight: 300;
+}
+
+.overline {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.actions {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.primaryButton,
+.outlineButton,
+.stopButton,
+.endButton {
+  min-height: 46px;
+  border-radius: 23px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.primaryButton {
+  flex: 1 1 100%;
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+
+.stopButton {
+  flex: 1;
+  width: auto;
+  border: 0;
+  background: var(--chip);
+  color: var(--text-1);
+}
+
+.endButton {
+  flex: 1;
+  border: 0;
+  background: color-mix(in srgb, var(--destructive-fg) 10%, transparent);
+  color: var(--destructive-fg);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.endButton:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
+.failureBand {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 20px 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--s-failed-fg) 9%, transparent);
+  color: var(--text-1);
+  font-size: 13px;
+}
+.failureBand strong {
+  color: var(--s-failed-fg);
+  font-weight: 600;
+}
+
+.waitingOverline {
+  font-weight: 600;
+}
+
+.promptBlock {
+  border-radius: 14px;
+}
+
+.bigAnswer {
+  height: 64px;
+  border: 0;
+  border-radius: 32px;
+  background: var(--chip);
+  font-weight: 500;
+}
+.bigAnswer:first-child {
+  background: var(--text-1);
+  color: var(--bg-0);
+}
+
+.guessNote {
+  font-size: 12px;
+  color: var(--accent-fg);
+}

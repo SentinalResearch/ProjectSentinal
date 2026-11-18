@@ -16,6 +16,9 @@ export type PromptAction =
   | { kind: "navigate"; to: string }
   | { kind: "answer"; sessionId: string; key: "y" | "n" }
   | { kind: "kill"; sessionId: string }
+  | { kind: "end"; sessionId: string }
+  | { kind: "openInbox" }
+  | { kind: "markAllRead" }
   | { kind: "hide"; sessionId: string }
   | { kind: "restore"; sessionId: string }
   | { kind: "delete"; sessionId: string }
@@ -320,6 +323,31 @@ function kill(index: PromptIndex, query: string): PromptSuggestion[] {
   });
 }
 
+// ── END ─────────────────────────────────────────────────────────────────────
+
+/** Live terminals (idle shells too) can be ended: Ctrl-C, then close the shell. */
+function end(index: PromptIndex, query: string): PromptSuggestion[] {
+  const live = index.sessions.filter(
+    (session) => !["COMPLETED", "FAILED", "INTERRUPTED"].includes(session.state) && canInterruptOrIdle(session),
+  );
+  return ranked(live, query, sessionKeys(index)).map((session) => {
+    const path = sessionPath(index, session);
+    return {
+      id: `end:${session.id}`,
+      group: "DO",
+      command: `end ${path}`,
+      detail: `${stateWord(session)} · asks, then Ctrl-C and closes the terminal`,
+      action: { kind: "end", sessionId: session.id },
+      completion: `end ${path}`,
+      sessionId: session.id,
+    };
+  });
+}
+
+function canInterruptOrIdle(session: Session): boolean {
+  return canInterrupt(session) || ((session.state === "IDLE" || session.state === "CREATED") && canInterrupt({ ...session, state: "RUNNING" }));
+}
+
 // ── HIDE / RESTORE / DELETE ─────────────────────────────────────────────────
 
 /** Finished Sessions can be hidden, restored, or permanently deleted (A4). */
@@ -401,6 +429,24 @@ function actions(index: PromptIndex): Array<PromptSuggestion & { keys: string[] 
       keys: ["theme", `${other} theme`, "appearance"],
     },
     {
+      id: "do:inbox",
+      group: "DO",
+      command: "inbox",
+      detail: "open notifications under the island",
+      action: { kind: "openInbox" },
+      completion: "inbox",
+      keys: ["inbox", "notifications", "alerts"],
+    },
+    {
+      id: "do:read",
+      group: "DO",
+      command: "mark all read",
+      detail: "clear the unread count",
+      action: { kind: "markAllRead" },
+      completion: "mark all read",
+      keys: ["mark all read", "read all", "clear notifications"],
+    },
+    {
       id: "do:signout",
       group: "DO",
       command: "sign out",
@@ -451,7 +497,7 @@ export function searchText(input: string): string | undefined {
   let query: string;
   if (head === "find") query = argument;
   else if ((head === "y" || head === "n") && (hasArgument || text.length === 1)) return undefined;
-  else if (["go", "run", "kill", "hide", "restore", "delete"].includes(head) && hasArgument) return undefined;
+  else if (["go", "run", "kill", "end", "hide", "restore", "delete"].includes(head) && hasArgument) return undefined;
   else if (head === "split") return undefined;
   else query = text;
   return query.length >= MIN_SEARCH ? query : undefined;
@@ -471,6 +517,7 @@ export function suggest(input: string, index: PromptIndex): PromptSuggestion[] {
   else if (head === "find" && hasArgument) all = find(index, argument);
   else if (head === "split" && (hasArgument || text === "split")) all = split(index, text.slice(5).replace(/^\s+/, ""));
   else if (head === "kill" && hasArgument) all = kill(index, argument);
+  else if (head === "end" && hasArgument) all = end(index, argument);
   else if (head === "hide" && hasArgument) all = hide(index, argument);
   else if (head === "restore" && hasArgument) all = restore(index, argument);
   else if (head === "delete" && hasArgument) all = deleteSession(index, argument);

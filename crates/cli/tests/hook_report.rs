@@ -63,7 +63,9 @@ fn answer(request: &LocalRequest) -> LocalResponse {
             );
             session.origin = SessionOrigin::ShellHook;
             session.pid = Some(*pid);
-            LocalResponse::Session { session }
+            LocalResponse::Session {
+                session: Box::new(session),
+            }
         }
         _ => LocalResponse::Command {
             command: Command::start(

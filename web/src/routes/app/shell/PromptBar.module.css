@@ -258,3 +258,19 @@
     background: color-mix(in srgb, var(--bg-deep) 80%, transparent);
   }
 }
+
+/* Desktop: Spotlight-style, right under the island you clicked, results below
+   the field. Phones keep the bottom sheet. */
+.layer:not([data-sheet]) .dock {
+  top: calc(var(--island-top) + var(--island-height) + 12px);
+  bottom: auto;
+  width: min(720px, calc(100vw - 48px));
+  flex-direction: column-reverse;
+  gap: 8px;
+}
+.layer:not([data-sheet]) .panel {
+  max-height: calc(100vh - var(--island-top) - var(--island-height) - 120px);
+}
+.layer:not([data-sheet]) .panel:not(:has(.row)) {
+  display: none;
+}

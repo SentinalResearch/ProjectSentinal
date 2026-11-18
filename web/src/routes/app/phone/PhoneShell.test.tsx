@@ -1,3 +1,4 @@
+import { resetLifecycle } from "../../../data/lifecycle";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -45,6 +46,7 @@ function renderShell(path: string) {
 
 describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
   afterEach(() => {
+    resetLifecycle();
     resetViewport();
     vi.restoreAllMocks();
   });
@@ -62,13 +64,13 @@ describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
     expect(screen.getByRole("navigation", { name: "Sentinal" })).not.toHaveAttribute("data-docked");
   });
 
-  it("has a glass island (logo, page, one live item, needs-you count) and a prompt pill — no top bar, tab bar, or menu", async () => {
+  it("has an island (logo, page, one live item, unread count) and a prompt pill — no top bar, tab bar, or menu", async () => {
     setViewport(390);
     renderShell("/app/overview");
     const island = screen.getByRole("navigation", { name: "Sentinal" });
     expect(within(island).getByRole("link", { name: "Overview" })).toBeInTheDocument();
     expect(within(island).getByText("Overview", { selector: "span" })).toBeInTheDocument();
-    expect(await within(island).findByRole("link", { name: /^\d+ need you$/ })).toBeInTheDocument();
+    expect(await within(island).findByRole("button", { name: /^\d+ unread notifications?$/ })).toBeInTheDocument();
     expect(within(island).getByRole("link", { name: /failed$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open the prompt" })).toHaveTextContent("go, run, find, y / n…");
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
@@ -127,7 +129,7 @@ describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
     const send = vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
     renderShell("/app/history");
     const user = userEvent.setup();
-    await screen.findByRole("link", { name: /^\d+ need you$/ });
+    await screen.findByRole("button", { name: /^\d+ unread notifications?$/ });
     await user.click(screen.getByRole("button", { name: "Open the prompt" }));
     const command = screen.getByRole("combobox", { name: "Command" });
     expect(command).toHaveAttribute("inputmode", "none");
@@ -140,11 +142,16 @@ describe("phone shell (MOBILE_GLASS_SPEC.md §1)", () => {
     expect(screen.queryByRole("dialog", { name: "Prompt" })).not.toBeInTheDocument();
   });
 
-  it("the needs-you count opens Overview filtered to Sessions that need you", async () => {
+  it("the unread count opens the inbox under the island; Open goes to that Session", async () => {
     setViewport(390);
     renderShell("/app/history");
-    await userEvent.setup().click(await screen.findByRole("link", { name: /^\d+ need you$/ }));
-    expect(screen.getByTestId("where")).toHaveTextContent("/app/overview?needs=1");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^\d+ unread notifications?$/ }));
+    const inbox = screen.getByRole("dialog", { name: "Notifications" });
+    expect(within(inbox).getByRole("region", { name: "Needs you" })).toBeInTheDocument();
+    await user.click(within(inbox).getAllByRole("button", { name: "Open" })[0]);
+    expect(screen.getByTestId("where")).toHaveTextContent(/^\/app\/sessions\//);
+    expect(screen.queryByRole("dialog", { name: "Notifications" })).not.toBeInTheDocument();
   });
 
   it("detail screens put ‹ back in the island", () => {

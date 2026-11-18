@@ -31,6 +31,18 @@ export interface SessionProgress {
   current: number;
   total: number;
   unit: string;
+  /** Read off the screen by the intelligence layer: a guess, shown dashed. */
+  inferred?: boolean;
+}
+
+/**
+ * A command the intelligence layer suggests (level 2): shown with why, run
+ * only when the owner taps it, never on its own.
+ */
+export interface SessionSuggestion {
+  command: string;
+  why: string;
+  inferred: true;
 }
 
 export interface SessionMetrics {
@@ -117,6 +129,12 @@ export interface Session {
   events?: SessionEvent[];
   /** What it is doing, in a line; see SessionSummary. */
   summary?: SessionSummary;
+  /** Commands worth running next, suggested from the screen. */
+  suggestions?: SessionSuggestion[];
+  /** What an agent running here last reported about itself (6.4). */
+  agentState?: import("./agentState").AgentStateView;
+  /** Started with `sentinal watch --sandbox`: a separate working folder. */
+  sandbox?: boolean;
   /** How the Session entered Sentinal; absent means UI. */
   origin?: SessionOrigin;
   /** What Sentinal can observe; absent means FULL. Authorization is enforced by the daemon. */

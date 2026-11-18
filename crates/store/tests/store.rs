@@ -627,3 +627,24 @@ fn mismatched_json_and_lineage_column_is_rejected_on_read() {
     drop(store);
     std::fs::remove_file(path).unwrap();
 }
+
+#[test]
+fn an_agent_report_is_never_stored_but_the_sandbox_flag_is() {
+    let store = Store::open_in_memory().unwrap();
+    let mut running = session(4, SessionState::Running);
+    running.sandbox = true;
+    running.agent_state = Some(Box::new(protocol::AgentReportedState {
+        status: protocol::AgentStatus::Working,
+        detail: Some("migrating tests".into()),
+        reported_at: Timestamp(103),
+    }));
+    store.insert_session(&running).unwrap();
+    store.update_session(&running).unwrap();
+
+    let stored = store.session(SessionId(4)).unwrap().unwrap();
+    assert_eq!(
+        stored.agent_state, None,
+        "a restart must not show a stale report"
+    );
+    assert!(stored.sandbox);
+}

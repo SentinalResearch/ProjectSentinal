@@ -108,8 +108,10 @@ export default defineConfig({
     { name: "diagnostics", testMatch: "diagnostics.spec.ts", dependencies: ["desktop-session"] },
     // Milestone 6.0: an agent token from Settings used through `sentinal mcp`.
     { name: "agents", testMatch: "agents.spec.ts", dependencies: ["diagnostics"] },
+    // Milestone 6.4: an agent reports itself from inside a sandbox Session.
+    { name: "agent-state", testMatch: "agent-state.spec.ts", dependencies: ["agents"] },
     // Milestone 4.D.1 acceptance: disconnects worker B, so it runs last.
-    { name: "projection-acceptance", testMatch: "projection-acceptance.spec.ts", dependencies: ["agents"] },
+    { name: "projection-acceptance", testMatch: "projection-acceptance.spec.ts", dependencies: ["agent-state"] },
   ],
   webServer: [
     {

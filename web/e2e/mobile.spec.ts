@@ -49,7 +49,9 @@ async function swipeFromLeftEdge(page: Page) {
 
 async function expectNoBrowserCredential(page: Page) {
   const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
-  expect(Object.keys(JSON.parse(stored)).filter((key) => key !== "sentinal.theme")).toEqual([]);
+  // Only preferences: theme, the learning tip, notification read / auto-clear choices.
+  const preferences = ["sentinal.theme", "sentinal.learn", "sentinal.lifecycle"];
+  expect(Object.keys(JSON.parse(stored)).filter((key) => !preferences.includes(key))).toEqual([]);
   expect(stored).not.toContain(password);
   expect(page.url()).not.toMatch(/token=/i);
 }

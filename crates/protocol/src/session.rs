@@ -293,6 +293,12 @@ pub struct Session {
     /// When the owner hid this finished Session; it stays searchable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dismissed_at: Option<Timestamp>,
+    /// What an agent running here last reported (6.4); in memory only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_state: Option<Box<crate::AgentReportedState>>,
+    /// Started with `sentinal watch --sandbox`: a separate working folder (6.4).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sandbox: bool,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -329,6 +335,8 @@ impl Session {
             coding_agent: None,
             output_search: false,
             dismissed_at: None,
+            agent_state: None,
+            sandbox: false,
             created_at: at,
             updated_at: at,
         }
@@ -406,6 +414,8 @@ impl Session {
         self.updated_at = at;
         if !to.is_busy() && to != SessionState::Disconnected {
             self.current_command = None;
+            // An agent's report (6.4) describes its Command; it ends with it.
+            self.agent_state = None;
         }
         Ok(())
     }
@@ -413,6 +423,35 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn an_agent_report_clears_when_the_command_or_session_ends_but_not_while_waiting() {
+        let report = crate::AgentReportedState {
+            status: crate::AgentStatus::Working,
+            detail: None,
+            reported_at: Timestamp(5),
+        };
+        let mut session = session_in(SessionState::Running);
+        session.agent_state = Some(Box::new(report.clone()));
+        session
+            .transition(SessionState::Waiting, Timestamp(6))
+            .unwrap();
+        assert!(session.agent_state.is_some(), "a question keeps it");
+        session
+            .transition(SessionState::Running, Timestamp(7))
+            .unwrap();
+        session
+            .transition(SessionState::Idle, Timestamp(8))
+            .unwrap();
+        assert_eq!(session.agent_state, None, "back at the prompt");
+
+        let mut session = session_in(SessionState::Running);
+        session.agent_state = Some(Box::new(report));
+        session
+            .transition(SessionState::Interrupted, Timestamp(9))
+            .unwrap();
+        assert_eq!(session.agent_state, None, "the Session ended");
+    }
     use super::*;
     use SessionState::*;
 
