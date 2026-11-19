@@ -126,6 +126,7 @@ fn text_bearing_events_are_indexed_and_others_are_not() {
             2,
             EventKind::WaitingForInput {
                 prompt: Some("Continue? [y/N]".into()),
+                marked: None,
                 options: Vec::new(),
             },
             2,

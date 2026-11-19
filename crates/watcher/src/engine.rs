@@ -44,6 +44,12 @@ pub struct EventEngine {
     /// Set when the program printed a `::sentinal` API line; explicit lines are
     /// then trusted over adapter and fallback guesses.
     explicit_api: bool,
+    /// How many times the daemon started this engine over after a panic.
+    restarts: u32,
+    /// Warning and error bursts (T0.11).
+    bursts: crate::bursts::Bursts,
+    /// Server ports already reported for this Command (T0.4).
+    servers: std::collections::HashSet<Option<u16>>,
 }
 
 impl EventEngine {
@@ -62,6 +68,9 @@ impl EventEngine {
             command_active: command.is_some(),
             screen: crate::screen_prompt::ScreenPrompts::default(),
             explicit_api: false,
+            restarts: 0,
+            bursts: crate::bursts::Bursts::default(),
+            servers: std::collections::HashSet::new(),
         };
         if let Some(command) = command {
             engine.select(command);
@@ -81,6 +90,32 @@ impl EventEngine {
         self
     }
 
+    /// A fresh engine with the same adapters and settings, for the daemon to
+    /// use after this one panicked (T0.3). The running Command's adapter is
+    /// chosen again when the next Command starts.
+    pub fn restarted(&self) -> Self {
+        let mut engine =
+            EventEngine::new(None, self.declarative.clone()).with_capture(self.capture);
+        engine.command_activity_required = self.command_activity_required;
+        engine.restarts = self.restarts.saturating_add(1);
+        engine
+    }
+
+    /// Times this engine was started over after a panic.
+    pub fn restarts(&self) -> u32 {
+        self.restarts
+    }
+
+    /// The capture level Events and Health are limited to.
+    pub fn capture(&self) -> CaptureLevel {
+        self.capture
+    }
+
+    /// Whether quiet timers wait for a tracked running Command.
+    pub fn command_activity_required(&self) -> bool {
+        self.command_activity_required
+    }
+
     /// Change the capture level, e.g. when an adopted log tail starts or stops.
     pub fn set_capture(&mut self, capture: CaptureLevel) {
         self.capture = capture;
@@ -95,6 +130,8 @@ impl EventEngine {
             self.command_active = true;
             self.screen.reset();
             self.explicit_api = false;
+            self.bursts.reset();
+            self.servers.clear();
         } else if matches!(observation.kind, ObservationKind::CommandFinished(_)) {
             self.command_active = false;
             self.screen.reset();
@@ -176,19 +213,27 @@ impl EventEngine {
             }
             _ => {}
         }
-        events = deduplicate(events)
-            .into_iter()
-            .filter(|event| capture.supports_evidence(event))
-            .filter(|event| self.allow_event(observation.at, event))
-            .collect();
-        let health = self.health.observe(observation, &events);
-        let health = bound(capture, health);
+        let mut counted = self.bursts.summaries(observation.at);
+        counted.extend(
+            deduplicate(events)
+                .into_iter()
+                .filter(|event| capture.supports_evidence(event))
+                .filter(|event| self.allow_event(observation.at, event)),
+        );
+        events = counted;
         let adapter_state = self.selected.as_ref().map(|adapter| adapter.state());
         let waiting = self.screen.waiting()
             || match &self.selected {
                 Some(adapter) if adapter.owns_prompts() => adapter.waiting(),
                 _ => !lines_mean_nothing && self.generic.waiting(),
             };
+        let asked_now = events
+            .iter()
+            .any(|event| matches!(event, EventKind::WaitingForInput { .. }));
+        // T0.6: an answered question stops warning; one asked just now counts.
+        self.health.set_waiting(waiting || asked_now);
+        let health = self.health.observe(observation, &events);
+        let health = bound(capture, health);
         EngineUpdate {
             events,
             health,
@@ -268,6 +313,13 @@ impl EventEngine {
     }
 
     fn allow_event(&mut self, at: Timestamp, event: &EventKind) -> bool {
+        if !self.bursts.admit(at, event) {
+            return false;
+        }
+        // A server is news once per port per Command, not on every reload.
+        if let EventKind::ServerStarted { port, .. } = event {
+            return self.servers.insert(*port);
+        }
         if let EventKind::MetricReported { name, .. } = event {
             // Like progress: at most one Event per metric every few seconds,
             // and only so many distinct names per Command.

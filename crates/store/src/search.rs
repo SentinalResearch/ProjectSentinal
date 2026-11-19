@@ -149,7 +149,7 @@ fn event_candidates(
             params![expression, since, INDEXED_CANDIDATES],
             records::event_from_row,
         )?;
-        rows.extend(found.collect::<Result<Vec<_>, _>>()?);
+        rows.extend(records::readable_rows(found, "events")?);
     }
     let mut statement = connection.prepare(
         "SELECT id, session_id, command_id, at, kind_json FROM (
@@ -163,7 +163,7 @@ fn event_candidates(
         params![RECENT_EVENT_SCAN, since, RECENT_SEARCH_WINDOW as u32],
         records::event_from_row,
     )?;
-    rows.extend(recent.collect::<Result<Vec<_>, _>>()?);
+    rows.extend(records::readable_rows(recent, "events")?);
     Ok(newest_matching(
         rows,
         |event| event.id.0,

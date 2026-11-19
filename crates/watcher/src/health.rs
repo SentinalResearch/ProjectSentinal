@@ -5,12 +5,18 @@ use protocol::{EventKind, Health, HealthLevel, HealthOverall, Resource};
 
 const MAX_EVIDENCE: usize = 16;
 const MAX_EVIDENCE_BYTES: usize = 512;
+/// Evidence key of the question being asked, so its answer can remove it.
+const QUESTION: &str = "question";
 
 /// Stateful deterministic Health calculator.
 pub struct HealthTracker {
     health: Health,
     stalled: bool,
     warnings: u32,
+    /// A question on screen or in the output is waiting for an answer.
+    waiting: bool,
+    /// The Command exited non-zero: the only thing that makes Health FAILED.
+    failed_exit: bool,
     /// What each evidence line is about, parallel to `health.evidence`: a
     /// newer line about the same thing replaces the older one.
     evidence_keys: Vec<String>,
@@ -31,8 +37,22 @@ impl HealthTracker {
             },
             stalled: false,
             warnings: 0,
+            waiting: false,
+            failed_exit: false,
             evidence_keys: Vec::new(),
         }
+    }
+
+    /// Whether a question still waits for an answer (T0.6). Once answered,
+    /// its warning and its evidence line go.
+    pub fn set_waiting(&mut self, waiting: bool) {
+        if self.waiting && !waiting {
+            self.remove_evidence(QUESTION);
+            if self.health.activity == HealthLevel::Warning && !self.stalled {
+                self.health.activity = HealthLevel::Good;
+            }
+        }
+        self.waiting = waiting;
     }
 
     /// Apply one observation and its emitted Events, returning current Health.
@@ -60,6 +80,7 @@ impl HealthTracker {
                 } else if let Some(code) = command.exit_code {
                     self.health.errors = self.health.errors.saturating_add(1);
                     self.health.stability = HealthLevel::Critical;
+                    self.failed_exit = true;
                     self.add_evidence(&format!("Command finished with exit code {code}"));
                 }
             }
@@ -117,9 +138,13 @@ impl HealthTracker {
                 self.health.stability = HealthLevel::Warning;
                 self.add_evidence(message);
             }
+            // An error line while the Command runs is a warning; only a failed
+            // exit makes it FAILED (T0.6).
             EventKind::ErrorDetected { message } => {
                 self.health.errors = self.health.errors.saturating_add(1);
-                self.health.stability = HealthLevel::Critical;
+                if self.health.stability != HealthLevel::Critical {
+                    self.health.stability = HealthLevel::Warning;
+                }
                 self.add_evidence(message);
             }
             EventKind::ResourceHigh { resource, percent } => {
@@ -136,8 +161,9 @@ impl HealthTracker {
             }
             EventKind::WaitingForInput { prompt, .. } => {
                 self.health.activity = HealthLevel::Warning;
-                self.warnings = self.warnings.saturating_add(1);
-                self.add_evidence(
+                self.waiting = true;
+                self.add_keyed_evidence(
+                    QUESTION,
                     prompt
                         .as_deref()
                         .unwrap_or("Command may be waiting for input"),
@@ -155,6 +181,7 @@ impl HealthTracker {
             EventKind::CommandFinished { exit_code, .. } if *exit_code != 0 => {
                 self.health.errors = self.health.errors.saturating_add(1);
                 self.health.stability = HealthLevel::Critical;
+                self.failed_exit = true;
                 self.add_evidence(&format!("Command failed with exit code {exit_code}"));
             }
             _ => {}
@@ -162,11 +189,13 @@ impl HealthTracker {
     }
 
     fn recompute_overall(&mut self) {
-        self.health.overall = if self.health.errors > 0 {
+        self.health.overall = if self.failed_exit {
             HealthOverall::Failed
         } else if self.stalled {
             HealthOverall::PossiblyStalled
         } else if self.warnings > 0
+            || self.waiting
+            || self.health.errors > 0
             || matches!(
                 self.health.resources,
                 HealthLevel::Warning | HealthLevel::Critical
@@ -190,6 +219,19 @@ impl HealthTracker {
         self.evidence_keys.clear();
         self.stalled = false;
         self.warnings = 0;
+        self.waiting = false;
+        self.failed_exit = false;
+    }
+
+    fn remove_evidence(&mut self, key: &str) {
+        if let Some(index) = self
+            .evidence_keys
+            .iter()
+            .position(|existing| existing == key)
+        {
+            self.evidence_keys.remove(index);
+            self.health.evidence.remove(index);
+        }
     }
 
     /// Add evidence keyed by its wording with the numbers removed, so

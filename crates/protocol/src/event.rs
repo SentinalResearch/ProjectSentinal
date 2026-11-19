@@ -107,6 +107,12 @@ pub enum EventKind {
         /// The answers the program offered, when it listed them (6.1).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         options: Vec<PromptOption>,
+        /// Which of `options` the menu's selector was on when the question
+        /// was asked, 0-based (T0.8). Absent when the screen showed no marker
+        /// or it was past the offered options. A client checks it is within
+        /// `options` before using it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        marked: Option<u8>,
     },
     /// No output and no resource activity for a while.
     PossiblyStalled {
@@ -277,6 +283,7 @@ mod tests {
             },
             EventKind::WaitingForInput {
                 prompt: None,
+                marked: None,
                 options: Vec::new(),
             },
             EventKind::PossiblyStalled {

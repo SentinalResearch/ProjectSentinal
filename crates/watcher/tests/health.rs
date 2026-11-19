@@ -51,7 +51,9 @@ fn stalled_rating_lists_quiet_resource_evidence() {
 }
 
 #[test]
-fn failed_rating_counts_errors_and_lists_evidence() {
+fn an_error_line_is_counted_and_a_warning_not_a_failure() {
+    // T0.6: one error line while a Command runs is not a failure; only a
+    // failed exit is.
     let mut tracker = HealthTracker::new();
     let health = tracker.observe(
         &Observation::output(Timestamp(1), "error: build failed"),
@@ -59,9 +61,9 @@ fn failed_rating_counts_errors_and_lists_evidence() {
             message: "error: build failed".into(),
         }],
     );
-    assert_eq!(health.overall, HealthOverall::Failed);
+    assert_eq!(health.overall, HealthOverall::Warning);
     assert_eq!(health.errors, 1);
-    assert_eq!(health.stability, HealthLevel::Critical);
+    assert_eq!(health.stability, HealthLevel::Warning);
     assert!(health
         .evidence
         .iter()
@@ -168,7 +170,7 @@ fn a_new_command_clears_the_previous_commands_failure() {
 }
 
 #[test]
-fn a_failure_in_the_running_command_still_fails_it() {
+fn an_error_line_warns_and_a_failed_exit_fails_the_command() {
     let mut tracker = HealthTracker::new();
     observe_kind(
         &mut tracker,
@@ -181,7 +183,50 @@ fn a_failure_in_the_running_command_still_fails_it() {
             message: "error: build failed".into(),
         }],
     );
+    assert_eq!(health.overall, HealthOverall::Warning);
+
+    let mut finished = command(1, "make", 1);
+    finished.finish(2, Timestamp(3)).unwrap();
+    let health = observe_kind(
+        &mut tracker,
+        3,
+        watcher::ObservationKind::CommandFinished(finished),
+    );
     assert_eq!(health.overall, HealthOverall::Failed);
+    assert_eq!(health.stability, HealthLevel::Critical);
+}
+
+#[test]
+fn a_question_warns_only_until_it_is_answered() {
+    let mut tracker = HealthTracker::new();
+    observe_kind(
+        &mut tracker,
+        1,
+        watcher::ObservationKind::CommandStarted(command(1, "npm install", 1)),
+    );
+    let health = tracker.observe(
+        &Observation::tick(Timestamp(2)),
+        &[EventKind::WaitingForInput {
+            prompt: Some("Continue? [y/N]".into()),
+            marked: None,
+            options: Vec::new(),
+        }],
+    );
+    assert_eq!(health.overall, HealthOverall::Warning);
+    assert_eq!(health.activity, HealthLevel::Warning);
+
+    tracker.set_waiting(false);
+    let health = tracker.observe(&Observation::output(Timestamp(3), "added 12 packages"), &[]);
+    assert_eq!(health.overall, HealthOverall::Healthy);
+    assert_eq!(health.activity, HealthLevel::Good);
+    assert!(
+        !health
+            .evidence
+            .iter()
+            .any(|line| line.contains("Continue?")),
+        "{:?}",
+        health.evidence
+    );
 }
 
 #[test]

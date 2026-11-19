@@ -25,8 +25,10 @@ export function choiceKeysAllowed(keys: string): boolean {
 
 /**
  * Agents whose menus are chosen with arrows and Enter, where a digit is not a
- * verified answer. The watcher does not report which option the marker is on,
- * so arrows cannot be counted safely either: these are answered in the terminal.
+ * verified answer. The watcher reports which option the marker was on when
+ * the question was asked (`marked`, T0.8), but the owner may have moved it
+ * since, so the browser does not count arrows from it: these are answered in
+ * the terminal until the daemon computes the keys from the current screen (T3.4).
  */
 const ARROW_MENU_AGENTS = new Set(["VIBE"]);
 

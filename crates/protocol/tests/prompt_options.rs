@@ -58,6 +58,7 @@ fn old_waiting_events_without_options_still_parse() {
         event,
         EventKind::WaitingForInput {
             prompt: Some("Continue? [y/N]".into()),
+            marked: None,
             options: vec![]
         }
     );

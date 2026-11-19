@@ -141,8 +141,9 @@ fails without it. Items marked *(v2.10.0)* are also in production.
 
 ### Still open
 
-- [ ] X14 Health stays WARNING after a question is answered, for the rest of
+- [x] X14 Health stays WARNING after a question is answered, for the rest of
       the Command (`watcher/src/health.rs:138`); agent Sessions are one Command
+      (fixed as T0.6)
 - [ ] X15 Rollback from 2.11: stored rows are decoded strictly, so
       `METRIC_REPORTED` Events and `VIBE`/`ANTIGRAVITY` Sessions make whole
       queries fail on 2.10 (`store/src/records.rs:156`, `lib.rs:354`)
@@ -165,8 +166,8 @@ fails without it. Items marked *(v2.10.0)* are also in production.
       is now a `ConfirmDialog`, which traps Tab, returns focus to its opener,
       and for delete starts on Cancel — `shell/GlassShell.test.tsx`
 - [ ] X22 Browser logins live only in memory and end on every daemon restart
-- [ ] X23 A panic in the watcher still ends the PTY reader; catch it there so
-      one bad line can never stop a Session being read
+- [x] X23 A panic in the watcher still ends the PTY reader; catch it there so
+      one bad line can never stop a Session being read (fixed as T0.3)
 - [ ] X24 From screenshots: on the phone Session page the Open terminal button
       covers Health · Evidence; the prompt bar covers the last Machine in the
       Start a Session sheet; an offline Machine's Session still shows IDLE
@@ -240,26 +241,48 @@ T0.5, T0.6 (X14), T0.11, T0.12 (X15).
       so no agent activity and no "agent finished" notification
 - [x] T0.2 Panic on a training line with a multi-byte character before
       `loss` (`crates/watcher/src/training.rs:282`)
-- [ ] T0.3 A watcher panic stops the PTY reader for that Session
-      (`crates/daemon/src/session_manager/tasks.rs`)
-- [ ] T0.4 Wrong server port (`127.0.0.1:8080` gives 127), and one Event per
-      matching line (`crates/watcher/src/generic.rs`)
-- [ ] T0.5 Tool calls counted again after each turn; a turn "finishes"
-      during an approval dialog (`agent_cli.rs`, `agent_activity.rs`)
-- [ ] T0.6 Health stays WARNING after a question is answered, and FAILED
-      after one error line (`crates/watcher/src/health.rs`)
+- [x] T0.3 A watcher panic stops the PTY reader for that Session
+      (`crates/daemon/src/session_manager/tasks.rs`). 2026-11-19: the watcher
+      runs under `catch_unwind`; a panic logs once, starts the engine over
+      with the same settings (`EventEngine::restarted`) and drops that one
+      observation — `tasks.rs` tests, `watcher/tests/restart.rs`
+- [x] T0.4 Wrong server port (`127.0.0.1:8080` gives 127), and one Event per
+      matching line (`crates/watcher/src/generic.rs`). 2026-11-19: a server is
+      reported once per port per Command — `watcher/tests/generic.rs`
+- [x] T0.5 Tool calls counted again after each turn; a turn "finishes"
+      during an approval dialog (`agent_cli.rs`, `agent_activity.rs`).
+      Already fixed with P4/X18: screen-read tool lines count once while
+      visible across turns, and an on-screen question holds the turn open —
+      `watcher/tests/agent_events.rs`
+- [x] T0.6 Health stays WARNING after a question is answered, and FAILED
+      after one error line (`crates/watcher/src/health.rs`). 2026-11-19: an
+      answered question clears its warning and evidence; an error line is a
+      counted WARNING; only a failed exit is FAILED (three tests updated on
+      purpose to the new rule) — `watcher/tests/health.rs`
 - [x] T0.7 `::sentinal` lines: metrics not rate limited, `unit` unbounded,
       malformed fields half accepted (B2 said otherwise)
-- [ ] T0.8 Same question asked again within one second is not reported;
-      marked menus allow 8 options, the protocol 6; marked row not reported
+- [x] T0.8 Same question asked again within one second is not reported;
+      marked menus allow 8 options, the protocol 6; marked row not reported.
+      The first two are fixed (X18, X19). 2026-11-19, approved by the owner:
+      `WAITING_FOR_INPUT.marked` (optional, 0-based, only within the offered
+      options) is the row the selector was on when the question was asked.
+      Moving the selector is not a new question. The web still sends no
+      arrows from it (the owner may have moved it since); T3.4 computes the
+      keys in the daemon from the current screen — `watcher/tests/screen_prompt.rs`
 - [x] T0.9 A second question in the same Session within 5 minutes sends no
       notification (worker and control both deduplicate). Likely the cause of
       the A3 item "notifications for questions sometimes never arrived"
 - [x] T0.10 `kill` leaves the Command running forever in history and tells
       no viewer
-- [ ] T0.11 No rate limit on warning and error Events
-- [ ] T0.12 One unreadable stored row fails the whole query (matters after a
-      rollback from a newer release)
+- [x] T0.11 No rate limit on warning and error Events. 2026-11-19: per
+      Session, the first 5 of a 10 s burst are kept, then one "N more
+      warnings in 10 s" Event; warnings and errors separately
+      (`watcher/src/bursts.rs`) — `watcher/tests/rate_limit.rs`
+- [x] T0.12 One unreadable stored row fails the whole query (matters after a
+      rollback from a newer release). 2026-11-19: Session and Event lists and
+      search skip and log rows this build cannot decode
+      (`store/tests/unreadable_rows.rs`). This also covers X15 going forward;
+      2.10 itself still decodes strictly
 - [x] T0.13 Projection: an update can be lost when it is compacted into a
       row already being uploaded; a worker with more than about 2,000
       records can never send a snapshot to a new control
@@ -534,6 +557,8 @@ Full notes: `docs/releases/v2.11.0.md`.
 
 - `ATTACH.history` (optional, off by default; old daemons ignore it). New
   fixture entry in `client_requests.json`
+- `WAITING_FOR_INPUT.marked` (optional, T0.8). New fixture entry (id 71) in
+  `events.json`
 
 ### Release notes so far (protocol changes since v2.10.0)
 

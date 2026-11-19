@@ -73,13 +73,15 @@ fn process_log_error_lines_are_events_but_health_is_not_failed() {
 }
 
 #[test]
-fn full_error_lines_still_mark_health_failed() {
+fn full_error_lines_warn_until_the_command_fails() {
+    // T0.6: an error line is a warning; only a failed exit is FAILED.
     let mut engine = EventEngine::new(None, Vec::new());
     let update = engine.observe(&Observation::output(
         Timestamp(1),
         "Traceback (most recent call last):",
     ));
-    assert_eq!(update.health.overall, HealthOverall::Failed);
+    assert_eq!(update.health.overall, HealthOverall::Warning);
+    assert_eq!(update.health.errors, 1);
 }
 
 #[test]

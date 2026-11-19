@@ -358,7 +358,12 @@ pub(super) fn apply_observation(
 ) {
     super::agent_state::flush_due(handle, observation.at);
     let update = match handle.watcher.lock() {
-        Ok(mut engine) => engine.observe(&observation),
+        Ok(mut engine) => match guarded(session_id, &mut engine, |engine| {
+            engine.observe(&observation)
+        }) {
+            Some(update) => update,
+            None => return,
+        },
         Err(_) => {
             tracing::error!(session = session_id.0, "watcher engine lock poisoned");
             return;
@@ -470,6 +475,30 @@ pub(super) fn apply_observation(
     }
 }
 
+/// Run the watcher, surviving a panic in it (T0.3): the PTY reader must keep
+/// reading whatever one bad line does to an adapter. The engine is started
+/// over with the same settings, the observation is dropped, and the first
+/// panic for this Session is logged.
+fn guarded<T>(
+    session_id: SessionId,
+    engine: &mut watcher::EventEngine,
+    run: impl FnOnce(&mut watcher::EventEngine) -> T,
+) -> Option<T> {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(engine))) {
+        Ok(value) => Some(value),
+        Err(_) => {
+            if engine.restarts() == 0 {
+                tracing::error!(
+                    session = session_id.0,
+                    "watcher panicked; started it over and kept reading the terminal"
+                );
+            }
+            *engine = engine.restarted();
+            None
+        }
+    }
+}
+
 pub(super) fn apply_health_event(
     session_id: SessionId,
     handle: &SessionHandle,
@@ -478,7 +507,12 @@ pub(super) fn apply_health_event(
     event: &EventKind,
 ) {
     let health = match handle.watcher.lock() {
-        Ok(mut engine) => engine.observe_existing_event(at, event),
+        Ok(mut engine) => match guarded(session_id, &mut engine, |engine| {
+            engine.observe_existing_event(at, event)
+        }) {
+            Some(health) => health,
+            None => return,
+        },
         Err(_) => {
             tracing::error!(session = session_id.0, "watcher engine lock poisoned");
             return;
@@ -619,8 +653,11 @@ fn save(
 
 #[cfg(test)]
 mod prompt_state_tests {
-    use super::prompt_transition;
-    use protocol::SessionState::{self, *};
+    use super::{guarded, prompt_transition};
+    use protocol::{
+        SessionId,
+        SessionState::{self, *},
+    };
 
     #[test]
     fn only_running_and_waiting_swap_on_prompts() {
@@ -634,5 +671,24 @@ mod prompt_state_tests {
         }
         assert_eq!(prompt_transition(Running, false), None);
         assert_eq!(prompt_transition(Waiting, true), None);
+    }
+
+    #[test]
+    fn a_watcher_panic_starts_the_engine_over_instead_of_ending_the_reader() {
+        let mut engine = watcher::EventEngine::new(None, Vec::new());
+        let failed: Option<()> = guarded(SessionId(3), &mut engine, |_| panic!("bad line"));
+        assert_eq!(failed, None);
+        assert_eq!(engine.restarts(), 1);
+
+        let next = guarded(SessionId(3), &mut engine, |engine| {
+            engine.observe(&watcher::Observation {
+                at: protocol::Timestamp(1),
+                kind: watcher::ObservationKind::OutputLine("still reading".into()),
+            })
+        });
+        assert!(
+            next.is_some(),
+            "the next line is watched by the fresh engine"
+        );
     }
 }

@@ -206,9 +206,9 @@ async fn a_full_screen_agent_s_menu_is_read_from_the_screen_with_its_words_intac
     let (prompt, options) = events
         .iter()
         .find_map(|event| match &event.kind {
-            EventKind::WaitingForInput { prompt, options } => {
-                Some((prompt.clone().unwrap(), options.clone()))
-            }
+            EventKind::WaitingForInput {
+                prompt, options, ..
+            } => Some((prompt.clone().unwrap(), options.clone())),
             _ => None,
         })
         .unwrap();

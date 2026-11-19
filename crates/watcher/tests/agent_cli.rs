@@ -97,6 +97,7 @@ fn a_claude_code_approval_becomes_waiting_with_its_three_answers() {
         events,
         vec![EventKind::WaitingForInput {
             prompt: Some("Do you want to proceed?".into()),
+            marked: None,
             options: vec![
                 option("Yes", "1"),
                 option(
@@ -123,7 +124,10 @@ fn borderless_dialogs_and_other_numbered_choices_work_too() {
             "  3. No, and tell Claude what to do differently (esc)",
         ],
     );
-    let [EventKind::WaitingForInput { prompt, options }] = events.as_slice() else {
+    let [EventKind::WaitingForInput {
+        prompt, options, ..
+    }] = events.as_slice()
+    else {
         panic!("{events:?}")
     };
     assert_eq!(
@@ -147,6 +151,7 @@ fn an_aider_prompt_offers_its_letter_answers() {
         events,
         vec![EventKind::WaitingForInput {
             prompt: Some("Run shell command?".into()),
+            marked: None,
             options: vec![
                 option("Yes", "y\r"),
                 option("No", "n\r"),

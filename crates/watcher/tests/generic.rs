@@ -135,7 +135,6 @@ fn command_gated_engine_never_calls_an_idle_shell_stalled() {
 
 #[test]
 fn a_server_start_line_from_any_program_is_a_server_started_event() {
-    let mut engine = EventEngine::new(None, Vec::new());
     for (line, expected_port, expected_url) in [
         (
             "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)",
@@ -160,6 +159,8 @@ fn a_server_start_line_from_any_program_is_a_server_started_event() {
         ),
         ("listening on 0.0.0.0:8081, pid 4123", Some(8081), None),
     ] {
+        // A fresh engine per line: one server is reported once (see below).
+        let mut engine = EventEngine::new(None, Vec::new());
         let update = engine.observe(&Observation::output(Timestamp(0), line));
         assert!(
             update.events.contains(&EventKind::ServerStarted {
@@ -189,4 +190,60 @@ fn ordinary_output_is_not_a_server_start() {
             "false SERVER_STARTED for: {line}"
         );
     }
+}
+
+fn servers(update: &watcher::EngineUpdate) -> Vec<Option<u16>> {
+    update
+        .events
+        .iter()
+        .filter_map(|event| match event {
+            EventKind::ServerStarted { port, .. } => Some(*port),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_server_is_reported_once_per_port_per_command() {
+    let command = Command::start(
+        CommandId(1),
+        SessionId(1),
+        MachineId("machine".into()),
+        "npm run dev",
+        "/work",
+        Timestamp(0),
+    );
+    let mut engine = EventEngine::new(Some(&command), Vec::new());
+    let first = engine.observe(&Observation::output(
+        Timestamp(1),
+        "Listening on 127.0.0.1:8080",
+    ));
+    assert_eq!(servers(&first), vec![Some(8080)]);
+    // A dev server repeats itself on every reload.
+    let again = engine.observe(&Observation::output(
+        Timestamp(2),
+        "INFO: listening on :8080",
+    ));
+    assert!(servers(&again).is_empty());
+    let other = engine.observe(&Observation::output(
+        Timestamp(3),
+        "listening on 0.0.0.0:9090",
+    ));
+    assert_eq!(servers(&other), vec![Some(9090)]);
+
+    let mut next = command.clone();
+    next.id = CommandId(2);
+    engine.observe(&Observation {
+        at: Timestamp(4),
+        kind: ObservationKind::CommandStarted(next),
+    });
+    let restarted = engine.observe(&Observation::output(
+        Timestamp(5),
+        "Listening on 127.0.0.1:8080",
+    ));
+    assert_eq!(
+        servers(&restarted),
+        vec![Some(8080)],
+        "a new Command reports it again"
+    );
 }

@@ -89,6 +89,13 @@ export type EventKind = {
    * The answers the program offered, when it listed them (6.1).
    */
   options?: Array<PromptOption>;
+  /**
+   * Which of `options` the menu's selector was on when the question
+   * was asked, 0-based (T0.8). Absent when the screen showed no marker
+   * or it was past the offered options. A client checks it is within
+   * `options` before using it.
+   */
+  marked?: number | null;
 } | {
   "type": "POSSIBLY_STALLED";
   /**

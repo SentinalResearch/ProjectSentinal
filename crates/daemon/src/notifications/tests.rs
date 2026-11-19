@@ -203,6 +203,7 @@ fn presentation_never_copies_output_prompt_command_or_checkpoint_path() {
         },
         EventKind::WaitingForInput {
             prompt: Some("Password: top-secret".into()),
+            marked: None,
             options: Vec::new(),
         },
         EventKind::CheckpointCreated {
@@ -287,6 +288,7 @@ fn every_supported_category_has_stable_appearance() {
         (
             EventKind::WaitingForInput {
                 prompt: None,
+                marked: None,
                 options: Vec::new(),
             },
             NotificationCategory::Waiting,
@@ -487,6 +489,7 @@ fn each_new_question_and_each_finished_turn_notifies() {
             id,
             EventKind::WaitingForInput {
                 prompt: Some("Do you want to proceed?".into()),
+                marked: None,
                 options: Vec::new(),
             },
         )

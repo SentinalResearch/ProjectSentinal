@@ -30,10 +30,27 @@ const MAX_CONTEXT_ROWS: usize = 3;
 const MAX_QUESTION_CHARS: usize = 300;
 
 /// A question on screen and the answers it offers.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub(crate) struct ScreenQuestion {
     pub(crate) question: String,
     pub(crate) options: Vec<PromptOption>,
+    /// The option the selector is on, 0-based (T0.8).
+    pub(crate) marked: Option<u8>,
+}
+
+/// The same question even when the selector moved: arrowing through a menu
+/// never asks it again.
+impl PartialEq for ScreenQuestion {
+    fn eq(&self, other: &Self) -> bool {
+        self.question == other.question && self.options == other.options
+    }
+}
+
+/// `position` as the marked option, if it is one of the `offered` answers.
+fn marked_option(position: Option<usize>, offered: usize) -> Option<u8> {
+    position
+        .filter(|index| *index < offered)
+        .and_then(|index| u8::try_from(index).ok())
 }
 
 /// Follows one Session's screen and reports each question once.
@@ -106,6 +123,7 @@ impl ScreenPrompts {
                 vec![EventKind::WaitingForInput {
                     prompt: Some(found.question),
                     options: found.options,
+                    marked: found.marked,
                 }]
             }
             Some((question, _)) if *question == found => Vec::new(),
@@ -197,13 +215,22 @@ fn marked_menu(lines: &[String], last: usize) -> Option<ScreenQuestion> {
         .enumerate()
         .map(|(position, (_, label, _))| PromptOption::new(label, &(position + 1).to_string()))
         .collect::<Option<Vec<_>>>()?;
-    Some(ScreenQuestion { question, options })
+    let marked = marked_option(
+        candidates.iter().position(|(_, _, marked)| *marked),
+        options.len(),
+    );
+    Some(ScreenQuestion {
+        question,
+        options,
+        marked,
+    })
 }
 
 /// The menu whose option 1 is on `first`, if the screen says it is one.
 fn menu_at(lines: &[String], first: usize, last: usize) -> Option<ScreenQuestion> {
     let mut options: Vec<String> = Vec::new();
     let mut selected = false;
+    let mut marked_at = None;
     let mut column = 0;
     let mut end = first;
     for (index, line) in lines.iter().enumerate().take(last + 1).skip(first) {
@@ -211,7 +238,10 @@ fn menu_at(lines: &[String], first: usize, last: usize) -> Option<ScreenQuestion
             if number as usize != options.len() + 1 || options.len() == MAX_PROMPT_OPTIONS {
                 break;
             }
-            selected |= line.trim_start().starts_with(MARKERS);
+            if line.trim_start().starts_with(MARKERS) {
+                selected = true;
+                marked_at.get_or_insert(options.len());
+            }
             options.push(label.to_string());
             column = label_column;
             end = index;
@@ -246,7 +276,12 @@ fn menu_at(lines: &[String], first: usize, last: usize) -> Option<ScreenQuestion
         .enumerate()
         .map(|(position, label)| PromptOption::new(label, &(position + 1).to_string()))
         .collect::<Option<Vec<_>>>()?;
-    Some(ScreenQuestion { question, options })
+    let marked = marked_option(marked_at, options.len());
+    Some(ScreenQuestion {
+        question,
+        options,
+        marked,
+    })
 }
 
 /// The nearest line above ending in `?`. A menu with no question needs key hints

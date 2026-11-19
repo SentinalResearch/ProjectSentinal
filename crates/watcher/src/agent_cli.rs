@@ -99,6 +99,7 @@ impl AgentCliAdapter {
                 self.state.waiting = true;
                 vec![EventKind::WaitingForInput {
                     prompt: Some(prompt.question.clone()),
+                    marked: None,
                     options: prompt.options.clone(),
                 }]
             }
@@ -297,6 +298,7 @@ pub(crate) fn letter_choices(line: &str) -> Option<crate::screen_prompt::ScreenQ
         crate::screen_prompt::ScreenQuestion {
             question: question.to_string(),
             options,
+            marked: None,
         }
     })
 }

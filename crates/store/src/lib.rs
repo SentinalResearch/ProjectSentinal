@@ -236,10 +236,7 @@ impl Store {
                 Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?))
             })?
             .collect::<Result<Vec<_>, _>>()?;
-        values
-            .iter()
-            .map(|(json, predecessor)| decode_session(json, *predecessor))
-            .collect()
+        Ok(readable_sessions(&values))
     }
 
     /// Mark all persisted live Sessions interrupted after a daemon restart.
@@ -259,8 +256,7 @@ impl Store {
         };
         let mut next_event: u64 = transaction.query_row(NEXT_EVENT_ID, [], |row| row.get(0))?;
         let mut events = Vec::with_capacity(json_values.len());
-        for (json, predecessor) in json_values {
-            let mut session = decode_session(&json, predecessor)?;
+        for mut session in readable_sessions(&json_values) {
             // Only daemon-owned PTYs die with the daemon; reduced-capture
             // Sessions are verified by the daemon's external recovery instead.
             if session.capture != CaptureLevel::Full {
@@ -306,10 +302,7 @@ impl Store {
                 Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?))
             })?
             .collect::<Result<Vec<_>, _>>()?;
-        values
-            .iter()
-            .map(|(json, predecessor)| decode_session(json, *predecessor))
-            .collect()
+        Ok(readable_sessions(&values))
     }
 
     /// Return the first unused Session ID.
@@ -351,6 +344,19 @@ impl Store {
     pub(crate) fn lock(&self) -> Result<MutexGuard<'_, Connection>, StoreError> {
         self.connection.lock().map_err(|_| StoreError::Lock)
     }
+}
+
+/// Decode stored Sessions, skipping (and logging) any this build cannot read,
+/// such as one written by a newer release before a rollback (T0.12).
+fn readable_sessions(values: &[(String, Option<i64>)]) -> Vec<Session> {
+    let mut sessions = Vec::with_capacity(values.len());
+    for (json, predecessor) in values {
+        match decode_session(json, *predecessor) {
+            Ok(session) => sessions.push(session),
+            Err(error) => tracing::warn!(%error, "skipped a stored Session this build cannot read"),
+        }
+    }
+    sessions
 }
 
 pub(crate) fn decode_session(

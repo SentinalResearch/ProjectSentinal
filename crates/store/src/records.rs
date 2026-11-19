@@ -115,7 +115,7 @@ impl Store {
         let session = session.map(|id| to_sql_id(id.0)).transpose()?;
         let after = to_sql_id(after.unwrap_or(EventId(0)).0)?;
         let rows = statement.query_map(params![session, after, limit], event_from_row)?;
-        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+        readable_rows(rows, "events")
     }
 }
 
@@ -153,7 +153,8 @@ pub(crate) fn command_from_row(row: &Row<'_>) -> rusqlite::Result<Command> {
 
 pub(crate) fn event_from_row(row: &Row<'_>) -> rusqlite::Result<Event> {
     let kind_json: String = row.get(4)?;
-    let kind: EventKind = serde_json::from_str(&kind_json).map_err(json_to_sql)?;
+    let kind: EventKind = serde_json::from_str(&kind_json)
+        .map_err(|error| unreadable(Box::new(UnreadableRow(error))))?;
     Ok(Event {
         id: EventId(from_sql_id(row.get(0)?)?),
         session_id: SessionId(from_sql_id(row.get(1)?)?),
@@ -181,6 +182,48 @@ fn from_sql_id(value: i64) -> rusqlite::Result<u64> {
             Box::new(error),
         )
     })
+}
+
+/// A stored value this build cannot decode, such as an Event kind written by a
+/// newer release before a rollback (T0.12). Queries skip such rows.
+#[derive(Debug)]
+pub(crate) struct UnreadableRow(serde_json::Error);
+
+impl std::fmt::Display for UnreadableRow {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "unreadable stored value: {}", self.0)
+    }
+}
+
+impl std::error::Error for UnreadableRow {}
+
+fn unreadable(error: Box<UnreadableRow>) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, error)
+}
+
+/// Collect query rows, skipping (and logging) rows this build cannot decode;
+/// any other error still fails the query.
+pub(crate) fn readable_rows<T>(
+    rows: impl Iterator<Item = rusqlite::Result<T>>,
+    what: &'static str,
+) -> Result<Vec<T>, StoreError> {
+    let mut kept = Vec::new();
+    let mut skipped = 0_usize;
+    for row in rows {
+        match row {
+            Ok(value) => kept.push(value),
+            Err(rusqlite::Error::FromSqlConversionFailure(_, _, error))
+                if error.downcast_ref::<UnreadableRow>().is_some() =>
+            {
+                skipped += 1;
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    if skipped > 0 {
+        tracing::warn!(skipped, what, "skipped stored rows this build cannot read");
+    }
+    Ok(kept)
 }
 
 fn json_to_sql(error: serde_json::Error) -> rusqlite::Error {

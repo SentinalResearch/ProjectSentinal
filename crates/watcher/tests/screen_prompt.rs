@@ -53,9 +53,9 @@ fn look(engine: &mut EventEngine, at: i64, screen: &str) -> (Vec<EventKind>, boo
 
 fn asked(events: &[EventKind]) -> Option<(String, Vec<PromptOption>)> {
     events.iter().find_map(|event| match event {
-        EventKind::WaitingForInput { prompt, options } => {
-            Some((prompt.clone().unwrap(), options.clone()))
-        }
+        EventKind::WaitingForInput {
+            prompt, options, ..
+        } => Some((prompt.clone().unwrap(), options.clone())),
         _ => None,
     })
 }
@@ -295,4 +295,52 @@ fn ordinary_text_is_never_a_marked_menu() {
         look(&mut e, 0, screen);
         assert!(!look(&mut e, 2_000, screen).1, "must not be a menu: {screen}");
     }
+}
+
+fn marked_row(events: &[EventKind]) -> Option<Option<u8>> {
+    events.iter().find_map(|event| match event {
+        EventKind::WaitingForInput { marked, .. } => Some(*marked),
+        _ => None,
+    })
+}
+
+fn settle(engine: &mut EventEngine, screen: &str) -> Vec<EventKind> {
+    look(engine, 0, screen);
+    look(engine, 1_000, screen).0
+}
+
+#[test]
+fn the_marked_row_of_a_menu_is_reported() {
+    // T0.8: which row the selector is on, so the right keys can be computed.
+    let mut e = engine("claude");
+    assert_eq!(marked_row(&settle(&mut e, CLAUDE)), Some(Some(0)));
+
+    let moved = CLAUDE
+        .replace("❯ 1. Yes", "  1. Yes")
+        .replace("  2. Yes, and", "❯ 2. Yes, and");
+    let mut e = engine("claude");
+    assert_eq!(marked_row(&settle(&mut e, &moved)), Some(Some(1)));
+
+    let unnumbered = "Do you want to proceed?\n  Yes\n❯ No\n\n↑↓ to navigate · Enter to select";
+    let mut e = engine("vibe");
+    assert_eq!(marked_row(&settle(&mut e, unnumbered)), Some(Some(1)));
+}
+
+#[test]
+fn a_menu_with_no_marker_reports_no_marked_row() {
+    let mut e = engine("vibe");
+    assert_eq!(marked_row(&settle(&mut e, VIBE)), Some(None));
+}
+
+#[test]
+fn a_marker_past_the_offered_answers_is_not_reported() {
+    let screen = format!(
+        "Pick a model?\n{}\n↑↓ navigate · Enter select",
+        (1..=8)
+            .map(|i| format!("{} model {i}", if i == 8 { "❯" } else { " " }))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    let mut e = engine("vibe");
+    assert_eq!(marked_row(&settle(&mut e, &screen)), Some(None));
 }

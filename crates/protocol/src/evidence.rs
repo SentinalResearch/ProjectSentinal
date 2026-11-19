@@ -78,6 +78,7 @@ mod tests {
             },
             EventKind::WaitingForInput {
                 prompt: None,
+                marked: None,
                 options: Vec::new(),
             },
             EventKind::PossiblyStalled {
