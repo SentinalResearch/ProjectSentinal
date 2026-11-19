@@ -2,6 +2,7 @@ import type { LinkFailureCode } from "../protocol/LinkFailureCode";
 import type { PairingCode } from "../protocol/PairingCode";
 import type { PairingCodeStatus } from "../protocol/PairingCodeStatus";
 import type { RegistryMachine } from "../protocol/RegistryMachine";
+import type { ChatEntry } from "../protocol/ChatEntry";
 import type { Completion } from "../protocol/Completion";
 import type { SearchQuery, SearchResults } from "./search";
 import type {
@@ -58,7 +59,16 @@ export type LiveEvent =
   | { type: "SESSION_METRICS"; sessionId: string; metrics: Session["metrics"] }
   | { type: "EVENT_APPENDED"; sessionId: string; event: SessionEvent; sessionPatch?: Partial<Session> }
   | { type: "MACHINE_UPDATED"; machine: Machine }
-  | { type: "NOTIFICATION"; notification: JournalNotification };
+  | { type: "NOTIFICATION"; notification: JournalNotification }
+  /** An agent Session's conversation, from its own file (AC2). */
+  | { type: "CHAT"; sessionId: string; linked: boolean; fromStart: boolean; entries: ChatEntry[] };
+
+/** An agent Session's conversation as its owning Machine keeps it (AC2). */
+export interface AgentChat {
+  /** A conversation file is linked; without one there is only the terminal. */
+  linked: boolean;
+  entries: ChatEntry[];
+}
 
 /** A refused registry request, carrying the daemon's stable failure code. */
 export class RegistryError extends Error {
@@ -123,6 +133,9 @@ export interface DataAdapter {
   subscribe(listener: (event: LiveEvent) => void): () => void;
 
   sendInput(sessionId: string, data: string): Promise<void>;
+
+  /** The conversation an agent Session's own file holds (AC2); not linked when unknown. */
+  getChat(sessionId: string): Promise<AgentChat>;
   sendSignal(sessionId: string, signal: "SIGINT" | "KILL"): Promise<void>;
 
   runRecipe(recipeId: string, params: Record<string, string>, machineId: string): Promise<{ sessionId: string }>;

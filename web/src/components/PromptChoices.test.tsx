@@ -56,6 +56,11 @@ describe("PromptChoices", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const { rerender } = render(<PromptChoices session={claude} />);
       await user.click(screen.getAllByRole("button")[0]);
+      // The check starts once the key was sent.
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(sendInput).toHaveBeenCalled();
       expect(screen.queryByRole("status")).toBeNull();
       await act(async () => {
         vi.advanceTimersByTime(ANSWER_CHECK_MS + 10);

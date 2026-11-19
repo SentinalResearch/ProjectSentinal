@@ -1,4 +1,5 @@
 import type { Terminal } from "@xterm/xterm";
+import { publishChat } from "../data/agentChat";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { dataAdapter } from "../data";
@@ -99,6 +100,15 @@ export function useRealTerminalSession(
       if (typeof event.data === "string") {
         try {
           const envelope = JSON.parse(event.data) as Envelope<DaemonMessage>;
+          // AC2: the conversation travels on the attach, gated like output.
+          if (envelope.payload.type === "CHAT" && envelope.payload.session_id === numericId) {
+            publishChat({
+              sessionId,
+              linked: envelope.payload.linked,
+              fromStart: envelope.payload.from_start,
+              entries: envelope.payload.entries,
+            });
+          }
           if (envelope.payload.type === "ERROR") {
             health.count("ERRORS", machine, "ERROR_ATTACH");
             terminal.write(`\r\n\x1b[38;2;255;59;47m[error] ${envelope.payload.message}\x1b[0m\r\n`);

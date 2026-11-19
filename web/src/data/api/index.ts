@@ -506,6 +506,14 @@ class DaemonTransport {
         sessionId: compositeId(this.machine, message.command.session_id),
         command: message.command.finished_at === null ? message.command.text : undefined,
       });
+    } else if (message.type === "CHAT") {
+      this.emit({
+        type: "CHAT",
+        sessionId: compositeId(this.machine, message.session_id),
+        linked: message.linked,
+        fromStart: message.from_start,
+        entries: message.entries,
+      });
     } else if (message.type === "EVENT" && this.eventDeduper.accept(this.machine, message.event.id)) {
       this.emit({
         type: "EVENT_APPENDED",
@@ -1323,6 +1331,20 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
           pollTimer = null;
         }
       };
+    },
+    async getChat(sessionId) {
+      await ensureInitialized();
+      try {
+        const local = localId(sessionId);
+        const reply = await liveOwner(sessionId, "Session chat").transport.request(
+          { type: "GET_CHAT", session_id: local },
+          (message) => message.type === "CHAT" && message.session_id === local,
+        );
+        if (reply.type === "CHAT") return { linked: reply.linked, entries: reply.entries };
+      } catch {
+        // An older daemon, or the Machine is away: the terminal is still there.
+      }
+      return { linked: false, entries: [] };
     },
     async sendInput(sessionId, data) {
       await ensureInitialized();

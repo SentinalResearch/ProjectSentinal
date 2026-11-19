@@ -312,7 +312,9 @@ pub async fn handle_connection(
             Ok(mut envelope) => match envelope.payload.validate() {
                 Ok(()) => {
                     // 6.4: who is calling comes from the OS, never from the request.
-                    if let LocalRequest::AgentState { caller_pid, .. } = &mut envelope.payload {
+                    if let LocalRequest::AgentState { caller_pid, .. }
+                    | LocalRequest::AgentTranscript { caller_pid, .. } = &mut envelope.payload
+                    {
                         *caller_pid = peer_pid(&stream);
                     }
                     match handler(envelope.payload).await {

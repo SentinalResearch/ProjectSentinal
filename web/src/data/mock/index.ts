@@ -161,6 +161,10 @@ export const mockAdapter: DataAdapter = {
     };
   },
 
+  async getChat() {
+    return { linked: false, entries: [] };
+  },
+
   async sendInput(sessionId: string, data: string) {
     await delay(undefined, 100, 250);
     const session = findSession(sessionId);

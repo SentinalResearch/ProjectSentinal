@@ -1,0 +1,274 @@
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  background: var(--bg-app, var(--bg-0));
+  color: var(--text-1);
+}
+
+.plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.planStep {
+  font-weight: 800;
+}
+
+.planTask {
+  color: var(--text-2);
+}
+
+.track {
+  flex: 1 0 100%;
+  height: 3px;
+  background: var(--line);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--s-running);
+}
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.meta {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+
+.user {
+  align-self: flex-end;
+  max-width: 80%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.userText {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--glow-accent, rgba(61, 90, 254, 0.16));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-fg) 30%, transparent);
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agent {
+  max-width: 92%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agentName {
+  color: var(--accent-fg);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.agentText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tool {
+  max-width: 92%;
+  border-radius: var(--radius-card, 12px);
+  background: var(--well, rgba(0, 0, 0, 0.35));
+  box-shadow: inset 0 0 0 1px var(--glass-edge-soft, var(--line));
+}
+
+.toolHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.toolHead:disabled {
+  cursor: default;
+}
+
+.toolVerb {
+  flex: none;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.toolSummary {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolStatus {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.tool[data-status="ok"] .toolStatus {
+  color: var(--s-running-fg);
+}
+
+.tool[data-status="failed"] .toolStatus {
+  color: var(--destructive-fg, var(--s-failed-fg));
+}
+
+.preview {
+  margin: 0;
+  padding: 4px 14px 12px;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--term-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.turn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.turn::before,
+.turn::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+.working {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.workingDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--s-running);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-running) 20%, transparent);
+}
+
+.muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.composer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 5px 5px 14px;
+  border-radius: 16px;
+  background: var(--glass-bg-strong, var(--bg-1));
+  box-shadow: inset 0 0 0 1px var(--glass-edge, var(--line));
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 38px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-1);
+  font: 15px var(--font-ui);
+}
+
+.send {
+  flex: none;
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-key, 10px);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 14px var(--font-ui);
+  cursor: pointer;
+}
+
+.send:disabled {
+  background: var(--chip, var(--bg-2));
+  color: var(--text-3);
+  cursor: default;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--chip, rgba(255, 255, 255, 0.08));
+  font-size: 0.87em;
+}

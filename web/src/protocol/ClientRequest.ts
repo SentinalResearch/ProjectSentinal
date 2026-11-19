@@ -115,6 +115,13 @@ export type ClientRequest =
     limit: number;
   }
   | {
+    "type": "GET_CHAT";
+    /**
+     * The agent Session.
+     */
+    session_id: SessionId;
+  }
+  | {
     "type": "GET_EVENTS";
     /**
      * Session to restrict results to; `None` returns machine-wide Events.

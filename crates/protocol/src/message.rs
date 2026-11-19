@@ -151,6 +151,12 @@ pub enum ClientRequest {
         /// Maximum number of commands to return.
         limit: u32,
     },
+    /// The conversation an agent Session's own file holds (AC1); answered
+    /// with `CHAT`, empty and `linked: false` when no file is linked.
+    GetChat {
+        /// The agent Session.
+        session_id: SessionId,
+    },
     /// Query persisted Events, optionally restricted to one Session.
     GetEvents {
         /// Session to restrict results to; `None` returns machine-wide Events.
@@ -298,6 +304,11 @@ impl ClientRequest {
                 crate::session_env::validate_session_env(*origin, env.as_deref())
             }
             ClientRequest::ContinueSession { session_id } if session_id.0 == 0 => {
+                Err(ProtocolError::InvalidIdentifier {
+                    field: "session_id",
+                })
+            }
+            ClientRequest::GetChat { session_id } if session_id.0 == 0 => {
                 Err(ProtocolError::InvalidIdentifier {
                     field: "session_id",
                 })
@@ -473,6 +484,20 @@ pub enum LocalRequest {
         #[cfg_attr(feature = "ts", ts(skip))]
         caller_pid: Option<u32>,
     },
+    /// An agent inside a Session names its own conversation file (AC1), from
+    /// its start hook. Accepted, like `AGENT_STATE`, only from a process
+    /// running inside `session_id`.
+    AgentTranscript {
+        /// The Session the agent runs in (from `SENTINAL_SESSION_ID`).
+        session_id: SessionId,
+        /// The conversation file, absolute.
+        path: String,
+        /// The calling process as the OS reported it; set by the socket
+        /// layer after decoding, never read from the wire.
+        #[serde(skip)]
+        #[cfg_attr(feature = "ts", ts(skip))]
+        caller_pid: Option<u32>,
+    },
     /// Rank Command lines that start with `prefix` (5.A).
     Complete {
         /// The Session being typed into; its cwd and project apply.
@@ -582,6 +607,16 @@ impl LocalRequest {
             LocalRequest::Complete {
                 prefix, cwd, limit, ..
             } => crate::complete::validate_request(prefix, cwd.as_deref(), *limit),
+            LocalRequest::AgentTranscript {
+                session_id, path, ..
+            } => {
+                if session_id.0 == 0 {
+                    return Err(ProtocolError::InvalidIdentifier {
+                        field: "session_id",
+                    });
+                }
+                crate::agent_chat::validate_transcript_path(path)
+            }
             LocalRequest::AgentState {
                 session_id,
                 detail,
@@ -820,6 +855,18 @@ pub enum DaemonMessage {
     Events {
         /// Events matching the request.
         events: Vec<Event>,
+    },
+    /// An agent Session's conversation (AC1): every kept entry in reply to
+    /// `GET_CHAT` (`from_start`), then new entries as the agent writes them.
+    Chat {
+        /// The agent Session.
+        session_id: SessionId,
+        /// Whether a conversation file is linked to the Session.
+        linked: bool,
+        /// True when `entries` replaces what the viewer had.
+        from_start: bool,
+        /// Oldest first, at most `MAX_CHAT_ENTRIES`.
+        entries: Vec<crate::ChatEntry>,
     },
     /// Current resource measurements for the machine.
     MachineMetrics {

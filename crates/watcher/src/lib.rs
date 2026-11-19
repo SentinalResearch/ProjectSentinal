@@ -3,6 +3,7 @@
 mod adapter;
 pub mod agent_activity;
 mod agent_cli;
+pub mod agent_transcript;
 mod bursts;
 mod cargo_adapter;
 mod declarative;

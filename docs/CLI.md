@@ -520,6 +520,22 @@ over the private local socket.
 - Sentinal never signals, traces, or writes to an adopted process; its exit
   code is always shown as unknown.
 
+### `agent-chat`
+
+Show Claude Code Sessions as a chat in the web app (design:
+`docs/AGENT_CHAT_DESIGN.md`).
+
+- `sentinal agent-chat setup` shows the `SessionStart` hook it would add to
+  `~/.claude/settings.json`, and adds it only after you answer `y`.
+  `--print` only prints it.
+- `sentinal agent-chat link` is what the hook runs. It reads Claude Code's
+  hook JSON on stdin and names the conversation file to the daemon. It
+  prints nothing and exits 0 outside a Sentinal Session.
+
+The daemon accepts the file only from a process inside that Session, and
+only under `~/.claude/projects/`. It reads it, never writes it, and stores
+nothing from it.
+
 ## Native notification operations
 
 Native Web Push is managed from the authenticated production PWA under

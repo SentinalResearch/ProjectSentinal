@@ -1,6 +1,7 @@
 //! Reusable command dispatch, parsing, and terminal framing for `sentinal`.
 
 pub mod adopt_command;
+pub mod agent_chat_command;
 pub mod agent_state_command;
 pub mod app;
 pub mod approval_command;

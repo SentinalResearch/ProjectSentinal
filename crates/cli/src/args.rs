@@ -92,6 +92,12 @@ pub enum Command {
         #[command(flatten)]
         report: crate::agent_state_command::Report,
     },
+    /// Show Claude Code Sessions as a chat: link their conversation file (AC1).
+    AgentChat {
+        /// What to do.
+        #[command(subcommand)]
+        action: AgentChatAction,
+    },
     /// Serve Sentinal's agent tools to an MCP client over stdio (Claude Code, Claude Desktop, …).
     ///
     /// Needs an agent token from Settings → Agents, in SENTINAL_AGENT_TOKEN
@@ -311,6 +317,22 @@ pub enum ConnectionAction {
         /// Print JSON.
         #[arg(long)]
         json: bool,
+    },
+}
+
+/// `sentinal agent-chat` operations.
+#[derive(Debug, Subcommand)]
+pub enum AgentChatAction {
+    /// From Claude Code's SessionStart hook: name its conversation file.
+    ///
+    /// Reads the hook's JSON on stdin. Prints nothing and exits 0 outside a
+    /// Sentinal Session or when the daemon is down.
+    Link,
+    /// Add the hook to ~/.claude/settings.json, after showing it and asking.
+    Setup {
+        /// Only print the hook, to add by hand.
+        #[arg(long)]
+        print: bool,
     },
 }
 

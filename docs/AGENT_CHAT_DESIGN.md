@@ -1,7 +1,9 @@
 # Agent Sessions as a chat: design proposal
 
-Status: **proposal, not approved.** Nothing here is built. The owner decides
-the numbered items in "Decisions for the owner" before any code.
+Status: **approved 2026-11-19** ("start these changes"), with each decision as
+recommended below. **Built:** AC1, AC2 on desktop, AC3 and part of AC4 (see
+"Built so far"). Not built: the phone Chat view, and tool counts on the
+Session's agent badge.
 
 ## The idea in one paragraph
 
@@ -205,7 +207,43 @@ without hooks stays terminal-only, rather than being guessed.
 - **AC4:** tool counts and turns from the file.
 - **AC5:** the next agent, once a real file has been captured.
 
+## Built so far (2026-11-19)
+
+- `protocol/src/agent_chat.rs`: chat entries; `GET_CHAT`, `CHAT`, and the
+  local `AGENT_TRANSCRIPT`, with fixtures.
+- `watcher/src/agent_transcript.rs`: the reader. Besides chat entries it
+  gives progress, which becomes an agent report (6.5), so every surface that
+  shows agent progress shows it:
+  - the task: the plan item in progress, else what the owner last asked;
+  - step N of M, from `TaskCreate` / `TaskUpdate`, or from `TodoWrite`;
+  - the activity, e.g. `Running cargo test`;
+  - working while a turn runs, done at `end_turn`;
+  - time on task, and Sentinal's pace estimate, as before.
+- `daemon/src/session_manager/agent_chat.rs`: link (the same in-Session
+  check as `AGENT_STATE`), path rules, a read-only follower built on
+  `log_tail`, and 500 entries in memory.
+- `sentinal agent-chat link | setup [--print]`.
+- Web: the `Chat | Terminal` switch on the desktop Session page, the chat
+  view, and the message box.
+
+Found while testing with real Claude Code 2.1.328:
+
+- The conversation file appears with the first message, not at
+  `SessionStart`, so the link checks the folder and the file is opened when
+  it appears.
+- The message box sends the text, then Enter 150 ms later. Sent together,
+  Claude Code takes them as a paste and does not submit.
+- Chat travels only on a Session's attach, which is gated like terminal
+  output; the desktop page keeps the terminal attached under Chat. The phone
+  page has no attach yet, so its Chat view is still to come.
+- Claude Code loads its task tools only on request, so many turns have no
+  plan. Those show the task and the live activity, without step N of M.
+- In a dev setup, the shell profile can put an older installed `sentinal`
+  first on `PATH`. The hook then fails ("unrecognized subcommand").
+
 ## Decisions for the owner
+
+Accepted 2026-11-19, as recommended.
 
 1. **Linking.** Approve linking only through the agent's hook (§1), with no
    guessing from folders or times.

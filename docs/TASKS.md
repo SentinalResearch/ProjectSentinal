@@ -232,18 +232,27 @@ approvals). Each fix has a test that fails without it.
 - [ ] Q13 The phone Session page shows LOSS and GPU cells for an agent
       Session that has neither
 
-### AC: agent Sessions as a chat · *proposal, waiting for the owner*
+### AC: agent Sessions as a chat · *built 2026-11-19, desktop*
 
-Design: `docs/AGENT_CHAT_DESIGN.md`. Read the agent's own conversation file
-(Claude Code first) instead of the screen, and show it as a chat beside the
-terminal. No code before the owner answers its seven decisions.
+Design: `docs/AGENT_CHAT_DESIGN.md` (approved, recommended decisions). Tried
+with real Claude Code 2.1.328 in a dev instance: link, chat, live updates,
+message box, and progress in the agent chip.
 
-- [ ] Owner answers "Decisions for the owner" in `docs/AGENT_CHAT_DESIGN.md`
-- [ ] AC1 Link through Claude Code's `SessionStart` hook, and the reader;
-      `sentinal status` shows the chat (no web change)
-- [ ] AC2 Read-only Chat view on the Session page
-- [ ] AC3 Message box
-- [ ] AC4 Tool counts and turns from the file
+- [x] Owner answers "Decisions for the owner": as recommended
+- [x] AC1 Link through Claude Code's `SessionStart` hook, and the reader;
+      progress (task, step N of M, activity, working/done) as an agent report.
+      Tests: `watcher/tests/agent_transcript.rs`, CLI `agent_chat_command`,
+      protocol fixtures. Not done: `sentinal status` does not print the chat
+- [x] AC2 Chat view on the desktop Session page (`AgentChatView`,
+      `data/agentChat.test.ts`). Not done: the phone page, which needs an
+      attach for live entries
+- [x] AC3 Message box: text, then Enter as its own keypress
+- [ ] AC4 Tool counts and turns from the file on the agent badge (the chat
+      and its turn lines already use them; the badge still reads the screen).
+      A linked Session should also count as Claude Code: one started as
+      `cd … && claude` shows "agent says"
+- [ ] Q14 After `new session` and Enter in the island, the places menu opens
+      on the new Session page (seen three times in the run)
 - [ ] AC5 Next agent, after capturing a real file from it
 
 - **2026-11-12 audit and terminal design:** a read of the watcher, protocol,

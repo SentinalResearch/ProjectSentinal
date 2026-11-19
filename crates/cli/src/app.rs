@@ -141,6 +141,25 @@ async fn dispatch(
         Command::AgentState { report } => {
             return Ok(crate::agent_state_command::run(report, err).await);
         }
+        Command::AgentChat { action } => {
+            return Ok(match action {
+                crate::args::AgentChatAction::Link => {
+                    crate::agent_chat_command::link(&mut std::io::stdin()).await
+                }
+                crate::args::AgentChatAction::Setup { print } => {
+                    let home = std::env::var_os("HOME")
+                        .map(std::path::PathBuf::from)
+                        .unwrap_or_default();
+                    let settings = home.join(".claude").join("settings.json");
+                    crate::agent_chat_command::setup(
+                        print,
+                        &settings,
+                        &mut std::io::stdin().lock(),
+                        out,
+                    )
+                }
+            });
+        }
         Command::Mcp {
             control,
             token_file,
@@ -443,6 +462,7 @@ async fn dispatch(
         | Command::Agents
         | Command::AgentSkill { .. }
         | Command::AgentState { .. }
+        | Command::AgentChat { .. }
         | Command::Identity { .. } => {}
     }
     Ok(ExitCode::SUCCESS)

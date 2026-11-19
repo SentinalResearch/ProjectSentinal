@@ -169,6 +169,7 @@ fn every_local_request_has_a_fixture() {
         "SHELL_COMMAND_FINISHED",
         "ADOPT_PROCESS",
         "AGENT_STATE",
+        "AGENT_TRANSCRIPT",
     ];
     let requests = load("local_requests.json");
     let present: Vec<&str> = requests
@@ -234,6 +235,7 @@ fn every_client_request_has_a_fixture() {
         "KILL",
         "GET_HISTORY",
         "GET_EVENTS",
+        "GET_CHAT",
         "SEARCH_COMMANDS",
         "LIST_RECIPES",
         "RUN_RECIPE",
@@ -272,6 +274,7 @@ fn every_daemon_message_has_a_fixture() {
         "COMMAND_UPDATED",
         "EVENT",
         "EVENTS",
+        "CHAT",
         "MACHINE_METRICS",
         "SESSION_METRICS",
         "HISTORY",

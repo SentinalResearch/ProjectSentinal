@@ -234,6 +234,12 @@ pub enum SessionManagerError {
         /// Session named in the report.
         session_id: SessionId,
     },
+    /// An agent named a conversation file Sentinal will not read (AC1).
+    #[error("conversation file refused: {reason}")]
+    TranscriptRefused {
+        /// Why, without the path.
+        reason: &'static str,
+    },
     /// Only FULL Sessions that are still running take agent reports.
     #[error("Session {0} does not take agent reports (not a live FULL Session)")]
     AgentReportsNotTaken(SessionId),

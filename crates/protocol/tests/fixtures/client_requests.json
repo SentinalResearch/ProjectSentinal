@@ -213,5 +213,6 @@
       ],
       "sandbox": true
     }
-  }
+  },
+  {"version": 1, "payload": {"type": "GET_CHAT", "session_id": 128}}
 ]

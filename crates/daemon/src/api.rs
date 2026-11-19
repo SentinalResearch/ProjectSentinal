@@ -260,6 +260,15 @@ impl AppState {
                     Err(error) => error_action(error),
                 }
             }
+            ClientRequest::GetChat { session_id } => match self.sessions.chat(session_id) {
+                Ok((linked, entries)) => WsAction::Reply(DaemonMessage::Chat {
+                    session_id,
+                    linked,
+                    from_start: true,
+                    entries,
+                }),
+                Err(error) => error_action(error),
+            },
             ClientRequest::GetEvents {
                 session_id,
                 after,

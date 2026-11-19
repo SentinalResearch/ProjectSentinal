@@ -26,6 +26,7 @@
 //! - [`coding_agent`] — AI coding agents running in a Session (6.1)
 
 pub mod agent;
+pub mod agent_chat;
 pub mod agent_state;
 pub mod auth;
 pub mod coding_agent;
@@ -60,6 +61,7 @@ pub mod time;
 pub mod training;
 pub mod worker_update;
 
+pub use agent_chat::{ChatEntry, ChatItem};
 pub use agent_state::{parse_agent_eta, validate_agent_progress};
 pub use agent_state::{
     AgentReportedState, AgentStatus, MAX_AGENT_DETAIL_CHARS, MAX_AGENT_ETA_SECS, MAX_AGENT_STEPS,

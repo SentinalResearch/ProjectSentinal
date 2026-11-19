@@ -33,6 +33,8 @@ import { SessionTopBlock } from "./SessionTopBlock";
 import { SummaryLine } from "./SummaryLine";
 import { Suggestions } from "./Suggestions";
 import { SessionHistoryTerminals } from "./SessionHistoryTerminals";
+import { AgentChatView } from "../../components/AgentChatView";
+import { useAgentChat } from "../../data/agentChat";
 import { ResumeHistory } from "./ResumeHistory";
 import { SessionRemoveActions } from "./SessionRemoveActions";
 import { SplitHandle, useSessionSplit } from "./SplitHandle";
@@ -50,6 +52,16 @@ const SECTION_LABELS: Record<CaptureLevel, string> = {
   PROCESS_LOG: "LOG",
   PROCESS: "METRICS",
 };
+
+const CHAT_VIEW_KEY = "sentinal.session.view";
+
+function readChatView(): "chat" | "terminal" {
+  try {
+    return localStorage.getItem(CHAT_VIEW_KEY) === "chat" ? "chat" : "terminal";
+  } catch {
+    return "terminal";
+  }
+}
 
 export function SessionDetailPage() {
   return useIsPhone() ? <PhoneSessionDetail /> : <DesktopSessionDetail />;
@@ -70,6 +82,17 @@ function DesktopSessionDetail() {
   const [endOpen, setEndOpen] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
   const [jumpTo, setJumpTo] = useState<{ id: string; nonce: number } | undefined>(undefined);
+  // AC2: Claude Code Sessions as a chat. Terminal first on desktop (decision 5).
+  const chat = useAgentChat(id ?? "");
+  const [view, setView] = useState<"chat" | "terminal">(() => readChatView());
+  function chooseView(next: "chat" | "terminal") {
+    setView(next);
+    try {
+      localStorage.setItem(CHAT_VIEW_KEY, next);
+    } catch {
+      // A per-browser convenience only.
+    }
+  }
 
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -188,6 +211,7 @@ function DesktopSessionDetail() {
   }
 
   const sectionLabel = SECTION_LABELS[capture];
+  const showChat = chat.linked && view === "chat";
 
   return (
     <div
@@ -202,7 +226,18 @@ function DesktopSessionDetail() {
         aria-label={sectionLabel.charAt(0) + sectionLabel.slice(1).toLowerCase()}
       >
         <div className={styles.terminalHeader}>
-          <span className={styles.terminalLabel}>{sectionLabel}</span>
+          {chat.linked ? (
+            <span className={styles.viewSwitch} role="group" aria-label="View">
+              <button type="button" aria-pressed={showChat} onClick={() => chooseView("chat")}>
+                Chat
+              </button>
+              <button type="button" aria-pressed={!showChat} onClick={() => chooseView("terminal")}>
+                Terminal
+              </button>
+            </span>
+          ) : (
+            <span className={styles.terminalLabel}>{sectionLabel}</span>
+          )}
           <span className={`${styles.terminalPath} mono`}>
             {machineName} · {session.cwd ?? "~"}
           </span>
@@ -216,6 +251,16 @@ function DesktopSessionDetail() {
             </span>
           )}
         </div>
+        {showChat && (
+          <AgentChatView
+            session={session}
+            entries={chat.entries}
+            agentName="Claude Code"
+            canSend={capabilities.canSendInput && !readOnly}
+          />
+        )}
+        {/* Stays attached while Chat shows: the live chat arrives on it. */}
+        <div className={styles.terminalBody} hidden={showChat}>
         {capabilities.canAttach ? (
           <SessionHistoryTerminals
             lineage={lineage}
@@ -228,6 +273,7 @@ function DesktopSessionDetail() {
             <ReducedCapturePanel session={session} showSummary={false} />
           </div>
         )}
+        </div>
       </section>
 
       {glass && <SplitHandle container={splitRef} split={split} onChange={setSplit} />}

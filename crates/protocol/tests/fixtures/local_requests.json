@@ -70,5 +70,6 @@
       "steps": 8,
       "eta_secs": 720
     }
-  }
+  },
+  {"version": 1, "payload": {"type": "AGENT_TRANSCRIPT", "session_id": 128, "path": "/Users/owner/.claude/projects/-Users-owner-work/7f3c.jsonl"}}
 ]

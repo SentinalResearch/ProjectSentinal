@@ -191,6 +191,17 @@ export type LocalRequest =
     eta_secs?: number | null;
   }
   | {
+    "type": "AGENT_TRANSCRIPT";
+    /**
+     * The Session the agent runs in (from `SENTINAL_SESSION_ID`).
+     */
+    session_id: SessionId;
+    /**
+     * The conversation file, absolute.
+     */
+    path: string;
+  }
+  | {
     "type": "COMPLETE";
     /**
      * The Session being typed into; its cwd and project apply.

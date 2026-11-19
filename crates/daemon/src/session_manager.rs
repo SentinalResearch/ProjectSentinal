@@ -2,6 +2,7 @@
 
 mod adopt;
 mod adopted_log;
+mod agent_chat;
 mod agent_state;
 mod capture;
 mod continuation;
@@ -151,6 +152,8 @@ struct SessionHandle {
     shell_reports: Mutex<external::ShellReports>,
     /// Agent report rate limit, held report and step history (6.4, 6.5).
     agent: Mutex<agent_state::AgentTrack>,
+    /// The agent's linked conversation file and its kept chat (AC1).
+    chat: Arc<Mutex<agent_chat::ChatState>>,
     /// Set by the first successful attach.
     attached: Arc<AtomicBool>,
     /// Active read-only tail of an adopted process's log.

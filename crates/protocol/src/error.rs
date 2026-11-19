@@ -217,6 +217,15 @@ pub enum ProtocolError {
         reason: &'static str,
     },
 
+    /// An agent conversation request failed its shape rules (AC1).
+    #[error("agent chat {field} {reason}")]
+    InvalidAgentChat {
+        /// Field containing the rejected value.
+        field: &'static str,
+        /// Stable reason.
+        reason: &'static str,
+    },
+
     /// A control projection field failed compatibility or bounds validation.
     #[error("projection {field} {reason}")]
     InvalidProjectionField {

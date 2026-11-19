@@ -91,6 +91,15 @@ impl SessionManager {
                 .map(|session| LocalResponse::Session {
                     session: Box::new(session),
                 }),
+            LocalRequest::AgentTranscript {
+                session_id,
+                path,
+                caller_pid,
+            } => self
+                .link_agent_transcript(session_id, &path, caller_pid)
+                .map(|session| LocalResponse::Session {
+                    session: Box::new(session),
+                }),
             // Machine identity and control links belong to the link manager.
             LocalRequest::GetIdentity
             | LocalRequest::ConnectControl { .. }
@@ -125,7 +134,8 @@ fn error_code(error: &SessionManagerError) -> LocalErrorCode {
         | SessionManagerError::NotShellHook(_)
         | SessionManagerError::ShellPidMismatch { .. }
         | SessionManagerError::AgentCallerUnknown
-        | SessionManagerError::AgentOutsideSession { .. } => LocalErrorCode::Forbidden,
+        | SessionManagerError::AgentOutsideSession { .. }
+        | SessionManagerError::TranscriptRefused { .. } => LocalErrorCode::Forbidden,
         SessionManagerError::AgentReportsNotTaken(_)
         | SessionManagerError::AgentProgressInvalid(_) => LocalErrorCode::InvalidRequest,
         SessionManagerError::SequenceConflict { .. }
