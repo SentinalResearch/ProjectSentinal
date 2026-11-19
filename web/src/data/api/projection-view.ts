@@ -8,7 +8,7 @@ import type { ProjectedMetrics } from "../../protocol/ProjectedMetrics";
 import type { ProjectedSession } from "../../protocol/ProjectedSession";
 import type { LiveEvent } from "../adapter";
 import type { Machine, MachineStatus, Session, SessionEvent, SessionHealth, SessionMetrics } from "../types";
-import { agentActionWord, agentFinishedText, formatEventTime, sessionDisplayName, sessionElapsedMs } from "../format";
+import { agentActionWord, agentFinishedText, formatEventTime, mergeProgress, sessionDisplayName, sessionElapsedMs } from "../format";
 import { compositeId } from "./machine-connections";
 import { mapAgentState } from "../agentState";
 
@@ -200,7 +200,12 @@ function replaceSession(sessions: Session[], session: Session): Session[] {
   const index = sessions.findIndex((candidate) => candidate.id === session.id);
   if (index < 0) return [...sessions, session];
   const next = sessions.slice();
-  next[index] = { ...sessions[index], ...session, events: sessions[index].events };
+  next[index] = {
+    ...sessions[index],
+    ...session,
+    events: sessions[index].events,
+    progress: mergeProgress(sessions[index].progress, session.progress),
+  };
   // A question that is over must never be answered as if it were still open.
   if (session.state !== "WAITING") {
     next[index] = { ...next[index], prompt: undefined, promptOptions: undefined, promptEventId: undefined };
@@ -237,9 +242,13 @@ export function applyProjectionMessage(
       // A new question: its text is on the owning Machine, not here.
       const question = change.event.facts.category === "WAITING"
         ? { promptEventId: Number(change.event.id), prompt: undefined, promptOptions: undefined } : {};
+      // The program's own counts ("epoch 7/40"); the Session row has only Health's percentage.
+      const facts = change.event.facts;
+      const counted = facts.category === "PROGRESS" && facts.total !== null
+        ? { progress: { current: facts.current, total: facts.total, unit: facts.unit.toLowerCase() } } : undefined;
       current.sessions = current.sessions.map((session) => session.id === sessionId
-        ? { ...session, ...question, events: [...(session.events ?? []), event] } : session);
-      events.push({ type: "EVENT_APPENDED", sessionId, event });
+        ? { ...session, ...question, ...counted, events: [...(session.events ?? []), event] } : session);
+      events.push({ type: "EVENT_APPENDED", sessionId, event, ...(counted ? { sessionPatch: counted } : {}) });
     } else if (change.metrics.scope === "SESSION" && change.metrics.session_id !== null) {
       const sessionId = compositeId(message.machine_id, change.metrics.session_id);
       const metrics = metricView(change.metrics);

@@ -32,6 +32,19 @@ function displayTime(time: string): string {
   return time;
 }
 
+/**
+ * Details that only repeat the Event's label: the control dashboard carries no
+ * text for these, so "Command started" under "Command started" says nothing.
+ */
+const RESTATED = new Set([
+  "Command started",
+  "Process started",
+  "Warning detected",
+  "Error detected",
+  "Waiting for input",
+  "Checkpoint created",
+]);
+
 /** Newest first — time · color square · TYPE (· session name) · detail (README's Event row spec). */
 export function EventsList({ events, sessionNames, title = "Events", showHead = true }: EventsListProps) {
   const combined = events.map((event, i) => ({ event, sessionName: sessionNames?.[i] }));
@@ -66,7 +79,7 @@ export function EventsList({ events, sessionNames, title = "Events", showHead = 
                   {sessionName && <span className={styles.who}>{sessionName}</span>}
                   {inferred && <span className={styles.guessLabel}>Sentinal thinks</span>}
                 </span>
-                {detail ? <span className={styles.detail}>{detail}</span> : null}
+                {detail && !RESTATED.has(detail) ? <span className={styles.detail}>{detail}</span> : null}
               </span>
             </div>
           );

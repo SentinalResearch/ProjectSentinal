@@ -213,7 +213,8 @@ impl EventEngine {
             }
             _ => {}
         }
-        let mut counted = self.bursts.summaries(observation.at);
+        let summaries = self.bursts.summaries(observation.at);
+        let mut counted = summaries.events;
         counted.extend(
             deduplicate(events)
                 .into_iter()
@@ -232,6 +233,10 @@ impl EventEngine {
             .any(|event| matches!(event, EventKind::WaitingForInput { .. }));
         // T0.6: an answered question stops warning; one asked just now counts.
         self.health.set_waiting(waiting || asked_now);
+        // Health counts every warning and error the program printed, not
+        // only the Events kept from a burst.
+        self.health
+            .count_left_out(summaries.warnings, summaries.errors);
         let health = self.health.observe(observation, &events);
         let health = bound(capture, health);
         EngineUpdate {
@@ -269,6 +274,14 @@ impl EventEngine {
             .iter()
             .map(|process| (process.pid, process.name.clone()))
             .collect::<BTreeMap<_, _>>();
+        // A terminal that tracks Commands already says what started and
+        // ended; one Event per child process (every `sleep`, every tool an
+        // agent runs) only buries them (QA 2026-11-19). Adopted processes,
+        // which have no Commands, keep these Events.
+        if self.command_activity_required {
+            self.processes = current;
+            return Vec::new();
+        }
         let mut events = current
             .iter()
             .filter(|(pid, _)| !self.processes.contains_key(pid))

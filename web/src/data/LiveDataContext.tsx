@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { dataAdapter } from "./index";
+import { mergeProgress } from "./format";
 import { latestGenerations } from "./lineage";
 import { markLoad } from "./load-timing";
 import { withMachineReach } from "./machine-status";
@@ -58,7 +59,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
             ...prev[idx],
             ...event.session,
             events: prev[idx].events,
-            progress: event.session.progress ?? prev[idx].progress,
+            progress: mergeProgress(prev[idx].progress, event.session.progress),
             // A question that is over must never be answered as if still open.
             prompt: event.session.state === "WAITING" ? event.session.prompt ?? prev[idx].prompt : undefined,
             promptOptions: event.session.state === "WAITING"

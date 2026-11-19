@@ -288,7 +288,9 @@ fn menu_at(lines: &[String], first: usize, last: usize) -> Option<ScreenQuestion
 /// below it to be believed, and then the lines that introduce it say what it asks.
 fn question_above(lines: &[String], first: usize, hinted: bool) -> Option<String> {
     let mut context: Vec<&str> = Vec::new();
-    for line in lines[..first].iter().rev() {
+    let mut stopped = 0;
+    for (index, line) in lines[..first].iter().enumerate().rev() {
+        stopped = index;
         let text = line.trim();
         if text.is_empty() {
             if context.is_empty() {
@@ -304,8 +306,58 @@ fn question_above(lines: &[String], first: usize, hinted: bool) -> Option<String
             break;
         }
     }
+    if !hinted || context.is_empty() {
+        return None;
+    }
+    // A link or a note can sit between the menu and its question, and the
+    // question may wrap ("…one you" / "trust? (Like…"): Claude Code's trust menu.
+    if let Some(question) = wrapped_question_above(lines, stopped) {
+        return Some(question);
+    }
     context.reverse();
-    (hinted && !context.is_empty()).then(|| bounded(&context.join(" · ")))
+    Some(bounded(&context.join(" · ")))
+}
+
+/// Rows searched above the menu's own lines for a wrapped question.
+const MAX_QUESTION_SCAN_ROWS: usize = 10;
+
+/// The first sentence ending in `?` in a paragraph a few rows above `end`,
+/// with its wrapped lines joined.
+fn wrapped_question_above(lines: &[String], end: usize) -> Option<String> {
+    let start = end.saturating_sub(MAX_QUESTION_SCAN_ROWS);
+    let mut paragraph: Vec<&str> = Vec::new();
+    for line in lines[start..end].iter().rev() {
+        let text = line.trim();
+        if !text.is_empty() {
+            paragraph.push(text);
+            continue;
+        }
+        if let Some(question) = sentence_with_question(&mut paragraph) {
+            return Some(question);
+        }
+    }
+    sentence_with_question(&mut paragraph)
+}
+
+fn sentence_with_question(paragraph: &mut Vec<&str>) -> Option<String> {
+    paragraph.reverse();
+    let joined = paragraph.join(" ");
+    paragraph.clear();
+    // A sentence's end, not a URL's query (`?q=`).
+    let mark = joined
+        .char_indices()
+        .find(|(index, c)| {
+            *c == '?'
+                && joined[index + 1..]
+                    .chars()
+                    .next()
+                    .is_none_or(char::is_whitespace)
+        })?
+        .0;
+    let before = &joined[..mark];
+    // From the start of that sentence, keeping a lead-in such as "Quick safety check:".
+    let start = before.rfind(['.', '!']).map_or(0, |dot| dot + 1);
+    Some(bounded(joined[start..=mark].trim()))
 }
 
 fn bounded(text: &str) -> String {

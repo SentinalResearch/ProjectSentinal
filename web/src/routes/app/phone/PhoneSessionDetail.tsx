@@ -13,7 +13,7 @@ import { CaptureBadge } from "../../../components/CaptureBadge";
 import { AgentStateChip, SandboxBadge } from "../../../components/AgentStateChip";
 import { dataAdapter } from "../../../data";
 import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../../data/capture";
-import { formatSessionDuration, healthColorSlug, lossOf } from "../../../data/format";
+import { formatSessionDuration, healthColorSlug, lossOf, progressCount } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Machine, Session } from "../../../data/types";
 import { TerminalPane } from "../../../terminal/TerminalPane";
@@ -246,9 +246,7 @@ function ProgressAndMetrics({ session }: { session: Session }) {
             {progress.inferred ? "≈ " : ""}
             {percent} %
           </span>
-          <span className="mono">
-            {progress.unit} {progress.current}/{progress.total}
-          </span>
+          {progressCount(progress) && <span className="mono">{progressCount(progress)}</span>}
           {progress.inferred && <span className={styles.guessNote}>Sentinal thinks · read off the screen</span>}
           <div className={styles.track}>
             <div className={styles.fill} style={{ width: `${percent}%` }} />

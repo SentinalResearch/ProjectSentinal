@@ -268,11 +268,41 @@ fn a_marked_menu_offers_at_most_the_protocol_s_six_answers() {
     assert!(waiting);
     let (question, options) = asked(&events).unwrap();
     assert_eq!(question, "Which model?");
-    let labels: Vec<&str> = options.iter().map(|option| option.label.as_str()).collect();
+    assert_eq!(options.len(), 6);
+}
+
+/// Claude Code 2.1.328's trust menu, captured in `just dev` 2026-11-19.
+const CLAUDE_TRUST: &str = "Accessing workspace:
+
+/Users/owner/work
+
+Quick safety check: Is this a project you created or one you
+trust? (Like your own code, a well-known open source project,
+or work from your team). If not, take a moment to review
+what's in this folder first.
+
+Claude Code'll be able to read, edit, and execute files here.
+
+Security guide
+
+❯ No, exit
+  Yes, I trust this folder
+
+Enter to confirm · Esc to cancel";
+
+#[test]
+fn claude_codes_trust_menu_asks_its_wrapped_question_not_the_link_above_it() {
+    let mut e = engine("claude");
+    look(&mut e, 0, CLAUDE_TRUST);
+    let (events, waiting) = look(&mut e, 1_000, CLAUDE_TRUST);
+    assert!(waiting);
+    let (question, options) = asked(&events).unwrap();
     assert_eq!(
-        labels,
-        ["model 1", "model 2", "model 3", "model 4", "model 5", "model 6"]
+        question,
+        "Quick safety check: Is this a project you created or one you trust?"
     );
+    let labels: Vec<&str> = options.iter().map(|o| o.label.as_str()).collect();
+    assert_eq!(labels, ["No, exit", "Yes, I trust this folder"]);
 }
 
 #[test]

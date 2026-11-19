@@ -8,6 +8,9 @@ import {
   eventKindLabel,
   formatEventTime,
   machineSummary,
+  mergeProgress,
+  progressCount,
+  progressText,
   sessionDisplayName,
   sessionElapsedMs,
 } from "./format";
@@ -93,5 +96,23 @@ describe("eventKindLabel", () => {
   it("falls back to sentence case for a kind it does not know", () => {
     expect(eventKindLabel("NEW_THING_HAPPENED")).toBe("New thing happened");
     expect(eventKindLabel("")).toBe("Event");
+  });
+});
+
+describe("progress text (QA 2026-11-19)", () => {
+  const epochs = { current: 7, total: 40, unit: "epoch" };
+  const percent = { current: 17.5, total: 100, unit: "%" };
+
+  it("shows the program's own count, and a bare percentage as a percentage", () => {
+    expect(progressText(epochs)).toBe("epoch 7/40");
+    expect(progressText(percent)).toBe("17.5 %");
+    expect(progressCount(percent)).toBeUndefined();
+  });
+
+  it("never lets the dashboard's percentage replace the program's counts", () => {
+    expect(mergeProgress(epochs, percent)).toBe(epochs);
+    expect(mergeProgress(percent, epochs)).toBe(epochs);
+    expect(mergeProgress(undefined, percent)).toBe(percent);
+    expect(mergeProgress(epochs, undefined)).toBe(epochs);
   });
 });

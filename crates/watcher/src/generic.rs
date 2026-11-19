@@ -203,6 +203,10 @@ const READY_PHRASES: &[&str] = &[
     "uvicorn running on",
     "server is listening",
     "server started on port",
+    // Python's http.server, Flask, and Next.js (QA 2026-11-19).
+    "serving http on",
+    "running on http",
+    "started server on",
 ];
 
 /// Recognise common server-start lines without a dedicated adapter (B1):
@@ -214,6 +218,7 @@ fn server_started_line(line: &str, lower: &str) -> Option<(Option<u16>, Option<S
     }
     let url = line
         .split_whitespace()
+        .map(|part| part.trim_start_matches(['(', '[', '<']))
         .find(|part| part.starts_with("http://") || part.starts_with("https://"))
         .map(|part| {
             part.trim_end_matches(|c: char| ",.;)]}".contains(c))

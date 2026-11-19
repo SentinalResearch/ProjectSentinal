@@ -101,3 +101,24 @@ fn a_lone_warning_after_the_window_has_no_count() {
     assert_eq!(kinds(&later).len(), 1);
     assert!(!kinds(&later)[0].1.contains("more"));
 }
+
+#[test]
+fn health_counts_every_error_printed_not_only_the_events_kept() {
+    // QA 2026-11-19: 12 errors in a burst showed as "7 errors" in Health.
+    let mut engine = EventEngine::new(None, Vec::new());
+    for line in 0..12 {
+        engine.observe(&Observation::output(
+            Timestamp(line * 100),
+            format!("error: mismatched types in src/lib_{line}.rs"),
+        ));
+    }
+    let update = engine.observe(&Observation {
+        at: Timestamp(10_000),
+        kind: watcher::ObservationKind::Tick,
+    });
+    assert_eq!(
+        kinds(&update),
+        vec![("error", "7 more errors in 10 s".to_string())]
+    );
+    assert_eq!(update.health.errors, 12);
+}

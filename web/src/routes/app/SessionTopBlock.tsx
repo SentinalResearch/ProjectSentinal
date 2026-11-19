@@ -1,5 +1,5 @@
 import { Button } from "../../components/Button";
-import { extractPort, formatLearningRate, lossOf, type SessionKind } from "../../data/format";
+import { extractPort, formatLearningRate, lossOf, progressCount, type SessionKind } from "../../data/format";
 import type { Session } from "../../data/types";
 import { PromptChoices } from "../../components/PromptChoices";
 import { canAnswer, offeredChoices } from "../../data/actions";
@@ -52,7 +52,8 @@ export function SessionTopBlock({
   }
 
   if (kind === "training" && session.progress) {
-    const { current, total, unit } = session.progress;
+    const { current, total } = session.progress;
+    const count = progressCount(session.progress);
     const pct = Math.round((current / total) * 100);
     const gpuPct = session.metrics?.gpuPct;
     const vram = session.metrics?.vramGB;
@@ -70,8 +71,12 @@ export function SessionTopBlock({
               <span className={styles.percentSign}>%</span>
             </span>
             <span className={styles.percentCaption}>
-              {unit} {current}/{total}
-              <br />
+              {count && (
+                <>
+                  {count}
+                  <br />
+                </>
+              )}
               {session.runningFor && `running ${session.runningFor}`}
               {session.progress.inferred && (
                 <span className={styles.guess}>

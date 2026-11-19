@@ -48,3 +48,20 @@ fn process_samples_emit_started_and_exited_differences_once() {
         }]
     ));
 }
+
+#[test]
+fn a_terminal_that_tracks_commands_has_no_event_per_child_process() {
+    // QA 2026-11-19: every `sleep` in a script added two Events.
+    let mut engine = EventEngine::new(None, Vec::new()).with_command_activity_required();
+    for (at, processes) in [
+        (1, vec![process(10, "zsh")]),
+        (2, vec![process(10, "zsh"), process(11, "sleep")]),
+        (3, vec![process(10, "zsh")]),
+    ] {
+        let update = engine.observe(&Observation {
+            at: Timestamp(at),
+            kind: ObservationKind::ProcessSample(ProcessObservation { processes }),
+        });
+        assert!(update.events.is_empty(), "at {at}: {:?}", update.events);
+    }
+}

@@ -43,6 +43,13 @@ impl HealthTracker {
         }
     }
 
+    /// Warnings and errors left out of a burst (T0.11). Each burst's summary
+    /// Event is itself counted once when observed, so it adds the rest here.
+    pub(crate) fn count_left_out(&mut self, warnings: u32, errors: u32) {
+        self.warnings = self.warnings.saturating_add(warnings.saturating_sub(1));
+        self.health.errors = self.health.errors.saturating_add(errors.saturating_sub(1));
+    }
+
     /// Whether a question still waits for an answer (T0.6). Once answered,
     /// its warning and its evidence line go.
     pub fn set_waiting(&mut self, waiting: bool) {

@@ -69,6 +69,13 @@ describe("prompt grammar", () => {
     expect(go("#tim")).toEqual({ kind: "navigate", to: "/app/projects/tim" });
   });
 
+  it("run with no matching Recipe offers a terminal instead of doing nothing", () => {
+    const [only, ...rest] = suggest("run python3 train.py --epochs 40", index);
+    expect(rest).toEqual([]);
+    expect(only.action).toEqual({ kind: "newSession" });
+    expect(only.detail).toContain('no Recipe matches "python3 train.py --epochs 40"');
+  });
+
   it("run opens the prefilled form, never runs", () => {
     const [first] = suggest('run "Qwen vLLM Server" on mac-mini', index);
     expect(first.command).toBe('run "Qwen vLLM Server" on mac-mini');

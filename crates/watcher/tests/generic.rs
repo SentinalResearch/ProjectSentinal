@@ -158,6 +158,22 @@ fn a_server_start_line_from_any_program_is_a_server_started_event() {
             None,
         ),
         ("listening on 0.0.0.0:8081, pid 4123", Some(8081), None),
+        // QA 2026-11-19: banners seen in `just dev`, and two more as common.
+        (
+            "Serving HTTP on 127.0.0.1 port 8765 (http://127.0.0.1:8765/) ...",
+            Some(8765),
+            Some("http://127.0.0.1:8765/"),
+        ),
+        (
+            " * Running on http://127.0.0.1:5000",
+            Some(5000),
+            Some("http://127.0.0.1:5000"),
+        ),
+        (
+            "ready - started server on 0.0.0.0:3000, url: http://localhost:3000",
+            Some(3000),
+            Some("http://localhost:3000"),
+        ),
     ] {
         // A fresh engine per line: one server is reported once (see below).
         let mut engine = EventEngine::new(None, Vec::new());
@@ -180,6 +196,7 @@ fn ordinary_output_is_not_a_server_start() {
         "the server is not responding",
         "port 8080 is already in use",
         "loading model weights",
+        "the job is running on host gpu-3",
     ] {
         let update = engine.observe(&Observation::output(Timestamp(0), line));
         assert!(

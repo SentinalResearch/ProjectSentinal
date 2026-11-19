@@ -180,6 +180,58 @@ fails without it. Items marked *(v2.10.0)* are also in production.
       package service, config and PTY code, most of the CLI and `web/src`,
       `scripts/`, `intelligence/`, `eval/`
 
+### Q: hands-on run in a dev instance, 2026-11-19
+
+Used like an owner would, in an isolated dev instance: a training script
+with `::sentinal` lines, a noisy build, a `[y/N]` script asked twice, a
+Python web server, and real Claude Code 2.1.328 (trust menu, two identical
+approvals). Each fix has a test that fails without it.
+
+- [x] Q1 Training progress read "18 %" with "% 17.5/100" (island: "18 % %
+      17.5/100"): the dashboard's Health percentage replaced the program's
+      `epoch 7/40`. Projected progress Events now carry the counts, a bare
+      percentage never replaces them, and one shows as "17.5 %" —
+      `format.test.ts`, `projection-view.test.ts`
+- [x] Q2 The whole app went blank ("Maximum update depth exceeded") when a
+      question arrived: the island's ticker measured its room from the
+      window while the island moved to centre itself by its width. Now
+      measured from the island's own edge (`LiveIsland.tsx`)
+- [x] Q3 Health said "7 errors" for a build that printed 12: it counted the
+      Events kept from a burst. It now counts every one — `rate_limit.rs`
+- [x] Q4 Every child process (each `sleep` in a script, each tool an agent
+      runs) added "Process started" and "Process exited" Events. Terminals
+      that track Commands no longer do; adopted processes still do —
+      `processes.rs`
+- [x] Q5 Claude Code 2.1.328 showed "0 tool calls" after running commands:
+      it now draws `● Creating empty file one.txt` over `⎿ $ touch one.txt`.
+      The `⎿ $` line is read — `agent_activity.rs`. Not done: the collapsed
+      `Ran 2 shell commands` summary, whose same text repeats across turns,
+      so very quick calls can still be missed
+- [x] Q6 Claude Code's trust menu was asked as "Security guide" (a link
+      above it). A hinted menu with no question right above it now finds the
+      wrapped sentence ending in `?` — `screen_prompt.rs`
+- [x] Q7 Answer buttons on menus without numbers (Claude Code's trust and
+      billing menus) send a digit, which those menus ignore, so the button
+      silently did nothing. The card now says so after 3 s and points to the
+      terminal (`PromptChoices.test.tsx`). The real fix is T3.4 (arrow keys
+      from the daemon) — **owner to decide** whether to bring it forward
+- [x] Q8 `run python3 train.py` in the island did nothing on Enter (`run` is
+      for Recipes). With no matching Recipe it now offers "new session" and
+      says why — `promptGrammar.test.ts`
+- [x] Q9 Python's `Serving HTTP on … port 8765` was not a server; nor are
+      Flask's `* Running on http://…` or Next.js's `started server on …`.
+      Now they are — `generic.rs`
+- [x] Q10 Events from the dashboard read "Command started / Command
+      started", "Warning / Warning detected": the detail only repeated the
+      label. The list leaves it out — `EventsList.test.tsx`
+- [ ] Q11 Confirmed X22 by hand: restarting the daemon signs every browser
+      out, while the sign-in page says browsers "stay signed in until you
+      sign out or the session expires"
+- [ ] Q12 A plain shell Session stays "Session 4" while it runs
+      `python3 serve.py`; the running Command could name it
+- [ ] Q13 The phone Session page shows LOSS and GPU cells for an agent
+      Session that has neither
+
 - **2026-11-12 audit and terminal design:** a read of the watcher, protocol,
   store, and the daemon's Session code found the bugs listed under **T0**, and
   the causes of cluttered and overlapping terminals. The owner decided the

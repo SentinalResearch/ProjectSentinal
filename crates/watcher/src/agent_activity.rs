@@ -53,9 +53,24 @@ pub fn working_line(line: &str) -> bool {
 }
 
 /// A tool call: Claude Code's `⏺ Name(args)`, `⏺ Running N shell command…`,
-/// Gemini CLI's `✓ Name args`, or aider's `Applied edit to file`.
+/// `⎿ $ command`, Gemini CLI's `✓ Name args`, or aider's `Applied edit to file`.
 pub fn tool_line(line: &str) -> Option<(AgentAction, String)> {
     let text = line.trim();
+    // Claude Code 2.1.3xx: `● Creating empty file one.txt` over `⎿ $ touch one.txt`.
+    // Only the `$` line names the command; plain `⎿` lines are its output.
+    if let Some(command) = text
+        .strip_prefix('⎿')
+        .and_then(|rest| rest.trim_start().strip_prefix("$ "))
+        .map(str::trim)
+        .filter(|command| !command.is_empty())
+    {
+        let action = if is_test_command(command) {
+            AgentAction::RanTests
+        } else {
+            AgentAction::RanCommand
+        };
+        return Some((action, detail(command)));
+    }
     if let Some(file) = text.strip_prefix("Applied edit to ") {
         return Some((AgentAction::EditedFile, detail(file)));
     }

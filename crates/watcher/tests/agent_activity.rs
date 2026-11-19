@@ -271,3 +271,26 @@ fn claude_codes_running_shell_command_wording_counts_as_a_tool_call() {
     assert_eq!(tool_line("⏺ Running tests"), None);
     assert_eq!(tool_line("⏺ Reading file"), None);
 }
+
+#[test]
+fn claude_code_2_1_3_names_each_command_on_its_dollar_line() {
+    // Captured in `just dev` 2026-11-19 (Claude Code 2.1.328): the call is a
+    // description line, then the command under `⎿ $`, then its output.
+    use AgentAction::*;
+    assert_eq!(
+        tool_line("  ⎿ $ touch one.txt"),
+        Some((RanCommand, "touch one.txt".to_string()))
+    );
+    assert_eq!(
+        tool_line("⎿  $ cargo test -p watcher"),
+        Some((RanTests, "cargo test -p watcher".to_string()))
+    );
+    for not_a_call in [
+        "● Creating empty file one.txt",
+        "  ⎿ Darwin Advanceds-Mini.studihaus 27.0.0",
+        "  ⎿ $",
+        "Ran 2 shell commands",
+    ] {
+        assert_eq!(tool_line(not_a_call), None, "{not_a_call}");
+    }
+}

@@ -1,5 +1,5 @@
 import type { AgentAction } from "../protocol/AgentAction";
-import type { CodingAgentView, Machine, Session } from "./types";
+import type { CodingAgentView, Machine, Session, SessionProgress } from "./types";
 
 // QUESTION: fixtures only carry a project name, never an id, and the prototype's own
 // ids ("tim", "maa") don't obviously derive from the names either. See QUESTIONS.md #9 —
@@ -34,10 +34,42 @@ export function formatEventTime(at: number | Date): string {
   return `${h}:${m}:${s}`;
 }
 
+/**
+ * Only a percentage: what Health knows when the program's own counts have not
+ * arrived (the control's dashboard carries no more). Never "% 17.5/100".
+ */
+export function isPercentOnly(progress: Pick<SessionProgress, "total" | "unit">): boolean {
+  return progress.unit === "%" && progress.total === 100;
+}
+
+/** The program's own count, "epoch 7/40", or nothing when only a percentage is known. */
+export function progressCount(progress: SessionProgress): string | undefined {
+  return isPercentOnly(progress) ? undefined : `${progress.unit} ${progress.current}/${progress.total}`;
+}
+
+/**
+ * The progress to keep when an update arrives. A bare percentage never replaces
+ * the program's own counts: the dashboard carries only Health's percentage,
+ * while the counts come with each progress Event.
+ */
+export function mergeProgress(
+  previous: SessionProgress | undefined,
+  next: SessionProgress | undefined,
+): SessionProgress | undefined {
+  if (!next) return previous;
+  if (previous && isPercentOnly(next) && !isPercentOnly(previous)) return previous;
+  return next;
+}
+
+/** "epoch 7/40", or "17.5 %" when only a percentage is known. */
+export function progressText(progress: SessionProgress): string {
+  return progressCount(progress) ?? `${Math.round(progress.current * 10) / 10} %`;
+}
+
 export function formatSessionFact(session: Session): string {
   const parts: string[] = [];
   if (session.progress) {
-    parts.push(`${session.progress.unit} ${session.progress.current}/${session.progress.total}`);
+    parts.push(progressText(session.progress));
   }
   const loss = lossOf(session);
   if (loss) parts.push(`loss ${loss.to}`);
@@ -186,6 +218,9 @@ const EVENT_LABELS: Record<string, string> = {
   ERROR_DETECTED: "Error",
   RESOURCE_HIGH: "Resource high",
   WAITING_FOR_INPUT: "Waiting for input",
+  // The control dashboard's names for the same Events.
+  WAITING: "Waiting for input",
+  CHECKPOINT: "Checkpoint saved",
   POSSIBLY_STALLED: "Possibly stalled",
   CHECKPOINT_CREATED: "Checkpoint saved",
   SERVER_STARTED: "Server started",
@@ -240,7 +275,7 @@ export function confirmConsequence(session: Session, machineName: string): strin
     const checkpoint = lastCheckpointPath(session);
     const base = `Stops ${session.command ?? session.name} on ${machineName}${
       session.runningFor ? ` after ${session.runningFor}` : ""
-    } at ${session.progress.unit} ${session.progress.current}/${session.progress.total}.`;
+    } at ${progressText(session.progress)}.`;
     return checkpoint ? `${base} Last checkpoint ${checkpoint}.` : base;
   }
   if (kind === "server") {

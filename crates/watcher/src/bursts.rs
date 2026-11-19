@@ -76,21 +76,32 @@ impl Bursts {
     }
 
     /// One Event per burst that ended by `at`, saying how many were left out.
-    pub(crate) fn summaries(&mut self, at: Timestamp) -> Vec<EventKind> {
+    pub(crate) fn summaries(&mut self, at: Timestamp) -> Summaries {
         let seconds = BURST_MS / 1_000;
-        let mut events = Vec::new();
+        let mut summaries = Summaries::default();
+        let events = &mut summaries.events;
         if let Some(count) = self.warnings.finished(at) {
+            summaries.warnings = count;
             let noun = if count == 1 { "warning" } else { "warnings" };
             events.push(EventKind::WarningDetected {
                 message: format!("{count} more {noun} in {seconds} s"),
             });
         }
         if let Some(count) = self.errors.finished(at) {
+            summaries.errors = count;
             let noun = if count == 1 { "error" } else { "errors" };
             events.push(EventKind::ErrorDetected {
                 message: format!("{count} more {noun} in {seconds} s"),
             });
         }
-        events
+        summaries
     }
+}
+
+/// The Events that end bursts, and how many warnings and errors they stand for.
+#[derive(Debug, Default)]
+pub(crate) struct Summaries {
+    pub(crate) events: Vec<EventKind>,
+    pub(crate) warnings: u32,
+    pub(crate) errors: u32,
 }

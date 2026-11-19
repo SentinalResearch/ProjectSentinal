@@ -7,6 +7,7 @@ import { ThemeChoice } from "../../../components/ThemeSwitch";
 import { dataAdapter } from "../../../data";
 import { answerPrompt, canAnswer, endSession, offeredChoices } from "../../../data/actions";
 import { inboxItems, lifecycle, useLifecycle } from "../../../data/lifecycle";
+import { progressCount } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Session } from "../../../data/types";
 import { IslandInbox, useUnreadCount } from "./IslandInbox";
@@ -100,7 +101,11 @@ export function LiveIsland({
   useLayoutEffect(() => {
     const check = () => {
       if (!measure.current || !slot.current) return;
-      const room = window.innerWidth - 32 - (slot.current.getBoundingClientRect().left - 16) - 120;
+      // From the island's own edge, not the window's: the island moves to
+      // centre itself by its width, and a room that followed it flipped the
+      // ticker between collapsed and full forever (QA 2026-11-19).
+      const before = slot.current.getBoundingClientRect().left - (islandRef.current?.getBoundingClientRect().left ?? 16);
+      const room = window.innerWidth - 32 - before - 120;
       setCollapsed(measure.current.scrollWidth > Math.min(room, 560));
     };
     check();
@@ -190,10 +195,8 @@ export function LiveIsland({
               {focus.reported.who} says · {focus.reported.label}
             </span>
           ) : (
-            focus.session.progress && (
-              <span className={styles.progressDetail}>
-                {focus.session.progress.unit} {focus.session.progress.current}/{focus.session.progress.total}
-              </span>
+            focus.session.progress && progressCount(focus.session.progress) && (
+              <span className={styles.progressDetail}>{progressCount(focus.session.progress)}</span>
             )
           )}
         </button>

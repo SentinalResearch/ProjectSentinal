@@ -181,4 +181,34 @@ describe("the prompt of a WAITING Session", () => {
     expect(machine.sessions[0].promptEventId).toBe(55);
     expect(machine.sessions[0].prompt).toBeUndefined();
   });
+  it("keeps the program's own counts when the Session row brings only Health's percentage (QA)", () => {
+    const data = base();
+    const view = projectionView(data, 3)!;
+    const machine = [...view.machines.values()][0];
+    const sessionId = data.machines[0].sessions[0].id;
+    const appended = applyProjectionMessage(view, {
+      type: "PROJECTION_DELTA",
+      machine_id: data.machines[0].machine_id,
+      from_revision: view.revision,
+      to_revision: view.revision + 1,
+      changes: [{
+        type: "EVENT_APPEND",
+        cursor: 9,
+        event: { id: 56, session_id: sessionId, at: 9, facts: { category: "PROGRESS", current: 7, total: 40, unit: "EPOCH" } },
+      }],
+    } as never, 4);
+    const counts = { current: 7, total: 40, unit: "epoch" };
+    expect(machine.sessions[0].progress).toEqual(counts);
+    expect(appended?.find((event) => event.type === "EVENT_APPENDED")).toMatchObject({ sessionPatch: { progress: counts } });
+
+    const health = { progress: 17.5, activity: "GOOD", resources: "GOOD", stability: "UNKNOWN", errors: 0, overall: "HEALTHY" };
+    applyProjectionMessage(view, {
+      type: "PROJECTION_DELTA",
+      machine_id: data.machines[0].machine_id,
+      from_revision: view.revision,
+      to_revision: view.revision + 1,
+      changes: [{ type: "SESSION_UPSERT", cursor: 10, session: { ...data.machines[0].sessions[0], health } }],
+    } as never, 5);
+    expect(machine.sessions[0].progress).toEqual(counts);
+  });
 });

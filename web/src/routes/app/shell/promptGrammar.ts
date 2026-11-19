@@ -198,6 +198,21 @@ export function parseRun(argument: string): { recipe: string; machine?: string }
 
 function run(index: PromptIndex, argument: string): PromptSuggestion[] {
   const { recipe: recipeQuery, machine: machineQuery } = parseRun(argument);
+  const recipes = runRecipes(index, recipeQuery, machineQuery);
+  if (recipes.length > 0 || !recipeQuery) return recipes;
+  // `run python3 train.py` is not a Recipe: say so, and offer a terminal
+  // instead of an Enter that does nothing (QA 2026-11-19).
+  return [{
+    id: "run:none",
+    group: "RUN",
+    command: "new session",
+    detail: `no Recipe matches "${recipeQuery}" · open a terminal and type it there`,
+    action: { kind: "newSession" },
+    completion: "new session",
+  }];
+}
+
+function runRecipes(index: PromptIndex, recipeQuery: string, machineQuery: string | undefined): PromptSuggestion[] {
   return ranked(index.recipes, recipeQuery, (recipe) => [recipe.name, recipe.id, recipe.category]).map((recipe) => {
     const allowed = recipe.machineIds?.length ? recipe.machineIds : [recipe.machine];
     const candidates = index.machines.filter((machine) => allowed.includes(machine.id));

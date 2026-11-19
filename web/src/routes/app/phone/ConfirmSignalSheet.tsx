@@ -1,6 +1,6 @@
 import { BottomSheet } from "../../../components/BottomSheet";
 import { HoldButton } from "../../../components/HoldButton";
-import { formatSessionDuration, lastCheckpointPath } from "../../../data/format";
+import { formatSessionDuration, lastCheckpointPath, progressText } from "../../../data/format";
 import type { Session } from "../../../data/types";
 import { CONFIRM_AFTER_SECONDS } from "./interrupt";
 import styles from "./phoneSession.module.css";
@@ -19,7 +19,7 @@ export interface ConfirmSignalSheetProps {
  * button. Cancel is the default; jobs under 30 s never see this.
  */
 export function ConfirmSignalSheet({ open, session, machineName, onConfirm, onClose }: ConfirmSignalSheetProps) {
-  const progress = session.progress ? `, ${session.progress.unit} ${session.progress.current}/${session.progress.total}` : "";
+  const progress = session.progress ? `, ${progressText(session.progress)}` : "";
   const checkpoint = lastCheckpointPath(session);
   const checkpointName = checkpoint?.split("/").pop()?.replace(/\.[^.]+$/, "");
   return (
