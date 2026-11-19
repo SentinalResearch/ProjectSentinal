@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { isDelayed, lastSeenText, machineStatusText } from "./machine-status";
-import type { Machine } from "./types";
+import { isDelayed, lastSeenText, machineStatusText, withMachineReach } from "./machine-status";
+import type { Machine, Session } from "./types";
 
 const base: Machine = { id: "rtx", name: "RTX-PC", os: "Linux", hardware: "", status: "ONLINE" };
 
@@ -37,5 +37,30 @@ describe("last seen", () => {
 
   it("never reads as the future when clocks disagree", () => {
     expect(lastSeenText(now + 60_000, now)).toBe("last seen just now");
+  });
+});
+
+describe("withMachineReach (X24)", () => {
+  const session = (id: string, machine: string, state: Session["state"]): Session =>
+    ({ id, machine, state, name: id, prompt: state === "WAITING" ? "Continue?" : undefined }) as Session;
+  const sessions = [
+    session("idle", "mac", "IDLE"),
+    session("asks", "mac", "WAITING"),
+    session("done", "mac", "COMPLETED"),
+    session("live", "rtx", "RUNNING"),
+    session("unlisted", "gone", "RUNNING"),
+  ];
+
+  it("says a live Session on an offline Machine is disconnected, not idle", () => {
+    const shown = withMachineReach(sessions, [{ id: "mac", status: "OFFLINE" }, { id: "rtx", status: "ONLINE" }]);
+    expect(shown.map((s) => s.state)).toEqual(["DISCONNECTED", "DISCONNECTED", "COMPLETED", "RUNNING", "RUNNING"]);
+    expect(shown[1].prompt).toBeUndefined();
+  });
+
+  it("changes nothing while every Machine is online, and keeps the real state for later", () => {
+    const online = [{ id: "mac", status: "ONLINE" as const }, { id: "rtx", status: "ONLINE" as const }];
+    expect(withMachineReach(sessions, online)).toBe(sessions);
+    withMachineReach(sessions, [{ id: "mac", status: "DISCONNECTED" }]);
+    expect(sessions[0].state).toBe("IDLE");
   });
 });

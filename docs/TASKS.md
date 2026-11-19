@@ -168,9 +168,14 @@ fails without it. Items marked *(v2.10.0)* are also in production.
 - [ ] X22 Browser logins live only in memory and end on every daemon restart
 - [x] X23 A panic in the watcher still ends the PTY reader; catch it there so
       one bad line can never stop a Session being read (fixed as T0.3)
-- [ ] X24 From screenshots: on the phone Session page the Open terminal button
+- [x] X24 From screenshots: on the phone Session page the Open terminal button
       covers Health · Evidence; the prompt bar covers the last Machine in the
-      Start a Session sheet; an offline Machine's Session still shows IDLE
+      Start a Session sheet; an offline Machine's Session still shows IDLE.
+      The first two were already fixed (the button is in the page and scrolls
+      away; the sheet renders on `<body>` above the prompt bar), checked at
+      375 px. A live Session on a Machine that is not online now shows
+      DISCONNECTED everywhere (`withMachineReach` in `LiveDataContext`); its
+      real state returns with the Machine
 - [ ] X25 The unread two thirds: most of `daemon/src/control`, link, push,
       package service, config and PTY code, most of the CLI and `web/src`,
       `scripts/`, `intelligence/`, `eval/`

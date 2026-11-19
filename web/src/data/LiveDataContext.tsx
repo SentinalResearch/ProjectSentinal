@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { dataAdapter } from "./index";
 import { latestGenerations } from "./lineage";
 import { markLoad } from "./load-timing";
+import { withMachineReach } from "./machine-status";
 import type { LiveEvent } from "./adapter";
 import type { Machine, Session } from "./types";
 
@@ -103,12 +104,14 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const latest = useMemo(() => latestGenerations(sessions), [sessions]);
+  // Sessions on a Machine that is not online have an unknown state (X24).
+  const shown = useMemo(() => withMachineReach(sessions, machines), [sessions, machines]);
+  const latest = useMemo(() => latestGenerations(shown), [shown]);
   const terminals = useMemo(() => latest.filter((session) => !session.dismissed), [latest]);
   const hidden = useMemo(() => latest.filter((session) => session.dismissed), [latest]);
   const value = useMemo<LiveDataValue>(
-    () => ({ machines, sessions, terminals, hidden, loading }),
-    [machines, sessions, terminals, hidden, loading],
+    () => ({ machines, sessions: shown, terminals, hidden, loading }),
+    [machines, shown, terminals, hidden, loading],
   );
 
   return <LiveDataContext.Provider value={value}>{children}</LiveDataContext.Provider>;

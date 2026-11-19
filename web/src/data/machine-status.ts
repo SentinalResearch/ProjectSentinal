@@ -1,4 +1,5 @@
-import type { Machine } from "./types";
+import { FINISHED_STATES } from "./format";
+import type { Machine, Session } from "./types";
 
 /**
  * Online by heartbeat, but the control's copy of its Sessions is more than a
@@ -38,4 +39,21 @@ export function lastSeenText(at: number, now: number): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 48) return `last seen ${hours} h ago`;
   return `last seen ${Math.floor(hours / 24)} days ago`;
+}
+
+/**
+ * What each Session's state can honestly be said to be. A Session that had not
+ * finished on a Machine that is not online has an unknown state, so it shows
+ * DISCONNECTED (X24) rather than the last state its Machine reported. Only the
+ * view changes: the Machine's next report shows the real state again. A Session
+ * whose Machine is not listed yet is left as it is.
+ */
+export function withMachineReach(sessions: Session[], machines: Pick<Machine, "id" | "status">[]): Session[] {
+  const unreachable = new Set(machines.filter((machine) => machine.status !== "ONLINE").map((machine) => machine.id));
+  if (unreachable.size === 0) return sessions;
+  return sessions.map((session) =>
+    unreachable.has(session.machine) && !FINISHED_STATES.has(session.state) && session.state !== "DISCONNECTED"
+      ? { ...session, state: "DISCONNECTED", prompt: undefined, promptOptions: undefined }
+      : session,
+  );
 }
