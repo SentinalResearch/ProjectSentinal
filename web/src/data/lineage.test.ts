@@ -4,7 +4,9 @@ import type { Session } from "./types";
 import {
   HISTORY_OUTPUT_BUDGET_BYTES,
   HISTORY_WINDOW_GENERATIONS,
+  historyWindow,
   latestGenerations,
+  priorPartsFor,
   resolveSessionLineage,
 } from "./lineage";
 
@@ -83,5 +85,39 @@ describe("latestGenerations", () => {
     const sessions = [generation(1, 9), generation(2, 1, "machine-b")];
 
     expect(latestGenerations(sessions).map((session) => session.id)).toEqual(["1", "2"]);
+  });
+});
+
+describe("historyWindow", () => {
+  it("ends at the latest part and shares the output budget across the parts shown", () => {
+    const sessions = Array.from({ length: 40 }, (_, index) =>
+      generation(index + 1, index === 0 ? undefined : index),
+    );
+    const lineage = resolveSessionLineage(sessions, "5");
+
+    const window = historyWindow(lineage);
+
+    expect(window.latest.id).toBe("40");
+    expect(window.parts).toHaveLength(HISTORY_WINDOW_GENERATIONS - 1);
+    expect(window.parts[0].id).toBe(String(40 - HISTORY_WINDOW_GENERATIONS + 1));
+    expect(window.offset).toBe(40 - HISTORY_WINDOW_GENERATIONS);
+    expect(window.total).toBe(40);
+    expect(window.bytesPerPart).toBe(Math.floor(HISTORY_OUTPUT_BUDGET_BYTES / HISTORY_WINDOW_GENERATIONS));
+  });
+
+  it("has no earlier parts for a terminal that never resumed", () => {
+    const window = historyWindow(resolveSessionLineage([generation(1)], "1"));
+    expect(window.parts).toEqual([]);
+    expect(window.total).toBe(1);
+  });
+});
+
+describe("priorPartsFor", () => {
+  it("gives the latest part its earlier parts, and nothing to an older part or a broken history", () => {
+    const sessions = [generation(1), generation(2, 1), generation(3, 2)];
+    expect(priorPartsFor(sessions, "3")?.parts.map((part) => part.id)).toEqual(["1", "2"]);
+    expect(priorPartsFor(sessions, "2")).toBeUndefined();
+    expect(priorPartsFor([generation(2, 99)], "2")).toBeUndefined();
+    expect(priorPartsFor([generation(1)], "1")).toBeUndefined();
   });
 });

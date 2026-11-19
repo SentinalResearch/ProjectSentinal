@@ -287,6 +287,7 @@ async fn handcrafted_remote_control_requests_all_fail_and_only_reads_happen() {
     for request in [
         ClientRequest::Attach {
             session_id: session.id,
+            history: false,
         },
         ClientRequest::Resize {
             session_id: session.id,
@@ -338,6 +339,7 @@ async fn handcrafted_control_requests_fail_for_process_log_sessions_too() {
     for request in [
         ClientRequest::Attach {
             session_id: session.id,
+            history: false,
         },
         ClientRequest::Resize {
             session_id: session.id,

@@ -33,6 +33,7 @@ import { SessionTopBlock } from "./SessionTopBlock";
 import { SummaryLine } from "./SummaryLine";
 import { Suggestions } from "./Suggestions";
 import { SessionHistoryTerminals } from "./SessionHistoryTerminals";
+import { ResumeHistory } from "./ResumeHistory";
 import { SessionRemoveActions } from "./SessionRemoveActions";
 import { SplitHandle, useSessionSplit } from "./SplitHandle";
 import { SessionCommands } from "./SessionCommands";
@@ -68,6 +69,7 @@ function DesktopSessionDetail() {
   const [continuing, setContinuing] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
+  const [jumpTo, setJumpTo] = useState<{ id: string; nonce: number } | undefined>(undefined);
 
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -217,9 +219,7 @@ function DesktopSessionDetail() {
         {capabilities.canAttach ? (
           <SessionHistoryTerminals
             lineage={lineage}
-            selectedId={session.id}
-            machineName={machineName}
-            onSelect={(sessionId) => navigate(`/app/sessions/${sessionId}`, { replace: true })}
+            jumpTo={jumpTo ?? (session.id !== latest.id ? { id: session.id, nonce: 0 } : undefined)}
             onAttachedChange={setAttached}
             onRequestInterrupt={askCtrlC}
           />
@@ -251,7 +251,7 @@ function DesktopSessionDetail() {
               <h1 className={styles.title}>{root.name}</h1>
               {lineage.ordered.length > 1 && (
                 <span className={styles.generationMarker}>
-                  Generation {lineage.selectedIndex + 1} of {lineage.ordered.length}
+                  Resumed {lineage.ordered.length - 1} {lineage.ordered.length === 2 ? "time" : "times"}
                 </span>
               )}
               <StateTag state={session.state} exitUnknown={unknownExit} variant={glass ? "line" : undefined} />
@@ -337,6 +337,10 @@ function DesktopSessionDetail() {
           </div>
         )}
         {lineageError && <p className={styles.continueError} role="alert">{lineageError}</p>}
+        <ResumeHistory
+          lineage={lineage}
+          onJump={(id) => setJumpTo((current) => ({ id, nonce: (current?.nonce ?? 0) + 1 }))}
+        />
         {continueError && <p className={styles.continueError} role="alert">{continueError}</p>}
 
         {session.summary && <SummaryLine summary={session.summary} />}

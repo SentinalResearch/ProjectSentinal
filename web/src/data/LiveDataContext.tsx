@@ -114,6 +114,11 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
   return <LiveDataContext.Provider value={value}>{children}</LiveDataContext.Provider>;
 }
 
+/** Live data when inside the provider, otherwise null (components used on their own). */
+export function useOptionalLiveData(): LiveDataValue | null {
+  return useContext(LiveDataContext);
+}
+
 export function useLiveData(): LiveDataValue {
   const ctx = useContext(LiveDataContext);
   if (!ctx) throw new Error("useLiveData must be used within LiveDataProvider");

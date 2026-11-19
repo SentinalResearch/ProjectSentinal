@@ -183,6 +183,37 @@ fails without it. Items marked *(v2.10.0)* are also in production.
 
 ---
 
+## H: terminal history and resume · *built 2026-11-19, not committed*
+
+Design: canvas page "Terminal history & resume", boards H1–H3, approved by
+the owner on 2026-11-19 (Resumed tags in chevron style).
+
+- [x] H1 Reattaching brings the scrollback back, not only the visible screen:
+      `ATTACH.history` (optional; the web sets it, the CLI does not). The daemon
+      sends its vt100 scrollback rows, then pushes the viewer's lines into its
+      own scrollback, then the usual screen (`session_manager/screen_history.rs`).
+      Covers T2.4's "history in the attach snapshot" on today's screen engine
+- [x] H2 One terminal per Session: earlier parts' saved output, oldest first,
+      then the live part (`terminal/priorParts.ts`, `usePriorParts.ts`). The
+      1–N part tabs and the stacked 220 px terminals are gone
+- [x] H3 A Resumed tag before each part: when, how the part before ended
+      (green exit 0, amber interrupted, red failed), part N / M. An xterm
+      decoration over a blank line: never written into output, logs or copies
+- [x] H4 History list on the Session page jumps to each resume; "Back to the
+      latest" pill while scrolled up; the phone terminal shows the same history
+- [x] H5 Hide and Delete know each Machine's release: 2.11 any finished
+      Session, 2.10 only failed, older none. Unsupported Machines are never
+      asked; Done lists say which Machine needs 2.11 and show "Hide · needs
+      2.11"; Auto-clear skips them; raw daemon errors are reworded
+      (`data/removal.ts`). Development builds (0.0.x) count as current
+- Known limits: a viewer that lags gets a full reset (RIS) and loses the
+  earlier parts until reload; at most 32 parts are drawn (older ones are
+  named, their output kept); the live screen starts below the earlier parts,
+  so a fresh shell shows an empty screen with history one scroll up
+- Not done: the session ↔ dashboard disagreement seen on 2026-11-19 (a
+  worker's Session 4 Interrupted while the control showed it running) is not
+  investigated yet
+
 ## T: terminal upgrade package · *main work, target v2.12.0*
 
 Goal: start work on one Machine and pick it up from any terminal, phone, or
@@ -498,6 +529,11 @@ holds credentials or settings must follow `config_dir`.
    of the protocol changes below
 
 Full notes: `docs/releases/v2.11.0.md`.
+
+### Protocol changes since v2.11.0
+
+- `ATTACH.history` (optional, off by default; old daemons ignore it). New
+  fixture entry in `client_requests.json`
 
 ### Release notes so far (protocol changes since v2.10.0)
 

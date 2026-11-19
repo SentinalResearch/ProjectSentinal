@@ -68,6 +68,11 @@ export type ClientRequest =
      * Session to attach to.
      */
     session_id: SessionId;
+    /**
+     * Send the Session's scrollback before the screen, so the viewer can
+     * scroll back. Off for viewers that draw into a real terminal (the CLI).
+     */
+    history?: boolean;
   }
   | {
     "type": "DETACH";

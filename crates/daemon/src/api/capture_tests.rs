@@ -108,7 +108,10 @@ async fn reduced_capture_rejects_attach_resize_kill_and_input_without_side_effec
         let before = state.sessions.session(id).unwrap();
 
         for request in [
-            ClientRequest::Attach { session_id: id },
+            ClientRequest::Attach {
+                session_id: id,
+                history: false,
+            },
             ClientRequest::Resize {
                 session_id: id,
                 cols: 100,
@@ -148,7 +151,14 @@ async fn full_capture_ui_session_keeps_attach_resize_and_input() {
     let id = create_ui_session(&state).await;
 
     assert!(matches!(
-        dispatch(&state, ClientRequest::Attach { session_id: id }).await,
+        dispatch(
+            &state,
+            ClientRequest::Attach {
+                session_id: id,
+                history: false,
+            }
+        )
+        .await,
         WsAction::Attach { .. }
     ));
     assert!(matches!(

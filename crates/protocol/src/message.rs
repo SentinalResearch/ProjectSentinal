@@ -120,6 +120,10 @@ pub enum ClientRequest {
     Attach {
         /// Session to attach to.
         session_id: SessionId,
+        /// Send the Session's scrollback before the screen, so the viewer can
+        /// scroll back. Off for viewers that draw into a real terminal (the CLI).
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        history: bool,
     },
     /// Stop streaming a session's output. The session keeps running.
     Detach {

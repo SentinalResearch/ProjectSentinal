@@ -111,6 +111,7 @@ fn exercise(daemon: &Daemon, shell: &str) {
         daemon,
         ClientRequest::Attach {
             session_id: session.id,
+            history: false,
         },
     ));
     assert!(

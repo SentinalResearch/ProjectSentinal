@@ -5,6 +5,7 @@ import { StateTag } from "../../../components/StateTag";
 import { dataAdapter } from "../../../data";
 import { canAnswer } from "../../../data/actions";
 import { useLiveData } from "../../../data/LiveDataContext";
+import { priorPartsFor } from "../../../data/lineage";
 import { useIsPhone } from "../../../hooks/useViewport";
 import type { KeyboardChip } from "../../../terminal/keyboard/TermKeyboard";
 import { TerminalPane } from "../../../terminal/TerminalPane";
@@ -109,6 +110,7 @@ export function PhoneTerminal() {
           sessionId={session.id}
           session={session}
           height="fill"
+          prior={priorPartsFor(sessions, session.id)}
           keyboard={{
             visible: keyboardShown,
             hardware,

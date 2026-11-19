@@ -22,6 +22,16 @@ use super::capture::{
 impl SessionManager {
     /// Snapshot the current screen and subscribe to subsequent output.
     pub fn attach(&self, session_id: SessionId) -> Result<Attachment, SessionManagerError> {
+        self.attach_with_history(session_id, false)
+    }
+
+    /// [`attach`](Self::attach), with the scrollback in front of the screen
+    /// (and in front of any redraw after a lag) when `history` is set.
+    pub fn attach_with_history(
+        &self,
+        session_id: SessionId,
+        history: bool,
+    ) -> Result<Attachment, SessionManagerError> {
         let handle = self.handle(session_id)?;
         require_capture(&handle, CaptureOperation::Attach)?;
         snapshot_and_subscribe(
@@ -31,6 +41,7 @@ impl SessionManager {
             ScreenSource {
                 session_id,
                 parser: handle.parser.clone(),
+                history,
             },
         )
     }
@@ -254,12 +265,18 @@ pub const RESET_TERMINAL: &[u8] = b"\x1bc";
 pub struct ScreenSource {
     session_id: SessionId,
     parser: Arc<std::sync::Mutex<vt100::Parser>>,
+    /// Send the scrollback in front of every screen ([`super::screen_history`]).
+    history: bool,
 }
 
 impl ScreenSource {
     #[cfg(test)]
     pub(crate) fn new(session_id: SessionId, parser: Arc<std::sync::Mutex<vt100::Parser>>) -> Self {
-        Self { session_id, parser }
+        Self {
+            session_id,
+            parser,
+            history: false,
+        }
     }
 
     /// The current screen, with `output` replaced by a receiver that starts
@@ -274,7 +291,12 @@ impl ScreenSource {
             resource: "screen",
             session_id: self.session_id,
         })?;
-        Ok((parser.screen().state_formatted(), output.resubscribe()))
+        let screen = if self.history {
+            super::screen_history::history_then_screen(parser.screen())
+        } else {
+            parser.screen().state_formatted()
+        };
+        Ok((screen, output.resubscribe()))
     }
 
     /// After a lag: a reset followed by the current screen, and a receiver
@@ -314,7 +336,32 @@ mod tests {
         ScreenSource {
             session_id: SessionId(1),
             parser: Arc::new(std::sync::Mutex::new(vt100::Parser::new(4, 20, 0))),
+            history: false,
         }
+    }
+
+    #[test]
+    fn a_history_attachment_carries_lines_scrolled_off_the_screen() {
+        let (output, _) = broadcast::channel(4);
+        let source = ScreenSource {
+            session_id: SessionId(1),
+            parser: Arc::new(std::sync::Mutex::new(vt100::Parser::new(2, 20, 100))),
+            history: true,
+        };
+        produce(&source, &output, b"first\r\nsecond\r\nthird\r\nfourth");
+        let plain = ScreenSource {
+            history: false,
+            ..source.clone()
+        };
+
+        let (with_history, _) = source.snapshot(&output.subscribe()).unwrap();
+        let (screen_only, _) = plain.snapshot(&output.subscribe()).unwrap();
+
+        assert!(String::from_utf8_lossy(&with_history).contains("first"));
+        assert!(!String::from_utf8_lossy(&screen_only).contains("first"));
+        let (redraw, _) = source.resync(&output.subscribe()).unwrap();
+        assert!(redraw.starts_with(RESET_TERMINAL));
+        assert!(String::from_utf8_lossy(&redraw).contains("first"));
     }
 
     /// What the PTY reader does: draw and publish under the screen lock.

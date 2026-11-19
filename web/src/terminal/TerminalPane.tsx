@@ -9,6 +9,8 @@ import type { Session, SessionEvent } from "../data/types";
 import { TermKeyboard, type KeyboardChip } from "./keyboard/TermKeyboard";
 import { outputTokens } from "./keyboard/outputTokens";
 import { useRealTerminalSession } from "./useRealTerminalSession";
+import { LivePill } from "./LivePill";
+import { usePriorParts, type PriorParts } from "./usePriorParts";
 import { isReadOnlyTerminalState } from "./lifecycle";
 import styles from "./TerminalPane.module.css";
 import { attachTouchScroll } from "./touchScroll";
@@ -66,6 +68,10 @@ export interface TerminalPaneProps {
   withAnswerKeys?: boolean;
   /** Maximum decompressed saved bytes this pane may fetch. */
   replayLimitBytes?: number;
+  /** Earlier parts of this terminal, drawn above it with Resumed tags (design H1). */
+  prior?: PriorParts;
+  /** Scroll to the start of one part; a new `nonce` repeats the jump. */
+  jumpTo?: { id: string; nonce: number };
   className?: string;
   /**
    * Phones: the built-in keyboard (MOBILE_GLASS_SPEC §4) replaces the key bar
@@ -113,6 +119,8 @@ export function TerminalPane({
   onDimensionsChange,
   forceReadOnly = false,
   replayLimitBytes,
+  prior,
+  jumpTo,
   className,
   withAnswerKeys = false,
   keyboard,
@@ -137,7 +145,9 @@ export function TerminalPane({
       // Only mock lines need \n → \r\n; real PTY bytes already carry their own
       // carriage returns, and converting breaks shells' cursor movement.
       convertEol: isMockData,
-      scrollback: 4000,
+      scrollback: prior && prior.parts.length > 0 ? 20_000 : 4000,
+      // Resumed tags are xterm decorations, still a proposed API in xterm 6.
+      allowProposedApi: true,
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
       fontSize: 13,
       lineHeight: 19 / 13,
@@ -146,12 +156,15 @@ export function TerminalPane({
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
-    try {
-      const webgl = new WebglAddon();
-      webgl.onContextLoss(() => webgl.dispose());
-      term.loadAddon(webgl);
-    } catch (err) {
-      console.warn("WebGL terminal renderer is unavailable", err);
+    // Browser automation reads terminal text from the DOM renderer.
+    if (!navigator.webdriver) {
+      try {
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        term.loadAddon(webgl);
+      } catch (err) {
+        console.warn("WebGL terminal renderer is unavailable", err);
+      }
     }
     // The built-in keyboard replaces the OS one: xterm's input never opens it.
     if (keyboard) term.textarea?.setAttribute("inputmode", "none");
@@ -192,10 +205,20 @@ export function TerminalPane({
     return () => disposable.dispose();
   }, [onDimensionsChange, terminal]);
 
+  const { ready: priorReady, markers } = usePriorParts(terminal, session, prior);
+  const keepContent = (prior?.parts.length ?? 0) > 0;
   const { attached: realAttached, sendBytes: sendRealBytes } = useRealTerminalSession(
     isMockData || readOnly ? "" : sessionId,
-    isMockData || readOnly ? null : terminal,
+    isMockData || readOnly || !priorReady ? null : terminal,
+    { keepContent },
   );
+
+  useEffect(() => {
+    if (!terminal || !jumpTo) return;
+    const marker = markers.find((entry) => entry.id === jumpTo.id)?.marker;
+    if (marker && !marker.isDisposed) terminal.scrollToLine(marker.line);
+    else if (jumpTo.id === sessionId) terminal.scrollToBottom();
+  }, [jumpTo, markers, sessionId, terminal]);
 
   // Full-screen on a touch screen: a drag scrolls the scrollback (or sends
   // arrows to a full-screen program). Small embedded panes leave the drag to the page.
@@ -214,7 +237,7 @@ export function TerminalPane({
   }, [isMockData, realAttached, onAttachedChange]);
 
   useEffect(() => {
-    if (isMockData || !readOnly || !terminal) return;
+    if (isMockData || !readOnly || !terminal || !priorReady) return;
     let cancelled = false;
     setReplayWarning(null);
     setReplayError(null);
@@ -235,7 +258,7 @@ export function TerminalPane({
     return () => {
       cancelled = true;
     };
-  }, [readOnly, replayLimitBytes, sessionId, terminal]);
+  }, [readOnly, replayLimitBytes, sessionId, terminal, priorReady]);
 
   // Mock mode: seed scrollback from the session's events, then replay only newly
   // appended ones as they arrive (LiveDataContext keeps `session.events` growing).
@@ -341,13 +364,16 @@ export function TerminalPane({
 
   return (
     <div className={className}>
-      <div
-        ref={hostRef}
-        className={fill ? `${styles.host} ${styles.hostFill}` : styles.host}
-        style={fill ? undefined : { height }}
-        data-testid="terminal-host"
-        data-readonly={readOnly}
-      />
+      <div className={fill ? `${styles.hostWrap} ${styles.hostWrapFill}` : styles.hostWrap}>
+        <div
+          ref={hostRef}
+          className={fill ? `${styles.host} ${styles.hostFill}` : styles.host}
+          style={fill ? undefined : { height }}
+          data-testid="terminal-host"
+          data-readonly={readOnly}
+        />
+        <LivePill terminal={terminal} />
+      </div>
       {replayWarning && <p className={styles.replayWarning} role="alert">Saved output warning: {replayWarning}</p>}
       {replayTruncated && (
         <p className={styles.replayWarning} role="status">

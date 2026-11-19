@@ -112,21 +112,24 @@ describe("SessionDetailPage", () => {
     expect(screen.getByTestId("terminal-host")).toHaveAttribute("data-readonly", "true");
   });
 
-  it("continues once into persisted-looking history with isolated read-only output", async () => {
+  it("resumes once into one terminal, with the resume in the History list", async () => {
     renderSession("/app/sessions/pytest");
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "pytest" });
 
     await user.dblClick(screen.getByRole("button", { name: "Resume terminal" }));
 
-    expect(await screen.findByText("Part 2 of 2", { selector: "strong" })).toBeInTheDocument();
+    expect(await screen.findByText("Resumed 1 time")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "pytest" })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("pytest tests/")).not.toBeInTheDocument());
-    expect(screen.getByText(/^FAILED — resumed at /)).toBeInTheDocument();
+    const history = screen.getByRole("region", { name: "Terminal history" });
+    expect(history).toHaveTextContent("2 parts · resumed 1 time");
+    expect(history).toHaveTextContent(/Resumed · before: failed/);
+    expect(history).toHaveTextContent("Started");
+    expect(screen.queryByText(/Part \d of \d/)).not.toBeInTheDocument();
     const terminals = screen.getAllByTestId("terminal-host");
-    expect(terminals).toHaveLength(2);
-    expect(terminals[0]).toHaveAttribute("data-readonly", "true");
-    expect(terminals[1]).toHaveAttribute("data-readonly", "false");
+    expect(terminals).toHaveLength(1);
+    expect(terminals[0]).toHaveAttribute("data-readonly", "false");
   });
 
   it("renders the waiting panel with y/n for a WAITING session", async () => {

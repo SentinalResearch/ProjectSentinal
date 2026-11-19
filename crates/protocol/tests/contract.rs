@@ -490,3 +490,21 @@ mod machine_link {
         }
     }
 }
+
+#[test]
+fn attach_history_is_optional_and_off_by_default() {
+    let old: ClientRequest =
+        serde_json::from_str(r#"{"type":"ATTACH","session_id":4}"#).expect("old ATTACH decodes");
+    assert_eq!(
+        old,
+        ClientRequest::Attach {
+            session_id: protocol::SessionId(4),
+            history: false,
+        }
+    );
+    let encoded = serde_json::to_string(&old).expect("encodes");
+    assert!(
+        !encoded.contains("history"),
+        "an old daemon never sees the field: {encoded}"
+    );
+}

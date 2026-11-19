@@ -225,7 +225,10 @@ impl AppState {
                     Err(error) => error_action(error),
                 }
             }
-            ClientRequest::Attach { session_id } => match self.sessions.attach(session_id) {
+            ClientRequest::Attach {
+                session_id,
+                history,
+            } => match self.sessions.attach_with_history(session_id, history) {
                 Ok(attachment) => WsAction::Attach {
                     session_id,
                     attachment,

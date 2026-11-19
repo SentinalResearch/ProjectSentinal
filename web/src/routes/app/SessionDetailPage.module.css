@@ -286,17 +286,6 @@
   flex-direction: column;
 }
 
-.historyStack {
-  flex: none;
-  max-height: 45%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--line);
-}
-
 .fillPane {
   flex: 1;
   min-height: 0;
@@ -304,51 +293,6 @@
   flex-direction: column;
 }
 
-.generationNav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px 12px;
-  background: var(--bg-2);
-}
-
-.generationNav button {
-  min-width: 30px;
-  height: 28px;
-  border: 0;
-  color: var(--text-2);
-  background: var(--bg-3);
-  font-family: var(--font-mono);
-  cursor: pointer;
-}
-
-.generationNav button[aria-current="page"] {
-  color: var(--bg-0);
-  background: var(--accent);
-}
-
-.generation {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.generationPrimary {
-  flex: 1;
-  min-height: 0;
-  gap: 0;
-}
-
-.generationPrimary .generationBoundary,
-.generationPrimary .generationHeader {
-  margin: 8px 20px 0;
-}
-
-.generationPrimary .generationHeader {
-  margin-bottom: 8px;
-}
-
-.generationBoundary,
 .historyOmitted {
   margin: 0;
   padding: 9px 12px;
@@ -357,32 +301,6 @@
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.4;
-}
-
-.generationBoundary {
-  border-left: 3px solid var(--accent);
-}
-
-.generationHeader {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 2px;
-  color: var(--text-3);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-.generationHeader strong {
-  flex: none;
-  white-space: nowrap;
-  color: var(--text-1);
-}
-
-.historyMachine {
-  margin: 0;
-  color: var(--text-3);
-  font-size: 11px;
 }
 
 .commandHistory {

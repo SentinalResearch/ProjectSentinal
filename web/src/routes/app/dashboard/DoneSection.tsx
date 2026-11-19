@@ -13,6 +13,7 @@ import {
   type AutoClear,
 } from "../../../data/lifecycle";
 import type { Session } from "../../../data/types";
+import type { RemovalSupport } from "../../../data/removal";
 import { useSessionRemoval } from "../useSessionRemoval";
 import styles from "./GlassDashboard.module.css";
 
@@ -39,6 +40,7 @@ export function DoneSection({
   const [deleting, setDeleting] = useState<Session | null>(null);
   const done = sessions.filter((session) => isDone(session) && !session.dismissed).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   if (done.length === 0) return null;
+  const notes = [...new Set(done.map((session) => removal.supportOf(session.id).note).filter(Boolean))];
   const next = ORDER[(ORDER.indexOf(life.autoClear) + 1) % ORDER.length];
 
   return (
@@ -66,10 +68,16 @@ export function DoneSection({
           {removal.error}
         </p>
       )}
+      {notes.map((note) => (
+        <p key={note} className={styles.needNote} role="status">
+          {note}
+        </p>
+      ))}
       {done.map((session) => (
         <DoneRow
           key={session.id}
           session={session}
+          support={removal.supportOf(session.id)}
           where={machineName(session.machine)}
           clears={clearsAt(session, life)}
           kept={life.kept.includes(session.id)}
@@ -100,6 +108,7 @@ export function DoneSection({
 
 function DoneRow({
   session,
+  support,
   where,
   clears,
   kept,
@@ -110,6 +119,7 @@ function DoneRow({
   onDelete,
 }: {
   session: Session;
+  support: RemovalSupport;
   where: string;
   clears: number | null;
   kept: boolean;
@@ -125,7 +135,13 @@ function DoneRow({
     handler();
   };
   const how = session.state === "INTERRUPTED" ? "stopped" : (session.result?.summary ?? formatSessionFact(session));
-  const fate = kept ? "kept" : clears !== null ? clearsInText(clears, now) : null;
+  const fate = !support.hide
+    ? "stays until this Machine updates"
+    : kept
+      ? "kept"
+      : clears !== null
+        ? clearsInText(clears, now)
+        : null;
   return (
     <article className={styles.doneRow} aria-labelledby={titleId} onClick={onOpen}>
       <StateIcon state={session.state} size={20} />
@@ -141,10 +157,22 @@ function DoneRow({
         <button type="button" className={styles.pill} onClick={stop(onOpen)} aria-label={`Open ${session.name}`}>
           Open
         </button>
-        <button type="button" className={styles.pill} disabled={busy} onClick={stop(onHide)} aria-label={`Hide ${session.name}`}>
-          Hide
+        <button
+          type="button"
+          className={styles.pill}
+          disabled={busy || !support.hide}
+          onClick={stop(onHide)}
+          aria-label={support.hide ? `Hide ${session.name}` : `Hide ${session.name}: needs Sentinal 2.11 on its Machine`}
+        >
+          {support.hide ? "Hide" : "Hide · needs 2.11"}
         </button>
-        <button type="button" className={styles.dangerQuiet} disabled={busy} onClick={stop(onDelete)} aria-label={`Delete ${session.name}`}>
+        <button
+          type="button"
+          className={styles.dangerQuiet}
+          disabled={busy || !support.remove}
+          onClick={stop(onDelete)}
+          aria-label={`Delete ${session.name}`}
+        >
           Delete…
         </button>
       </div>

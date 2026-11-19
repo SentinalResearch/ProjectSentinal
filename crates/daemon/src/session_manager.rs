@@ -13,6 +13,7 @@ mod local_dispatch;
 mod log_budget;
 mod operations;
 mod replay;
+mod screen_history;
 mod structured;
 mod tasks;
 

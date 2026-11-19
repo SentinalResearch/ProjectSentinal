@@ -94,3 +94,30 @@ async fn input_that_cannot_be_audited_never_reaches_the_shell() {
     fake.exit(session.id, 0).unwrap();
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[tokio::test]
+async fn a_history_attach_brings_back_lines_that_scrolled_off_the_screen() {
+    let fake = Arc::new(FakePty::echoing());
+    let sessions = manager("history", fake.clone());
+    let session = sessions.create(request()).await.unwrap();
+    let mut first = sessions.attach(session.id).unwrap();
+    // Scrollback here keeps 3 lines; 30 lines push at least that many off 24 rows.
+    for line in 1..=30 {
+        sessions
+            .write_input(session.id, format!("line {line}\r\n").as_bytes(), "test")
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), first.output.recv())
+            .await
+            .expect("an echo")
+            .unwrap();
+    }
+
+    let plain = sessions.attach(session.id).unwrap();
+    let with_history = sessions.attach_with_history(session.id, true).unwrap();
+
+    let plain = String::from_utf8_lossy(&plain.screen).into_owned();
+    let with_history = String::from_utf8_lossy(&with_history.screen).into_owned();
+    assert!(!plain.contains("line 6"), "line 6 scrolled off the screen");
+    assert!(with_history.contains("line 6"), "{with_history:?}");
+    fake.exit(session.id, 0).unwrap();
+}

@@ -211,8 +211,11 @@ impl DaemonClient {
         requested_size: Option<(u16, u16)>,
         auto_wrap: bool,
     ) -> Result<AttachEnd, ClientError> {
-        self.send_control(ClientRequest::Attach { session_id })
-            .await?;
+        self.send_control(ClientRequest::Attach {
+            session_id,
+            history: false,
+        })
+        .await?;
         let ready = self.receive_initial_screen(session_id);
         match ready_deadline {
             Some(deadline) => tokio::time::timeout(deadline, ready)

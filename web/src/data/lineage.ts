@@ -44,6 +44,41 @@ export function latestGenerations(sessions: Session[]): Session[] {
     });
 }
 
+/** The parts one combined terminal shows: the newest window, ending at the latest. */
+export interface HistoryWindow {
+  /** Earlier parts in the window, oldest first. */
+  parts: Session[];
+  latest: Session;
+  /** Earlier parts left out of the window. */
+  offset: number;
+  total: number;
+  bytesPerPart: number;
+}
+
+export function historyWindow(lineage: SessionLineage): HistoryWindow {
+  const shown = lineage.ordered.slice(-HISTORY_WINDOW_GENERATIONS);
+  return {
+    parts: shown.slice(0, -1),
+    latest: lineage.latest,
+    offset: lineage.ordered.length - shown.length,
+    total: lineage.ordered.length,
+    bytesPerPart: Math.floor(HISTORY_OUTPUT_BUDGET_BYTES / Math.max(1, shown.length)),
+  };
+}
+
+/**
+ * The earlier parts to draw above `sessionId`'s terminal, or undefined when it
+ * is not the latest part or its history cannot be resolved.
+ */
+export function priorPartsFor(sessions: Session[], sessionId: string): Omit<HistoryWindow, "latest"> | undefined {
+  try {
+    const { latest, ...window } = historyWindow(resolveSessionLineage(sessions, sessionId));
+    return latest.id === sessionId && window.parts.length > 0 ? window : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Resolve and bound one persisted linear Session history from LIST_SESSIONS. */
 export function resolveSessionLineage(sessions: Session[], selectedId: string): SessionLineage {
   const byId = new Map(sessions.map((session) => [session.id, session]));

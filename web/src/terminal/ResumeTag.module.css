@@ -1,0 +1,88 @@
+/*
+ * The Resumed tag drawn over the blank line between two parts of a terminal
+ * (design H1/H2): chevron segments, never text written into the terminal.
+ */
+.tag {
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.segment {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  margin-left: -6px;
+  padding: 0 17px 0 16px;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%, 9px 50%);
+}
+
+.resumed {
+  margin-left: 0;
+  padding-left: 10px;
+  border-radius: 11px 0 0 11px;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
+  background: #3d5afe;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.when {
+  background: #2e2e33;
+  color: #e6e6e2;
+}
+
+.before.interrupted {
+  background: #463a12;
+  color: #ffd27a;
+}
+
+.before.ok {
+  background: #183a24;
+  color: #7fe0a0;
+}
+
+.before.failed {
+  background: #4a1a16;
+  color: #ff9a90;
+}
+
+.part {
+  background: #1e1e22;
+  color: #9a9a96;
+}
+
+.rule {
+  flex: 1;
+  height: 1px;
+  margin-left: 12px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.livePill {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 5;
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--accent, #2a44e0);
+  color: #ffffff;
+  font-family: var(--font-sans, inherit);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.livePill:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}

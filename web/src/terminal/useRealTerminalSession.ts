@@ -26,7 +26,20 @@ export interface RealTerminalSession {
   sendBytes: (bytes: Uint8Array) => void;
 }
 
-export function useRealTerminalSession(sessionId: string, terminal: Terminal | null): RealTerminalSession {
+export interface RealTerminalOptions {
+  /**
+   * Earlier parts of this terminal are already drawn above: keep them, and let
+   * the snapshot's history scroll them up instead of resetting the terminal.
+   */
+  keepContent?: boolean;
+}
+
+export function useRealTerminalSession(
+  sessionId: string,
+  terminal: Terminal | null,
+  options: RealTerminalOptions = {},
+): RealTerminalSession {
+  const keepContent = options.keepContent ?? false;
   const [attached, setAttached] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   let route: ReturnType<typeof dataAdapter.resolveTerminal> | null = null;
@@ -75,7 +88,9 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
 
     socket.onopen = () => {
       resizeToTerminal();
-      sendRequest({ type: "ATTACH", session_id: numericId });
+      // History: the daemon sends the scrollback before the screen, so a
+      // viewer can scroll back through what it missed.
+      sendRequest({ type: "ATTACH", session_id: numericId, history: true });
       setAttached(true);
     };
     socket.onclose = () => setAttached(false);
@@ -99,10 +114,11 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       const echoed = echo.output();
       if (echoed !== undefined) health.record("TYPING_ECHO_MS", machine, echoed);
       if (!snapshotReceived) {
-        // The first frame redraws the whole screen; start from a clean one.
+        // The first frame redraws the whole screen; start from a clean one
+        // unless earlier parts are drawn above it.
         snapshotReceived = true;
         health.record("TERMINAL_OPEN_MS", machine, performance.now() - openedAt);
-        terminal.reset();
+        if (!keepContent) terminal.reset();
         terminal.write(frame.payload);
         resizeToTerminal();
         return;
@@ -126,7 +142,7 @@ export function useRealTerminalSession(sessionId: string, terminal: Terminal | n
       sendRequest({ type: "DETACH", session_id: numericId });
       socket.close();
     };
-  }, [terminal, numericId, websocketUrl, sessionId]);
+  }, [terminal, numericId, websocketUrl, sessionId, keepContent]);
 
   return { attached, sendBytes };
 }

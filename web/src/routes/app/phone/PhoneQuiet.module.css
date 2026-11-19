@@ -347,3 +347,13 @@
   outline: 2px solid var(--accent-fg);
   outline-offset: 2px;
 }
+
+/* A Machine on an older release: say what it needs instead of failing (design H3). */
+.versionNote {
+  margin: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.45;
+}

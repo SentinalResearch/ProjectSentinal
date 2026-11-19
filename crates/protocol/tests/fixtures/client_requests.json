@@ -46,6 +46,14 @@
   {
     "version": 1,
     "payload": {
+      "type": "ATTACH",
+      "session_id": 128,
+      "history": true
+    }
+  },
+  {
+    "version": 1,
+    "payload": {
       "type": "DETACH",
       "session_id": 128
     }

@@ -12,7 +12,7 @@ vi.mock("../data", () => ({
   },
 }));
 
-type Sent = { type: string; cols?: number; rows?: number } | "binary";
+type Sent = { type: string; cols?: number; rows?: number; history?: boolean } | "binary";
 
 class StubWebSocket {
   static OPEN = 1;
@@ -59,7 +59,7 @@ describe("useRealTerminalSession", () => {
     socket.onopen!();
     expect(socket.sent).toEqual([
       { type: "RESIZE", session_id: 7, cols: 132, rows: 40 },
-      { type: "ATTACH", session_id: 7 },
+      { type: "ATTACH", session_id: 7, history: true },
     ]);
 
     await socket.onmessage!(frame("snapshot"));
@@ -69,5 +69,14 @@ describe("useRealTerminalSession", () => {
     await socket.onmessage!(frame("live"));
     expect(log).toEqual(["reset", "snapshot", "live"]);
     expect(socket.sent).toHaveLength(3);
+  });
+
+  it("keeps earlier parts already drawn instead of resetting the terminal", async () => {
+    const { terminal, log } = fakeTerminal();
+    renderHook(() => useRealTerminalSession("pop:7", terminal, { keepContent: true }));
+    const socket = StubWebSocket.last!;
+    socket.onopen!();
+    await socket.onmessage!(frame("history and screen"));
+    expect(log).toEqual(["history and screen"]);
   });
 });
