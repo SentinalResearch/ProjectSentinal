@@ -232,6 +232,20 @@ approvals). Each fix has a test that fails without it.
 - [ ] Q13 The phone Session page shows LOSS and GPU cells for an agent
       Session that has neither
 
+### AC: agent Sessions as a chat · *proposal, waiting for the owner*
+
+Design: `docs/AGENT_CHAT_DESIGN.md`. Read the agent's own conversation file
+(Claude Code first) instead of the screen, and show it as a chat beside the
+terminal. No code before the owner answers its seven decisions.
+
+- [ ] Owner answers "Decisions for the owner" in `docs/AGENT_CHAT_DESIGN.md`
+- [ ] AC1 Link through Claude Code's `SessionStart` hook, and the reader;
+      `sentinal status` shows the chat (no web change)
+- [ ] AC2 Read-only Chat view on the Session page
+- [ ] AC3 Message box
+- [ ] AC4 Tool counts and turns from the file
+- [ ] AC5 Next agent, after capturing a real file from it
+
 - **2026-11-12 audit and terminal design:** a read of the watcher, protocol,
   store, and the daemon's Session code found the bugs listed under **T0**, and
   the causes of cluttered and overlapping terminals. The owner decided the
