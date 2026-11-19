@@ -26,6 +26,8 @@ pub struct EngineUpdate {
     pub waiting: bool,
     /// A `::sentinal task` or `state` line from this observation (6.5).
     pub agent_line: Option<crate::progress::AgentLine>,
+    /// Time left for the running Command, from its counts or history (B1).
+    pub estimate: Option<protocol::ProgressEstimate>,
 }
 
 /// Pure per-Session engine combining Generic and Command-specific adapters.
@@ -50,6 +52,8 @@ pub struct EventEngine {
     bursts: crate::bursts::Bursts,
     /// Server ports already reported for this Command (T0.4).
     servers: std::collections::HashSet<Option<u16>>,
+    /// Time left for the running Command (B1).
+    estimator: crate::estimate::Estimator,
 }
 
 impl EventEngine {
@@ -71,6 +75,7 @@ impl EventEngine {
             restarts: 0,
             bursts: crate::bursts::Bursts::default(),
             servers: std::collections::HashSet::new(),
+            estimator: crate::estimate::Estimator::default(),
         };
         if let Some(command) = command {
             engine.select(command);
@@ -99,6 +104,11 @@ impl EventEngine {
         engine.command_activity_required = self.command_activity_required;
         engine.restarts = self.restarts.saturating_add(1);
         engine
+    }
+
+    /// How long earlier successful runs of the running command took (B1).
+    pub fn set_history(&mut self, durations_ms: &[i64]) {
+        self.estimator.set_history(durations_ms);
     }
 
     /// Times this engine was started over after a panic.
@@ -132,9 +142,11 @@ impl EventEngine {
             self.explicit_api = false;
             self.bursts.reset();
             self.servers.clear();
+            self.estimator.start(observation.at);
         } else if matches!(observation.kind, ObservationKind::CommandFinished(_)) {
             self.command_active = false;
             self.screen.reset();
+            self.estimator.finish();
         }
         let capture = self.capture;
         let mut events = self.process_events(observation);
@@ -213,6 +225,12 @@ impl EventEngine {
             }
             _ => {}
         }
+        // Every count feeds the estimate, rate-limited Events or not.
+        for event in &events {
+            if let EventKind::ProgressUpdated { current, total, .. } = event {
+                self.estimator.progress(observation.at, *current, *total);
+            }
+        }
         let summaries = self.bursts.summaries(observation.at);
         let mut counted = summaries.events;
         counted.extend(
@@ -245,6 +263,7 @@ impl EventEngine {
             adapter_state,
             waiting,
             agent_line,
+            estimate: self.estimator.estimate(observation.at),
         }
     }
 

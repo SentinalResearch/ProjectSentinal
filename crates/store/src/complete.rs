@@ -85,6 +85,24 @@ impl Store {
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
+    /// How long the latest successful runs of exactly `text` in `cwd` took,
+    /// newest first, at most `limit` (B1: "usually takes").
+    pub fn typical_durations(
+        &self,
+        text: &str,
+        cwd: &str,
+        limit: u32,
+    ) -> Result<Vec<i64>, StoreError> {
+        let connection = self.lock()?;
+        let mut statement = connection.prepare_cached(
+            "SELECT finished_at - started_at FROM commands
+             WHERE text = ?1 AND cwd = ?2 AND exit_code = 0 AND finished_at IS NOT NULL
+             ORDER BY started_at DESC, id DESC LIMIT ?3",
+        )?;
+        let rows = statement.query_map(rusqlite::params![text, cwd, limit], |row| row.get(0))?;
+        Ok(rows.collect::<Result<Vec<i64>, _>>()?)
+    }
+
     /// Exit code of the latest finished run of exactly `text`.
     pub fn last_finished_exit(&self, text: &str) -> Result<Option<i32>, StoreError> {
         let connection = self.lock()?;

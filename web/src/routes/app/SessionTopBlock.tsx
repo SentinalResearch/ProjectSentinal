@@ -1,5 +1,6 @@
 import { Button } from "../../components/Button";
-import { extractPort, formatLearningRate, lossOf, progressCount, type SessionKind } from "../../data/format";
+import { estimateBasisText, estimateText, finishClock, paceText } from "../../data/estimate";
+import { extractPort, FINISHED_STATES, formatLearningRate, lossOf, progressCount, type SessionKind } from "../../data/format";
 import type { Session } from "../../data/types";
 import { PromptChoices } from "../../components/PromptChoices";
 import { canAnswer, offeredChoices } from "../../data/actions";
@@ -78,6 +79,7 @@ export function SessionTopBlock({
                 </>
               )}
               {session.runningFor && `running ${session.runningFor}`}
+              <EstimateLine session={session} />
               {session.progress.inferred && (
                 <span className={styles.guess}>
                   <span className={styles.guessRing} aria-hidden="true" />
@@ -225,5 +227,27 @@ export function SessionTopBlock({
     );
   }
 
+  // B1: no counts, but the command has a history (or a stall to report).
+  if (session.estimate && !FINISHED_STATES.has(session.state)) {
+    return (
+      <section className={styles.estimateOnly} aria-label="Time left">
+        <EstimateLine session={session} />
+      </section>
+    );
+  }
   return null;
+}
+
+/** "about 4 m left · done ~18:32 · 40 epoch/min", with what it rests on. */
+function EstimateLine({ session }: { session: Session }) {
+  const estimate = session.estimate;
+  const text = estimateText(estimate);
+  if (!text) return null;
+  const parts = [text, finishClock(estimate, Date.now()) && `done ~${finishClock(estimate, Date.now())}`, paceText(estimate, session.progress?.unit)];
+  return (
+    <span className={styles.estimate} title={estimateBasisText(estimate)} data-stalled={estimate?.stalled_secs != null || undefined}>
+      <br />
+      {parts.filter(Boolean).join(" · ")}
+    </span>
+  );
 }

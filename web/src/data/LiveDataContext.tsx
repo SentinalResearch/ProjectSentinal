@@ -89,9 +89,14 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
             : s)),
         );
       } else if (event.type === "COMMAND_UPDATED") {
-        setSessions((prev) => prev.map((session) =>
-          session.id === event.sessionId ? { ...session, command: event.command } : session,
-        ));
+        setSessions((prev) => prev.map((session) => {
+          if (session.id !== event.sessionId) return session;
+          // A new Command: the last one's counts are not this one's progress.
+          const started = event.command !== undefined && event.command !== session.command;
+          return started
+            ? { ...session, command: event.command, progress: undefined }
+            : { ...session, command: event.command };
+        }));
       } else if (event.type === "SESSION_METRICS") {
         setSessions((prev) => prev.map((session) =>
           session.id === event.sessionId ? { ...session, metrics: { ...session.metrics, ...event.metrics } } : session,

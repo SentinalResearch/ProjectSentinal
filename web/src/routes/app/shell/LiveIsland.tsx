@@ -7,6 +7,7 @@ import { ThemeChoice } from "../../../components/ThemeSwitch";
 import { dataAdapter } from "../../../data";
 import { answerPrompt, canAnswer, endSession, offeredChoices } from "../../../data/actions";
 import { inboxItems, lifecycle, useLifecycle } from "../../../data/lifecycle";
+import { estimateShort } from "../../../data/estimate";
 import { progressCount } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
 import type { Session } from "../../../data/types";
@@ -196,7 +197,9 @@ export function LiveIsland({
             </span>
           ) : (
             focus.session.progress && progressCount(focus.session.progress) && (
-              <span className={styles.progressDetail}>{progressCount(focus.session.progress)}</span>
+              <span className={styles.progressDetail}>
+                {[progressCount(focus.session.progress), estimateShort(focus.session.estimate)].filter(Boolean).join(" · ")}
+              </span>
             )
           )}
         </button>

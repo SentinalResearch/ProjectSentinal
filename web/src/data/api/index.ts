@@ -264,6 +264,7 @@ export function mapSession(session: WireSession): Session {
         }
       : undefined,
     agentState: mapAgentState(session.agent_state),
+    estimate: session.estimate ?? undefined,
     sandbox: session.sandbox || undefined,
     origin: session.origin,
     capture: session.capture,

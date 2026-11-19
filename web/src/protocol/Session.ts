@@ -5,6 +5,7 @@ import type { CodingAgentSummary } from "./CodingAgentSummary";
 import type { CommandId } from "./CommandId";
 import type { Health } from "./Health";
 import type { MachineId } from "./MachineId";
+import type { ProgressEstimate } from "./ProgressEstimate";
 import type { ProjectId } from "./ProjectId";
 import type { SessionId } from "./SessionId";
 import type { SessionLog } from "./SessionLog";
@@ -101,6 +102,11 @@ export type Session = {
    * What an agent running here last reported (6.4); in memory only.
    */
   agent_state?: AgentReportedState | null;
+  /**
+   * Time left for the running Command, from its counts or its history
+   * (B1); in memory only, absent between Commands.
+   */
+  estimate?: ProgressEstimate | null;
   /**
    * Started with `sentinal watch --sandbox`: a separate working folder (6.4).
    */

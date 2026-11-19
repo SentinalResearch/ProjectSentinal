@@ -1,4 +1,5 @@
 import type { AgentAction } from "../protocol/AgentAction";
+import { estimateShort } from "./estimate";
 import type { CodingAgentView, Machine, Session, SessionProgress } from "./types";
 
 // QUESTION: fixtures only carry a project name, never an id, and the prototype's own
@@ -70,6 +71,11 @@ export function formatSessionFact(session: Session): string {
   const parts: string[] = [];
   if (session.progress) {
     parts.push(progressText(session.progress));
+  }
+  // B1: the time left, from counts or history.
+  const left = estimateShort(session.estimate);
+  if (left) {
+    parts.push(left);
   }
   const loss = lossOf(session);
   if (loss) parts.push(`loss ${loss.to}`);

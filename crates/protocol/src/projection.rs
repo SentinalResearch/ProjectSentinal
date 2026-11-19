@@ -184,6 +184,9 @@ pub struct ProjectedSession {
     /// Started as a sandbox Session (6.4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sandbox: bool,
+    /// Time left for the running Command (B1): numbers and closed codes only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub estimate: Option<Box<crate::ProgressEstimate>>,
 }
 
 impl ProjectedSession {
@@ -224,6 +227,7 @@ impl ProjectedSession {
                     ..state.clone()
                 }),
             sandbox: session.sandbox,
+            estimate: session.estimate.clone(),
         }
     }
 }

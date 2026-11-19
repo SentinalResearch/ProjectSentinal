@@ -142,6 +142,7 @@ function mapSession(
     ...(promptEvent === undefined ? {} : { promptEventId: promptEvent }),
     codingAgent,
     agentState: mapAgentState(session.agent_state),
+    estimate: session.estimate ?? undefined,
     sandbox: session.sandbox || undefined,
     origin: session.origin,
     capture: session.capture,

@@ -408,3 +408,21 @@
   border: 1.2px dashed var(--accent-fg);
   border-radius: 50%;
 }
+
+/* B1: time left */
+.estimate {
+  color: var(--text-2);
+}
+
+.estimate[data-stalled] {
+  color: var(--s-stalled-fg);
+}
+
+.estimateOnly {
+  padding: 4px 0 8px;
+  font-size: 14px;
+}
+
+.estimateOnly .estimate br {
+  display: none;
+}

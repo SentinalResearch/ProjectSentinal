@@ -253,6 +253,11 @@ message box, and progress in the agent chip.
       `cd … && claude` shows "agent says"
 - [ ] Q14 After `new session` and Enter in the island, the places menu opens
       on the new Session page (seen three times in the run)
+- [ ] Q15 The island's notification inbox does not close on Escape, so the
+      next click can open one of its Sessions by mistake
+- [x] Q16 A quiet Command still showed the last Command's "100 % · epoch
+      40/40": the browser now drops a Session's counts when a new Command
+      starts (`LiveDataContext`)
 - [ ] AC5 Next agent, after capturing a real file from it
 
 - **2026-11-12 audit and terminal design:** a read of the watcher, protocol,
@@ -569,8 +574,22 @@ restarts the daemon. Refuses to overwrite an existing file without
       reusing the P0 screen sampling
 - [x] Servers ("listening on :8080") without a dedicated adapter — generic
       adapter now emits `SERVER_STARTED` from common server-start lines
-- [ ] Long runs: rate, estimated finish, time since last progress, and a
-      progress chart on the Session page
+- [x] Long runs: rate, estimated finish, time since last progress
+      (2026-11-19). One estimator (`watcher/src/estimate.rs`) takes every
+      progress Event, whoever produced it, and gives time left from the
+      recent pace (median step rate blended with the window average, the last
+      12 points), the pace per minute, and a stall ("no progress for 3 m")
+      when counts stop far longer than their usual gap. With no counts, the
+      median of the command's last 7 successful runs in the same folder
+      ("usually 25 s · about 20 s left", or "taking longer than usual").
+      Each estimate says its basis and confidence ("about" or "roughly").
+      `Session.estimate`, also on the dashboard projection (numbers only),
+      never stored. Shown on the Session page, phone, rows and island.
+      Tried by hand: a 40-epoch run read "about 50 s left · done ~18:19 ·
+      40 epoch/min" at epoch 7; a quiet 25 s script read "usually 25 s" on
+      its second run. Tests: `watcher/tests/estimate.rs`,
+      `web/src/data/estimate.test.ts`
+- [ ] Progress chart on the Session page
 
 ### B3. Data collection for training
 

@@ -350,6 +350,9 @@ pub(super) fn prompt_transition(
     }
 }
 
+/// Earlier successful runs used for "usually takes".
+const HISTORY_RUNS: u32 = 7;
+
 pub(super) fn apply_observation(
     session_id: SessionId,
     handle: &SessionHandle,
@@ -357,9 +360,20 @@ pub(super) fn apply_observation(
     observation: watcher::Observation,
 ) {
     super::agent_state::flush_due(handle, observation.at);
+    // B1: how long this command usually takes, for a Command with no counts.
+    let history = match (&observation.kind, store) {
+        (watcher::ObservationKind::CommandStarted(command), Some(store)) => store
+            .typical_durations(&command.text, &command.cwd, HISTORY_RUNS)
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
     let update = match handle.watcher.lock() {
         Ok(mut engine) => match guarded(session_id, &mut engine, |engine| {
-            engine.observe(&observation)
+            let update = engine.observe(&observation);
+            if !history.is_empty() {
+                engine.set_history(&history);
+            }
+            update
         }) {
             Some(update) => update,
             None => return,
@@ -400,6 +414,12 @@ pub(super) fn apply_observation(
             }
             if session.coding_agent != coding_agent {
                 session.coding_agent = coding_agent;
+                session_changed = true;
+            }
+            // Rounded in the watcher, so this changes only every few seconds.
+            let estimate = update.estimate.map(Box::new);
+            if session.estimate != estimate {
+                session.estimate = estimate;
                 session_changed = true;
             }
             (

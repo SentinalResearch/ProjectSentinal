@@ -15,6 +15,7 @@ import { dataAdapter } from "../../../data";
 import { captureCapabilities, captureExplanation, captureOf, exitUnknown, logHint } from "../../../data/capture";
 import { formatSessionDuration, healthColorSlug, lossOf, progressCount } from "../../../data/format";
 import { useLiveData } from "../../../data/LiveDataContext";
+import { estimateBasisText, estimateText } from "../../../data/estimate";
 import type { Machine, Session } from "../../../data/types";
 import { TerminalPane } from "../../../terminal/TerminalPane";
 import { EventsList } from "../EventsList";
@@ -247,6 +248,11 @@ function ProgressAndMetrics({ session }: { session: Session }) {
             {percent} %
           </span>
           {progressCount(progress) && <span className="mono">{progressCount(progress)}</span>}
+          {estimateText(session.estimate) && (
+            <span className={styles.muted} title={estimateBasisText(session.estimate)}>
+              {estimateText(session.estimate)}
+            </span>
+          )}
           {progress.inferred && <span className={styles.guessNote}>Sentinal thinks · read off the screen</span>}
           <div className={styles.track}>
             <div className={styles.fill} style={{ width: `${percent}%` }} />

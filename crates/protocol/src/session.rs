@@ -296,6 +296,10 @@ pub struct Session {
     /// What an agent running here last reported (6.4); in memory only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_state: Option<Box<crate::AgentReportedState>>,
+    /// Time left for the running Command, from its counts or its history
+    /// (B1); in memory only, absent between Commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub estimate: Option<Box<crate::ProgressEstimate>>,
     /// Started with `sentinal watch --sandbox`: a separate working folder (6.4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sandbox: bool,
@@ -336,6 +340,7 @@ impl Session {
             output_search: false,
             dismissed_at: None,
             agent_state: None,
+            estimate: None,
             sandbox: false,
             created_at: at,
             updated_at: at,

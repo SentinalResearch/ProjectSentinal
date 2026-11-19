@@ -391,13 +391,15 @@ pub(crate) fn to_sql_id(value: u64) -> Result<i64, StoreError> {
     i64::try_from(value).map_err(|_| StoreError::IdRange { value })
 }
 
-/// A Session as stored: what an agent reported (6.4) is a live moment and is
-/// never written, so a restart cannot show a stale "working".
+/// A Session as stored: what an agent reported (6.4) and the time-left
+/// estimate (B1) are live moments and are never written, so a restart cannot
+/// show a stale "working" or countdown.
 fn stored_session_json(session: &Session) -> Result<String, serde_json::Error> {
-    if session.agent_state.is_none() {
+    if session.agent_state.is_none() && session.estimate.is_none() {
         return serde_json::to_string(session);
     }
     let mut stored = session.clone();
     stored.agent_state = None;
+    stored.estimate = None;
     serde_json::to_string(&stored)
 }

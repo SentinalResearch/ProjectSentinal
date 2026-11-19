@@ -8,6 +8,7 @@ mod bursts;
 mod cargo_adapter;
 mod declarative;
 mod engine;
+pub mod estimate;
 mod framing;
 mod generic;
 mod health;

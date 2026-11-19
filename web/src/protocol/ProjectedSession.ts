@@ -2,6 +2,7 @@
 import type { AgentReportedState } from "./AgentReportedState";
 import type { CaptureLevel } from "./CaptureLevel";
 import type { CodingAgentSummary } from "./CodingAgentSummary";
+import type { ProgressEstimate } from "./ProgressEstimate";
 import type { ProjectedCaptureCapabilities } from "./ProjectedCaptureCapabilities";
 import type { ProjectedHealth } from "./ProjectedHealth";
 import type { SessionId } from "./SessionId";
@@ -77,4 +78,8 @@ export type ProjectedSession = {
    * Started as a sandbox Session (6.4).
    */
   sandbox?: boolean;
+  /**
+   * Time left for the running Command (B1): numbers and closed codes only.
+   */
+  estimate?: ProgressEstimate | null;
 };
