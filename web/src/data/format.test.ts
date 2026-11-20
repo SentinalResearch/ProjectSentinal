@@ -116,3 +116,11 @@ describe("progress text (QA 2026-11-19)", () => {
     expect(mergeProgress(epochs, undefined)).toBe(epochs);
   });
 });
+
+describe("an adopted process's elapsed time (field report)", () => {
+  it("counts from when the process really started, not from adoption", () => {
+    const hour = 3_600_000;
+    const adopted = { state: "RUNNING", createdAt: 9 * hour, updatedAt: 9 * hour, processStartedAt: 0 };
+    expect(sessionElapsedMs(adopted, 9 * hour + 27_000)).toBe(9 * hour + 27_000);
+  });
+});

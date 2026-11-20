@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { RunCards } from "../../../components/RunCards";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
@@ -101,6 +102,8 @@ export function PhoneOverview() {
         </p>
       )}
 
+      <RunCards sessions={visible} />
+
       {needs.length > 0 && (
         <section className={styles.section} aria-label="Needs you">
           <h3 className={styles.sectionHead}>Needs you</h3>
@@ -172,7 +175,7 @@ export function PhoneOverview() {
         <Lane
           key={machine.id}
           machine={machine}
-          sessions={terminals.filter((session) => session.machine === machine.id && onLane(session) && !needsAttention(session))}
+          sessions={terminals.filter((session) => session.machine === machine.id && !session.group && onLane(session) && !needsAttention(session))}
           load={load[machine.id]}
         />
       ))}

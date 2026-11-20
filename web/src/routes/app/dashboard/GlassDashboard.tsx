@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { RunCards } from "../../../components/RunCards";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AgentBadge } from "../../../components/AgentBadge";
@@ -120,6 +121,8 @@ export function GlassDashboard() {
       </div>
 
       <div className={styles.main}>
+        <RunCards sessions={scopedSessions} />
+
         <section className={styles.section} aria-labelledby="needs-you-heading">
           <div className={styles.sectionHead}>
             <h2 id="needs-you-heading" className={styles.sectionTitle}>
@@ -161,7 +164,7 @@ export function GlassDashboard() {
           <MachineLane
             key={machine.id}
             machine={machine}
-            sessions={terminals.filter((session) => session.machine === machine.id && onLane(session) && shown(session))}
+            sessions={terminals.filter((session) => session.machine === machine.id && !session.group && onLane(session) && shown(session))}
             emptyNote={agentsOnly ? "No AI agents." : "No Sessions."}
             load={load[machine.id]}
             onOpen={open}

@@ -258,6 +258,44 @@ message box, and progress in the agent chip.
 - [x] Q16 A quiet Command still showed the last Command's "100 % · epoch
       40/40": the browser now drops a Session's counts when a new Command
       starts (`LiveDataContext`)
+
+### F: field report from a real GPU queue (2026-11-19)
+
+An agent ran a 163-job, three-model eval queue under Sentinal 2.11 and wrote
+up what went wrong. Tried again here with a two-model queue (one job fails).
+
+- [x] F1 Session RAM read 548% / 20.7 GB: worker processes share pages and
+      were summed per process. Capped at what the Machine has in use, so it
+      never passes 100% (`entry.rs`, `session_ram_percent`)
+- [x] F2 GPU at 92–93% raised warnings. Busy GPU compute is the point of an
+      ML run; only GPU memory nearly full counts (`health.rs`, the
+      resource debouncer)
+- [x] F3 An adopted process started 9 h ago read "running 27s": elapsed
+      time uses `process_started_at` in the CLI and web (also on the
+      dashboard projection)
+- [x] F4 Short-lived workers of an adopted run flooded the Events: a child
+      is reported once it has lived 5 s; its exit only if its start was
+- [ ] F5 Processes show only `python 100% 2.1 GB`: show the arguments, the
+      GPU (`CUDA_VISIBLE_DEVICES`) and its GPU memory
+- [ ] F6 Lines like `exit=1` or a Traceback in a followed log never reach
+      Health: let a Session define error and done patterns for its log
+- [x] F7 `sentinal status` now shows TIME (estimate), TASK and METRICS
+- [x] F8 `sentinal ls` lists live Sessions by group with full titles, and
+      counts ended ones; `ls --all` lists everything
+- [x] F9 Groups: `--group run/model/job` on `watch` and `adopt`,
+      `sentinal group <id> <path>`, `SET_GROUP`. The overview shows one card
+      per run (lead progress, live parts with progress and time left, failed
+      parts named, "Hide N finished"); grouped Sessions leave the Machine
+      lists. `watch --exit` ends a job's Session with its exit code
+- [x] F10 Agent guide and skill: groups, `--exit`, progress in units of work
+      (GPU-minutes, not job counts), and a progress helper that writes to its
+      own file, never the experiment's
+- [ ] F11 Live Activities: mirror each run card on the iPhone lock screen and
+      Dynamic Island. Needs a native iOS app (ActivityKit, APNs push
+      updates); the web app cannot. Its own project
+- [ ] F12 Each process can be adopted only once; and what `kill` does to an
+      adopted run should be said before it is done
+
 - [ ] AC5 Next agent, after capturing a real file from it
 
 - **2026-11-12 audit and terminal design:** a read of the watcher, protocol,

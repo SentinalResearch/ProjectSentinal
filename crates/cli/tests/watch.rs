@@ -61,7 +61,9 @@ fn bare_watch_has_no_title_or_command() {
             detach: false,
             sandbox: false,
             cwd: None,
-            command: None
+            command: None,
+            group: None,
+            exit: false,
         }
     ));
     // A trailing separator with nothing after it is still a bare Watch.

@@ -184,6 +184,12 @@ pub struct ProjectedSession {
     /// Started as a sandbox Session (6.4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sandbox: bool,
+    /// The Session's group path; one that does not pass the rules is left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// When an adopted process really started, before Sentinal saw it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub process_started_at: Option<Timestamp>,
     /// Time left for the running Command (B1): numbers and closed codes only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub estimate: Option<Box<crate::ProgressEstimate>>,
@@ -227,6 +233,11 @@ impl ProjectedSession {
                     ..state.clone()
                 }),
             sandbox: session.sandbox,
+            group: session
+                .group
+                .clone()
+                .filter(|group| crate::session::validate_group(group).is_ok()),
+            process_started_at: session.process_started_at,
             estimate: session.estimate.clone(),
         }
     }
@@ -508,6 +519,9 @@ pub struct ProjectedMetrics {
 }
 
 /// One ordered projection mutation.
+// A wire message held only while it is sent or applied; boxing its Session
+// would change every builder for no measured gain.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]

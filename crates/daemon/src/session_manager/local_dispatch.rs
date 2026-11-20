@@ -91,6 +91,12 @@ impl SessionManager {
                 .map(|session| LocalResponse::Session {
                     session: Box::new(session),
                 }),
+            LocalRequest::SetGroup { session_id, group } => {
+                self.set_group(session_id, group)
+                    .map(|session| LocalResponse::Session {
+                        session: Box::new(session),
+                    })
+            }
             LocalRequest::AgentTranscript {
                 session_id,
                 path,

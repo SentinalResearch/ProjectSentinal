@@ -110,6 +110,60 @@ echo "::sentinal state value=blocked"
   as Events, never notify, and never change Session state. A malformed line
   is ignored and shown as normal output.
 
+## Runs with many jobs: groups
+
+A run with several parts (models, conditions, seeds, jobs) gets one group
+path, up to four parts split by `/`. The owner sees one card per run on the
+overview, the way a phone shows a live activity: overall progress, each live
+part with its own progress and time left, and one button to hide everything
+that has finished.
+
+```sh
+# The run's own Session (its "lead"): progress for the whole run.
+sentinal watch --detach -t "layout-tests queue" --group layout-tests -- ./launcher.sh
+# One Session per part, under the run. --exit ends it with the job's exit code.
+sentinal watch --detach --exit -t "gemma bos-after-prefix" --group layout-tests/gemma/bos-after-prefix -- ./job.sh gemma bos
+# Already running? Adopt it into the group. Only observes; never signals it.
+sentinal adopt 41235 --log logs/run.log --group layout-tests
+# Move a Session afterwards, or take it out.
+sentinal group 12 layout-tests/ministral
+sentinal group 12 --clear
+```
+
+Report progress in units that measure **work**, not just counts. If one
+job takes 20 minutes and another 5, `jobs 68/163` says 42% when 59% of the
+work is done. Weight by what you know:
+
+```sh
+# The lead: GPU-minutes done of the run's estimated total.
+echo "::sentinal progress current=$done_gpu_min total=$total_gpu_min unit=gpu-min"
+echo "::sentinal metric name=failed_jobs value=$failed"
+echo '::sentinal task name="gemma: bos-after-prefix, 52 of 74 jobs"'
+# Each job: its own tasks.
+echo "::sentinal progress current=$task total=164 unit=task"
+```
+
+Sentinal turns any of these into time left, pace and a stall warning, and
+shows "about 40 m left" or "roughly 2 h left" depending on how steady the
+pace is. A command that prints no progress gets "usually 25 m" from its
+earlier successful runs.
+
+If the program cannot print these lines, write them from a small helper to
+**its own** file, and adopt with `--log` on that file. Never append to the
+experiment's own logs or results.
+
+```sh
+# Helper: reads the run's state, writes progress to its own file.
+./progress_helper.sh > /tmp/layout-tests.sentinal.log &
+# The launcher's PID, e.g. from `pgrep -f launcher.sh`:
+sentinal adopt 41235 --log /tmp/layout-tests.sentinal.log --group layout-tests
+```
+
+End each part with `::sentinal state value=done` (or let the Command exit).
+`sentinal ls` lists live Sessions by group, with ended ones counted;
+`sentinal ls --all` lists everything. `sentinal status <id>` shows the
+time left, the task and the program's own metrics.
+
 ## Session states
 
 | State | Meaning | What to do |

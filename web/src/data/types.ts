@@ -133,6 +133,8 @@ export interface Session {
   suggestions?: SessionSuggestion[];
   /** What an agent running here last reported about itself (6.4). */
   agentState?: import("./agentState").AgentStateView;
+  /** Group path, e.g. `layout-tests/gemma`: Sessions sharing the first part show together. */
+  group?: string;
   /** Time left for the running Command, from its counts or its history (B1). */
   estimate?: import("../protocol/ProgressEstimate").ProgressEstimate;
   /** Started with `sentinal watch --sandbox`: a separate working folder. */

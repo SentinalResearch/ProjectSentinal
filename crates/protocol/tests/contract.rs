@@ -170,6 +170,7 @@ fn every_local_request_has_a_fixture() {
         "ADOPT_PROCESS",
         "AGENT_STATE",
         "AGENT_TRANSCRIPT",
+        "SET_GROUP",
     ];
     let requests = load("local_requests.json");
     let present: Vec<&str> = requests
@@ -236,6 +237,7 @@ fn every_client_request_has_a_fixture() {
         "GET_HISTORY",
         "GET_EVENTS",
         "GET_CHAT",
+        "SET_GROUP",
         "SEARCH_COMMANDS",
         "LIST_RECIPES",
         "RUN_RECIPE",

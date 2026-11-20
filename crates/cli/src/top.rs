@@ -227,7 +227,13 @@ pub fn render_status(snapshot: &TopSnapshot, session: &Session, events: &[Event]
         "{} · {} · running {}",
         snapshot.machine.name,
         session.cwd,
-        duration(snapshot.now.0.saturating_sub(session.created_at.0)),
+        // An adopted process ran before Sentinal saw it (field report).
+        duration(
+            snapshot
+                .now
+                .0
+                .saturating_sub(session.process_started_at.unwrap_or(session.created_at).0)
+        ),
     );
     text.push('\n');
 
@@ -254,6 +260,32 @@ pub fn render_status(snapshot: &TopSnapshot, session: &Session, events: &[Event]
                 let _ = writeln!(text, "PROGRESS  {unit} {current}");
             }
         }
+    }
+    // Field report 2026-11-19: the time left, the task an agent or program
+    // reported, and its own metrics were only in the JSON.
+    if let Some(estimate) = session.estimate.as_deref() {
+        let _ = writeln!(text, "TIME      {}", estimate_text(estimate));
+    }
+    if let Some(state) = session.agent_state.as_deref() {
+        let mut parts = vec![wire_name(&state.status)];
+        if let Some(task) = &state.task {
+            parts.push(task.clone());
+        }
+        if let (Some(step), Some(steps)) = (state.step, state.steps) {
+            parts.push(format!("step {step} of {steps}"));
+        }
+        if let Some(detail) = &state.detail {
+            parts.push(detail.clone());
+        }
+        let _ = writeln!(text, "TASK      {}", parts.join(" · "));
+    }
+    let metrics = latest_metrics(events);
+    if !metrics.is_empty() {
+        let line: Vec<String> = metrics
+            .iter()
+            .map(|(name, value)| format!("{name} {value}"))
+            .collect();
+        let _ = writeln!(text, "METRICS   {}", line.join(" · "));
     }
     if let Some(training) = &session.training {
         let mut parts = vec![format!("LOSS {}", loss_text(session))];
@@ -368,3 +400,80 @@ fn session_load(details: &MachineDetails, session_id: SessionId) -> (Option<f32>
 #[cfg(test)]
 #[path = "top_tests.rs"]
 mod tests;
+
+/// The newest value of each `METRIC_REPORTED` name, in first-seen order.
+fn latest_metrics(events: &[Event]) -> Vec<(String, f64)> {
+    let mut metrics: Vec<(String, f64)> = Vec::new();
+    for event in events {
+        if let EventKind::MetricReported { name, value } = &event.kind {
+            match metrics.iter_mut().find(|(known, _)| known == name) {
+                Some(entry) => entry.1 = *value,
+                None => metrics.push((name.clone(), *value)),
+            }
+        }
+    }
+    metrics
+}
+
+/// "about 4m left · 40 per min", "usually 25s", "no progress for 3m".
+fn estimate_text(estimate: &protocol::ProgressEstimate) -> String {
+    use protocol::{EstimateBasis, EstimateConfidence};
+    let secs = |value: u32| duration(i64::from(value) * 1_000);
+    if let Some(stalled) = estimate.stalled_secs {
+        return format!("no progress for {}", secs(stalled));
+    }
+    let mut parts = Vec::new();
+    if estimate.basis == EstimateBasis::History {
+        if let Some(typical) = estimate.typical_secs {
+            parts.push(format!("usually {}", secs(typical)));
+        }
+    }
+    if estimate.longer_than_usual {
+        parts.push("taking longer than usual".to_owned());
+    } else if let Some(left) = estimate.left_secs {
+        let word = if estimate.confidence == EstimateConfidence::Low {
+            "roughly"
+        } else {
+            "about"
+        };
+        parts.push(if left == 0 {
+            "almost done".to_owned()
+        } else {
+            format!("{word} {} left", secs(left))
+        });
+    }
+    if let Some(pace) = estimate.per_minute {
+        parts.push(format!("{pace} per min"));
+    }
+    parts.join(" · ")
+}
+
+/// `sentinal ls`: live Sessions, grouped, with full titles. Ended and hidden
+/// ones are counted, and listed with `all` (field report 2026-11-19).
+pub fn render_list(sessions: &[Session], all: bool) -> String {
+    let mut shown: Vec<&Session> = sessions
+        .iter()
+        .filter(|session| all || (!session.state.is_finished() && session.dismissed_at.is_none()))
+        .collect();
+    shown.sort_by(|a, b| a.group.cmp(&b.group).then(a.id.0.cmp(&b.id.0)));
+    let mut text = String::new();
+    for session in &shown {
+        let _ = writeln!(
+            text,
+            "{}\t{}\t{}\t{}\t{}",
+            session.id.0,
+            wire_name(&session.state),
+            session.group.as_deref().unwrap_or("-"),
+            session_name(session),
+            session.cwd,
+        );
+    }
+    let left_out = sessions.len() - shown.len();
+    if left_out > 0 {
+        let _ = writeln!(
+            text,
+            "({left_out} ended or hidden; sentinal ls --all lists them)"
+        );
+    }
+    text
+}

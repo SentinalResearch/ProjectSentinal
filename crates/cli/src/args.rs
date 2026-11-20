@@ -33,6 +33,9 @@ pub enum Command {
         /// Print the API's `Session` objects as JSON.
         #[arg(long)]
         json: bool,
+        /// Also list ended and hidden Sessions.
+        #[arg(long)]
+        all: bool,
     },
     /// Live text view of this Machine's load and running Sessions.
     Top {
@@ -91,6 +94,20 @@ pub enum Command {
         /// What to report.
         #[command(flatten)]
         report: crate::agent_state_command::Report,
+    },
+    /// Put a Session in a group, e.g. `layout-tests/gemma`, or take it out.
+    ///
+    /// Sessions in one group show together in the web app, and its finished
+    /// Sessions can be hidden at once. Up to four parts split by `/`.
+    Group {
+        /// Session ID.
+        id: u64,
+        /// Group path; leave out with --clear.
+        #[arg(required_unless_present = "clear")]
+        path: Option<String>,
+        /// Take the Session out of its group.
+        #[arg(long, conflicts_with = "path")]
+        clear: bool,
     },
     /// Show Claude Code Sessions as a chat: link their conversation file (AC1).
     AgentChat {
@@ -229,6 +246,15 @@ pub enum Command {
         /// Session title shown in `ls` and the web UI.
         #[arg(short = 't', long)]
         title: Option<String>,
+        /// Group path, e.g. `layout-tests/gemma/job-12`: Sessions in one group show together.
+        #[arg(long, value_name = "PATH")]
+        group: Option<String>,
+        /// End the Session when the Command ends, with its exit code (for jobs).
+        ///
+        /// The Command replaces the shell, so the Session finishes COMPLETED
+        /// or FAILED instead of waiting at a prompt.
+        #[arg(long, requires = "command")]
+        exit: bool,
         /// Start the Command, print the Session ID, and return without attaching.
         ///
         /// Needs no terminal and may run inside another Session, so AI agents
@@ -271,6 +297,9 @@ pub enum Command {
         /// Session title shown in `ls` and the web UI.
         #[arg(short = 't', long)]
         title: Option<String>,
+        /// Group path, e.g. `layout-tests/gemma`: Sessions in one group show together.
+        #[arg(long, value_name = "PATH")]
+        group: Option<String>,
     },
     /// Connect this already-installed Machine to an owner-selected control Machine.
     ///

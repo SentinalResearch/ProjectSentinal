@@ -45,7 +45,7 @@ export function isPercentOnly(progress: Pick<SessionProgress, "total" | "unit">)
 
 /** The program's own count, "epoch 7/40", or nothing when only a percentage is known. */
 export function progressCount(progress: SessionProgress): string | undefined {
-  return isPercentOnly(progress) ? undefined : `${progress.unit} ${progress.current}/${progress.total}`;
+  return isPercentOnly(progress) ? undefined : `${progress.unit} ${progress.current}/${progress.total}`.trim();
 }
 
 /**
@@ -317,9 +317,16 @@ export const FINISHED_STATES: ReadonlySet<string> = new Set(["COMPLETED", "FAILE
  * changed when it reached its final state.
  */
 export function sessionElapsedMs(
-  session: { state: string; createdAt: number; updatedAt: number; finishedAt?: number | null },
+  session: {
+    state: string;
+    createdAt: number;
+    updatedAt: number;
+    finishedAt?: number | null;
+    /** An adopted process's real start, before Sentinal saw it. */
+    processStartedAt?: number | null;
+  },
   now: number,
 ): number {
   const end = FINISHED_STATES.has(session.state) ? (session.finishedAt ?? session.updatedAt) : now;
-  return Math.max(0, end - session.createdAt);
+  return Math.max(0, end - (session.processStartedAt ?? session.createdAt));
 }

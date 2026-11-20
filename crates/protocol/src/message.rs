@@ -151,6 +151,14 @@ pub enum ClientRequest {
         /// Maximum number of commands to return.
         limit: u32,
     },
+    /// Put a Session in a group, or take it out with `None`; answered with
+    /// the updated Session.
+    SetGroup {
+        /// The Session.
+        session_id: SessionId,
+        /// A path such as `layout-tests/gemma`, or `None`.
+        group: Option<String>,
+    },
     /// The conversation an agent Session's own file holds (AC1); answered
     /// with `CHAT`, empty and `linked: false` when no file is linked.
     GetChat {
@@ -307,6 +315,16 @@ impl ClientRequest {
                 Err(ProtocolError::InvalidIdentifier {
                     field: "session_id",
                 })
+            }
+            ClientRequest::SetGroup { session_id, group } => {
+                if session_id.0 == 0 {
+                    return Err(ProtocolError::InvalidIdentifier {
+                        field: "session_id",
+                    });
+                }
+                group
+                    .as_deref()
+                    .map_or(Ok(()), crate::session::validate_group)
             }
             ClientRequest::GetChat { session_id } if session_id.0 == 0 => {
                 Err(ProtocolError::InvalidIdentifier {
@@ -484,6 +502,13 @@ pub enum LocalRequest {
         #[cfg_attr(feature = "ts", ts(skip))]
         caller_pid: Option<u32>,
     },
+    /// Put a Session in a group, or take it out (`sentinal group`).
+    SetGroup {
+        /// The Session.
+        session_id: SessionId,
+        /// A path such as `layout-tests/gemma`, or `None`.
+        group: Option<String>,
+    },
     /// An agent inside a Session names its own conversation file (AC1), from
     /// its start hook. Accepted, like `AGENT_STATE`, only from a process
     /// running inside `session_id`.
@@ -607,6 +632,16 @@ impl LocalRequest {
             LocalRequest::Complete {
                 prefix, cwd, limit, ..
             } => crate::complete::validate_request(prefix, cwd.as_deref(), *limit),
+            LocalRequest::SetGroup { session_id, group } => {
+                if session_id.0 == 0 {
+                    return Err(ProtocolError::InvalidIdentifier {
+                        field: "session_id",
+                    });
+                }
+                group
+                    .as_deref()
+                    .map_or(Ok(()), crate::session::validate_group)
+            }
             LocalRequest::AgentTranscript {
                 session_id, path, ..
             } => {

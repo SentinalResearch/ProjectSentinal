@@ -862,9 +862,11 @@ async fn attached_client_receives_metrics_and_resource_events() {
             watcher::MetricsObservation {
                 cpu_percent: 1.0,
                 cpu_machine_percent: Some(0.1),
-                gpu_percent: Some(96.0),
+                // GPU memory nearly full is pressure; busy GPU compute is
+                // not (field report 2026-11-19).
+                gpu_percent: Some(99.0),
                 ram_percent: Some(50.0),
-                vram_percent: Some(25.0),
+                vram_percent: Some(96.0),
             },
         )
         .unwrap();

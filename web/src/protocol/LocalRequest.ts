@@ -191,6 +191,17 @@ export type LocalRequest =
     eta_secs?: number | null;
   }
   | {
+    "type": "SET_GROUP";
+    /**
+     * The Session.
+     */
+    session_id: SessionId;
+    /**
+     * A path such as `layout-tests/gemma`, or `None`.
+     */
+    group: string | null;
+  }
+  | {
     "type": "AGENT_TRANSCRIPT";
     /**
      * The Session the agent runs in (from `SENTINAL_SESSION_ID`).

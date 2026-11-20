@@ -103,6 +103,12 @@ export type Session = {
    */
   agent_state?: AgentReportedState | null;
   /**
+   * Where the Session belongs, as a path of up to four parts, e.g.
+   * `layout-tests/gemma/job-12`. Sessions sharing the first part show
+   * together; set by an agent or the owner (`SET_GROUP`).
+   */
+  group?: string | null;
+  /**
    * Time left for the running Command, from its counts or its history
    * (B1); in memory only, absent between Commands.
    */

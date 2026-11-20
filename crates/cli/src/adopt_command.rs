@@ -140,17 +140,35 @@ pub fn choose(listed: &[PsRow], input: &str) -> Choice {
     ))
 }
 
+/// What `sentinal adopt` was asked to do.
+pub struct AdoptOptions {
+    /// Process ID, unless picked.
+    pub pid: Option<u32>,
+    /// Choose interactively.
+    pub pick: bool,
+    /// Log file to follow read-only.
+    pub log: Option<PathBuf>,
+    /// Session title.
+    pub title: Option<String>,
+    /// Group path.
+    pub group: Option<String>,
+}
+
 /// Run `sentinal adopt`.
 pub async fn run(
-    pid: Option<u32>,
-    pick: bool,
-    log: Option<PathBuf>,
-    title: Option<String>,
+    options: AdoptOptions,
     input: &mut dyn BufRead,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> ExitCode {
-    match adopt(pid, pick, log, title, input, out).await {
+    let AdoptOptions {
+        pid,
+        pick,
+        log,
+        title,
+        group,
+    } = options;
+    match adopt(pid, pick, log, title, group, input, out).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             let _ = writeln!(err, "sentinal: {message}");
@@ -164,9 +182,13 @@ async fn adopt(
     pick: bool,
     log: Option<PathBuf>,
     title: Option<String>,
+    group: Option<String>,
     input: &mut dyn BufRead,
     out: &mut dyn Write,
 ) -> Result<(), String> {
+    if let Some(group) = group.as_deref() {
+        protocol::session::validate_group(group).map_err(|error| error.to_string())?;
+    }
     let pid = match (pid, pick) {
         (Some(pid), _) => pid,
         (None, _) => match pick_interactively(input, out)? {
@@ -208,7 +230,21 @@ async fn adopt(
         })?;
     match reply {
         LocalResponse::Session { session } => {
-            writeln!(out, "{}", describe(pid, &session)).map_err(|e| e.to_string())
+            writeln!(out, "{}", describe(pid, &session)).map_err(|e| e.to_string())?;
+            if let Some(group) = group {
+                let request = LocalRequest::SetGroup {
+                    session_id: session.id,
+                    group: Some(group.clone()),
+                };
+                match tokio::time::timeout(ADOPT_DEADLINE, exchange(&socket, request)).await {
+                    Ok(Ok(LocalResponse::Session { .. })) => {
+                        writeln!(out, "In group {group}").map_err(|e| e.to_string())?;
+                    }
+                    _ => writeln!(out, "Adopted, but its group was not set")
+                        .map_err(|e| e.to_string())?,
+                }
+            }
+            Ok(())
         }
         LocalResponse::Error { message, .. } => {
             Err(format!("sentinald refused to adopt pid {pid}: {message}"))

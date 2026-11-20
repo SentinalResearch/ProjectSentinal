@@ -129,6 +129,7 @@ function mapSession(
           createdAt: session.created_at,
           updatedAt: session.updated_at,
           finishedAt: session.finished_at,
+          processStartedAt: session.process_started_at,
         },
         now,
       ),
@@ -143,6 +144,7 @@ function mapSession(
     codingAgent,
     agentState: mapAgentState(session.agent_state),
     estimate: session.estimate ?? undefined,
+    group: session.group ?? undefined,
     sandbox: session.sandbox || undefined,
     origin: session.origin,
     capture: session.capture,
@@ -246,7 +248,8 @@ export function applyProjectionMessage(
       // The program's own counts ("epoch 7/40"); the Session row has only Health's percentage.
       const facts = change.event.facts;
       const counted = facts.category === "PROGRESS" && facts.total !== null
-        ? { progress: { current: facts.current, total: facts.total, unit: facts.unit.toLowerCase() } } : undefined;
+        // A unit the dashboard does not know arrives as UNKNOWN: say no unit.
+        ? { progress: { current: facts.current, total: facts.total, unit: facts.unit === "UNKNOWN" ? "" : facts.unit.toLowerCase() } } : undefined;
       current.sessions = current.sessions.map((session) => session.id === sessionId
         ? { ...session, ...question, ...counted, events: [...(session.events ?? []), event] } : session);
       events.push({ type: "EVENT_APPENDED", sessionId, event, ...(counted ? { sessionPatch: counted } : {}) });

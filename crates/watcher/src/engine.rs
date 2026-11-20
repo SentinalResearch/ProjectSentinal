@@ -30,6 +30,10 @@ pub struct EngineUpdate {
     pub estimate: Option<protocol::ProgressEstimate>,
 }
 
+/// A child process that appears after the first sample is reported once it
+/// has lived this long.
+const MIN_PROCESS_LIFE_MS: i64 = 5_000;
+
 /// Pure per-Session engine combining Generic and Command-specific adapters.
 pub struct EventEngine {
     generic: GenericAdapter,
@@ -38,7 +42,10 @@ pub struct EventEngine {
     health: HealthTracker,
     last_progress: Option<(Timestamp, Option<f32>)>,
     last_metric: std::collections::HashMap<String, Timestamp>,
-    processes: BTreeMap<u32, String>,
+    /// pid → (name, first seen, whether its start was reported).
+    processes: BTreeMap<u32, (String, i64, bool)>,
+    /// A process sample has been seen: what runs at the first one is reported at once.
+    sampled: bool,
     capture: CaptureLevel,
     command_activity_required: bool,
     command_active: bool,
@@ -67,6 +74,7 @@ impl EventEngine {
             last_progress: None,
             last_metric: std::collections::HashMap::new(),
             processes: BTreeMap::new(),
+            sampled: false,
             capture: CaptureLevel::Full,
             command_activity_required: false,
             command_active: command.is_some(),
@@ -288,36 +296,44 @@ impl EventEngine {
         let ObservationKind::ProcessSample(sample) = &observation.kind else {
             return Vec::new();
         };
-        let current = sample
-            .processes
-            .iter()
-            .map(|process| (process.pid, process.name.clone()))
-            .collect::<BTreeMap<_, _>>();
+        let at = observation.at.0;
+        let first = !self.sampled;
+        self.sampled = true;
         // A terminal that tracks Commands already says what started and
         // ended; one Event per child process (every `sleep`, every tool an
-        // agent runs) only buries them (QA 2026-11-19). Adopted processes,
-        // which have no Commands, keep these Events.
-        if self.command_activity_required {
-            self.processes = current;
-            return Vec::new();
+        // agent runs) only buries them (QA 2026-11-19).
+        let quiet = self.command_activity_required;
+        let mut current: BTreeMap<u32, (String, i64, bool)> = BTreeMap::new();
+        let mut events = Vec::new();
+        for process in &sample.processes {
+            let known = self.processes.get(&process.pid);
+            let first_seen = known.map_or(at, |(_, seen, _)| *seen);
+            let reported = known.is_some_and(|(_, _, reported)| *reported);
+            // Adopted runs: what runs when first seen is the run itself; a
+            // child counts once it has lived a while, so short-lived workers
+            // do not flood the Events (field report 2026-11-19).
+            let report = !quiet
+                && !reported
+                && (first || at.saturating_sub(first_seen) >= MIN_PROCESS_LIFE_MS);
+            if report {
+                events.push(EventKind::ProcessStarted {
+                    pid: process.pid,
+                    name: process.name.clone(),
+                });
+            }
+            current.insert(
+                process.pid,
+                (process.name.clone(), first_seen, reported || report),
+            );
         }
-        let mut events = current
-            .iter()
-            .filter(|(pid, _)| !self.processes.contains_key(pid))
-            .map(|(pid, name)| EventKind::ProcessStarted {
-                pid: *pid,
-                name: name.clone(),
-            })
-            .collect::<Vec<_>>();
-        events.extend(
-            self.processes
-                .keys()
-                .filter(|pid| !current.contains_key(pid))
-                .map(|pid| EventKind::ProcessExited {
+        for (pid, (_, _, reported)) in &self.processes {
+            if *reported && !current.contains_key(pid) {
+                events.push(EventKind::ProcessExited {
                     pid: *pid,
                     exit_code: None,
-                }),
-        );
+                });
+            }
+        }
         self.processes = current;
         events
     }

@@ -235,7 +235,12 @@ export function mapSession(session: WireSession): Session {
     state: session.state,
     runningFor: formatDuration(
       sessionElapsedMs(
-        { state: session.state, createdAt: session.created_at, updatedAt: session.updated_at },
+        {
+          state: session.state,
+          createdAt: session.created_at,
+          updatedAt: session.updated_at,
+          processStartedAt: session.process_started_at,
+        },
         Date.now(),
       ),
     ),
@@ -265,6 +270,7 @@ export function mapSession(session: WireSession): Session {
       : undefined,
     agentState: mapAgentState(session.agent_state),
     estimate: session.estimate ?? undefined,
+    group: session.group ?? undefined,
     sandbox: session.sandbox || undefined,
     origin: session.origin,
     capture: session.capture,

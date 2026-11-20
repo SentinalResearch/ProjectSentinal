@@ -296,6 +296,11 @@ pub struct Session {
     /// What an agent running here last reported (6.4); in memory only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_state: Option<Box<crate::AgentReportedState>>,
+    /// Where the Session belongs, as a path of up to four parts, e.g.
+    /// `layout-tests/gemma/job-12`. Sessions sharing the first part show
+    /// together; set by an agent or the owner (`SET_GROUP`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// Time left for the running Command, from its counts or its history
     /// (B1); in memory only, absent between Commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -340,6 +345,7 @@ impl Session {
             output_search: false,
             dismissed_at: None,
             agent_state: None,
+            group: None,
             estimate: None,
             sandbox: false,
             created_at: at,
@@ -723,5 +729,61 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("absolute"));
+    }
+}
+
+/// Most parts in a group path.
+pub const MAX_GROUP_PARTS: usize = 4;
+/// Most characters in one part of a group path.
+pub const MAX_GROUP_PART_CHARS: usize = 40;
+
+/// A group path: 1–4 parts split by `/`, each 1–40 letters, digits, spaces,
+/// `.`, `_` or `-`, not starting or ending with a space.
+pub fn validate_group(group: &str) -> Result<(), crate::ProtocolError> {
+    let parts: Vec<&str> = group.split('/').collect();
+    let part_ok = |part: &&str| {
+        let count = part.chars().count();
+        (1..=MAX_GROUP_PART_CHARS).contains(&count)
+            && part.trim() == *part
+            && part
+                .chars()
+                .all(|c| c.is_alphanumeric() || matches!(c, ' ' | '.' | '_' | '-'))
+    };
+    if parts.len() <= MAX_GROUP_PARTS && parts.iter().all(part_ok) {
+        Ok(())
+    } else {
+        Err(crate::ProtocolError::InvalidAgentChat {
+            field: "group",
+            reason: "must be 1-4 parts of letters, digits, spaces, . _ -, split by /",
+        })
+    }
+}
+
+#[cfg(test)]
+mod group_tests {
+    use super::validate_group;
+
+    #[test]
+    fn group_paths_are_short_plain_parts() {
+        for good in [
+            "layout-tests",
+            "layout-tests/gemma/job 12",
+            "a/b/c/d",
+            "run_2.1",
+        ] {
+            assert!(validate_group(good).is_ok(), "{good}");
+        }
+        for bad in [
+            "",
+            "a//b",
+            "/a",
+            "a/b/c/d/e",
+            " a",
+            "a\nb",
+            "x".repeat(41).as_str(),
+            "a/<b>",
+        ] {
+            assert!(validate_group(bad).is_err(), "{bad}");
+        }
     }
 }

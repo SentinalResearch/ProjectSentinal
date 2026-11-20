@@ -852,6 +852,7 @@ fn spawn_metric_sampler(
                     .collect(),
             );
             let ram_total = snapshot.machine.ram_total_bytes;
+            let ram_used = snapshot.machine.ram_used_bytes;
             let gpu_percent = snapshot
                 .machine
                 .gpus
@@ -864,7 +865,12 @@ fn spawn_metric_sampler(
             if let Err(error) = sessions.publish_machine_metrics(snapshot.machine) {
                 tracing::warn!(%error, "failed to publish Machine metrics");
             }
-            for metrics in snapshot.sessions {
+            for mut metrics in snapshot.sessions {
+                // Shared pages are counted once per process; the shown total
+                // is capped at what the Machine has in use, like the share.
+                if ram_used > 0 {
+                    metrics.totals.rss_bytes = metrics.totals.rss_bytes.min(ram_used);
+                }
                 if let Some(root) = root_by_session.get(&metrics.session_id) {
                     if let Err(error) = sessions.publish_processes(
                         metrics.session_id,
@@ -874,8 +880,11 @@ fn spawn_metric_sampler(
                         tracing::warn!(session = metrics.session_id.0, %error, "failed to publish process observation");
                     }
                 }
+                // Field report 2026-11-19: worker processes that share pages
+                // with their parent were summed again and again (548%). A
+                // Session can use at most what the whole Machine has in use.
                 let ram_percent = (ram_total > 0)
-                    .then(|| (metrics.totals.rss_bytes as f64 / ram_total as f64 * 100.0) as f32);
+                    .then(|| session_ram_percent(metrics.totals.rss_bytes, ram_used, ram_total));
                 let session_gpu_percent = (metrics.totals.gpu_mem_bytes > 0)
                     .then_some(gpu_percent)
                     .flatten();
@@ -891,9 +900,8 @@ fn spawn_metric_sampler(
                 if let Some(percent) = ram_percent {
                     values.push((Resource::Ram, percent));
                 }
-                if let Some(percent) = session_gpu_percent {
-                    values.push((Resource::Gpu, percent));
-                }
+                // A busy GPU is what an ML run is for: only GPU memory
+                // running out is a warning (field report 2026-11-19).
                 if let Some(percent) = vram_percent {
                     values.push((Resource::Vram, percent));
                 }
@@ -1033,5 +1041,39 @@ mod hostname_tests {
             "pop-os"
         );
         assert_eq!(pick_hostname(None, None, None), "terminal-agent-machine");
+    }
+}
+
+/// A Session's share of RAM: its processes' summed resident memory, which
+/// counts shared pages once per process, capped at what the whole Machine
+/// has in use, so it never passes 100%.
+pub(crate) fn session_ram_percent(
+    rss_bytes: u64,
+    machine_used_bytes: u64,
+    total_bytes: u64,
+) -> f32 {
+    if total_bytes == 0 {
+        return 0.0;
+    }
+    let used = if machine_used_bytes > 0 {
+        rss_bytes.min(machine_used_bytes)
+    } else {
+        rss_bytes.min(total_bytes)
+    };
+    (used as f64 / total_bytes as f64 * 100.0) as f32
+}
+
+#[cfg(test)]
+mod session_ram_tests {
+    use super::session_ram_percent;
+
+    #[test]
+    fn shared_worker_memory_never_passes_what_the_machine_uses() {
+        // 20.7 GB summed over workers on a 31 GB Machine using 10.5 GB.
+        let gb = 1_000_000_000_u64;
+        let percent = session_ram_percent(207 * gb / 10, 105 * gb / 10, 31 * gb);
+        assert!((percent - 33.87).abs() < 0.1, "{percent}");
+        assert!(session_ram_percent(u64::MAX, 0, 31 * gb) <= 100.0);
+        assert_eq!(session_ram_percent(5, 5, 0), 0.0);
     }
 }

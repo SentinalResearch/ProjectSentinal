@@ -15,7 +15,7 @@ use std::path::Path;
 fn parses_list_command() {
     let cli = Cli::try_parse_from(["ta", "ls"]).unwrap();
 
-    assert!(matches!(cli.command, Command::List { json: false }));
+    assert!(matches!(cli.command, Command::List { json: false, .. }));
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn read_commands_take_json() {
     let parse = |args: &[&str]| Cli::try_parse_from(args).unwrap().command;
     assert!(matches!(
         parse(&["sentinal", "ls", "--json"]),
-        Command::List { json: true }
+        Command::List { json: true, .. }
     ));
     assert!(matches!(
         parse(&["sentinal", "status", "7", "--json"]),

@@ -300,11 +300,17 @@ async fn dispatch(
             pick,
             log,
             title,
+            group,
         } => {
             let mut input = std::io::stdin().lock();
-            return Ok(
-                crate::adopt_command::run(pid, pick, log, title, &mut input, out, err).await,
-            );
+            let options = crate::adopt_command::AdoptOptions {
+                pid,
+                pick,
+                log,
+                title,
+                group,
+            };
+            return Ok(crate::adopt_command::run(options, &mut input, out, err).await);
         }
         command => Cli { command, ..cli },
     };
@@ -315,6 +321,8 @@ async fn dispatch(
     let urls = resolve_daemon_urls(cli.url.as_deref())?;
     if let Command::Watch {
         title,
+        group,
+        exit,
         detach,
         sandbox,
         cwd,
@@ -332,8 +340,16 @@ async fn dispatch(
                 }
             })
         });
+        // `--exit`: the Command replaces the shell, so the Session ends with it.
+        let command = match (exit, command) {
+            (true, Some(command)) => {
+                Some(std::iter::once("exec".to_owned()).chain(command).collect())
+            }
+            (_, command) => command,
+        };
         let options = WatchOptions {
             title,
+            group,
             detach,
             sandbox,
             command,
@@ -343,18 +359,38 @@ async fn dispatch(
 
     let mut client = DaemonClient::connect(&urls, &token_file).await?;
     match cli.command {
-        Command::List { json } => match client.request(ClientRequest::ListSessions).await? {
+        Command::Group { id, path, clear: _ } => {
+            if let Some(path) = path.as_deref() {
+                if let Err(error) = protocol::session::validate_group(path) {
+                    let _ = writeln!(err, "sentinal: {error}");
+                    return Ok(ExitCode::from(2));
+                }
+            }
+            match client
+                .request(ClientRequest::SetGroup {
+                    session_id: SessionId(id),
+                    group: path.clone(),
+                })
+                .await?
+            {
+                DaemonMessage::SessionUpdated { .. } => {
+                    let _ = match path {
+                        Some(path) => writeln!(out, "Session {id} is in {path}"),
+                        None => writeln!(out, "Session {id} is in no group"),
+                    };
+                }
+                other => {
+                    print_unexpected(err, other);
+                    return Ok(ExitCode::FAILURE);
+                }
+            }
+        }
+        Command::List { json, all } => match client.request(ClientRequest::ListSessions).await? {
             DaemonMessage::Sessions { sessions } if json => {
                 let _ = writeln!(out, "{}", crate::top::sessions_json(&sessions));
             }
             DaemonMessage::Sessions { sessions } => {
-                for session in sessions {
-                    let _ = writeln!(
-                        out,
-                        "{}\t{:?}\t{}\t{}",
-                        session.id.0, session.state, session.cwd, session.shell
-                    );
-                }
+                let _ = write!(out, "{}", crate::top::render_list(&sessions, all));
             }
             message => print_unexpected(err, message),
         },
@@ -471,6 +507,7 @@ async fn dispatch(
 /// What `sentinal watch` was asked to do.
 struct WatchOptions {
     title: Option<String>,
+    group: Option<String>,
     detach: bool,
     /// `Some(cwd)` for `--sandbox`, with `--cwd` if one was given.
     sandbox: Option<Option<PathBuf>>,
@@ -486,6 +523,7 @@ async fn watch(
 ) -> Result<ExitCode, AppError> {
     let WatchOptions {
         title,
+        group,
         detach,
         sandbox,
         command,
@@ -525,9 +563,27 @@ async fn watch(
                 Some(cwd) => crate::watch::into_sandbox(request, cwd.as_deref())?,
                 None => request,
             };
-            let (client, session) =
+            let (mut client, session) =
                 create_session(|| DaemonClient::connect(urls, token_file), request).await?;
             let id = session.id.0;
+            if let Some(group) = group {
+                if let Err(message) = protocol::session::validate_group(&group) {
+                    let _ = writeln!(err, "sentinal: group not set: {message}");
+                } else if !matches!(
+                    client
+                        .request(ClientRequest::SetGroup {
+                            session_id: session.id,
+                            group: Some(group),
+                        })
+                        .await,
+                    Ok(DaemonMessage::SessionUpdated { .. })
+                ) {
+                    let _ = writeln!(
+                        err,
+                        "sentinal: Session {id} started, but its group was not set"
+                    );
+                }
+            }
             if detach {
                 let _ = writeln!(out, "{id}");
                 return Ok(ExitCode::SUCCESS);

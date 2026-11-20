@@ -50,6 +50,21 @@ sentinal agent-state --status blocked --detail "need the staging API key"
 The owner sees "claude says ~12 m" beside Sentinal's own estimate from your
 pace ("about 15 m at this pace"). Neither is shown as fact.
 
+## Runs with many jobs
+
+Give every part of one run the same group, so the owner sees one card per
+run instead of a list of loose Sessions:
+
+```sh
+sentinal watch --detach -t "queue" --group layout-tests -- ./launcher.sh
+sentinal watch --detach --exit -t "gemma job 12" --group layout-tests/gemma/job-12 -- ./job.sh
+```
+
+Report progress in units of work (GPU-minutes, tasks), not job counts,
+when jobs differ in length. Never write progress into the experiment's own
+files: a helper writes to its own file, adopted with `--log`. Details:
+`sentinal agent-guide`.
+
 ## Run work in its own folder
 
 To try something without touching the project folder, start it as a sandbox

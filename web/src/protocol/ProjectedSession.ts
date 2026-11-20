@@ -79,6 +79,14 @@ export type ProjectedSession = {
    */
   sandbox?: boolean;
   /**
+   * The Session's group path; one that does not pass the rules is left out.
+   */
+  group?: string | null;
+  /**
+   * When an adopted process really started, before Sentinal saw it.
+   */
+  process_started_at?: Timestamp | null;
+  /**
    * Time left for the running Command (B1): numbers and closed codes only.
    */
   estimate?: ProgressEstimate | null;

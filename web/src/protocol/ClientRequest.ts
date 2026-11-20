@@ -115,6 +115,17 @@ export type ClientRequest =
     limit: number;
   }
   | {
+    "type": "SET_GROUP";
+    /**
+     * The Session.
+     */
+    session_id: SessionId;
+    /**
+     * A path such as `layout-tests/gemma`, or `None`.
+     */
+    group: string | null;
+  }
+  | {
     "type": "GET_CHAT";
     /**
      * The agent Session.

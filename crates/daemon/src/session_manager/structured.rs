@@ -90,6 +90,18 @@ impl SessionManager {
         self.set_hidden(session_id, Some(now))
     }
 
+    /// Put a Session in a group (`layout-tests/gemma`), or take it out.
+    pub fn set_group(
+        &self,
+        session_id: SessionId,
+        group: Option<String>,
+    ) -> Result<protocol::Session, SessionManagerError> {
+        if let Some(group) = group.as_deref() {
+            protocol::session::validate_group(group)?;
+        }
+        self.update_known_session(session_id, |session| session.group = group)
+    }
+
     /// Show a hidden Session and its continuation chain again.
     pub fn restore(&self, session_id: SessionId) -> Result<protocol::Session, SessionManagerError> {
         self.set_hidden(session_id, None)

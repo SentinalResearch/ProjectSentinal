@@ -106,9 +106,10 @@ impl HealthTracker {
     fn apply_metrics(&mut self, metrics: &crate::MetricsObservation) {
         // Per-core CPU can exceed 100% on a multi-core Machine; pressure is
         // judged by the share of the whole Machine.
+        // GPU compute is left out: a busy GPU is the point of an ML run;
+        // GPU memory nearly full is the pressure (field report 2026-11-19).
         let peak = [
             metrics.cpu_machine_percent,
-            metrics.gpu_percent,
             metrics.ram_percent,
             metrics.vram_percent,
         ]

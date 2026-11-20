@@ -239,9 +239,9 @@ fn repeated_samples_keep_one_evidence_line_per_kind() {
         let busy = watcher::MetricsObservation {
             cpu_percent: 0.0,
             cpu_machine_percent: None,
-            gpu_percent: Some(91.0 + step as f32 / 10.0),
+            gpu_percent: None,
             ram_percent: None,
-            vram_percent: None,
+            vram_percent: Some(91.0 + step as f32 / 10.0),
         };
         observe_kind(
             &mut tracker,
@@ -291,4 +291,24 @@ fn resource_events_name_the_resource_plainly() {
         "{:?}",
         health.evidence
     );
+}
+
+#[test]
+fn a_busy_gpu_is_the_point_of_an_ml_run_not_a_warning() {
+    // Field report 2026-11-19: 92–93% GPU compute drove WARNING.
+    let mut tracker = HealthTracker::new();
+    let busy = watcher::MetricsObservation {
+        cpu_percent: 10.0,
+        cpu_machine_percent: Some(5.0),
+        gpu_percent: Some(93.0),
+        ram_percent: Some(30.0),
+        vram_percent: Some(60.0),
+    };
+    observe_kind(
+        &mut tracker,
+        0,
+        watcher::ObservationKind::MetricsSample(busy),
+    );
+    let health = tracker.observe(&Observation::output(Timestamp(1), "step"), &[]);
+    assert_eq!(health.resources, protocol::HealthLevel::Good);
 }

@@ -214,5 +214,6 @@
       "sandbox": true
     }
   },
-  {"version": 1, "payload": {"type": "GET_CHAT", "session_id": 128}}
+  {"version": 1, "payload": {"type": "GET_CHAT", "session_id": 128}},
+  {"version": 1, "payload": {"type": "SET_GROUP", "session_id": 128, "group": null}}
 ]
