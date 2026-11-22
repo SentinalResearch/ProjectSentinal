@@ -124,6 +124,43 @@ pub enum ClientRequest {
         /// scroll back. Off for viewers that draw into a real terminal (the CLI).
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         history: bool,
+        /// This viewer's box in columns (T3). With `rows`, it makes this a
+        /// sized viewer, which gets `SESSION_SIZE`; without, an old client.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        cols: Option<u16>,
+        /// This viewer's box in rows (T3). Sent together with `cols`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        rows: Option<u16>,
+        /// `OBSERVE` never sets the size and may not type (T3). Default
+        /// `INTERACTIVE`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        mode: Option<ViewerMode>,
+    },
+    /// This viewer's box changed, or it gained or lost focus (T3). Only for
+    /// a Session this connection is attached to.
+    ViewerState {
+        /// The attached Session.
+        session_id: SessionId,
+        /// The viewer's box in columns.
+        cols: u16,
+        /// The viewer's box in rows.
+        rows: u16,
+        /// The owner is using this viewer now (focus or typing).
+        active: bool,
+    },
+    /// Answer a menu by its place in the list (T3.4). The daemon checks the
+    /// question is still `event_id` and the menu on screen is the one
+    /// reported, then moves from the marked row to `option` and presses Enter.
+    AnswerPrompt {
+        /// The waiting Session.
+        session_id: SessionId,
+        /// The `WAITING_FOR_INPUT` Event that showed the menu.
+        event_id: crate::EventId,
+        /// 0-based place of the chosen answer in that Event's `options`.
+        option: u8,
     },
     /// Stop streaming a session's output. The session keeps running.
     Detach {
@@ -268,12 +305,38 @@ pub enum ClientRequest {
     },
 }
 
+/// How a viewer takes part in a Session's size (T3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ViewerMode {
+    /// Types and may set the size.
+    #[default]
+    Interactive,
+    /// Only looks (peek cards, read-only pages): never sets the size, and its
+    /// input is refused.
+    Observe,
+}
+
 impl ClientRequest {
     /// Check values that the type system cannot, like a zero terminal size.
     pub fn validate(&self) -> Result<(), ProtocolError> {
         match self {
-            ClientRequest::CreateSession { cols, rows, .. }
+            ClientRequest::Attach { cols, rows, .. } if cols.is_some() != rows.is_some() => {
+                Err(ProtocolError::InvalidTerminalSize {
+                    cols: cols.unwrap_or(0),
+                    rows: rows.unwrap_or(0),
+                })
+            }
+            ClientRequest::Attach {
+                cols: Some(cols),
+                rows: Some(rows),
+                ..
+            }
+            | ClientRequest::CreateSession { cols, rows, .. }
             | ClientRequest::Resize { cols, rows, .. }
+            | ClientRequest::ViewerState { cols, rows, .. }
                 if *cols == 0 || *rows == 0 =>
             {
                 Err(ProtocolError::InvalidTerminalSize {
@@ -907,6 +970,19 @@ pub enum DaemonMessage {
     Events {
         /// Events matching the request.
         events: Vec<Event>,
+    },
+    /// The Session's terminal size (T3), to sized viewers only: on attach,
+    /// before the snapshot, and on every change, followed at once by a
+    /// reset and a snapshot at this size. Viewers draw at it.
+    SessionSize {
+        /// The Session.
+        session_id: SessionId,
+        /// Columns.
+        cols: u16,
+        /// Rows.
+        rows: u16,
+        /// This viewer's report set the size.
+        owner: bool,
     },
     /// Terminals attached to this Session should detach now, as if the
     /// detach key was pressed (`sentinal detach`). Web viewers ignore it.

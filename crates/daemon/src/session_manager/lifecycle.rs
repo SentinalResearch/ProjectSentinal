@@ -1,5 +1,6 @@
 //! Session creation, continuation, and PTY task startup.
 
+use super::viewers;
 use super::{
     lock_session, tasks, validate_size, CreateSession, SessionHandle, SessionManager,
     SessionManagerError, AUTO_WRAP_ATTACH_GRACE,
@@ -285,6 +286,11 @@ impl SessionManager {
 
         let (output, _) = broadcast::channel(256);
         let (structured, _) = broadcast::channel(256);
+        let (size, _) = tokio::sync::watch::channel(viewers::SizeChange {
+            cols: request.cols,
+            rows: request.rows,
+            owner: None,
+        });
         let screen = crate::screen::Screen::spawn(
             &id.0.to_string(),
             crate::screen::ScreenSize {
@@ -313,6 +319,9 @@ impl SessionManager {
             try_wait,
             pty_closed: AtomicBool::new(false),
             screen,
+            asked: Mutex::new(None),
+            viewers: Mutex::new(viewers::Viewers::new(request.cols, request.rows)),
+            size,
             structured,
             observations: self.inner.observations.clone(),
             events: self.inner.events.clone(),

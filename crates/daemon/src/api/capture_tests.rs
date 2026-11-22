@@ -111,6 +111,9 @@ async fn reduced_capture_rejects_attach_resize_kill_and_input_without_side_effec
             ClientRequest::Attach {
                 session_id: id,
                 history: false,
+                cols: None,
+                rows: None,
+                mode: None,
             },
             ClientRequest::Resize {
                 session_id: id,
@@ -156,6 +159,9 @@ async fn full_capture_ui_session_keeps_attach_resize_and_input() {
             ClientRequest::Attach {
                 session_id: id,
                 history: false,
+                cols: None,
+                rows: None,
+                mode: None,
             }
         )
         .await,

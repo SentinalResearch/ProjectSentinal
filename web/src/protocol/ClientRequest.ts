@@ -7,6 +7,7 @@ import type { SearchFilters } from "./SearchFilters";
 import type { SearchScope } from "./SearchScope";
 import type { SessionId } from "./SessionId";
 import type { SessionOrigin } from "./SessionOrigin";
+import type { ViewerMode } from "./ViewerMode";
 
 /**
  * Requests a client (web UI, CLI, agent) sends to the daemon.
@@ -73,6 +74,54 @@ export type ClientRequest =
      * scroll back. Off for viewers that draw into a real terminal (the CLI).
      */
     history?: boolean;
+    /**
+     * This viewer's box in columns (T3). With `rows`, it makes this a
+     * sized viewer, which gets `SESSION_SIZE`; without, an old client.
+     */
+    cols?: number;
+    /**
+     * This viewer's box in rows (T3). Sent together with `cols`.
+     */
+    rows?: number;
+    /**
+     * `OBSERVE` never sets the size and may not type (T3). Default
+     * `INTERACTIVE`.
+     */
+    mode?: ViewerMode;
+  }
+  | {
+    "type": "VIEWER_STATE";
+    /**
+     * The attached Session.
+     */
+    session_id: SessionId;
+    /**
+     * The viewer's box in columns.
+     */
+    cols: number;
+    /**
+     * The viewer's box in rows.
+     */
+    rows: number;
+    /**
+     * The owner is using this viewer now (focus or typing).
+     */
+    active: boolean;
+  }
+  | {
+    "type": "ANSWER_PROMPT";
+    /**
+     * The waiting Session.
+     */
+    session_id: SessionId;
+    /**
+     * The `WAITING_FOR_INPUT` Event that showed the menu.
+     */
+    event_id: EventId;
+    /**
+     * 0-based place of the chosen answer in that Event's `options`.
+     */
+    option: number;
   }
   | {
     "type": "DETACH";

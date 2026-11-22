@@ -39,6 +39,26 @@ pub(super) fn spawn_forwarder(
                         return;
                     }
                 }
+                resized = size_changed(&mut attachment.viewer) => {
+                    if !resized {
+                        // The Session is gone; output ends on its own.
+                        attachment.viewer = None;
+                        continue;
+                    }
+                    let Some(viewer) = attachment.viewer.as_ref() else { continue };
+                    let message = viewer.size_message(session_id);
+                    // The size, then a whole screen at that size, then the
+                    // output after it (T3).
+                    let (redraw, receiver) = attachment.screen_source.resync();
+                    attachment.output = receiver;
+                    if output_tx.send(AttachedOutput::Structured(Box::new(message))).await.is_err() {
+                        return;
+                    }
+                    let frame = AttachedOutput::Binary(encode_terminal_frame(session_id, &redraw));
+                    if output_tx.send(frame).await.is_err() {
+                        return;
+                    }
+                }
                 structured = attachment.structured.recv() => match structured {
                     Ok(message) => {
                         if output_tx.send(AttachedOutput::Structured(Box::new(message))).await.is_err() {
@@ -53,6 +73,15 @@ pub(super) fn spawn_forwarder(
             }
         }
     })
+}
+
+/// Wait for a sized viewer's Session to change size; never for any other
+/// viewer. False when the Session's size can no longer change.
+async fn size_changed(viewer: &mut Option<crate::session_manager::ViewerHandle>) -> bool {
+    match viewer.as_mut().filter(|viewer| viewer.sized) {
+        Some(viewer) => viewer.size.changed().await.is_ok(),
+        None => std::future::pending().await,
+    }
 }
 
 #[cfg(test)]
@@ -93,6 +122,7 @@ mod tests {
             structured: structured.subscribe(),
             confirmation: Arc::new(AtomicBool::new(false)),
             screen_source: source,
+            viewer: None,
         };
         let produce = |bytes: &[u8]| screen.feed(bytes.to_vec());
         // A viewer socket that holds one frame and is not being read.

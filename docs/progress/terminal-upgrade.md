@@ -99,3 +99,68 @@ how the browser draws it, not the daemon's output.
 - Linking the Zig-built library with the musl toolchain CI uses
   (`musl-tools`) was not tried; locally Zig was the linker.
 - The CLI still attaches without history; that is T4.
+
+## T3: one size per Session (2026-11-22)
+
+Design: `docs/TERMINAL_SIZE_DESIGN.md`, approved by the owner on 2026-11-22
+with the four recommended decisions. Tested on a working tree based on commit
+`050572e`.
+
+### What was built
+
+| Part | Where |
+|---|---|
+| `ATTACH.cols`, `rows`, `mode`; `VIEWER_STATE`; `ANSWER_PROMPT`; `SESSION_SIZE`; `ViewerMode`; fixtures and TypeScript | `crates/protocol/src/message.rs`, `tests/fixtures/`, `web/src/protocol/` |
+| Size policy: pure, clock injected | `crates/daemon/src/session_manager/viewers.rs` |
+| Viewers attached, reports, typing, old `RESIZE`, settle timer, audit, PTY and screen resize | `session_manager/viewer_ops.rs`, `audit.rs` |
+| A size change: `SESSION_SIZE` to sized viewers, then a reset and a snapshot | `api/attach.rs`, `api.rs` |
+| Menu answers from the current screen | `session_manager/answer.rs`, `watcher::menu_on_screen` |
+| Web: attach with the box, draw at the Session size, shrink to fit, pan, bar | `web/src/terminal/{useRealTerminalSession.ts,TerminalPane.tsx,sessionSize.ts}` |
+| Peek cards as observers | `web/src/terminal/peek.ts` |
+| Vibe menus answered from cards again | `web/src/data/actions.ts`, adapters |
+| CLI: attach with its window, `VIEWER_STATE`, wrap off and status line | `crates/cli/src/{client.rs,session_size.rs}` |
+
+Compatibility: an installed CLI stops on an unknown message type, so
+`SESSION_SIZE` goes only to viewers that sent a size. Old clients' `RESIZE`
+still sets the size at once. New clients facing an older daemon (a worker
+behind the control) find no `SESSION_SIZE` before the screen and fall back
+to `RESIZE`.
+
+### Tests
+
+Policy (9): alone takes the size; joining does not; two viewers alternating
+after the settle time; a window drag resizes once; focus and blur; the active
+viewer leaving; observers; old `RESIZE`; bounds. Through the manager (5,
+`crates/daemon/tests/session_size.rs`): hand-over with audit records and the
+PTY's size; leaving; observers may not type; old client; the snapshot redrawn
+at the new size. Answers (3): keys from the marked row (both cursor-key
+modes); the selector moved since the question; refusals. Protocol: sized
+`ATTACH` validation. CLI (4): owner, wider, smaller, status width. Web: size
+arithmetic (5), the hook against old and new daemons, peek as observer, Vibe
+answers through `ANSWER_PROMPT`. Browser: two windows of different sizes,
+typing in turn, rows identical; the bar moves; "Use this size".
+
+`just check`: passed. Rust 1,462 passed, 0 failed, 22 ignored; web 592
+passed (108 files).
+
+`just test-e2e`: 21 passed (2.1 min). The first run failed one existing
+layout test: the window that set the size shrank its font while waiting for
+the daemon to confirm a narrower size. Fixed: that window now refits at once.
+
+### Tried by hand (QA instance, web on 127.0.0.1:5283)
+
+A phone-width tab opened a Session alone and took its size (long lines
+wrapped at its edge). A second tab at 1440×900 joined: it showed the same
+91×32 screen and "Sized for another device (91×32) · Use this size". One tap
+moved the size to the wide tab (95×31 in the pane); the phone tab then
+showed the wide screen unwrapped at a smaller font, with the bar offering the
+size back.
+
+### Not verified
+
+- The CLI side by hand: covered by its unit tests and the build only.
+- `ANSWER_PROMPT` against a real Vibe menu: covered by unit tests on the key
+  arithmetic and refusals, not run against the program.
+- Panning in a phone's full-screen terminal: touch drags scroll the
+  scrollback there, so a Session wider than the phone at 9 px pans only with
+  a trackpad or mouse.

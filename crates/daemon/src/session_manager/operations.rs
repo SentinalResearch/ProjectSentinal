@@ -1,8 +1,6 @@
 //! Attach and lifecycle-gated PTY operations.
 
-use super::{
-    lock_session, validate_size, Attachment, SessionHandle, SessionManager, SessionManagerError,
-};
+use super::{lock_session, Attachment, SessionHandle, SessionManager, SessionManagerError};
 use crate::audit::AuditRecord;
 use protocol::{DaemonMessage, SessionId, SessionState};
 use std::{
@@ -15,9 +13,7 @@ use std::{
 };
 use tokio::sync::broadcast;
 
-use super::capture::{
-    ensure_session_operation, require_capture, require_operation, CaptureOperation,
-};
+use super::capture::{ensure_session_operation, require_operation, CaptureOperation};
 
 impl SessionManager {
     /// Snapshot the current screen and subscribe to subsequent output.
@@ -32,35 +28,36 @@ impl SessionManager {
         session_id: SessionId,
         history: bool,
     ) -> Result<Attachment, SessionManagerError> {
-        let handle = self.handle(session_id)?;
-        require_capture(&handle, CaptureOperation::Attach)?;
-        Ok(snapshot_and_subscribe(
-            &handle.structured,
-            handle.attached.clone(),
-            ScreenSource {
-                screen: handle.screen.clone(),
-                history,
-            },
-        ))
+        self.attach_viewer(session_id, history, super::ViewerOptions::default())
     }
+}
 
+/// The screen and live output for one new viewer of `handle`.
+pub(super) fn snapshot_attachment(handle: &SessionHandle, history: bool) -> Attachment {
+    snapshot_and_subscribe(
+        &handle.structured,
+        handle.attached.clone(),
+        ScreenSource {
+            screen: handle.screen.clone(),
+            history,
+        },
+    )
+}
+
+impl SessionManager {
     /// The Session's history and screen as text lines, oldest first.
     pub fn scrollback(&self, session_id: SessionId) -> Result<Vec<String>, SessionManagerError> {
         Ok(self.handle(session_id)?.screen.lines())
     }
 
-    /// Resize a session's PTY and in-memory screen.
+    /// Resize a Session at once, as an old client's `RESIZE` does (T3).
     pub fn resize(
         &self,
         session_id: SessionId,
         cols: u16,
         rows: u16,
     ) -> Result<(), SessionManagerError> {
-        validate_size(cols, rows)?;
-        let handle = self.operation_handle(session_id, CaptureOperation::Resize)?;
-        (handle.resize)(cols, rows)?;
-        handle.screen.resize(cols, rows);
-        Ok(())
+        self.legacy_resize(session_id, None, cols, rows, "local")
     }
 
     /// Audit terminal input metadata, then write the input to the PTY.
@@ -78,6 +75,7 @@ impl SessionManager {
             client_addr: client_addr.to_string(),
             session_id,
             byte_count: bytes.len(),
+            resize: None,
         })?;
         let mut writer = handle
             .writer
@@ -183,7 +181,7 @@ impl SessionManager {
         Ok(())
     }
 
-    fn operation_handle(
+    pub(super) fn operation_handle(
         &self,
         session_id: SessionId,
         operation: CaptureOperation,
@@ -285,6 +283,7 @@ fn snapshot_and_subscribe(
         structured,
         confirmation,
         screen_source,
+        viewer: None,
     }
 }
 

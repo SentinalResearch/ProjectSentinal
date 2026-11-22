@@ -134,6 +134,13 @@ export interface DataAdapter {
 
   sendInput(sessionId: string, data: string): Promise<void>;
 
+  /**
+   * Choose `option` (0-based) of the menu in the question Event `eventId`
+   * (T3.4). The daemon moves the selector from where it is now and presses
+   * Enter, or refuses when the question on screen changed.
+   */
+  answerPrompt(sessionId: string, eventId: number, option: number): Promise<void>;
+
   /** The conversation an agent Session's own file holds (AC2); not linked when unknown. */
   getChat(sessionId: string): Promise<AgentChat>;
   sendSignal(sessionId: string, signal: "SIGINT" | "KILL"): Promise<void>;

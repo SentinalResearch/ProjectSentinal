@@ -174,8 +174,15 @@ impl AppState {
         address.ip().to_string()
     }
 
-    /// Decode, validate, and dispatch one WebSocket text frame.
+    /// Decode, validate, and dispatch one WebSocket text frame, from a
+    /// connection with no attachments.
     pub async fn dispatch_text(&self, text: &str) -> WsAction {
+        self.dispatch_on(text, &Connection::default()).await
+    }
+
+    /// [`dispatch_text`](Self::dispatch_text) for one connection: its
+    /// address and the viewer it is for each attached Session (T3).
+    pub(crate) async fn dispatch_on(&self, text: &str, connection: &Connection) -> WsAction {
         let request = match Envelope::<ClientRequest>::decode(text) {
             Ok(envelope) => envelope.payload,
             Err(error) => return error_action(error),
@@ -228,7 +235,18 @@ impl AppState {
             ClientRequest::Attach {
                 session_id,
                 history,
-            } => match self.sessions.attach_with_history(session_id, history) {
+                cols,
+                rows,
+                mode,
+            } => match self.sessions.attach_viewer(
+                session_id,
+                history,
+                crate::session_manager::ViewerOptions {
+                    size: cols.zip(rows),
+                    mode: mode.unwrap_or_default(),
+                    client_addr: connection.client_addr.clone(),
+                },
+            ) {
                 Ok(attachment) => WsAction::Attach {
                     session_id,
                     attachment,
@@ -240,7 +258,13 @@ impl AppState {
                 session_id,
                 cols,
                 rows,
-            } => match self.sessions.resize(session_id, cols, rows) {
+            } => match self.sessions.legacy_resize(
+                session_id,
+                connection.viewers.get(&session_id).copied(),
+                cols,
+                rows,
+                &connection.client_addr,
+            ) {
                 Ok(()) => match session_reply(&self.sessions, session_id) {
                     WsAction::Reply(message) => WsAction::Resize {
                         session_id,
@@ -248,6 +272,36 @@ impl AppState {
                     },
                     action => action,
                 },
+                Err(error) => error_action(error),
+            },
+            ClientRequest::ViewerState {
+                session_id,
+                cols,
+                rows,
+                active,
+            } => match connection.viewers.get(&session_id) {
+                Some(viewer) => {
+                    match self
+                        .sessions
+                        .viewer_state(session_id, *viewer, cols, rows, active)
+                    {
+                        Ok(()) => WsAction::Confirm(session_id),
+                        Err(error) => error_action(error),
+                    }
+                }
+                None => error_action(format!("attach to session {session_id} first")),
+            },
+            ClientRequest::AnswerPrompt {
+                session_id,
+                event_id,
+                option,
+            } => match self.sessions.answer_prompt(
+                session_id,
+                event_id,
+                option,
+                &connection.client_addr,
+            ) {
+                Ok(()) => session_reply(&self.sessions, session_id),
                 Err(error) => error_action(error),
             },
             ClientRequest::Kill { session_id } => match self.sessions.kill(session_id) {
@@ -448,6 +502,10 @@ impl AppState {
 pub enum WsAction {
     /// Send one structured daemon reply.
     Reply(DaemonMessage),
+    /// `VIEWER_STATE`: the viewer has its screen (the attachment
+    /// acknowledgement of sized viewers, as `RESIZE` is of old ones); nothing
+    /// to send.
+    Confirm(SessionId),
     /// Send a screen snapshot and begin forwarding live output.
     Attach {
         /// Session being attached.
@@ -464,6 +522,15 @@ pub enum WsAction {
     },
     /// Stop forwarding one session to this client.
     Detach(SessionId),
+}
+
+/// What one WebSocket connection brings to a request (T3).
+#[derive(Debug, Default)]
+pub(crate) struct Connection {
+    /// For the audit log.
+    pub(crate) client_addr: String,
+    /// The viewer this connection is, for each Session it is attached to.
+    pub(crate) viewers: HashMap<SessionId, crate::session_manager::ViewerId>,
 }
 
 #[derive(Serialize)]
@@ -767,13 +834,35 @@ async fn handle_client_message(
 ) -> bool {
     match message {
         Message::Text(text) => {
-            let action = state.dispatch_text(text.as_str()).await;
+            let connection = Connection {
+                client_addr: client_addr.to_string(),
+                viewers: attachments
+                    .iter()
+                    .filter_map(|(session, attached)| Some((*session, attached.viewer?)))
+                    .collect(),
+            };
+            let action = state.dispatch_on(text.as_str(), &connection).await;
             apply_action(socket, output_tx, attachments, action).await
         }
         Message::Binary(frame) => {
             let result = decode_terminal_frame(&frame)
                 .map_err(|error| error.to_string())
                 .and_then(|(session_id, bytes)| {
+                    if let Some(viewer) = attachments.get(&session_id).and_then(|a| a.viewer) {
+                        // An observer may not type; typing makes a viewer the
+                        // one that sets the size (T3).
+                        if !state
+                            .sessions
+                            .viewer_may_type(session_id, viewer)
+                            .map_err(|error| error.to_string())?
+                        {
+                            return Err("this viewer only observes".to_string());
+                        }
+                        state
+                            .sessions
+                            .viewer_input(session_id, viewer)
+                            .map_err(|error| error.to_string())?;
+                    }
                     state
                         .sessions
                         .write_input(session_id, bytes, client_addr)
@@ -798,6 +887,14 @@ async fn apply_action(
 ) -> bool {
     match action {
         WsAction::Reply(message) => send_daemon_message(socket, message).await,
+        WsAction::Confirm(session_id) => {
+            if let Some(attachment) = attachments.get(&session_id) {
+                attachment
+                    .confirmation
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            true
+        }
         WsAction::Resize {
             session_id,
             message,
@@ -813,6 +910,12 @@ async fn apply_action(
             session_id,
             attachment,
         } => {
+            // A sized viewer learns the Session's size before its screen.
+            if let Some(viewer) = attachment.viewer.as_ref().filter(|viewer| viewer.sized) {
+                if !send_daemon_message(socket, viewer.size_message(session_id)).await {
+                    return false;
+                }
+            }
             if socket
                 .send(Message::Binary(
                     encode_terminal_frame(session_id, &attachment.screen).into(),
@@ -826,8 +929,16 @@ async fn apply_action(
                 previous.task.abort();
             }
             let confirmation = attachment.confirmation.clone();
+            let viewer = attachment.viewer.as_ref().map(|viewer| viewer.id);
             let task = attach::spawn_forwarder(session_id, attachment, output_tx.clone());
-            attachments.insert(session_id, AttachedForwarder { task, confirmation });
+            attachments.insert(
+                session_id,
+                AttachedForwarder {
+                    task,
+                    confirmation,
+                    viewer,
+                },
+            );
             true
         }
         WsAction::Detach(session_id) => {
@@ -842,6 +953,8 @@ async fn apply_action(
 struct AttachedForwarder {
     task: JoinHandle<()>,
     confirmation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// The viewer this attachment is (T3).
+    viewer: Option<crate::session_manager::ViewerId>,
 }
 
 async fn send_daemon_message(socket: &mut WebSocket, message: DaemonMessage) -> bool {

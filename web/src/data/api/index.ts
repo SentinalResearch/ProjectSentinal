@@ -1357,6 +1357,16 @@ export function createApiAdapter(options: ApiAdapterOptions = {}): DataAdapter {
       await ensureInitialized();
       await liveOwner(sessionId, "terminal input").transport.sendBytes(localId(sessionId), encoder.encode(data));
     },
+    async answerPrompt(sessionId, eventId, option) {
+      await ensureInitialized();
+      const local = localId(sessionId);
+      const reply = await liveOwner(sessionId, "terminal input").transport.request(
+        { type: "ANSWER_PROMPT", session_id: local, event_id: eventId, option },
+        (message) =>
+          message.type === "ERROR" || (message.type === "SESSION_UPDATED" && message.session.id === local),
+      );
+      if (reply.type === "ERROR") throw new Error(reply.message);
+    },
     async sendSignal(sessionId, signal) {
       await ensureInitialized();
       const connection = liveOwner(sessionId, signal === "SIGINT" ? "terminal input" : "kill");

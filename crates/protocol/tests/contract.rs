@@ -232,6 +232,8 @@ fn every_client_request_has_a_fixture() {
         "CREATE_SESSION",
         "CONTINUE_SESSION",
         "ATTACH",
+        "VIEWER_STATE",
+        "ANSWER_PROMPT",
         "DETACH",
         "RESIZE",
         "KILL",
@@ -507,11 +509,37 @@ fn attach_history_is_optional_and_off_by_default() {
         ClientRequest::Attach {
             session_id: protocol::SessionId(4),
             history: false,
+            cols: None,
+            rows: None,
+            mode: None,
         }
     );
     let encoded = serde_json::to_string(&old).expect("encodes");
     assert!(
-        !encoded.contains("history"),
-        "an old daemon never sees the field: {encoded}"
+        !encoded.contains("history") && !encoded.contains("cols") && !encoded.contains("mode"),
+        "an old daemon never sees the fields: {encoded}"
     );
+}
+
+#[test]
+fn a_sized_attach_needs_both_dimensions_and_neither_zero() {
+    let attach = |cols, rows| ClientRequest::Attach {
+        session_id: protocol::SessionId(4),
+        history: false,
+        cols,
+        rows,
+        mode: Some(protocol::ViewerMode::Observe),
+    };
+    assert!(attach(Some(80), Some(24)).validate().is_ok());
+    assert!(attach(None, None).validate().is_ok());
+    assert!(attach(Some(80), None).validate().is_err());
+    assert!(attach(None, Some(24)).validate().is_err());
+    assert!(attach(Some(0), Some(24)).validate().is_err());
+    let state = ClientRequest::ViewerState {
+        session_id: protocol::SessionId(4),
+        cols: 80,
+        rows: 0,
+        active: true,
+    };
+    assert!(state.validate().is_err());
 }

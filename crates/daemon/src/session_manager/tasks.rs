@@ -432,6 +432,17 @@ pub(super) fn apply_observation(
             kind,
         })
         .collect::<Vec<_>>();
+    // T3.4: the question a menu answer must still be on.
+    if let Ok(mut asked) = handle.asked.lock() {
+        if !update.waiting {
+            *asked = None;
+        }
+        for event in &events {
+            if let EventKind::WaitingForInput { options, .. } = &event.kind {
+                *asked = Some((event.id, options.clone()));
+            }
+        }
+    }
     if let Some(store) = store {
         for event in &events {
             if let Err(error) = store.insert_event(event) {

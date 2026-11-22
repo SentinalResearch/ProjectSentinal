@@ -165,6 +165,12 @@ export const mockAdapter: DataAdapter = {
     return { linked: false, entries: [] };
   },
 
+  async answerPrompt(sessionId: string, _eventId: number, option: number) {
+    const choice = findSession(sessionId)?.promptOptions?.[option];
+    if (!choice) throw new Error("option is not in the menu");
+    await mockAdapter.sendInput(sessionId, choice.keys);
+  },
+
   async sendInput(sessionId: string, data: string) {
     await delay(undefined, 100, 250);
     const session = findSession(sessionId);

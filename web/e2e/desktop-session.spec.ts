@@ -201,3 +201,62 @@ test("a finished Session is hidden, restored, and deleted on a real daemon", asy
   await expect.poll(stored).toBeUndefined();
   await expect(currentPage(page).getByText("Remove me")).toHaveCount(0);
 });
+
+// T3.6: one size per Session. Two windows of different sizes on the same
+// Session draw the same screen, cell for cell, whichever one was typed in last.
+test("two windows of different sizes show the same screen, whoever types", async ({ browser }) => {
+  const created = await daemonRequest(env("SENTINAL_E2E_CONTROL_WS"), "test-token", {
+    type: "CREATE_SESSION", shell: "/bin/zsh", cwd: "/tmp", cols: 100, rows: 30,
+    origin: "UI", title: "Two windows", command: null,
+  }, "SESSION_UPDATED");
+  const session = created.session as { id: number; machine_id: string };
+  const url = `/app/sessions/${session.machine_id}:${session.id}`;
+
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const wide = await context.newPage();
+  await signIn(wide);
+  const narrow = await context.newPage();
+  await narrow.setViewportSize({ width: 1024, height: 700 });
+
+  const open = async (page: Page) => {
+    await page.goto(url);
+    await expect(page.getByRole("heading", { name: "Two windows" })).toBeVisible();
+    await expect(currentPage(page).getByText("attached", { exact: true })).toBeVisible();
+  };
+  await open(wide);
+  await open(narrow);
+
+  /** Every row of the terminal, as text. */
+  const screen = (page: Page) =>
+    page.getByTestId("terminal-host").locator(".xterm-rows > div").evaluateAll((rows) =>
+      rows.map((row) => (row.textContent ?? "").replace(/ /g, " ").trimEnd()),
+    );
+  const typeIn = async (page: Page, text: string) => {
+    await page.getByTestId("terminal-host").click();
+    await page.keyboard.type(text);
+  };
+  const sameScreen = async () => {
+    await expect.poll(async () => JSON.stringify(await screen(narrow)), { timeout: 10_000 })
+      .toBe(JSON.stringify(await screen(wide)));
+  };
+
+  await typeIn(wide, "typed in the wide window ");
+  await expect(wide.getByTestId("terminal-host")).toContainText("typed in the wide window");
+  await sameScreen();
+  // The narrow window shows the wide window's screen and can take the size.
+  await expect(narrow.getByText(/Sized for another device/)).toBeVisible();
+  await expect(wide.getByText(/Sized for another device/)).toHaveCount(0);
+
+  await typeIn(narrow, "then in the narrow one");
+  await expect(narrow.getByTestId("terminal-host")).toContainText("then in the narrow one");
+  await expect(wide.getByText(/Sized for another device/)).toBeVisible({ timeout: 10_000 });
+  await expect(narrow.getByText(/Sized for another device/)).toHaveCount(0);
+  await sameScreen();
+  await expect(wide.getByTestId("terminal-host")).toContainText("typed in the wide window");
+
+  // One tap gives the size back.
+  await wide.getByRole("button", { name: "Use this size" }).click();
+  await expect(wide.getByText(/Sized for another device/)).toHaveCount(0, { timeout: 10_000 });
+  await sameScreen();
+  await context.close();
+});

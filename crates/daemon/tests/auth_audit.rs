@@ -449,6 +449,7 @@ fn audit_log_records_metadata_but_not_terminal_bytes() {
         client_addr: "100.64.0.2:50123".into(),
         session_id: SessionId(7),
         byte_count: 19,
+        resize: None,
     };
 
     log.append(&record).unwrap();

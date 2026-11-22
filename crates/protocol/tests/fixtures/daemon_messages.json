@@ -45,5 +45,7 @@
   { "version": 1, "payload": { "type": "ERROR", "message": "unknown session #999" } },
   { "version": 1, "payload": { "type": "SESSIONS_DELETED", "session_ids": [129, 128] } },
   {"version": 1, "payload": {"type": "CHAT", "session_id": 128, "linked": true, "from_start": true, "entries": [{"at": 1795083900000, "item": {"kind": "USER", "text": "Fix the failing parser test"}}, {"at": 1795083901000, "item": {"kind": "AGENT", "text": "I'll look at the parser first."}}, {"at": 1795083902000, "item": {"kind": "TOOL", "id": "toolu_01", "tool": "Bash", "summary": "cargo test -p parser"}}, {"at": 1795083905000, "item": {"kind": "TOOL_RESULT", "id": "toolu_01", "ok": true, "preview": "test result: ok. 41 passed"}}, {"at": 1795083906000, "item": {"kind": "TURN_FINISHED", "tool_uses": 1}}]}},
-  {"version": 1, "payload": {"type": "DETACH_REQUESTED", "session_id": 128}}
+  {"version": 1, "payload": {"type": "DETACH_REQUESTED", "session_id": 128}},
+  {"version": 1, "payload": {"type": "SESSION_SIZE", "session_id": 128, "cols": 132, "rows": 40, "owner": true}},
+  {"version": 1, "payload": {"type": "SESSION_SIZE", "session_id": 128, "cols": 132, "rows": 40, "owner": false}}
 ]

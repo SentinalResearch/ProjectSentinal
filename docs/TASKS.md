@@ -471,17 +471,38 @@ T0.5, T0.6 (X14), T0.11, T0.12 (X15).
       default 2,000; libghostty drops history a page at a time, so "about").
       The CLI still asks for none: picking up with history is T4
 
-### T3. One size per Session · *protocol change, proposal first*
+### T3. One size per Session · *proposal approved 2026-11-22, built*
 
-- [ ] T3.1 `ATTACH` fields, `VIEWER_STATE`, `SESSION_SIZE`, fixtures
-- [ ] T3.2 Size policy in the daemon (latest active viewer)
-- [ ] T3.3 Web renders at the Session size; "Use this size" bar; peek cards
-      observe only
-- [ ] T3.4 Answer keys for marked menus computed in the daemon from the
-      current screen; the Vibe-only arrow logic in `web/src/data/actions.ts`
-      (which assumes option 1 is marked) is removed
-- [ ] T3.5 CLI follows the Session size
-- [ ] T3.6 Two-viewer browser test
+Design: `docs/TERMINAL_SIZE_DESIGN.md` (owner approved the four recommended
+decisions).
+
+- [x] T3.1 `ATTACH` gains optional `cols`, `rows`, `mode`; new
+      `VIEWER_STATE`, `ANSWER_PROMPT` and `SESSION_SIZE`; fixtures; TypeScript
+- [x] T3.2 Size policy in the daemon (`session_manager/viewers.rs`, pure,
+      clock injected; `viewer_ops.rs` applies it): the active viewer is the
+      one that last typed or focused; 150 ms settle; joining never takes the
+      size unless alone; the size stays when the active viewer leaves;
+      observers never set it; old `RESIZE` applies at once; 20–500 × 5–200;
+      every accepted size is in the audit log with the client address. A
+      size change sends sized viewers `SESSION_SIZE`, then a reset and a
+      snapshot at the new size (exactly-once, as T2's attach)
+- [x] T3.3 Web: attaches with its box; draws at the Session size; when
+      another device set it, shrinks the font to fit the width (not below
+      9 px), then pans; "Sized for another device · Use this size" bar.
+      Focus or typing takes the size. Peek cards attach as observers and
+      draw at the Session size. An older daemon still gets `RESIZE`
+- [x] T3.4 `ANSWER_PROMPT`: the daemon reads the menu on the current screen,
+      refuses if the question or menu changed or nothing is marked, and
+      sends arrows (application cursor keys when the program asked) from
+      the marked row, then Enter. Vibe menus are answered from cards again
+- [x] T3.5 CLI: attaches with its window size, acknowledges with
+      `VIEWER_STATE`, becomes the size only by typing. When another device
+      set the size: long lines are cut at the window's edge (wrap off) and
+      the status shows in a free row below the screen, or the window title.
+      An older daemon still gets `RESIZE`. Not real cropping: rows below
+      the window still scroll it (the CLI has no screen of its own)
+- [x] T3.6 Browser test: two windows of different sizes on one Session, type
+      in each in turn, rows identical; the bar moves; "Use this size" works
 
 ### T4. `sentinal watch` picks up from anywhere · *design first*
 
@@ -742,6 +763,13 @@ Full notes: `docs/releases/v2.11.0.md`.
   `events.json`
 
 ### Release notes so far (protocol changes since v2.10.0)
+
+- One size per Session (T3): `ATTACH.cols`, `rows`, `mode` (optional),
+  `VIEWER_STATE`, `ANSWER_PROMPT`, `SESSION_SIZE`; `ViewerMode`. Additive;
+  `PROTOCOL_VERSION` stays 1. `SESSION_SIZE` goes only to viewers that sent
+  a size, because installed CLIs stop on unknown message types. Old
+  `RESIZE` still sets the size at once. The audit log gains optional
+  `resize` records
 
 - Terminal engine: libghostty-vt replaces `vt100` in the daemon (T2). No
   wire change. New `daemon.toml` key `attach_history_lines` (default 2000).

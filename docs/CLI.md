@@ -527,6 +527,16 @@ attached to it with `sentinal attach` or `sentinal watch`, exactly as
 pressing `Ctrl+J` does. The Session keeps running; web viewers stay. Only a
 process inside that Session may ask. Outside a Session it says so and exits 1.
 
+### One size per Session
+
+A Session has one terminal size, set by the window you last typed in
+(web pages also take it on focus). `sentinal attach` and `sentinal watch`
+report their window size but do not take the size from another device just
+by attaching. While another device's size is in use, long lines are cut at
+this window's edge and the status says "Sized for another device (W×H) ·
+type here to take over", in the row below the screen or in the window title.
+Typing makes this window the size; the screen is redrawn for it.
+
 ### `agent-chat`
 
 Show Claude Code Sessions as a chat in the web app (design:

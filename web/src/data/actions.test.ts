@@ -56,11 +56,11 @@ describe("answering a choice (P1)", () => {
     expect(send).toHaveBeenCalledWith("m:2", "3");
   });
 
-  it("offers no one-tap answer for Vibe, whose marker position is unknown", async () => {
-    // Down x (N-1) assumed the marker starts on option 1; if it does not, the
-    // wrong answer reaches a permission prompt. Until the watcher reports where
-    // the marker is, a Vibe question is answered in the terminal.
+  it("answers a Vibe menu by naming the option, never by counting arrows (T3.4)", async () => {
+    // The owner may have moved the marker since the question was asked, so the
+    // daemon computes the keys from the screen as it is when answering.
     const send = vi.spyOn(dataAdapter, "sendInput").mockResolvedValue();
+    const answer = vi.spyOn(dataAdapter, "answerPrompt").mockResolvedValue();
     const vibe: Session = {
       id: "m:3",
       machine: "m",
@@ -73,8 +73,14 @@ describe("answering a choice (P1)", () => {
       ],
       codingAgent: { agent: "VIBE", working: true, toolUses: 0 },
     };
+    // Without the question's Event there is nothing to check the screen against.
     expect(canAnswer(vibe)).toBe(false);
     await expect(answerChoice("m:3", { label: "No", keys: "2" }, vibe)).rejects.toThrow();
+
+    const asked = { ...vibe, promptEventId: 812 };
+    expect(canAnswer(asked)).toBe(true);
+    await answerChoice("m:3", { label: "No", keys: "2" }, asked);
+    expect(answer).toHaveBeenCalledWith("m:3", 812, 1);
     expect(send).not.toHaveBeenCalled();
   });
 

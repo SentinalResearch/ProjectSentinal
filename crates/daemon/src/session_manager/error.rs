@@ -246,4 +246,7 @@ pub enum SessionManagerError {
     /// A report's progress does not fit what the agent reported before (6.5).
     #[error("agent progress: {0}")]
     AgentProgressInvalid(&'static str),
+    /// A menu answer did not match what is on screen now (T3.4).
+    #[error(transparent)]
+    AnswerRefused(#[from] super::answer::AnswerRefused),
 }

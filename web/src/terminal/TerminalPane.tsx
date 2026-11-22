@@ -16,6 +16,7 @@ import { usePriorParts, type PriorParts } from "./usePriorParts";
 import { isReadOnlyTerminalState } from "./lifecycle";
 import styles from "./TerminalPane.module.css";
 import { attachTouchScroll } from "./touchScroll";
+import { BASE_FONT, baseCells, fitFont, sizedForOther } from "./sessionSize";
 
 const TERM_BG = "#0C0C0C";
 const TERM_FG = "#D4D4D0";
@@ -129,6 +130,9 @@ export function TerminalPane({
 }: TerminalPaneProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
+  /** T3: what happens when the box changes; replaced once the Session's size is known. */
+  const onBoxChange = useRef<() => void>(() => undefined);
   const inputLineRef = useRef("");
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const seenEventCount = useRef(0);
@@ -151,11 +155,12 @@ export function TerminalPane({
       // Resumed tags are xterm decorations, still a proposed API in xterm 6.
       allowProposedApi: true,
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-      fontSize: 13,
+      fontSize: BASE_FONT,
       lineHeight: 19 / 13,
       theme: { background: TERM_BG, foreground: TERM_FG, cursor: TERM_FG },
     });
     const fit = new FitAddon();
+    fitRef.current = fit;
     term.loadAddon(fit);
     term.open(host);
     // Browser automation reads terminal text from the DOM renderer.
@@ -174,13 +179,14 @@ export function TerminalPane({
     fit.fit();
     // The first fit may measure the fallback font; refit once the real one loads.
     void document.fonts?.ready.then(() => {
-      if (terminalRef.current === term) fit.fit();
+      if (terminalRef.current === term) onBoxChange.current();
     });
     terminalRef.current = term;
     setTerminal(term);
 
+    onBoxChange.current = () => fit.fit();
     const refit = trailing(() => {
-      if (terminalRef.current === term) fit.fit();
+      if (terminalRef.current === term) onBoxChange.current();
     }, FIT_DEBOUNCE_MS);
     const onResize = refit.call;
     window.addEventListener("resize", onResize);
@@ -193,6 +199,7 @@ export function TerminalPane({
       resizeObserver.disconnect();
       term.dispose();
       terminalRef.current = null;
+      fitRef.current = null;
       setTerminal(null);
     };
     // Deliberately mount once per session id — see the session-id effect below for resets.
@@ -214,11 +221,70 @@ export function TerminalPane({
 
   const { ready: priorReady, markers } = usePriorParts(terminal, session, prior);
   const keepContent = (prior?.parts.length ?? 0) > 0;
-  const { attached: realAttached, sendBytes: sendRealBytes } = useRealTerminalSession(
+  // T3: this box in cells at the base font, whatever font the terminal shows.
+  const boxSize = useRef(() => {
+    const term = terminalRef.current;
+    const proposed = fitRef.current?.proposeDimensions();
+    if (!term || !proposed || !proposed.cols || !proposed.rows) return null;
+    return baseCells(proposed.cols, proposed.rows, term.options.fontSize ?? BASE_FONT);
+  }).current;
+  const {
+    attached: realAttached,
+    sendBytes: sendRealBytes,
+    sessionSize,
+    report,
+  } = useRealTerminalSession(
     isMockData || readOnly ? "" : sessionId,
     isMockData || readOnly || !priorReady ? null : terminal,
-    { keepContent },
+    { keepContent, boxSize },
   );
+  const [box, setBox] = useState<{ cols: number; rows: number } | null>(null);
+
+  // T3: with a daemon that owns the size, the terminal stays at the Session's
+  // size; a box change is reported (and takes effect only while this viewer
+  // sets the size), and the font shrinks to fit the width, then the view pans.
+  useEffect(() => {
+    if (!terminal) return;
+    if (!sessionSize) {
+      onBoxChange.current = () => fitRef.current?.fit();
+      return;
+    }
+    const apply = () => {
+      const current = boxSize();
+      if (!current) return;
+      setBox(current);
+      const font = fitFont(sessionSize.cols, current.cols);
+      if (terminal.options.fontSize !== font) terminal.options.fontSize = font;
+      if (terminal.cols !== sessionSize.cols || terminal.rows !== sessionSize.rows) {
+        terminal.resize(sessionSize.cols, sessionSize.rows);
+      }
+    };
+    onBoxChange.current = () => {
+      if (sessionSize.owner) {
+        // This window sets the size: fit at once, as before T3, and report;
+        // the daemon's SESSION_SIZE then confirms what is already drawn.
+        if (terminal.options.fontSize !== BASE_FONT) terminal.options.fontSize = BASE_FONT;
+        fitRef.current?.fit();
+        const current = boxSize();
+        if (current) {
+          setBox(current);
+          report(current.cols, current.rows, document.activeElement === terminal.textarea);
+        }
+        return;
+      }
+      apply();
+      const current = boxSize();
+      if (current) report(current.cols, current.rows, document.activeElement === terminal.textarea);
+    };
+    apply();
+  }, [boxSize, report, sessionSize, terminal]);
+
+  const useThisSize = () => {
+    const current = boxSize();
+    if (current) report(current.cols, current.rows, true);
+    terminal?.focus();
+  };
+  const sizedElsewhere = sizedForOther(sessionSize, box);
 
   useEffect(() => {
     if (!terminal || !jumpTo) return;
@@ -381,6 +447,16 @@ export function TerminalPane({
         />
         <LivePill terminal={terminal} />
       </div>
+      {sizedElsewhere && sessionSize && (
+        <div className={styles.sizeBar} role="status">
+          <span>
+            Sized for another device ({sessionSize.cols}×{sessionSize.rows})
+          </span>
+          <button type="button" className={styles.sizeBarButton} onClick={useThisSize}>
+            Use this size
+          </button>
+        </div>
+      )}
       {replayWarning && <p className={styles.replayWarning} role="alert">Saved output warning: {replayWarning}</p>}
       {replayTruncated && (
         <p className={styles.replayWarning} role="status">

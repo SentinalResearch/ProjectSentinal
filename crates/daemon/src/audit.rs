@@ -19,6 +19,19 @@ pub struct AuditRecord {
     pub session_id: SessionId,
     /// Number of input bytes, excluding the frame header.
     pub byte_count: usize,
+    /// Set when this record is a change of the Session's size (T3), not
+    /// input; `byte_count` is then 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resize: Option<AuditResize>,
+}
+
+/// A Session size accepted from a viewer's report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditResize {
+    /// Columns.
+    pub cols: u16,
+    /// Rows.
+    pub rows: u16,
 }
 
 /// Append-only JSON Lines audit log.

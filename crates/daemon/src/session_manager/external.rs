@@ -461,6 +461,14 @@ impl SessionManager {
             try_wait: Arc::new(|| Ok(None)),
             pty_closed: std::sync::atomic::AtomicBool::new(true),
             screen: crate::screen::Screen::without_engine(output.clone()),
+            asked: Mutex::new(None),
+            viewers: Mutex::new(super::viewers::Viewers::new(1, 1)),
+            size: tokio::sync::watch::channel(super::viewers::SizeChange {
+                cols: 1,
+                rows: 1,
+                owner: None,
+            })
+            .0,
             structured,
             observations: self.inner.observations.clone(),
             events: self.inner.events.clone(),

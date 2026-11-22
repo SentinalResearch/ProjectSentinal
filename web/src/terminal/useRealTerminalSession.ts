@@ -9,6 +9,7 @@ import { decodeTerminalFrame, encodeTerminalFrame } from "../frame";
 import type { ClientRequest } from "../protocol/ClientRequest";
 import type { DaemonMessage } from "../protocol/DaemonMessage";
 import type { Envelope } from "../protocol/Envelope";
+import type { SessionSize } from "./sessionSize";
 
 const PROTOCOL_VERSION = 1;
 const encoder = new TextEncoder();
@@ -25,6 +26,13 @@ export interface RealTerminalSession {
   attached: boolean;
   /** Send raw bytes to the attached session (used by key-bar Esc/Tab/↑/↓ presses). */
   sendBytes: (bytes: Uint8Array) => void;
+  /**
+   * The Session's size from a daemon that owns it (T3), or null from an
+   * older one, whose terminal still sizes the PTY itself.
+   */
+  sessionSize: SessionSize | null;
+  /** Report this viewer's box (at the base font) and whether it is in use. */
+  report: (cols: number, rows: number, active: boolean) => void;
 }
 
 export interface RealTerminalOptions {
@@ -33,6 +41,8 @@ export interface RealTerminalOptions {
    * the snapshot's history scroll them up instead of resetting the terminal.
    */
   keepContent?: boolean;
+  /** This viewer's box in cells at the base font (T3); the terminal's size when absent. */
+  boxSize?: () => { cols: number; rows: number } | null;
 }
 
 export function useRealTerminalSession(
@@ -41,8 +51,12 @@ export function useRealTerminalSession(
   options: RealTerminalOptions = {},
 ): RealTerminalSession {
   const keepContent = options.keepContent ?? false;
+  const boxSizeRef = useRef(options.boxSize);
+  boxSizeRef.current = options.boxSize;
   const [attached, setAttached] = useState(false);
+  const [sessionSize, setSessionSize] = useState<SessionSize | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const sizedRef = useRef(false);
   let route: ReturnType<typeof dataAdapter.resolveTerminal> | null = null;
   try {
     route = dataAdapter.resolveTerminal(sessionId);
@@ -62,8 +76,23 @@ export function useRealTerminalSession(
     [numericId],
   );
 
+  const report = useCallback(
+    (cols: number, rows: number, active: boolean) => {
+      const socket = socketRef.current;
+      if (!sizedRef.current || numericId === undefined || socket?.readyState !== WebSocket.OPEN) return;
+      const envelope: Envelope<ClientRequest> = {
+        version: PROTOCOL_VERSION,
+        payload: { type: "VIEWER_STATE", session_id: numericId, cols, rows, active },
+      };
+      socket.send(JSON.stringify(envelope));
+    },
+    [numericId],
+  );
+
   useEffect(() => {
     if (!terminal || numericId === undefined || websocketUrl === undefined) return;
+    sizedRef.current = false;
+    setSessionSize(null);
 
     // Measured for Settings → Diagnostics (4.H): durations only, never the bytes.
     const machine = machineId(sessionId);
@@ -79,19 +108,22 @@ export function useRealTerminalSession(
       socket.send(JSON.stringify(envelope));
     }
 
-    // The shell lays out its output for the PTY's size, so the PTY must match
-    // this terminal: size it before the snapshot is taken, and send RESIZE
-    // again once the snapshot arrives (that RESIZE is also the attachment
-    // acknowledgement, as in the CLI).
+    // T3: the daemon owns the size. ATTACH says this viewer's box; a daemon
+    // that owns the size answers SESSION_SIZE before the screen, and this
+    // terminal draws at that size. An older daemon (a worker behind the
+    // control may be one) ignores the box: then this terminal sizes the PTY
+    // with RESIZE once the snapshot arrives, as before.
+    const box = () => boxSizeRef.current?.() ?? { cols: terminal.cols, rows: terminal.rows };
     const resizeToTerminal = () =>
       sendRequest({ type: "RESIZE", session_id: numericId, cols: terminal.cols, rows: terminal.rows });
+    const focused = () => document.activeElement === terminal.textarea;
     let snapshotReceived = false;
 
     socket.onopen = () => {
-      resizeToTerminal();
+      const { cols, rows } = box();
       // History: the daemon sends the scrollback before the screen, so a
       // viewer can scroll back through what it missed.
-      sendRequest({ type: "ATTACH", session_id: numericId, history: true });
+      sendRequest({ type: "ATTACH", session_id: numericId, history: true, cols, rows, mode: "INTERACTIVE" });
       setAttached(true);
     };
     socket.onclose = () => setAttached(false);
@@ -108,6 +140,13 @@ export function useRealTerminalSession(
               fromStart: envelope.payload.from_start,
               entries: envelope.payload.entries,
             });
+          }
+          if (envelope.payload.type === "SESSION_SIZE" && envelope.payload.session_id === numericId) {
+            const { cols, rows, owner } = envelope.payload;
+            sizedRef.current = true;
+            // A reset and a whole screen at this size follow at once.
+            if (terminal.cols !== cols || terminal.rows !== rows) terminal.resize(cols, rows);
+            setSessionSize({ cols, rows, owner });
           }
           if (envelope.payload.type === "ERROR") {
             health.count("ERRORS", machine, "ERROR_ATTACH");
@@ -130,7 +169,14 @@ export function useRealTerminalSession(
         health.record("TERMINAL_OPEN_MS", machine, performance.now() - openedAt);
         if (!keepContent) terminal.reset();
         terminal.write(frame.payload);
-        resizeToTerminal();
+        // The attachment acknowledgement: VIEWER_STATE to a daemon that owns
+        // the size (attaching does not take it from others), else RESIZE.
+        if (sizedRef.current) {
+          const { cols, rows } = box();
+          sendRequest({ type: "VIEWER_STATE", session_id: numericId, cols, rows, active: focused() });
+        } else {
+          resizeToTerminal();
+        }
         return;
       }
       // The daemon resets and redraws a viewer that fell behind (ESC c).
@@ -142,17 +188,28 @@ export function useRealTerminalSession(
       echo.keystroke(data);
       sendBytes(encoder.encode(data));
     });
-    const resizeDisposable = terminal.onResize(({ cols, rows }) =>
-      sendRequest({ type: "RESIZE", session_id: numericId, cols, rows }),
-    );
+    // An older daemon: this terminal's size is the PTY's. With a daemon that
+    // owns the size, the terminal follows SESSION_SIZE instead.
+    const resizeDisposable = terminal.onResize(({ cols, rows }) => {
+      if (!sizedRef.current) sendRequest({ type: "RESIZE", session_id: numericId, cols, rows });
+    });
+    // Focus means "I'm using this one" (owner decision 2): it takes the size.
+    const textarea = terminal.textarea;
+    const onFocus = () => {
+      if (!sizedRef.current) return;
+      const { cols, rows } = box();
+      sendRequest({ type: "VIEWER_STATE", session_id: numericId, cols, rows, active: true });
+    };
+    textarea?.addEventListener("focus", onFocus);
 
     return () => {
       dataDisposable.dispose();
       resizeDisposable.dispose();
+      textarea?.removeEventListener("focus", onFocus);
       sendRequest({ type: "DETACH", session_id: numericId });
       socket.close();
     };
   }, [terminal, numericId, websocketUrl, sessionId, keepContent]);
 
-  return { attached, sendBytes };
+  return { attached, sendBytes, sessionSize, report };
 }

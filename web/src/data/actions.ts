@@ -25,10 +25,10 @@ export function choiceKeysAllowed(keys: string): boolean {
 
 /**
  * Agents whose menus are chosen with arrows and Enter, where a digit is not a
- * verified answer. The watcher reports which option the marker was on when
- * the question was asked (`marked`, T0.8), but the owner may have moved it
- * since, so the browser does not count arrows from it: these are answered in
- * the terminal until the daemon computes the keys from the current screen (T3.4).
+ * verified answer. The owner may have moved the marker since the question
+ * was asked, so the browser never counts arrows itself: it names the option,
+ * and the daemon computes the keys from the current screen at the moment of
+ * answering, refusing if the question has changed (`ANSWER_PROMPT`, T3.4).
  */
 const ARROW_MENU_AGENTS = new Set(["VIBE"]);
 
@@ -36,10 +36,23 @@ function arrowMenu(session?: Session): boolean {
   return session?.codingAgent !== undefined && ARROW_MENU_AGENTS.has(session.codingAgent.agent);
 }
 
+/** Where `choice` is in the menu the daemon reported, or -1. */
+function optionIndex(session: Session, choice: PromptChoice): number {
+  return (session.promptOptions ?? []).findIndex(
+    (option) => option.label === choice.label && option.keys === choice.keys,
+  );
+}
+
 /** Send one offered answer. Anything but a choice key is refused here too. */
 export function answerChoice(sessionId: string, choice: PromptChoice, session?: Session): Promise<void> {
   if (!choiceKeysAllowed(choice.keys)) return Promise.reject(new Error("not an answer key"));
-  if (arrowMenu(session)) return Promise.reject(new Error("answer this menu in the terminal"));
+  if (session && arrowMenu(session)) {
+    const option = optionIndex(session, choice);
+    if (session.promptEventId === undefined || option < 0) {
+      return Promise.reject(new Error("answer this menu in the terminal"));
+    }
+    return dataAdapter.answerPrompt(sessionId, session.promptEventId, option);
+  }
   return dataAdapter.sendInput(sessionId, choice.keys);
 }
 
@@ -63,7 +76,8 @@ const YES_NO = /\[\s*y(es)?\s*\/\s*n(o)?\s*\]|\(\s*y\s*\/\s*n\s*\)/i;
 export function canAnswer(session: Session): boolean {
   if (session.state !== "WAITING" || !session.prompt) return false;
   if (!captureCapabilities(captureOf(session)).canSendInput) return false;
-  if (arrowMenu(session)) return false;
+  // An arrow menu is answered by the daemon, which needs the question's Event.
+  if (arrowMenu(session)) return session.promptEventId !== undefined && offeredChoices(session).length > 0;
   return offeredChoices(session).length > 0 || YES_NO.test(session.prompt);
 }
 
@@ -76,7 +90,6 @@ export function noAnswerReason(session: Session): string | null {
   if (!captureCapabilities(captureOf(session)).canSendInput) {
     return "Sentinal only watches this one. Answer it in its own terminal.";
   }
-  if (arrowMenu(session)) return "This menu needs the arrow keys. Answer it in the terminal.";
   return "Answer it in the terminal.";
 }
 

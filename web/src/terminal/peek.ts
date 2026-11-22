@@ -7,6 +7,7 @@ import { dataAdapter, isMockData } from "../data";
 import type { Session } from "../data/types";
 import { decodeTerminalFrame } from "../frame";
 import type { ClientRequest } from "../protocol/ClientRequest";
+import type { DaemonMessage } from "../protocol/DaemonMessage";
 import type { Envelope } from "../protocol/Envelope";
 
 const PROTOCOL_VERSION = 1;
@@ -29,8 +30,9 @@ export interface PeekSocket {
 
 /**
  * A read-only attach used only to show a terminal card's latest lines. It sends
- * ATTACH and DETACH and nothing else: never input and never RESIZE, so the real
- * terminal's size and contents are untouched.
+ * ATTACH (as an observer, T3) and DETACH and nothing else: never input, never
+ * RESIZE, and an observer never sets the Session's size. A daemon that owns
+ * the size says it (`onSize`), so the card's screen is drawn at that size.
  */
 export class PeekClient {
   private socket: PeekSocket | null = null;
@@ -39,6 +41,7 @@ export class PeekClient {
     private readonly url: string,
     private readonly sessionId: number,
     private readonly onBytes: (bytes: Uint8Array) => void,
+    private readonly onSize: (cols: number, rows: number) => void = () => undefined,
     private readonly openSocket: (url: string) => PeekSocket = (url) => new WebSocket(url) as unknown as PeekSocket,
   ) {}
 
@@ -46,9 +49,27 @@ export class PeekClient {
     const socket = this.openSocket(this.url);
     socket.binaryType = "arraybuffer";
     this.socket = socket;
-    socket.onopen = () => this.request({ type: "ATTACH", session_id: this.sessionId });
+    socket.onopen = () =>
+      this.request({
+        type: "ATTACH",
+        session_id: this.sessionId,
+        cols: PEEK_COLS,
+        rows: PEEK_ROWS,
+        mode: "OBSERVE",
+      });
     socket.onmessage = (event) => {
-      if (typeof event.data === "string" || !(event.data instanceof ArrayBuffer)) return;
+      if (typeof event.data === "string") {
+        try {
+          const message = (JSON.parse(event.data) as Envelope<DaemonMessage>).payload;
+          if (message.type === "SESSION_SIZE" && message.session_id === this.sessionId) {
+            this.onSize(message.cols, message.rows);
+          }
+        } catch {
+          // ignore malformed control messages
+        }
+        return;
+      }
+      if (!(event.data instanceof ArrayBuffer)) return;
       const frame = decodeTerminalFrame(new Uint8Array(event.data));
       if (frame.sessionId === this.sessionId) this.onBytes(frame.payload);
     };
@@ -102,7 +123,12 @@ export function usePeekLines(session: Session, visible: boolean): string[] {
       for (let row = 0; row < buffer.length; row += 1) all.push(buffer.getLine(row)?.translateToString(true) ?? "");
       setLines(lastNonEmptyLines(all, 2));
     };
-    const client = new PeekClient(route.websocketUrl, route.localSessionId, (bytes) => screen.write(bytes, read));
+    const client = new PeekClient(
+      route.websocketUrl,
+      route.localSessionId,
+      (bytes) => screen.write(bytes, read),
+      (cols, rows) => screen.resize(cols, rows),
+    );
     client.start();
     return () => {
       client.stop();

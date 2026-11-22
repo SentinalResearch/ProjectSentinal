@@ -211,45 +211,46 @@ impl DaemonClient {
         requested_size: Option<(u16, u16)>,
         auto_wrap: bool,
     ) -> Result<AttachEnd, ClientError> {
-        // T1.4: size the PTY to this terminal before the snapshot is taken,
-        // so the screen arrives laid out for this window, as the web does.
-        // Its reply is awaited and its outcome ignored, so a refused resize
-        // can never be mistaken for a refused attach.
+        // T3: say this window's size in ATTACH. A daemon that owns the size
+        // answers with SESSION_SIZE before the screen and lays the screen
+        // out for this window when it is the only viewer; an older daemon
+        // ignores the fields and is sized by RESIZE below, as before.
         let size = requested_size.or_else(terminal_size);
-        if let Some((cols, rows)) = size {
-            let _ = self
-                .request(ClientRequest::Resize {
-                    session_id,
-                    cols,
-                    rows,
-                })
-                .await;
-        }
         self.send_control(ClientRequest::Attach {
             session_id,
             history: false,
+            cols: size.map(|(cols, _)| cols),
+            rows: size.map(|(_, rows)| rows),
+            mode: size.map(|_| protocol::ViewerMode::Interactive),
         })
         .await?;
         let ready = self.receive_initial_screen(session_id);
-        match ready_deadline {
+        let session_size = match ready_deadline {
             Some(deadline) => tokio::time::timeout(deadline, ready)
                 .await
                 .map_err(|_| ClientError::AttachReadyTimeout(deadline))??,
             None => ready.await?,
-        }
+        };
         // Do not acknowledge auto-wrap until this process can safely take
         // ownership of the caller's terminal.
         let _raw = RawTerminal::enable()?;
-        // RESIZE is the attachment acknowledgement: it is sent only after
-        // this client has actually received the screen snapshot.
+        // The acknowledgement, sent only after this client has actually
+        // received the screen snapshot: VIEWER_STATE to a daemon that owns
+        // the size (it does not take the size from others), else RESIZE.
         let (cols, rows) = size.unwrap_or((80, 24));
-        self.send_control(ClientRequest::Resize {
-            session_id,
-            cols,
-            rows,
-        })
+        let mut view = crate::session_size::SizeView::new((cols, rows));
+        view.session = session_size;
+        self.send_control(acknowledgement(session_id, &view))
+            .await?;
+        let mut stdout = tokio::io::stdout();
+        write_all(
+            &mut stdout,
+            &[view.on_change(), view.after_frame()].concat(),
+        )
         .await?;
-        let result = self.pump_attachment(session_id, (cols, rows)).await;
+        let result = self.pump_attachment(session_id, view).await;
+        // Leave the window as we found it.
+        let _ = write_all(&mut stdout, b"\x1b[?7h").await;
         if auto_wrap && result.is_err() {
             // Once acknowledged, falling back would start a second shell.
             return Ok(AttachEnd::Detached);
@@ -260,7 +261,7 @@ impl DaemonClient {
     async fn pump_attachment(
         &mut self,
         session_id: SessionId,
-        mut size: (u16, u16),
+        mut view: crate::session_size::SizeView,
     ) -> Result<AttachEnd, ClientError> {
         let mut stdin = spawn_stdin_reader();
         let mut stdout = tokio::io::stdout();
@@ -277,14 +278,12 @@ impl DaemonClient {
                         None => std::future::pending().await,
                     }
                 } => {
-                    if let Some(now) = terminal_size().filter(|now| *now != size) {
-                        size = now;
-                        self.send_control(ClientRequest::Resize {
-                            session_id,
-                            cols: now.0,
-                            rows: now.1,
-                        })
-                        .await?;
+                    if let Some(now) = terminal_size().filter(|now| *now != view.window) {
+                        view.window = now;
+                        // To a daemon that owns the size, a report; it is
+                        // applied only while this terminal sets the size.
+                        self.send_control(acknowledgement(session_id, &view)).await?;
+                        write_all(&mut stdout, &view.on_change()).await?;
                     }
                 }
                 chunk = stdin.recv() => {
@@ -328,14 +327,7 @@ impl DaemonClient {
                             let (frame_session, bytes) = decode_terminal_frame(&frame)
                                 .map_err(|error| ClientError::Daemon(error.to_string()))?;
                             if frame_session == session_id {
-                                stdout.write_all(bytes).await.map_err(|source| ClientError::Io {
-                                    operation: "write",
-                                    source,
-                                })?;
-                                stdout.flush().await.map_err(|source| ClientError::Io {
-                                    operation: "flush",
-                                    source,
-                                })?;
+                                write_all(&mut stdout, &[bytes, &view.after_frame()].concat()).await?;
                             }
                         }
                         Message::Text(text) => {
@@ -351,6 +343,13 @@ impl DaemonClient {
                                 {
                                     self.send_control(ClientRequest::Detach { session_id }).await?;
                                     return Ok(AttachEnd::Detached);
+                                }
+                                // T3: the size, then a fresh screen at it.
+                                DaemonMessage::SessionSize { session_id: sized, cols, rows, owner }
+                                    if sized == session_id =>
+                                {
+                                    view.session = Some((cols, rows, owner));
+                                    write_all(&mut stdout, &view.on_change()).await?;
                                 }
                                 // The shell exited: there is nothing left to show.
                                 DaemonMessage::SessionUpdated { session }
@@ -369,8 +368,14 @@ impl DaemonClient {
         }
     }
 
-    async fn receive_initial_screen(&mut self, session_id: SessionId) -> Result<(), ClientError> {
+    /// Write the first screen. Returns the Session's size when the daemon
+    /// sent one first (T3), `None` from an older daemon.
+    async fn receive_initial_screen(
+        &mut self,
+        session_id: SessionId,
+    ) -> Result<Option<(u16, u16, bool)>, ClientError> {
         let mut stdout = tokio::io::stdout();
+        let mut size = None;
         while let Some(message) = self.socket.next().await {
             match message? {
                 Message::Binary(frame) => {
@@ -388,13 +393,21 @@ impl DaemonClient {
                             operation: "flush",
                             source,
                         })?;
-                        return Ok(());
+                        return Ok(size);
                     }
                 }
                 Message::Text(text) => {
-                    let message = Envelope::<DaemonMessage>::decode(text.as_str())?.payload;
-                    if let DaemonMessage::Error { message } = message {
-                        return Err(ClientError::Daemon(message));
+                    match Envelope::<DaemonMessage>::decode(text.as_str())?.payload {
+                        DaemonMessage::Error { message } => {
+                            return Err(ClientError::Daemon(message));
+                        }
+                        DaemonMessage::SessionSize {
+                            session_id: sized,
+                            cols,
+                            rows,
+                            owner,
+                        } if sized == session_id => size = Some((cols, rows, owner)),
+                        _ => {}
                     }
                 }
                 Message::Close(_) => return Err(ClientError::Disconnected),
@@ -476,6 +489,44 @@ impl Drop for RawTerminal {
         let _ = std::io::Write::flush(&mut out);
         let _ = Command::new("stty").arg(&self.previous).status();
     }
+}
+
+/// How this window reports its size: `VIEWER_STATE` to a daemon that owns
+/// the size (T3), else the old `RESIZE`. Never `active`: in a terminal,
+/// typing is what makes this viewer the one that sets the size.
+fn acknowledgement(session_id: SessionId, view: &crate::session_size::SizeView) -> ClientRequest {
+    let (cols, rows) = view.window;
+    if view.session.is_some() {
+        ClientRequest::ViewerState {
+            session_id,
+            cols,
+            rows,
+            active: false,
+        }
+    } else {
+        ClientRequest::Resize {
+            session_id,
+            cols,
+            rows,
+        }
+    }
+}
+
+async fn write_all(stdout: &mut tokio::io::Stdout, bytes: &[u8]) -> Result<(), ClientError> {
+    if bytes.is_empty() {
+        return Ok(());
+    }
+    stdout
+        .write_all(bytes)
+        .await
+        .map_err(|source| ClientError::Io {
+            operation: "write",
+            source,
+        })?;
+    stdout.flush().await.map_err(|source| ClientError::Io {
+        operation: "flush",
+        source,
+    })
 }
 
 /// Current terminal size as `(cols, rows)`, or `None` when unknown or 0x0.

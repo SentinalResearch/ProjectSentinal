@@ -21,7 +21,9 @@
   flex: 1;
   min-height: 0;
   height: auto;
-  overflow: hidden;
+  /* T3: a Session wider than this box even at the smallest font pans sideways. */
+  overflow-x: auto;
+  overflow-y: hidden;
   overscroll-behavior: contain;
   touch-action: none;
 }
@@ -100,4 +102,32 @@
 :global([data-glass]) .ctrlC:hover {
   background: color-mix(in srgb, var(--s-failed) 20%, var(--bg-1));
   color: #ff6b61;
+}
+
+/* T3: the screen is sized for another device; one tap takes the size. */
+.sizeBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.sizeBarButton {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.sizeBarButton:hover {
+  background: var(--bg-2);
 }

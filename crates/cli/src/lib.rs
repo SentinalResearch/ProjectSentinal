@@ -29,6 +29,7 @@ pub mod rc_install;
 pub mod release;
 pub mod release_args;
 pub mod session_env;
+mod session_size;
 pub mod setup;
 pub mod skill_install;
 pub mod top;

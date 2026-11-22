@@ -4,6 +4,7 @@ mod adopt;
 mod adopted_log;
 mod agent_chat;
 mod agent_state;
+mod answer;
 mod capture;
 mod continuation;
 mod error;
@@ -17,6 +18,8 @@ mod replay;
 mod sequence_boundary;
 mod structured;
 mod tasks;
+mod viewer_ops;
+mod viewers;
 
 use crate::{
     audit::AuditLog,
@@ -44,6 +47,7 @@ use std::{
 };
 use store::Store;
 use tokio::sync::broadcast;
+pub use viewers::ViewerId;
 
 /// How long an AUTO_WRAP Session may wait for its terminal to attach.
 pub const AUTO_WRAP_ATTACH_GRACE: std::time::Duration = std::time::Duration::from_millis(300);
@@ -111,9 +115,68 @@ pub struct Attachment {
     pub(crate) confirmation: Arc<AtomicBool>,
     /// Redraws this viewer if it falls behind `output`.
     pub screen_source: ScreenSource,
+    /// This viewer's part in the Session's size (T3); detached when dropped.
+    pub(crate) viewer: Option<ViewerHandle>,
+}
+
+/// One viewer of a Session (T3). Dropping it detaches the viewer.
+pub(crate) struct ViewerHandle {
+    pub(crate) id: viewers::ViewerId,
+    /// It sent its box, so it understands `SESSION_SIZE`.
+    pub(crate) sized: bool,
+    /// The Session's size as it changes.
+    pub(crate) size: tokio::sync::watch::Receiver<viewers::SizeChange>,
+    handle: Arc<SessionHandle>,
+}
+
+impl ViewerHandle {
+    /// `SESSION_SIZE` for this viewer at the current size.
+    pub(crate) fn size_message(&self, session_id: SessionId) -> DaemonMessage {
+        let size = *self.size.borrow();
+        DaemonMessage::SessionSize {
+            session_id,
+            cols: size.cols,
+            rows: size.rows,
+            owner: size.owner == Some(self.id),
+        }
+    }
+}
+
+impl Drop for ViewerHandle {
+    fn drop(&mut self) {
+        if let Ok(mut viewers) = self.handle.viewers.lock() {
+            viewers.detach(self.id);
+        }
+    }
+}
+
+/// How a viewer attaches (T3).
+#[derive(Debug, Clone)]
+pub struct ViewerOptions {
+    /// Its box, when the client sent one.
+    pub size: Option<(u16, u16)>,
+    /// Interactive or observe.
+    pub mode: protocol::ViewerMode,
+    /// For the audit log when its report sets the size.
+    pub client_addr: String,
+}
+
+impl Default for ViewerOptions {
+    fn default() -> Self {
+        Self {
+            size: None,
+            mode: protocol::ViewerMode::Interactive,
+            client_addr: "local".into(),
+        }
+    }
 }
 
 impl Attachment {
+    /// The viewer this attachment is (T3).
+    pub fn viewer_id(&self) -> Option<ViewerId> {
+        self.viewer.as_ref().map(|viewer| viewer.id)
+    }
+
     /// Confirm that the screen snapshot reached the attaching transport.
     pub fn confirm(&self) {
         self.confirmation
@@ -132,6 +195,12 @@ struct SessionHandle {
     pty_closed: AtomicBool,
     /// The authoritative screen; it also publishes `output` (T2).
     screen: crate::screen::Screen,
+    /// The question the Session is waiting on: its Event and options (T3.4).
+    asked: Mutex<Option<(protocol::EventId, Vec<protocol::PromptOption>)>>,
+    /// Who is viewing and which of them sets the size (T3).
+    viewers: Mutex<viewers::Viewers>,
+    /// The Session's size, for every sized viewer's forwarder (T3).
+    size: tokio::sync::watch::Sender<viewers::SizeChange>,
     structured: broadcast::Sender<DaemonMessage>,
     /// Global observation stream used by Sessions that cannot attach.
     observations: broadcast::Sender<DaemonMessage>,
@@ -194,6 +263,8 @@ struct SessionManagerInner {
     log_tail_polling: bool,
     /// Lines of history in front of the screen in a viewer's snapshot (T2.4).
     attach_history_lines: usize,
+    /// Ids for viewers, one per attachment (T3).
+    next_viewer: AtomicU64,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -268,6 +339,7 @@ impl SessionManager {
                 projects: crate::projects::Projects::default(),
                 log_tail_polling: true,
                 attach_history_lines: crate::screen::DEFAULT_ATTACH_HISTORY_LINES,
+                next_viewer: AtomicU64::new(1),
             }),
         }
     }

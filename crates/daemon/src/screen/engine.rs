@@ -5,7 +5,7 @@
 use ghostty_vt::fmt::{Format, Formatter, FormatterOptions};
 use ghostty_vt::screen::Screen as ActiveScreen;
 use ghostty_vt::selection::Selection;
-use ghostty_vt::terminal::{Options, Point, PointCoordinate, Terminal};
+use ghostty_vt::terminal::{Mode, Options, Point, PointCoordinate, Terminal};
 
 /// An error from the engine, as text: callers log it and fail open.
 pub(crate) type EngineError = String;
@@ -30,6 +30,9 @@ pub struct ScreenRows {
     pub alternate: bool,
     /// Cursor column and row, from 0.
     pub cursor: (u16, u16),
+    /// The program asked for application cursor keys (DECCKM): arrows are
+    /// `ESC O A`, not `ESC [ A`.
+    pub application_cursor: bool,
 }
 
 /// One Session's screen.
@@ -151,6 +154,7 @@ impl Engine {
                 self.terminal.cursor_x().map_err(error)?,
                 self.terminal.cursor_y().map_err(error)?,
             ),
+            application_cursor: self.terminal.mode(Mode::DECCKM).map_err(error)?,
         })
     }
 

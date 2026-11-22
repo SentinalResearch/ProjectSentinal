@@ -63,6 +63,24 @@ export type DaemonMessage = {
    */
   events: Array<Event>;
 } | {
+  "type": "SESSION_SIZE";
+  /**
+   * The Session.
+   */
+  session_id: SessionId;
+  /**
+   * Columns.
+   */
+  cols: number;
+  /**
+   * Rows.
+   */
+  rows: number;
+  /**
+   * This viewer's report set the size.
+   */
+  owner: boolean;
+} | {
   "type": "DETACH_REQUESTED";
   /**
    * The Session.

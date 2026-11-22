@@ -88,7 +88,7 @@ pub use machine_details::{
 };
 pub use message::{
     ClientRequest, DaemonMessage, Envelope, LocalErrorCode, LocalRequest, LocalResponse,
-    MAX_COMMAND_TEXT_BYTES, MAX_LOCAL_FRAME_BYTES, PROTOCOL_VERSION,
+    ViewerMode, MAX_COMMAND_TEXT_BYTES, MAX_LOCAL_FRAME_BYTES, PROTOCOL_VERSION,
 };
 pub use metric::{GpuMetrics, MachineMetrics, SessionMetrics};
 pub use notification::{

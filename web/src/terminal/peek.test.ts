@@ -25,16 +25,30 @@ describe("peek attach", () => {
   it("sends only ATTACH and DETACH — never input or RESIZE — and passes on its own Session's bytes", () => {
     const socket = new FakeSocket();
     const received: string[] = [];
-    const client = new PeekClient("ws://control.test/api/v1/machines/rtx/ws", 7, (bytes) => received.push(new TextDecoder().decode(bytes)), () => socket);
+    const sizes: [number, number][] = [];
+    const client = new PeekClient(
+      "ws://control.test/api/v1/machines/rtx/ws",
+      7,
+      (bytes) => received.push(new TextDecoder().decode(bytes)),
+      (cols, rows) => sizes.push([cols, rows]),
+      () => socket,
+    );
     client.start();
     socket.readyState = 1;
     socket.onopen?.();
+    const size = (session: number, owner: boolean) =>
+      JSON.stringify({ version: 1, payload: { type: "SESSION_SIZE", session_id: session, cols: 132, rows: 40, owner } });
+    socket.onmessage?.({ data: size(7, false) });
+    socket.onmessage?.({ data: size(8, false) });
     socket.onmessage?.({ data: encodeTerminalFrame(7, new TextEncoder().encode("epoch 68/100\r\n")).buffer as ArrayBuffer });
     socket.onmessage?.({ data: encodeTerminalFrame(8, new TextEncoder().encode("other session")).buffer as ArrayBuffer });
     client.stop();
 
     const types = socket.sent.map((text) => JSON.parse(text).payload.type);
     expect(types).toEqual(["ATTACH", "DETACH"]);
+    // An observer (T3): it never sets the Session's size, and draws at it.
+    expect(JSON.parse(socket.sent[0]).payload).toMatchObject({ mode: "OBSERVE" });
+    expect(sizes).toEqual([[132, 40]]);
     expect(received).toEqual(["epoch 68/100\r\n"]);
     expect(socket.closed).toBe(true);
   });
