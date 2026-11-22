@@ -14,7 +14,6 @@ mod local_dispatch;
 mod log_budget;
 mod operations;
 mod replay;
-mod screen_history;
 mod sequence_boundary;
 mod structured;
 mod tasks;
@@ -23,7 +22,6 @@ use crate::{
     audit::AuditLog,
     process_probe::ProcessProbe,
     pty::{PtyBackend, PtyError},
-    scrollback::Scrollback,
     tracker::{CommandTracker, TrackerIds},
 };
 pub use error::SessionManagerError;
@@ -32,6 +30,8 @@ use protocol::{DaemonMessage, Event, MachineId, Session, SessionId, SessionOrigi
 pub use replay::{
     OutputReplay, DEFAULT_OUTPUT_PAGE_BYTES, MAX_OUTPUT_PAGE_BYTES, MAX_OUTPUT_SCAN_BYTES,
 };
+#[cfg(test)]
+pub(crate) use sequence_boundary::SequenceBoundary;
 use std::{
     collections::HashMap,
     io::Write,
@@ -130,9 +130,8 @@ struct SessionHandle {
     kill: Arc<dyn Fn() -> Result<(), PtyError> + Send + Sync>,
     try_wait: Arc<dyn Fn() -> Result<Option<i32>, PtyError> + Send + Sync>,
     pty_closed: AtomicBool,
-    parser: Arc<Mutex<vt100::Parser>>,
-    scrollback: Arc<Mutex<Scrollback>>,
-    output: broadcast::Sender<Vec<u8>>,
+    /// The authoritative screen; it also publishes `output` (T2).
+    screen: crate::screen::Screen,
     structured: broadcast::Sender<DaemonMessage>,
     /// Global observation stream used by Sessions that cannot attach.
     observations: broadcast::Sender<DaemonMessage>,
@@ -193,6 +192,8 @@ struct SessionManagerInner {
     projects: crate::projects::Projects,
     /// Whether adopted log tails poll on a background timer (tests drive them).
     log_tail_polling: bool,
+    /// Lines of history in front of the screen in a viewer's snapshot (T2.4).
+    attach_history_lines: usize,
 }
 
 /// Owner of all persistent sessions on one daemon.
@@ -266,6 +267,7 @@ impl SessionManager {
                 watcher_adapters: Vec::new(),
                 projects: crate::projects::Projects::default(),
                 log_tail_polling: true,
+                attach_history_lines: crate::screen::DEFAULT_ATTACH_HISTORY_LINES,
             }),
         }
     }
@@ -275,6 +277,15 @@ impl SessionManager {
         match Arc::get_mut(&mut self.inner) {
             Some(inner) => inner.log_tail_polling = enabled,
             None => tracing::error!("log-tail polling must be set before the manager is shared"),
+        }
+        self
+    }
+
+    /// About how many lines of history a viewer's snapshot carries (T2.4).
+    pub fn with_attach_history_lines(mut self, lines: usize) -> Self {
+        match Arc::get_mut(&mut self.inner) {
+            Some(inner) => inner.attach_history_lines = lines,
+            None => tracing::error!("attach history must be set before the manager is shared"),
         }
         self
     }

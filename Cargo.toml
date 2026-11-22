@@ -29,7 +29,9 @@ toml = "0.9"
 tower = { version = "0.5", features = ["util"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-vt100 = "0.16"
+# The daemon's screen (T2). A fork of libghostty-rs pinned to libghostty-vt
+# 1.0.1; see docs/DEPENDENCIES.md. Exact: the C library is pre-1.0.
+ghostty-vt = { version = "=0.9.0", default-features = false }
 zstd = "0.13"
 sha2 = "0.10"
 hmac = "0.12"

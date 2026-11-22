@@ -324,10 +324,10 @@ fn artifact_identity(file: &str) -> Option<(&str, &str)> {
     let value = file
         .strip_prefix("sentinal-worker-")?
         .strip_suffix(".tar.gz")?;
-    const TARGETS: [&str; 4] = [
+    // Intel Macs (x86_64-apple-darwin) are not built since 2026-11-22.
+    const TARGETS: [&str; 3] = [
         "x86_64-unknown-linux-musl",
         "aarch64-unknown-linux-musl",
-        "x86_64-apple-darwin",
         "aarch64-apple-darwin",
     ];
     TARGETS.iter().find_map(|target| {

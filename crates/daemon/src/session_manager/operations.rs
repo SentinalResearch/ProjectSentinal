@@ -34,30 +34,19 @@ impl SessionManager {
     ) -> Result<Attachment, SessionManagerError> {
         let handle = self.handle(session_id)?;
         require_capture(&handle, CaptureOperation::Attach)?;
-        snapshot_and_subscribe(
-            &handle.output,
+        Ok(snapshot_and_subscribe(
             &handle.structured,
             handle.attached.clone(),
             ScreenSource {
-                session_id,
-                parser: handle.parser.clone(),
+                screen: handle.screen.clone(),
                 history,
             },
-        )
+        ))
     }
 
-    /// Return the retained line-oriented scrollback.
+    /// The Session's history and screen as text lines, oldest first.
     pub fn scrollback(&self, session_id: SessionId) -> Result<Vec<String>, SessionManagerError> {
-        let handle = self.handle(session_id)?;
-        let lines = handle
-            .scrollback
-            .lock()
-            .map_err(|_| SessionManagerError::Lock {
-                resource: "scrollback",
-                session_id,
-            })?
-            .lines();
-        Ok(lines)
+        Ok(self.handle(session_id)?.screen.lines())
     }
 
     /// Resize a session's PTY and in-memory screen.
@@ -70,15 +59,7 @@ impl SessionManager {
         validate_size(cols, rows)?;
         let handle = self.operation_handle(session_id, CaptureOperation::Resize)?;
         (handle.resize)(cols, rows)?;
-        handle
-            .parser
-            .lock()
-            .map_err(|_| SessionManagerError::Lock {
-                resource: "screen",
-                session_id,
-            })?
-            .screen_mut()
-            .set_size(rows, cols);
+        handle.screen.resize(cols, rows);
         Ok(())
     }
 
@@ -263,163 +244,139 @@ pub const RESET_TERMINAL: &[u8] = b"\x1bc";
 /// The Session's screen, for redrawing a viewer that fell behind.
 #[derive(Clone)]
 pub struct ScreenSource {
-    session_id: SessionId,
-    parser: Arc<std::sync::Mutex<vt100::Parser>>,
-    /// Send the scrollback in front of every screen ([`super::screen_history`]).
+    screen: crate::screen::Screen,
+    /// Put the history in front of every screen (T2.4).
     history: bool,
 }
 
 impl ScreenSource {
     #[cfg(test)]
-    pub(crate) fn new(session_id: SessionId, parser: Arc<std::sync::Mutex<vt100::Parser>>) -> Self {
+    pub(crate) fn new(screen: crate::screen::Screen) -> Self {
         Self {
-            session_id,
-            parser,
+            screen,
             history: false,
         }
     }
 
-    /// The current screen, with `output` replaced by a receiver that starts
-    /// exactly after it. The PTY reader publishes output while holding the
-    /// screen lock, so no byte is both in the screen and in the receiver, or
-    /// in neither.
-    pub fn snapshot(
-        &self,
-        output: &broadcast::Receiver<Vec<u8>>,
-    ) -> Result<(Vec<u8>, broadcast::Receiver<Vec<u8>>), SessionManagerError> {
-        let parser = self.parser.lock().map_err(|_| SessionManagerError::Lock {
-            resource: "screen",
-            session_id: self.session_id,
-        })?;
-        let screen = if self.history {
-            super::screen_history::history_then_screen(parser.screen())
-        } else {
-            parser.screen().state_formatted()
-        };
-        Ok((screen, output.resubscribe()))
+    /// The current screen and a receiver for the output that follows it:
+    /// no byte is in both, or in neither ([`crate::screen`]).
+    pub fn snapshot(&self) -> (Vec<u8>, broadcast::Receiver<Vec<u8>>) {
+        self.screen.snapshot(self.history)
     }
 
     /// After a lag: a reset followed by the current screen, and a receiver
     /// that continues from that screen.
-    pub fn resync(
-        &self,
-        output: &broadcast::Receiver<Vec<u8>>,
-    ) -> Result<(Vec<u8>, broadcast::Receiver<Vec<u8>>), SessionManagerError> {
-        let (screen, receiver) = self.snapshot(output)?;
-        Ok(([RESET_TERMINAL, &screen].concat(), receiver))
+    pub fn resync(&self) -> (Vec<u8>, broadcast::Receiver<Vec<u8>>) {
+        let (screen, receiver) = self.snapshot();
+        ([RESET_TERMINAL, &screen].concat(), receiver)
     }
 }
 
 fn snapshot_and_subscribe(
-    output_sender: &broadcast::Sender<Vec<u8>>,
     structured_sender: &broadcast::Sender<DaemonMessage>,
     confirmation: Arc<AtomicBool>,
     screen_source: ScreenSource,
-) -> Result<Attachment, SessionManagerError> {
+) -> Attachment {
     let structured = structured_sender.subscribe();
-    let (screen, output) = screen_source.snapshot(&output_sender.subscribe())?;
-    Ok(Attachment {
+    let (screen, output) = screen_source.snapshot();
+    Attachment {
         screen,
         output,
         structured,
         confirmation,
         screen_source,
-    })
+    }
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::screen::{Screen, ScreenSize};
 
-    fn source() -> ScreenSource {
+    fn source(rows: u16, history: bool, queue: usize) -> ScreenSource {
+        let (output, _) = broadcast::channel(queue);
+        let size = ScreenSize {
+            cols: 20,
+            rows,
+            history_lines: 100,
+            attach_history_lines: 100,
+        };
         ScreenSource {
-            session_id: SessionId(1),
-            parser: Arc::new(std::sync::Mutex::new(vt100::Parser::new(4, 20, 0))),
-            history: false,
+            screen: Screen::spawn("test", size, output),
+            history,
         }
+    }
+
+    /// What the PTY reader does.
+    fn produce(source: &ScreenSource, bytes: &[u8]) {
+        source.screen.feed(bytes.to_vec());
     }
 
     #[test]
     fn a_history_attachment_carries_lines_scrolled_off_the_screen() {
-        let (output, _) = broadcast::channel(4);
-        let source = ScreenSource {
-            session_id: SessionId(1),
-            parser: Arc::new(std::sync::Mutex::new(vt100::Parser::new(2, 20, 100))),
-            history: true,
-        };
-        produce(&source, &output, b"first\r\nsecond\r\nthird\r\nfourth");
+        let source = source(2, true, 4);
+        produce(&source, b"first\r\nsecond\r\nthird\r\nfourth");
         let plain = ScreenSource {
             history: false,
             ..source.clone()
         };
 
-        let (with_history, _) = source.snapshot(&output.subscribe()).unwrap();
-        let (screen_only, _) = plain.snapshot(&output.subscribe()).unwrap();
+        let (with_history, _) = source.snapshot();
+        let (screen_only, _) = plain.snapshot();
 
         assert!(String::from_utf8_lossy(&with_history).contains("first"));
         assert!(!String::from_utf8_lossy(&screen_only).contains("first"));
-        let (redraw, _) = source.resync(&output.subscribe()).unwrap();
+        let (redraw, _) = source.resync();
         assert!(redraw.starts_with(RESET_TERMINAL));
         assert!(String::from_utf8_lossy(&redraw).contains("first"));
     }
 
-    /// What the PTY reader does: draw and publish under the screen lock.
-    fn produce(source: &ScreenSource, output: &broadcast::Sender<Vec<u8>>, bytes: &[u8]) {
-        let mut parser = source.parser.lock().unwrap();
-        parser.process(bytes);
-        let _ = output.send(bytes.to_vec());
-    }
-
     #[test]
     fn attachment_output_starts_exactly_after_the_screen() {
-        let (output, _) = broadcast::channel(4);
         let (structured, _) = broadcast::channel(4);
-        let source = source();
-        produce(&source, &output, b"before");
+        let source = source(4, false, 4);
+        produce(&source, b"before");
         let mut attachment = snapshot_and_subscribe(
-            &output,
             &structured,
             Arc::new(AtomicBool::new(false)),
             source.clone(),
-        )
-        .unwrap();
-        produce(&source, &output, b" after");
+        );
+        produce(&source, b" after");
 
         assert!(String::from_utf8_lossy(&attachment.screen).contains("before"));
-        assert_eq!(attachment.output.try_recv().unwrap(), b" after");
+        assert_eq!(attachment.output.blocking_recv().unwrap(), b" after");
         assert!(attachment.output.try_recv().is_err());
     }
 
     #[test]
     fn a_lagged_viewer_is_redrawn_and_continues_from_the_redraw() {
-        let (output, _) = broadcast::channel(2);
         let (structured, _) = broadcast::channel(2);
-        let source = source();
+        let source = source(4, false, 2);
         let mut attachment = snapshot_and_subscribe(
-            &output,
             &structured,
             Arc::new(AtomicBool::new(false)),
             source.clone(),
-        )
-        .unwrap();
+        );
         for line in ["one\r\n", "two\r\n", "three\r\n", "four"] {
-            produce(&source, &output, line.as_bytes());
+            produce(&source, line.as_bytes());
         }
+        // Wait until the screen thread has drawn everything.
+        assert!(source.screen.lines().contains(&"four".to_string()));
         assert!(matches!(
             attachment.output.try_recv(),
             Err(broadcast::error::TryRecvError::Lagged(2))
         ));
 
-        let (redraw, mut receiver) = source.resync(&attachment.output).unwrap();
-        produce(&source, &output, b"!");
+        let (redraw, mut receiver) = source.resync();
+        produce(&source, b"!");
 
         assert!(redraw.starts_with(RESET_TERMINAL));
         let screen = String::from_utf8_lossy(&redraw);
         for line in ["one", "two", "three", "four"] {
             assert!(screen.contains(line), "{line} missing from the redraw");
         }
-        assert_eq!(receiver.try_recv().unwrap(), b"!");
+        assert_eq!(receiver.blocking_recv().unwrap(), b"!");
         assert!(receiver.try_recv().is_err());
     }
 }

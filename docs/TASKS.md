@@ -316,7 +316,8 @@ the owner on 2026-11-19 (Resumed tags in chevron style).
       `ATTACH.history` (optional; the web sets it, the CLI does not). The daemon
       sends its vt100 scrollback rows, then pushes the viewer's lines into its
       own scrollback, then the usual screen (`session_manager/screen_history.rs`).
-      Covers T2.4's "history in the attach snapshot" on today's screen engine
+      Covers T2.4's "history in the attach snapshot" on today's screen engine.
+      Since T2 the screen module does it (`screen/engine.rs`, `snapshot`)
 - [x] H2 One terminal per Session: earlier parts' saved output, oldest first,
       then the live part (`terminal/priorParts.ts`, `usePriorParts.ts`). The
       1–N part tabs and the stacked 220 px terminals are gone
@@ -444,9 +445,31 @@ T0.5, T0.6 (X14), T0.11, T0.12 (X15).
 
 ### T2. Authoritative screen on `libghostty-vt`
 
-- [ ] Build gate on all four release targets, with numbers; stop and report
-- [ ] T2.1–T2.4 one `screen` module, engine thread per Session, every reader
-      moved to it, history in the attach snapshot
+- [x] Build gate, 2026-11-22: builds for all four release targets (Linux
+      from the pinned source with Zig 0.17.1, macOS from the prebuilt
+      XCFramework); 2.4× the throughput of `vt100`; 117 of 119 recorded
+      screens identical, the two differences being `vt100` bugs (tab stops,
+      DEC line drawing); +1.2 MB on macOS, +2.0–2.4 MB on Linux; no
+      start-up cost. Numbers in `docs/progress/terminal-upgrade.md`. Owner
+      chose libghostty-vt
+- [x] T2.1 `crates/daemon/src/screen/`: the only code that names the engine
+      (`engine.rs`). Feed, resize with reflow, snapshot, rows for the
+      watcher, alternate-screen flag, cursor, text lines; no `unsafe`
+- [x] T2.2 One screen thread per Session. The PTY reader feeds it whole
+      sequences over a bounded channel (64 reads); the thread draws them,
+      then publishes them, and answers snapshots between two feeds, so a
+      snapshot and its receiver split the output exactly. A viewer never
+      holds anything up (broadcast). Fail open: without an engine, output
+      still reaches every viewer and a snapshot is empty
+- [x] T2.3 Watcher rows, attach snapshot, lag redraw and `scrollback` read
+      the screen; `vt100` and the line ring are gone. Output replay stays a
+      read of the compressed log, as it never used the screen. Fixed on the
+      way: a viewer that attached while a program was on the alternate
+      screen now gets the main screen back when the program leaves it
+- [x] T2.4 A snapshot with history (`ATTACH.history`, which the web sends)
+      carries about `attach_history_lines` of history (`daemon.toml`,
+      default 2,000; libghostty drops history a page at a time, so "about").
+      The CLI still asks for none: picking up with history is T4
 
 ### T3. One size per Session · *protocol change, proposal first*
 
@@ -719,6 +742,16 @@ Full notes: `docs/releases/v2.11.0.md`.
   `events.json`
 
 ### Release notes so far (protocol changes since v2.10.0)
+
+- Terminal engine: libghostty-vt replaces `vt100` in the daemon (T2). No
+  wire change. New `daemon.toml` key `attach_history_lines` (default 2000).
+  Release builds of Linux workers need Zig 0.17.1, fetched by
+  `scripts/fetch-terminal-engine.sh`
+- Intel Macs dropped (owner, 2026-11-22): no `x86_64-apple-darwin` build,
+  installers refuse Intel Macs, a package manifest naming one is refused.
+  Installed copies up to v2.11.0 only accept a release whose `SHA256SUMS`
+  lists all four old targets, so they will not see the first release without
+  it; they update by running the installer again
 
 - `RESTORE_SESSION`, `DELETE_SESSION`, `SESSIONS_DELETED`, tombstones
 - Heartbeat `instance_id`, `build_commit`; `INSTANCE_CONFLICT`

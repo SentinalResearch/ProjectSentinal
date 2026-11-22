@@ -29,8 +29,6 @@ jobs:
             runner: ubuntu-24.04-arm
           - target: aarch64-apple-darwin
             runner: macos-15
-          - target: x86_64-apple-darwin
-            runner: macos-15
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -58,6 +56,12 @@ jobs:
 
       - name: Fetch locked Rust dependencies
         run: cargo fetch --locked
+
+      # The daemon's terminal engine (libghostty-vt): pinned files fetched
+      # now, so the build below runs offline. Linux builds it from source
+      # with Zig 0.17.1; macOS links the prebuilt XCFramework.
+      - name: Fetch the terminal engine
+        run: scripts/fetch-terminal-engine.sh "${{ matrix.target }}" "$RUNNER_TEMP/terminal-engine" >> "$GITHUB_ENV"
 
       - name: Build the production PWA
         working-directory: web

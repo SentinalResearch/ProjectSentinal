@@ -58,22 +58,8 @@ pub(super) fn spawn_reader(
                         if let Err(error) = save(&mut encoder, &mut budget, &trailing) {
                             tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append trailing session log");
                         }
-                        // Published under the screen lock: see `ScreenSource::snapshot`.
-                        match handle.parser.lock() {
-                            Ok(mut parser) => {
-                                parser.process(&trailing);
-                                let _ = handle.output.send(trailing.clone());
-                            }
-                            Err(_) => {
-                                tracing::error!(session = session_id.0, "screen lock poisoned");
-                            }
-                        }
-                        match handle.scrollback.lock() {
-                            Ok(mut scrollback) => scrollback.push(&trailing),
-                            Err(_) => {
-                                tracing::error!(session = session_id.0, "scrollback lock poisoned");
-                            }
-                        }
+                        // Drawn, then published, by the screen thread (T2.2).
+                        handle.screen.feed(trailing.clone());
                         apply_output(session_id, &handle, store.as_deref(), &trailing, clock());
                     }
                     finish_output(session_id, &handle, store.as_deref(), clock());
@@ -95,27 +81,9 @@ pub(super) fn spawn_reader(
                     .error(protocol::observability::HealthLabel::ErrorLogWrite);
                 tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append session log");
             }
-            // Published under the screen lock: see `ScreenSource::snapshot`.
-            // Only whole sequences, so a snapshot never falls inside one.
-            let whole = boundary.push(bytes);
-            match handle.parser.lock() {
-                Ok(mut parser) if !whole.is_empty() => {
-                    parser.process(&whole);
-                    let _ = handle.output.send(whole);
-                }
-                Ok(_) => {}
-                Err(_) => {
-                    tracing::error!(session = session_id.0, "screen lock poisoned");
-                    return;
-                }
-            }
-            match handle.scrollback.lock() {
-                Ok(mut scrollback) => scrollback.push(bytes),
-                Err(_) => {
-                    tracing::error!(session = session_id.0, "scrollback lock poisoned");
-                    return;
-                }
-            }
+            // Drawn, then published, by the screen thread (T2.2). Only whole
+            // sequences, so a snapshot never falls inside one.
+            handle.screen.feed(boundary.push(bytes));
             let mut prompt_ready = false;
             for signal in parsed.signals {
                 prompt_ready |= signal == ShellSignal::PromptStart;
@@ -305,18 +273,10 @@ pub(super) fn sample_screen(
         return;
     }
     handle.screen_sampled_at.store(at.0, Ordering::Relaxed);
-    let sample = match handle.parser.lock() {
-        Ok(parser) => {
-            let screen = parser.screen();
-            let (_, cols) = screen.size();
-            let rows: Vec<String> = screen.rows(0, cols).collect();
-            watcher::Observation::screen(at, rows, screen.alternate_screen())
-        }
-        Err(_) => {
-            tracing::error!(session = session_id.0, "screen lock poisoned");
-            return;
-        }
+    let Some(screen) = handle.screen.rows() else {
+        return;
     };
+    let sample = watcher::Observation::screen(at, screen.rows, screen.alternate);
     apply_observation(session_id, handle, store, sample);
 }
 

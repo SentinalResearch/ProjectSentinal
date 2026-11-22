@@ -71,9 +71,11 @@ async fn persistent_session_integration() {
     .await
     .unwrap();
     let reattached = manager.attach(session.id).unwrap();
-    let mut restored = vt100::Parser::new(24, 80, 0);
-    restored.process(&reattached.screen);
+    let restored = daemon::screen::render_rows(&reattached.screen, 80, 24);
 
-    assert!(restored.screen().contents().contains("done"));
+    assert!(
+        restored.iter().any(|row| row.contains("done")),
+        "{restored:?}"
+    );
     fs::remove_dir_all(data_dir).unwrap();
 }

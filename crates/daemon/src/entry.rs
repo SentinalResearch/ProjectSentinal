@@ -286,6 +286,7 @@ pub async fn run() -> Result<(), DaemonError> {
         store.clone(),
     )?
     .with_watcher_adapters(watcher_adapters)
+    .with_attach_history_lines(config.attach_history_lines)
     .with_projects(projects.clone())
     .with_process_probe(ProcessProbe::system(daemon_uid));
     // A dev terminal's `sentinal` must reach this daemon, never the installed one.

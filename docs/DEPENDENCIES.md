@@ -19,6 +19,7 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `reqwest` (`rustls-tls`, `json`, no default features) | daemon | Worker-to-control HTTPS for pairing exchange, heartbeat, refresh, and disconnect (4.0, approved 2026-10-02) |
 | `web-push-native` 0.5 (`vapid`, no defaults) | daemon | Pure-Rust RFC Web Push encryption and VAPID request construction for the control-owned Push gateway (4.D, approved 2026-10-06) |
 | `base64ct` 1.8 | daemon | Strict base64url encoding/decoding for VAPID and browser Push key material (4.D, approved 2026-10-06) |
+| `ghostty-vt` `=0.9.0` (libghostty-vt 1.0.1) | daemon | The authoritative screen of every Session (T2, approved by the owner 2026-11-12; build gate passed 2026-11-22). Named only in `crates/daemon/src/screen/engine.rs`. It is a fork, by prabirshrestha (repository `gpui-cn`), of `Uzaaft/libghostty-rs` 0.2.2; the C library it links is the official libghostty-vt release, pinned by sha256. macOS links the release's prebuilt XCFramework; Linux builds the pinned source with Zig 0.17.1. Release builds fetch both first with `scripts/fetch-terminal-engine.sh` and then build offline. Adds about 1.2 MB to an Apple silicon binary and 2.0–2.4 MB to a Linux one. Replaced `vt100` |
 
 ## Approved for later milestones
 
@@ -27,7 +28,6 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `tokio` | 1 | Async runtime for the daemon |
 | `axum` | 1 | HTTP + WebSocket API |
 | `portable-pty` | 1 | Spawn shells in a PTY (Linux + macOS) |
-| `vt100` or `alacritty_terminal` | 1 | Keep screen state for reattach |
 | `tracing`, `tracing-subscriber` | 1 | Logging |
 | `clap` | 1 | CLI argument parsing |
 | `zstd` | 1 | Compress scrollback logs |
@@ -37,7 +37,6 @@ Fewer dependencies = easier to understand, faster builds, fewer surprises.
 | `futures-util` | 1/1c.1 | Async WebSocket handling for the CLI and bounded file streaming for the daemon package service |
 | `tower` (dev) | 1 | Exercise Axum routes in-process without network sockets |
 | `argon2` | 1.1 | Hash and verify the single owner's password with Argon2id |
-| `libghostty-vt` | Terminal upgrade T2 | Authoritative screen state in the daemon (reflow on resize, correct character widths), replacing `vt100`. Approved by the owner 2026-11-12, on condition that the T2 build gate in `prompts/13-terminal-upgrade-package.md` passes on all four release targets; pre-1.0 and built with Zig, so the version is pinned exactly and used from one module only |
 | `@xterm/addon-unicode11` (web) | Terminal upgrade T1 | Current Unicode character widths in the web terminal, so emoji and wide symbols take the cells the program assumed |
 
 ## Web (Milestone 1+)

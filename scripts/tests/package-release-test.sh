@@ -47,12 +47,12 @@ make_fake_bins "$fake_bins" one
 first="$test_root/build one"
 second="$test_root/build two"
 
-"$builder" --version 0.0.1 --target x86_64-apple-darwin \
+"$builder" --version 0.0.1 --target aarch64-apple-darwin \
   --bin-dir "$fake_bins" --output "$first" --source-date-epoch 1790712000 >/dev/null
-"$builder" --version 0.0.1 --target x86_64-apple-darwin \
+"$builder" --version 0.0.1 --target aarch64-apple-darwin \
   --bin-dir "$fake_bins" --output "$second" --source-date-epoch 1790712000 >/dev/null
 
-artifact_name='sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz'
+artifact_name='sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz'
 first_artifact="$first/$artifact_name"
 second_artifact="$second/$artifact_name"
 [[ -f "$first_artifact" ]] || fail 'builder did not create the expected artifact'
@@ -92,7 +92,7 @@ for required in \
   grep -Fxq "$required" <<<"$entries" || fail "archive is missing $required"
 done
 service_worker="$(tar -xOzf "$first_artifact" sentinal-worker/web/sw.js)"
-grep -Fq 'sentinal-0.0.1-x86_64-apple-darwin' <<<"$service_worker" || fail 'service worker cache is not release-specific'
+grep -Fq 'sentinal-0.0.1-aarch64-apple-darwin' <<<"$service_worker" || fail 'service worker cache is not release-specific'
 if grep -Fq '__SENTINAL_RELEASE_ID__' <<<"$service_worker"; then
   fail 'service worker retained its release marker'
 fi
@@ -143,7 +143,7 @@ grep -Fq "\"bytes\": $(wc -c <"$first_artifact" | tr -d '[:space:]')" "$release"
 
 make_fake_bins "$fake_bins" changed
 changed_dir="$test_root/changed"
-"$builder" --version 0.0.1 --target x86_64-apple-darwin \
+"$builder" --version 0.0.1 --target aarch64-apple-darwin \
   --bin-dir "$fake_bins" --output "$changed_dir" --source-date-epoch 1790712000 >/dev/null
 if error="$("$publisher" publish --version 0.0.1 --package-dir "$package_dir" \
   --published-at 1790712000000 --artifact "$changed_dir/$artifact_name" --sums "$first_dir/SHA256SUMS" --signature "$first_dir/SHA256SUMS.sig" --allowed-signers "$allowed" 2>&1)"; then
@@ -159,20 +159,20 @@ grep -Fq "release '0.0.1' already exists with different content" "$test_root/con
 
 # A failure before the channel switch leaves the previous stable release intact.
 v2_dir="$test_root/v2"
-"$builder" --version 0.0.2 --target x86_64-apple-darwin \
+"$builder" --version 0.0.2 --target aarch64-apple-darwin \
   --bin-dir "$fake_bins" --output "$v2_dir" --source-date-epoch 1790712001 >/dev/null
 sign_dir "$v2_dir"
 stable_before="$(sha256 "$stable")"
 if SENTINAL_PUBLISH_FAIL_BEFORE_CHANNEL=1 "$publisher" publish --version 0.0.2 \
   --package-dir "$package_dir" --published-at 1790712001000 --sums "$v2_dir/SHA256SUMS" --signature "$v2_dir/SHA256SUMS.sig" --allowed-signers "$allowed" \
-  --artifact "$v2_dir/sentinal-worker-0.0.2-x86_64-apple-darwin.tar.gz" 2>"$test_root/interrupted"; then
+  --artifact "$v2_dir/sentinal-worker-0.0.2-aarch64-apple-darwin.tar.gz" 2>"$test_root/interrupted"; then
   fail 'injected publish interruption unexpectedly succeeded'
 fi
 [[ "$stable_before" == "$(sha256 "$stable")" ]] || fail 'interrupted publish changed stable channel'
 
 "$publisher" publish --version 0.0.2 --package-dir "$package_dir" \
   --published-at 1790712001000 --sums "$v2_dir/SHA256SUMS" --signature "$v2_dir/SHA256SUMS.sig" --allowed-signers "$allowed" \
-  --artifact "$v2_dir/sentinal-worker-0.0.2-x86_64-apple-darwin.tar.gz" >/dev/null
+  --artifact "$v2_dir/sentinal-worker-0.0.2-aarch64-apple-darwin.tar.gz" >/dev/null
 grep -Fq '"release_version": "0.0.2"' "$stable" || fail 'stable did not advance to v2'
 "$publisher" rollback --version 0.0.1 --package-dir "$package_dir" >/dev/null
 grep -Fq '"release_version": "0.0.1"' "$stable" || fail 'rollback did not restore v1 pointer'
@@ -217,10 +217,10 @@ done
 EOF
 chmod 755 "$fake_tools/cargo"
 built_dir="$test_root/built by cargo"
-(umask 0002 && PATH="$fake_tools:$PATH" "$builder" --version 0.0.3 --target x86_64-apple-darwin \
+(umask 0002 && PATH="$fake_tools:$PATH" "$builder" --version 0.0.3 --target aarch64-apple-darwin \
   --source-dir "$source_copy" --output "$built_dir" --source-date-epoch 1790712002 >/dev/null) ||
   fail 'builder refused binaries it compiled itself under umask 0002'
-built_listing="$(tar -tvzf "$built_dir/sentinal-worker-0.0.3-x86_64-apple-darwin.tar.gz" sentinal-worker/bin/sentinald)"
+built_listing="$(tar -tvzf "$built_dir/sentinal-worker-0.0.3-aarch64-apple-darwin.tar.gz" sentinal-worker/bin/sentinald)"
 [[ "$built_listing" == -rwxr-xr-x* ]] || fail "built binary mode is not 0755: $built_listing"
 read -r stamped_version stamped_commit <"$source_copy/target/stamp"
 [[ "$stamped_version" == 0.0.3 ]] || fail "cargo did not receive SENTINAL_RELEASE_VERSION (got '$stamped_version')"
@@ -229,7 +229,7 @@ read -r stamped_version stamped_commit <"$source_copy/target/stamp"
 writable_bins="$test_root/writable bins"
 make_fake_bins "$writable_bins" writable
 chmod 775 "$writable_bins/sentinal"
-if "$builder" --version 0.0.4 --target x86_64-apple-darwin \
+if "$builder" --version 0.0.4 --target aarch64-apple-darwin \
   --bin-dir "$writable_bins" --output "$test_root/writable" 2>/dev/null; then
   fail 'builder accepted a group-writable supplied binary'
 fi
@@ -239,19 +239,19 @@ fi
 retention_dir="$test_root/retention packages"
 for patch in 1 2 3 4 5 6 7; do
   build="$test_root/retention build $patch"
-  "$builder" --version "0.1.$patch" --target x86_64-apple-darwin \
+  "$builder" --version "0.1.$patch" --target aarch64-apple-darwin \
     --bin-dir "$fake_bins" --output "$build" --source-date-epoch 1790712000 >/dev/null
   sign_dir "$build"
   "$publisher" publish --version "0.1.$patch" --package-dir "$retention_dir" \
-    --artifact "$build/sentinal-worker-0.1.$patch-x86_64-apple-darwin.tar.gz" \
+    --artifact "$build/sentinal-worker-0.1.$patch-aarch64-apple-darwin.tar.gz" \
     --sums "$build/SHA256SUMS" --signature "$build/SHA256SUMS.sig" --allowed-signers "$allowed" >/dev/null
 done
 kept="$(cd "$retention_dir/releases" && ls ./*.json | sed 's#^\./##; s#\.json$##' | LC_ALL=C sort | tr '\n' ' ')"
 [[ "$kept" == "0.1.3 0.1.4 0.1.5 0.1.6 0.1.7 " ]] || fail "retention kept '$kept'"
 [[ ! -e "$retention_dir/releases/0.1.2.SHA256SUMS" && ! -e "$retention_dir/releases/0.1.2.SHA256SUMS.sig" ]] ||
   fail 'retention left an old signature behind'
-[[ ! -e "$retention_dir/artifacts/sentinal-worker-0.1.1-x86_64-apple-darwin.tar.gz" ]] || fail 'retention left an old artifact'
-[[ -e "$retention_dir/artifacts/sentinal-worker-0.1.3-x86_64-apple-darwin.tar.gz" ]] || fail 'retention deleted a kept artifact'
+[[ ! -e "$retention_dir/artifacts/sentinal-worker-0.1.1-aarch64-apple-darwin.tar.gz" ]] || fail 'retention left an old artifact'
+[[ -e "$retention_dir/artifacts/sentinal-worker-0.1.3-aarch64-apple-darwin.tar.gz" ]] || fail 'retention deleted a kept artifact'
 grep -q '"release_version": "0.1.7"' "$retention_dir/channels/stable.json" || fail 'stable does not point at the newest release'
 
 # A rolled-back channel keeps its release even when newer ones push it out.

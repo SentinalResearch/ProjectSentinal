@@ -60,6 +60,9 @@ pub struct DaemonConfig {
     pub config_dir: PathBuf,
     /// Maximum number of terminal lines retained in memory per session.
     pub scrollback_lines: usize,
+    /// About how many of those lines a viewer gets in front of the screen
+    /// when it attaches (T2.4).
+    pub attach_history_lines: usize,
     /// File containing the bearer token.
     pub token_file: PathBuf,
     /// File containing the single owner's password hash.
@@ -97,6 +100,7 @@ struct RawConfig {
     bind: Option<String>,
     data_dir: Option<PathBuf>,
     scrollback_lines: Option<usize>,
+    attach_history_lines: Option<usize>,
     token_file: Option<PathBuf>,
     auth_file: Option<PathBuf>,
     notify_file: Option<PathBuf>,
@@ -328,6 +332,9 @@ impl DaemonConfig {
             isolated,
             config_dir: config_dir.clone(),
             scrollback_lines: raw.scrollback_lines.unwrap_or(DEFAULT_SCROLLBACK_LINES),
+            attach_history_lines: raw
+                .attach_history_lines
+                .unwrap_or(crate::screen::DEFAULT_ATTACH_HISTORY_LINES),
             token_file: raw.token_file.unwrap_or_else(|| config_dir.join("token")),
             auth_file: raw
                 .auth_file

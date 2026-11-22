@@ -11,6 +11,7 @@ fn defaults_bind_only_to_loopback() {
 
     assert_eq!(config.bind.to_string(), "127.0.0.1:7420");
     assert_eq!(config.scrollback_lines, 10_000);
+    assert_eq!(config.attach_history_lines, 2_000);
     assert_eq!(
         config.data_dir,
         Path::new("/home/tester/.local/share/terminal-agent")
@@ -46,6 +47,7 @@ fn configured_values_are_loaded() {
 bind = "127.0.0.1:9000"
 data_dir = "/var/tmp/terminal-agent"
 scrollback_lines = 25
+attach_history_lines = 7
 token_file = "/var/tmp/terminal-agent.token"
 auth_file = "/var/tmp/terminal-agent-auth.json"
 local_socket = "/var/tmp/sentinald.sock"
@@ -55,6 +57,7 @@ local_socket = "/var/tmp/sentinald.sock"
 
     assert_eq!(config.bind.to_string(), "127.0.0.1:9000");
     assert_eq!(config.scrollback_lines, 25);
+    assert_eq!(config.attach_history_lines, 7);
     assert_eq!(config.data_dir, Path::new("/var/tmp/terminal-agent"));
     assert_eq!(
         config.auth_file,

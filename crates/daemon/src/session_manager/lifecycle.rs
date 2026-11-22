@@ -8,7 +8,6 @@ use crate::{
     osc::{new_nonce, OscParser, NONCE_ENV},
     private_fs::{ensure_private_dir, private_file_options},
     pty::{PtySpawnRequest, SpawnedPty},
-    scrollback::Scrollback,
     shell::{install_hooks, launch, ShellLaunch},
     tracker::CommandTracker,
 };
@@ -286,14 +285,16 @@ impl SessionManager {
 
         let (output, _) = broadcast::channel(256);
         let (structured, _) = broadcast::channel(256);
-        let parser = Arc::new(Mutex::new(vt100::Parser::new(
-            request.rows,
-            request.cols,
-            self.inner.config.scrollback_lines,
-        )));
-        let scrollback = Arc::new(Mutex::new(Scrollback::new(
-            self.inner.config.scrollback_lines,
-        )));
+        let screen = crate::screen::Screen::spawn(
+            &id.0.to_string(),
+            crate::screen::ScreenSize {
+                cols: request.cols,
+                rows: request.rows,
+                history_lines: self.inner.config.scrollback_lines,
+                attach_history_lines: self.inner.attach_history_lines,
+            },
+            output.clone(),
+        );
         let SpawnedPty {
             root_pid,
             reader,
@@ -311,9 +312,7 @@ impl SessionManager {
             kill,
             try_wait,
             pty_closed: AtomicBool::new(false),
-            parser,
-            scrollback,
-            output,
+            screen,
             structured,
             observations: self.inner.observations.clone(),
             events: self.inner.events.clone(),

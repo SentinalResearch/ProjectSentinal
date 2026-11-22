@@ -41,6 +41,7 @@ pub mod projects;
 pub mod pty;
 pub mod push;
 pub mod recipes;
+pub mod screen;
 pub mod scrollback;
 pub mod search;
 pub mod search_output;

@@ -28,9 +28,9 @@ platform="$(uname -s):$(uname -m)"
 case "$platform" in
   Linux:x86_64|Linux:amd64) target='x86_64-unknown-linux-musl' ;;
   Linux:aarch64|Linux:arm64) target='aarch64-unknown-linux-musl' ;;
-  Darwin:x86_64) target='x86_64-apple-darwin' ;;
+  Darwin:x86_64) fail 'Intel Macs are not supported; Sentinal runs on Apple silicon Macs and on Linux' ;;
   Darwin:arm64) target='aarch64-apple-darwin' ;;
-  *) fail "unsupported target '$platform'; supported: macOS 13+ (arm64, x86_64), Linux with systemd (x86_64, aarch64)" ;;
+  *) fail "unsupported target '$platform'; supported: macOS 13+ on Apple silicon, Linux with systemd (x86_64, aarch64)" ;;
 esac
 if [ -n "$version" ]; then
   printf '%s' "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' ||

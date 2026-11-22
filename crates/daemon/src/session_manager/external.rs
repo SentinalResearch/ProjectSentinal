@@ -11,8 +11,7 @@ use super::{
     lock_session, tasks::apply_signal, SessionHandle, SessionManager, SessionManagerError,
 };
 use crate::{
-    osc::ShellSignal, process_probe::ProcessProbe, pty::PtyError, scrollback::Scrollback,
-    tracker::CommandTracker,
+    osc::ShellSignal, process_probe::ProcessProbe, pty::PtyError, tracker::CommandTracker,
 };
 use protocol::{
     CaptureLevel, Command, CommandId, DaemonMessage, Event, EventKind, Session, SessionId,
@@ -461,9 +460,7 @@ impl SessionManager {
             kill: Arc::new(move || Err(unsupported("kill"))),
             try_wait: Arc::new(|| Ok(None)),
             pty_closed: std::sync::atomic::AtomicBool::new(true),
-            parser: Arc::new(Mutex::new(vt100::Parser::new(1, 1, 0))),
-            scrollback: Arc::new(Mutex::new(Scrollback::new(0))),
-            output,
+            screen: crate::screen::Screen::without_engine(output.clone()),
             structured,
             observations: self.inner.observations.clone(),
             events: self.inner.events.clone(),

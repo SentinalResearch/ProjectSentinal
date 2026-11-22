@@ -514,16 +514,9 @@ async fn attach_restores_text_drawn_on_row_five() {
     wait_for_scrollback(&manager, session.id, "restored").await;
 
     let attachment = manager.attach(session.id).unwrap();
-    let mut restored = vt100::Parser::new(24, 80, 0);
-    restored.process(&attachment.screen);
+    let restored = daemon::screen::render_rows(&attachment.screen, 80, 24);
 
-    assert_eq!(restored.screen().cell(4, 0).unwrap().contents(), "r");
-    assert!(restored
-        .screen()
-        .rows(0, 8)
-        .nth(4)
-        .unwrap()
-        .contains("restored"));
+    assert!(restored[4].starts_with("restored"), "{restored:?}");
     fake.exit(session.id, 0).unwrap();
     wait_for_state(&manager, session.id, SessionState::Completed).await;
     fs::remove_dir_all(data_dir).unwrap();

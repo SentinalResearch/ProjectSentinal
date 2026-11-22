@@ -13,10 +13,9 @@ use std::{
 const MAX_API_BYTES: &str = "262144";
 const MAX_SUMS_BYTES: &str = "65536";
 const MAX_SIGNATURE_BYTES: &str = "8192";
-const TARGETS: [&str; 4] = [
+const TARGETS: [&str; 3] = [
     "x86_64-unknown-linux-musl",
     "aarch64-unknown-linux-musl",
-    "x86_64-apple-darwin",
     "aarch64-apple-darwin",
 ];
 

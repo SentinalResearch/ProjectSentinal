@@ -28,16 +28,9 @@ pub(super) fn spawn_forwarder(
                         Ok(bytes) => bytes,
                         Err(RecvError::Lagged(skipped)) => {
                             tracing::warn!(session = session_id.0, skipped, "attached terminal client lagged; redrawing");
-                            match attachment.screen_source.resync(&attachment.output) {
-                                Ok((redraw, receiver)) => {
-                                    attachment.output = receiver;
-                                    redraw
-                                }
-                                Err(error) => {
-                                    tracing::error!(session = session_id.0, %error, "could not redraw a lagged terminal client");
-                                    return;
-                                }
-                            }
+                            let (redraw, receiver) = attachment.screen_source.resync();
+                            attachment.output = receiver;
+                            redraw
                         }
                         Err(RecvError::Closed) => return,
                     };
@@ -66,11 +59,12 @@ pub(super) fn spawn_forwarder(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::screen::{Screen, ScreenSize};
     use crate::{
         framing::decode_terminal_frame,
         session_manager::{ScreenSource, RESET_TERMINAL},
     };
-    use std::sync::{atomic::AtomicBool, Arc, Mutex};
+    use std::sync::{atomic::AtomicBool, Arc};
     use tokio::sync::broadcast;
 
     fn frame_bytes(output: AttachedOutput) -> Vec<u8> {
@@ -82,23 +76,25 @@ mod tests {
 
     #[tokio::test]
     async fn a_slow_viewer_gets_a_valid_screen_after_lag_never_a_partial_stream() {
-        let parser = Arc::new(Mutex::new(vt100::Parser::new(5, 20, 0)));
         let (output, _) = broadcast::channel(4);
         let (structured, _) = broadcast::channel(4);
-        let source = ScreenSource::new(SessionId(7), parser.clone());
-        let (screen, receiver) = source.snapshot(&output.subscribe()).unwrap();
+        let size = ScreenSize {
+            cols: 20,
+            rows: 5,
+            history_lines: 0,
+            attach_history_lines: 0,
+        };
+        let screen = Screen::spawn("test", size, output);
+        let source = ScreenSource::new(screen.clone());
+        let (snapshot, receiver) = source.snapshot();
         let attachment = Attachment {
-            screen,
+            screen: snapshot,
             output: receiver,
             structured: structured.subscribe(),
             confirmation: Arc::new(AtomicBool::new(false)),
             screen_source: source,
         };
-        let produce = |bytes: &[u8]| {
-            let mut parser = parser.lock().unwrap();
-            parser.process(bytes);
-            let _ = output.send(bytes.to_vec());
-        };
+        let produce = |bytes: &[u8]| screen.feed(bytes.to_vec());
         // A viewer socket that holds one frame and is not being read.
         let (tx, mut viewer) = mpsc::channel(1);
         let task = spawn_forwarder(SessionId(7), attachment, tx);
@@ -110,6 +106,8 @@ mod tests {
         for line in 0..40 {
             produce(format!("\r\nline {line}").as_bytes());
         }
+        // Everything is drawn and published before the viewer reads again.
+        let _ = screen.lines();
         tokio::task::yield_now().await;
 
         // Drain: whatever was already queued may arrive, then the redraw. After

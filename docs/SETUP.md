@@ -122,8 +122,8 @@ control$ just package-worker 0.0.1 x86_64-unknown-linux-musl dist-linux
 ```
 
 Supported targets are `x86_64-unknown-linux-musl`,
-`aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, and
-`aarch64-apple-darwin`. Publish every artifact for one version together:
+`aarch64-unknown-linux-musl`, and `aarch64-apple-darwin`. Intel Macs are not
+supported. Publish every artifact for one version together:
 
 ```console
 control$ scripts/publish-worker-release.sh publish \

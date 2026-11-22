@@ -141,7 +141,13 @@ impl ReleaseTarget {
         let expected_target = match (self.os, self.arch) {
             (TargetOs::Linux, TargetArch::X86_64) => "x86_64-unknown-linux-musl",
             (TargetOs::Linux, TargetArch::Aarch64) => "aarch64-unknown-linux-musl",
-            (TargetOs::Macos, TargetArch::X86_64) => "x86_64-apple-darwin",
+            (TargetOs::Macos, TargetArch::X86_64) => {
+                return field(
+                    false,
+                    "target",
+                    "Intel Macs (x86_64-apple-darwin) are no longer supported",
+                );
+            }
             (TargetOs::Macos, TargetArch::Aarch64) => "aarch64-apple-darwin",
         };
         field(

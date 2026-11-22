@@ -14,7 +14,6 @@ sentinal_package_target_values() {
   case "$1" in
     x86_64-unknown-linux-musl) printf 'LINUX X86_64\n' ;;
     aarch64-unknown-linux-musl) printf 'LINUX AARCH64\n' ;;
-    x86_64-apple-darwin) printf 'MACOS X86_64\n' ;;
     aarch64-apple-darwin) printf 'MACOS AARCH64\n' ;;
     *) sentinal_package_die "unsupported target '$1'" ;;
   esac

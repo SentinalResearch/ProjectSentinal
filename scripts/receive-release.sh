@@ -10,7 +10,7 @@ readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/package-common.sh"
 source "$SCRIPT_DIR/lib/release-signature.sh"
 
-readonly TARGETS=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-apple-darwin aarch64-apple-darwin)
+readonly TARGETS=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl aarch64-apple-darwin)
 readonly MAX_SUMS_BYTES=65536
 readonly MAX_ARTIFACT_BYTES=268435456
 

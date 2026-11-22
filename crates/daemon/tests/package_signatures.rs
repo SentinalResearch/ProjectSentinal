@@ -98,7 +98,6 @@ fn write_executable(path: &Path, contents: &str) {
 
 fn host_target() -> (&'static str, TargetOs, TargetArch) {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("macos", "x86_64") => ("x86_64-apple-darwin", TargetOs::Macos, TargetArch::X86_64),
         ("macos", "aarch64") => ("aarch64-apple-darwin", TargetOs::Macos, TargetArch::Aarch64),
         ("linux", "x86_64") => (
             "x86_64-unknown-linux-musl",
@@ -159,7 +158,7 @@ async fn serves_signed_sums_beside_each_release_and_refuses_other_names() {
     }
     fs::set_permissions(&packages, fs::Permissions::from_mode(0o700)).unwrap();
     let sums = format!(
-        "{}  sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz\n",
+        "{}  sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz\n",
         "a".repeat(64)
     );
     fs::write(packages.join("releases/0.0.1.SHA256SUMS"), &sums).unwrap();

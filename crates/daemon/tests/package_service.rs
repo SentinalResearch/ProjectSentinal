@@ -56,10 +56,10 @@ fn manifest_json(bytes: u64) -> String {
   "minimum_protocol_version": 1,
   "maximum_protocol_version": 1,
   "targets": [{{
-    "target": "x86_64-apple-darwin",
+    "target": "aarch64-apple-darwin",
     "os": "MACOS",
-    "arch": "X86_64",
-    "artifact_path": "/packages/v1/artifacts/sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz",
+    "arch": "AARCH64",
+    "artifact_path": "/packages/v1/artifacts/sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz",
     "bytes": {bytes},
     "sha256": "{SHA}"
   }}]
@@ -90,7 +90,7 @@ fn publish_fixture(root: &Path, artifact: &[u8]) {
     fs::write(root.join("channels/stable.json"), &manifest).unwrap();
     fs::write(root.join("releases/0.0.1.json"), &manifest).unwrap();
     fs::write(
-        root.join("artifacts/sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz"),
+        root.join("artifacts/sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz"),
         artifact,
     )
     .unwrap();
@@ -105,7 +105,7 @@ fn manifest_accepts_supported_target_and_rejects_duplicate_target() {
     let duplicated = manifest_json(12).replace(
         "]\n}",
         &format!(
-            ",{{\"target\":\"x86_64-apple-darwin\",\"os\":\"MACOS\",\"arch\":\"X86_64\",\"artifact_path\":\"/packages/v1/artifacts/sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz\",\"bytes\":12,\"sha256\":\"{SHA}\"}}]\n}}"
+            ",{{\"target\":\"aarch64-apple-darwin\",\"os\":\"MACOS\",\"arch\":\"AARCH64\",\"artifact_path\":\"/packages/v1/artifacts/sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz\",\"bytes\":12,\"sha256\":\"{SHA}\"}}]\n}}"
         ),
     );
     let error = ReleaseManifest::parse(duplicated.as_bytes(), 1024 * 1024).unwrap_err();
@@ -137,6 +137,15 @@ fn manifest_rejects_incompatible_protocol_excessive_size_and_bad_checksum() {
 }
 
 #[test]
+fn manifest_refuses_an_intel_mac_target() {
+    let intel = manifest_json(12)
+        .replace("aarch64-apple-darwin", "x86_64-apple-darwin")
+        .replace("\"AARCH64\"", "\"X86_64\"");
+    let error = ReleaseManifest::parse(intel.as_bytes(), 1024 * 1024).unwrap_err();
+    assert!(error.to_string().contains("Intel Macs"), "{error}");
+}
+
+#[test]
 fn manifest_accepts_every_supported_target_and_rejects_missing_or_bad_release_fields() {
     let targets = [
         (
@@ -149,7 +158,6 @@ fn manifest_accepts_every_supported_target_and_rejects_missing_or_bad_release_fi
             TargetOs::Linux,
             TargetArch::Aarch64,
         ),
-        ("x86_64-apple-darwin", TargetOs::Macos, TargetArch::X86_64),
         ("aarch64-apple-darwin", TargetOs::Macos, TargetArch::Aarch64),
     ]
     .into_iter()
@@ -240,7 +248,7 @@ async fn serves_manifest_install_script_and_exact_immutable_artifact() {
     let artifact_response = app
         .oneshot(
             Request::builder()
-                .uri("/packages/v1/artifacts/sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz")
+                .uri("/packages/v1/artifacts/sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -261,7 +269,7 @@ async fn rejects_ranges_traversal_unknown_releases_and_length_mismatch() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/packages/v1/artifacts/sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz")
+                .uri("/packages/v1/artifacts/sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz")
                 .header("range", "bytes=0-2")
                 .body(Body::empty())
                 .unwrap(),
@@ -292,14 +300,14 @@ async fn rejects_ranges_traversal_unknown_releases_and_length_mismatch() {
 
     fs::write(
         root.0
-            .join("artifacts/sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz"),
+            .join("artifacts/sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz"),
         b"short",
     )
     .unwrap();
     let mismatch = app
         .oneshot(
             Request::builder()
-                .uri("/packages/v1/artifacts/sentinal-worker-0.0.1-x86_64-apple-darwin.tar.gz")
+                .uri("/packages/v1/artifacts/sentinal-worker-0.0.1-aarch64-apple-darwin.tar.gz")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -802,7 +810,6 @@ fn sha256(path: &Path) -> String {
 
 fn host_target() -> (&'static str, TargetOs, TargetArch) {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("macos", "x86_64") => ("x86_64-apple-darwin", TargetOs::Macos, TargetArch::X86_64),
         ("macos", "aarch64") => ("aarch64-apple-darwin", TargetOs::Macos, TargetArch::Aarch64),
         ("linux", "x86_64") => (
             "x86_64-unknown-linux-musl",

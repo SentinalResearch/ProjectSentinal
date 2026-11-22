@@ -44,7 +44,7 @@ sentinal_package_require_absolute package "$package_dir"
 case "$(uname -s):$(uname -m)" in
   Linux:x86_64|Linux:amd64) target=x86_64-unknown-linux-musl ;;
   Linux:aarch64|Linux:arm64) target=aarch64-unknown-linux-musl ;;
-  Darwin:x86_64) target=x86_64-apple-darwin ;;
+  Darwin:x86_64) sentinal_package_die 'Intel Macs are not supported; Sentinal runs on Apple silicon Macs and on Linux' ;;
   Darwin:arm64) target=aarch64-apple-darwin ;;
   *) sentinal_package_die "this platform is unsupported: $(uname -s):$(uname -m)" ;;
 esac
