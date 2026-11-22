@@ -19,14 +19,19 @@ fn parses_list_command() {
 }
 
 #[test]
-fn there_is_no_detach_command_because_another_process_cannot_end_an_attachment() {
-    // An attachment belongs to one terminal's own connection; a separate
-    // `sentinal detach <id>` could only hang. Ctrl+J in that terminal detaches.
+fn detach_takes_no_id_because_it_runs_inside_the_session() {
+    // T1.6 (owner, 2026-11-21): `sentinal detach` works like Ctrl+J. It runs
+    // inside the Session and the daemon tells that Session's terminals to let
+    // go; naming another Session (the old, hanging form) is not accepted.
+    assert!(matches!(
+        Cli::try_parse_from(["sentinal", "detach"]).unwrap().command,
+        cli::args::Command::Detach
+    ));
     assert!(Cli::try_parse_from(["sentinal", "detach", "7"]).is_err());
     use clap::CommandFactory;
     let help = Cli::command().render_long_help().to_string();
     assert!(help.contains("Ctrl+J"));
-    assert!(!help.contains("sentinal detach"));
+    assert!(help.contains("sentinal detach"));
 }
 
 #[test]

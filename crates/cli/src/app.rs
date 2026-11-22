@@ -141,6 +141,9 @@ async fn dispatch(
         Command::AgentState { report } => {
             return Ok(crate::agent_state_command::run(report, err).await);
         }
+        Command::Detach => {
+            return Ok(crate::detach::detach_command(err).await);
+        }
         Command::AgentChat { action } => {
             return Ok(match action {
                 crate::args::AgentChatAction::Link => {
@@ -499,6 +502,7 @@ async fn dispatch(
         | Command::AgentSkill { .. }
         | Command::AgentState { .. }
         | Command::AgentChat { .. }
+        | Command::Detach
         | Command::Identity { .. } => {}
     }
     Ok(ExitCode::SUCCESS)

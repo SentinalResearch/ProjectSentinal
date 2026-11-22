@@ -87,6 +87,30 @@ impl SessionManager {
         Ok(session)
     }
 
+    /// `sentinal detach` from inside `session_id`: its attached terminals let
+    /// go, as with the detach key. Only a process inside the Session may ask,
+    /// so another program cannot drop someone's terminal.
+    pub(crate) fn request_detach(
+        &self,
+        session_id: SessionId,
+        caller_pid: Option<u32>,
+    ) -> Result<Session, SessionManagerError> {
+        let caller = caller_pid.ok_or(SessionManagerError::AgentCallerUnknown)?;
+        let handle = self.handle(session_id)?;
+        let root = lock_session(&handle)?.pid;
+        if !root.is_some_and(|root| self.inner.probe.descends_from(caller, root)) {
+            return Err(SessionManagerError::AgentOutsideSession {
+                pid: caller,
+                session_id,
+            });
+        }
+        let _ = handle
+            .structured
+            .send(DaemonMessage::DetachRequested { session_id });
+        let session = lock_session(&handle)?.clone();
+        Ok(session)
+    }
+
     /// The Session's kept chat, and whether a file is linked.
     pub fn chat(
         &self,

@@ -313,7 +313,8 @@ pub async fn handle_connection(
                 Ok(()) => {
                     // 6.4: who is calling comes from the OS, never from the request.
                     if let LocalRequest::AgentState { caller_pid, .. }
-                    | LocalRequest::AgentTranscript { caller_pid, .. } = &mut envelope.payload
+                    | LocalRequest::AgentTranscript { caller_pid, .. }
+                    | LocalRequest::Detach { caller_pid, .. } = &mut envelope.payload
                     {
                         *caller_pid = peer_pid(&stream);
                     }

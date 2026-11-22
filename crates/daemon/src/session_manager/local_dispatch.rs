@@ -91,6 +91,15 @@ impl SessionManager {
                 .map(|session| LocalResponse::Session {
                     session: Box::new(session),
                 }),
+            LocalRequest::Detach {
+                session_id,
+                caller_pid,
+            } => {
+                self.request_detach(session_id, caller_pid)
+                    .map(|session| LocalResponse::Session {
+                        session: Box::new(session),
+                    })
+            }
             LocalRequest::SetGroup { session_id, group } => {
                 self.set_group(session_id, group)
                     .map(|session| LocalResponse::Session {

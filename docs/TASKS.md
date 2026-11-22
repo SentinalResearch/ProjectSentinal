@@ -412,14 +412,35 @@ T0.5, T0.6 (X14), T0.11, T0.12 (X15).
 
 ### T1. Display fixes without a protocol change
 
-- [ ] T1.1 Unicode 11 widths in the web terminal
-- [ ] T1.2 Debounced fit
-- [ ] T1.3 CLI handles window resize and restores the local terminal on exit
-- [ ] T1.4 CLI resizes before the snapshot
-- [ ] T1.5 A viewer never starts inside an escape sequence
-- [ ] T1.6 Detach key: `Ctrl-\ d` only; `Ctrl+J` goes to the program. The
-      `sentinal detach` subcommand on `dev` hangs and cannot work as written:
-      owner decides remove or redefine
+- [x] T1.1 Unicode 11 widths in the web terminal and its peek preview
+      (`@xterm/addon-unicode11` 0.9.0) — `terminal/unicode11.test.ts` checks
+      emoji and CJK columns (2026-11-20)
+- [x] T1.2 Debounced fit: one fit 100 ms after the last resize
+      (`terminal/trailing.ts`)
+- [x] T1.3 CLI follows SIGWINCH while attached, and every exit from attach
+      restores the local terminal (alternate screen off, cursor on, mouse and
+      bracketed paste off, attributes reset; `RESTORE_TERMINAL`). Not yet
+      tried by hand
+- [x] T1.4 CLI sends RESIZE before ATTACH (its reply awaited and ignored),
+      then again as the acknowledgement, as the web does
+- [x] T1.5 A viewer never starts inside an escape sequence: the PTY reader
+      gives the screen and viewers whole sequences only and holds an
+      unfinished tail (at most 8 KiB) for the next read
+      (`session_manager/sequence_boundary.rs`). Test: a viewer attaching at
+      every byte of a recorded stream ends with the daemon's screen. Found:
+      a program that leaves the alternate screen after a viewer attached
+      returns that viewer to an empty screen (the snapshot carries only the
+      screen on show); T2's authoritative screen fixes it
+- [x] T1.6 Owner decided 2026-11-21: `sentinal detach` "detaches from
+      Sentinal, just like Ctrl+J", so `Ctrl+J` stays the detach key (a lone
+      keypress, never from a paste; `Ctrl-\ d` still works). The old
+      subcommand, removed in `64117cf`, is back in a form that can work: run
+      inside an attached Session, it asks the daemon over the local socket
+      (only a process inside that Session is accepted), and the daemon tells
+      the Session's attached terminals to let go (`DETACH_REQUESTED`); web
+      viewers stay. Tried by hand: a Session ran `sentinal detach` and its
+      terminal returned to the local shell with the Session still running; a
+      process outside the Session was refused
 
 ### T2. Authoritative screen on `libghostty-vt`
 

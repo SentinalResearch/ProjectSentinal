@@ -520,6 +520,13 @@ over the private local socket.
 - Sentinal never signals, traces, or writes to an adopted process; its exit
   code is always shown as unknown.
 
+### `detach`
+
+Run inside an attached Session, `sentinal detach` detaches every terminal
+attached to it with `sentinal attach` or `sentinal watch`, exactly as
+pressing `Ctrl+J` does. The Session keeps running; web viewers stay. Only a
+process inside that Session may ask. Outside a Session it says so and exits 1.
+
 ### `agent-chat`
 
 Show Claude Code Sessions as a chat in the web app (design:

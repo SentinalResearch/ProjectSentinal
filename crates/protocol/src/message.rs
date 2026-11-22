@@ -502,6 +502,17 @@ pub enum LocalRequest {
         #[cfg_attr(feature = "ts", ts(skip))]
         caller_pid: Option<u32>,
     },
+    /// `sentinal detach` from inside a Session: its attached terminals let go,
+    /// as with the detach key. Accepted only from a process inside it.
+    Detach {
+        /// The Session (from `SENTINAL_SESSION_ID`).
+        session_id: SessionId,
+        /// The calling process as the OS reported it; set by the socket
+        /// layer after decoding, never read from the wire.
+        #[serde(skip)]
+        #[cfg_attr(feature = "ts", ts(skip))]
+        caller_pid: Option<u32>,
+    },
     /// Put a Session in a group, or take it out (`sentinal group`).
     SetGroup {
         /// The Session.
@@ -632,6 +643,12 @@ impl LocalRequest {
             LocalRequest::Complete {
                 prefix, cwd, limit, ..
             } => crate::complete::validate_request(prefix, cwd.as_deref(), *limit),
+            LocalRequest::Detach { session_id, .. } if session_id.0 == 0 => {
+                Err(ProtocolError::InvalidIdentifier {
+                    field: "session_id",
+                })
+            }
+            LocalRequest::Detach { .. } => Ok(()),
             LocalRequest::SetGroup { session_id, group } => {
                 if session_id.0 == 0 {
                     return Err(ProtocolError::InvalidIdentifier {
@@ -890,6 +907,12 @@ pub enum DaemonMessage {
     Events {
         /// Events matching the request.
         events: Vec<Event>,
+    },
+    /// Terminals attached to this Session should detach now, as if the
+    /// detach key was pressed (`sentinal detach`). Web viewers ignore it.
+    DetachRequested {
+        /// The Session.
+        session_id: SessionId,
     },
     /// An agent Session's conversation (AC1): every kept entry in reply to
     /// `GET_CHAT` (`from_start`), then new entries as the agent writes them.

@@ -63,6 +63,12 @@ export type DaemonMessage = {
    */
   events: Array<Event>;
 } | {
+  "type": "DETACH_REQUESTED";
+  /**
+   * The Session.
+   */
+  session_id: SessionId;
+} | {
   "type": "CHAT";
   /**
    * The agent Session.

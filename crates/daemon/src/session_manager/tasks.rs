@@ -47,10 +47,13 @@ pub(super) fn spawn_reader(
         let mut budget =
             super::log_budget::LogBudget::new(super::log_budget::SESSION_LOG_CAP_BYTES);
         let mut buffer = [0_u8; 8192];
+        // T1.5: viewers and the screen get whole sequences only.
+        let mut boundary = super::sequence_boundary::SequenceBoundary::default();
         loop {
             let count = match reader.read(&mut buffer) {
                 Ok(0) => {
-                    let trailing = osc.finish();
+                    let mut trailing = boundary.push(&osc.finish());
+                    trailing.extend(boundary.finish());
                     if !trailing.is_empty() {
                         if let Err(error) = save(&mut encoder, &mut budget, &trailing) {
                             tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append trailing session log");
@@ -93,11 +96,14 @@ pub(super) fn spawn_reader(
                 tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to append session log");
             }
             // Published under the screen lock: see `ScreenSource::snapshot`.
+            // Only whole sequences, so a snapshot never falls inside one.
+            let whole = boundary.push(bytes);
             match handle.parser.lock() {
-                Ok(mut parser) => {
-                    parser.process(bytes);
-                    let _ = handle.output.send(bytes.to_vec());
+                Ok(mut parser) if !whole.is_empty() => {
+                    parser.process(&whole);
+                    let _ = handle.output.send(whole);
                 }
+                Ok(_) => {}
                 Err(_) => {
                     tracing::error!(session = session_id.0, "screen lock poisoned");
                     return;

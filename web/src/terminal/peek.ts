@@ -1,4 +1,6 @@
 import { Terminal } from "@xterm/xterm";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { activateUnicode11 } from "./trailing";
 import { useEffect, useState } from "react";
 
 import { dataAdapter, isMockData } from "../data";
@@ -91,7 +93,9 @@ export function usePeekLines(session: Session, visible: boolean): string[] {
       return;
     }
     activePeeks += 1;
-    const screen = new Terminal({ cols: PEEK_COLS, rows: PEEK_ROWS, allowProposedApi: false, scrollback: 0 });
+    // Unicode 11 widths, like the full terminal (T1.1): a proposed API.
+    const screen = new Terminal({ cols: PEEK_COLS, rows: PEEK_ROWS, allowProposedApi: true, scrollback: 0 });
+    activateUnicode11(screen, new Unicode11Addon());
     const read = () => {
       const buffer = screen.buffer.active;
       const all: string[] = [];

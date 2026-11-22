@@ -191,6 +191,13 @@ export type LocalRequest =
     eta_secs?: number | null;
   }
   | {
+    "type": "DETACH";
+    /**
+     * The Session (from `SENTINAL_SESSION_ID`).
+     */
+    session_id: SessionId;
+  }
+  | {
     "type": "SET_GROUP";
     /**
      * The Session.

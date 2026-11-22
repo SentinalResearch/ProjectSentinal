@@ -211,6 +211,20 @@ impl DaemonClient {
         requested_size: Option<(u16, u16)>,
         auto_wrap: bool,
     ) -> Result<AttachEnd, ClientError> {
+        // T1.4: size the PTY to this terminal before the snapshot is taken,
+        // so the screen arrives laid out for this window, as the web does.
+        // Its reply is awaited and its outcome ignored, so a refused resize
+        // can never be mistaken for a refused attach.
+        let size = requested_size.or_else(terminal_size);
+        if let Some((cols, rows)) = size {
+            let _ = self
+                .request(ClientRequest::Resize {
+                    session_id,
+                    cols,
+                    rows,
+                })
+                .await;
+        }
         self.send_control(ClientRequest::Attach {
             session_id,
             history: false,
@@ -228,14 +242,14 @@ impl DaemonClient {
         let _raw = RawTerminal::enable()?;
         // RESIZE is the attachment acknowledgement: it is sent only after
         // this client has actually received the screen snapshot.
-        let (cols, rows) = requested_size.or_else(terminal_size).unwrap_or((80, 24));
+        let (cols, rows) = size.unwrap_or((80, 24));
         self.send_control(ClientRequest::Resize {
             session_id,
             cols,
             rows,
         })
         .await?;
-        let result = self.pump_attachment(session_id).await;
+        let result = self.pump_attachment(session_id, (cols, rows)).await;
         if auto_wrap && result.is_err() {
             // Once acknowledged, falling back would start a second shell.
             return Ok(AttachEnd::Detached);
@@ -243,13 +257,36 @@ impl DaemonClient {
         result
     }
 
-    async fn pump_attachment(&mut self, session_id: SessionId) -> Result<AttachEnd, ClientError> {
+    async fn pump_attachment(
+        &mut self,
+        session_id: SessionId,
+        mut size: (u16, u16),
+    ) -> Result<AttachEnd, ClientError> {
         let mut stdin = spawn_stdin_reader();
         let mut stdout = tokio::io::stdout();
         let mut detector = DetachDetector::new();
+        // T1.3: follow this window's size while attached.
+        let mut resized =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::window_change()).ok();
 
         loop {
             tokio::select! {
+                Some(()) = async {
+                    match resized.as_mut() {
+                        Some(signal) => signal.recv().await,
+                        None => std::future::pending().await,
+                    }
+                } => {
+                    if let Some(now) = terminal_size().filter(|now| *now != size) {
+                        size = now;
+                        self.send_control(ClientRequest::Resize {
+                            session_id,
+                            cols: now.0,
+                            rows: now.1,
+                        })
+                        .await?;
+                    }
+                }
                 chunk = stdin.recv() => {
                     let input = match chunk {
                         Some(Ok(bytes)) => bytes,
@@ -306,6 +343,14 @@ impl DaemonClient {
                             match message {
                                 DaemonMessage::Error { message } => {
                                     return Err(ClientError::Daemon(message));
+                                }
+                                // `sentinal detach` inside the Session: let go,
+                                // exactly as the detach key does.
+                                DaemonMessage::DetachRequested { session_id: asked }
+                                    if asked == session_id =>
+                                {
+                                    self.send_control(ClientRequest::Detach { session_id }).await?;
+                                    return Ok(AttachEnd::Detached);
                                 }
                                 // The shell exited: there is nothing left to show.
                                 DaemonMessage::SessionUpdated { session }
@@ -418,8 +463,17 @@ impl RawTerminal {
     }
 }
 
+/// What a program in the Session may have left the local terminal in, undone
+/// on any exit from attach (T1.3): leave the alternate screen, show the
+/// cursor, mouse reporting and bracketed paste off, attributes reset.
+pub const RESTORE_TERMINAL: &[u8] =
+    b"\x1b[?1049l\x1b[?25h\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[0m";
+
 impl Drop for RawTerminal {
     fn drop(&mut self) {
+        let mut out = std::io::stdout();
+        let _ = std::io::Write::write_all(&mut out, RESTORE_TERMINAL);
+        let _ = std::io::Write::flush(&mut out);
         let _ = Command::new("stty").arg(&self.previous).status();
     }
 }

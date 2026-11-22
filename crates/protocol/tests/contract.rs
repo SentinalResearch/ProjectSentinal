@@ -171,6 +171,7 @@ fn every_local_request_has_a_fixture() {
         "AGENT_STATE",
         "AGENT_TRANSCRIPT",
         "SET_GROUP",
+        "DETACH",
     ];
     let requests = load("local_requests.json");
     let present: Vec<&str> = requests
@@ -277,6 +278,7 @@ fn every_daemon_message_has_a_fixture() {
         "EVENT",
         "EVENTS",
         "CHAT",
+        "DETACH_REQUESTED",
         "MACHINE_METRICS",
         "SESSION_METRICS",
         "HISTORY",

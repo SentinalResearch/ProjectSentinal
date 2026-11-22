@@ -1,4 +1,6 @@
 import { FitAddon } from "@xterm/addon-fit";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { FIT_DEBOUNCE_MS, trailing, activateUnicode11 } from "./trailing";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
@@ -168,6 +170,7 @@ export function TerminalPane({
     }
     // The built-in keyboard replaces the OS one: xterm's input never opens it.
     if (keyboard) term.textarea?.setAttribute("inputmode", "none");
+    activateUnicode11(term, new Unicode11Addon());
     fit.fit();
     // The first fit may measure the fallback font; refit once the real one loads.
     void document.fonts?.ready.then(() => {
@@ -176,12 +179,16 @@ export function TerminalPane({
     terminalRef.current = term;
     setTerminal(term);
 
-    const onResize = () => fit.fit();
+    const refit = trailing(() => {
+      if (terminalRef.current === term) fit.fit();
+    }, FIT_DEBOUNCE_MS);
+    const onResize = refit.call;
     window.addEventListener("resize", onResize);
     const resizeObserver = new ResizeObserver(onResize);
     resizeObserver.observe(host);
 
     return () => {
+      refit.cancel();
       window.removeEventListener("resize", onResize);
       resizeObserver.disconnect();
       term.dispose();

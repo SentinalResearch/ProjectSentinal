@@ -72,5 +72,6 @@
     }
   },
   {"version": 1, "payload": {"type": "AGENT_TRANSCRIPT", "session_id": 128, "path": "/Users/owner/.claude/projects/-Users-owner-work/7f3c.jsonl"}},
-  {"version": 1, "payload": {"type": "SET_GROUP", "session_id": 128, "group": "layout-tests/gemma"}}
+  {"version": 1, "payload": {"type": "SET_GROUP", "session_id": 128, "group": "layout-tests/gemma"}},
+  {"version": 1, "payload": {"type": "DETACH", "session_id": 128}}
 ]

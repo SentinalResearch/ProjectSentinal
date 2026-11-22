@@ -81,3 +81,50 @@ impl DetachDetector {
         }
     }
 }
+
+/// `sentinal detach`: ask the daemon to make this Session's attached
+/// terminals let go. Only works from inside the Session, which the daemon
+/// checks with the OS.
+pub async fn detach_command(err: &mut dyn std::io::Write) -> std::process::ExitCode {
+    use crate::hook_report::{exchange, socket_path};
+    use protocol::{LocalRequest, LocalResponse, SessionId};
+    use std::{path::PathBuf, process::ExitCode, time::Duration};
+
+    let Some(id) = std::env::var("SENTINAL_SESSION_ID")
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|id| *id > 0)
+    else {
+        let _ = writeln!(
+            err,
+            "sentinal: not inside a Sentinal Session; nothing to detach"
+        );
+        return ExitCode::FAILURE;
+    };
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from);
+    let explicit = std::env::var_os(protocol::local::SOCKET_ENV).map(PathBuf::from);
+    let Some(socket) = socket_path(explicit, home.as_deref(), runtime.as_deref()) else {
+        let _ = writeln!(err, "sentinal: HOME is not set; set SENTINAL_SOCKET");
+        return ExitCode::FAILURE;
+    };
+    let request = LocalRequest::Detach {
+        session_id: SessionId(id),
+        caller_pid: None,
+    };
+    match tokio::time::timeout(Duration::from_secs(2), exchange(&socket, request)).await {
+        Ok(Ok(LocalResponse::Session { .. })) => ExitCode::SUCCESS,
+        Ok(Ok(LocalResponse::Error { message, .. })) => {
+            let _ = writeln!(err, "sentinal: detach refused: {message}");
+            ExitCode::FAILURE
+        }
+        _ => {
+            let _ = writeln!(
+                err,
+                "sentinal: sentinald did not answer at {}",
+                socket.display()
+            );
+            ExitCode::FAILURE
+        }
+    }
+}

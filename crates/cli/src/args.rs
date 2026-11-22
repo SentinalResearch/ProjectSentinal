@@ -10,7 +10,7 @@ use std::path::PathBuf;
     name = "sentinal",
     version = crate::version::VERSION.as_str(),
     about,
-    after_help = "Attach: `sentinal attach <id>`; detach while attached with Ctrl+J, and the Session keeps running. AI agents: `sentinal agent-guide`."
+    after_help = "Attach: `sentinal attach <id>`; detach while attached with Ctrl+J (or run `sentinal detach` inside the Session), and the Session keeps running. AI agents: `sentinal agent-guide`."
 )]
 pub struct Cli {
     /// Daemon WebSocket URL.
@@ -95,6 +95,11 @@ pub enum Command {
         #[command(flatten)]
         report: crate::agent_state_command::Report,
     },
+    /// From inside an attached Session: detach, as Ctrl+J does.
+    ///
+    /// Every terminal attached to this Session with `sentinal attach` or
+    /// `sentinal watch` lets go; the Session keeps running. Web viewers stay.
+    Detach,
     /// Put a Session in a group, e.g. `layout-tests/gemma`, or take it out.
     ///
     /// Sessions in one group show together in the web app, and its finished

@@ -15,6 +15,7 @@ mod log_budget;
 mod operations;
 mod replay;
 mod screen_history;
+mod sequence_boundary;
 mod structured;
 mod tasks;
 
