@@ -32,7 +32,7 @@ Read these first, in order:
   `docs/guide/sentinal-guide-overleaf.zip`.
 - **Commit, push, tag, and release only when the owner asks.** Work on the `dev`
   branch. `main` gets work only through `just promote`, and releases only through
-  `just ship X.Y.Z` run by the owner. The next release is **v2.11.0**; do not
+  `just ship X.Y.Z` run by the owner. The next release is **v2.12.0**; do not
   release it.
 - **Do not run commands on the owner's VMs.** Write the command; the owner runs it.
 - The product is spelled **Sentinal** (binaries `sentinal`, `sentinald`,
@@ -83,9 +83,11 @@ If the task changes the protocol and something is unclear, stop and ask.
 
 ## State right now
 
-- `main` = `origin/main` = tag **v2.10.0** (production).
-- `dev` has 11 local commits (not pushed), including the screen
-  question detector and dashboard prompt fixes (task **P0**, now committed).
+- Production is tag **v2.11.0**. `dev` is 13 commits past it (not pushed):
+  the terminal upgrade package T0–T5 (keepers last, `a461c64`), groups,
+  time left, the Claude Code chat, Q1–Q10 and X24.
+- Next release: **v2.12.0**, owner steps in section R below, notes in
+  `docs/releases/v2.12.0.md` (draft).
 - **2026-11-08 agent pass:** B2 (::sentinal progress/metric API), B1
   (METRIC_REPORTED + server detection), P1 (Vibe arrows+Enter), P2 (marked
   menus), P4 (Claude "Running N shell command…"), P5 (agent Session names),
@@ -763,24 +765,41 @@ restarts the daemon. Refuses to overwrite an existing file without
 
 ---
 
-## C: multi-day runs survive a daemon restart · *now T5*
+## C: multi-day runs survive a daemon restart · *built as T5*
 
-Today a daemon restart or update ends FULL Sessions. This track is built as
-stage **T5** of the terminal upgrade package; the list below is kept for the
-detail.
+Built as stage **T5** of the terminal upgrade package (`a461c64`); details in
+section T above.
 
-- [ ] Owner approves `docs/R1_KEEPER_DESIGN.md` (no code before this)
-- [ ] A per-Session keeper keeps the PTY and log alive while `sentinald` restarts
-- [ ] The restarted daemon reclaims its own keepers and rebuilds screen and
+- [x] Owner approves `docs/R1_KEEPER_DESIGN.md` (2026-11-24)
+- [x] A per-Session keeper keeps the PTY and log alive while `sentinald` restarts
+- [x] The restarted daemon reclaims its own keepers and rebuilds screen and
       tracker state; unknown or inconsistent keepers fail closed
-- [ ] Upgrade and crash tests
+- [ ] Upgrade and crash tests: crash and restart pass with real processes on
+      macOS; a real update with live terminals and keepers on Linux are open
+      (owner, see "Acceptance runs" in `docs/progress/acceptance-v1.md`)
 
 ## D: one install per Machine · done
 
 All items done in `98f41d7` and `19be6fe`. Keep it that way: every new file that
 holds credentials or settings must follow `config_dir`.
 
-## R: release v2.11.0 · *owner only*
+## R: release v2.12.0 · *owner only*
+
+1. Owner tries the T5 keepers in `just dev` (start `top`, restart the dev
+   daemon, the terminal is still there)
+2. `just promote` (runs every check, merges `dev` into `main`, pushes nothing)
+3. Owner: `sentinal backup create` on the control and on each worker
+4. Owner: `git checkout main && just ship 2.12.0`
+5. Owner: `gh release edit v2.12.0 --notes-file docs/releases/v2.12.0.md`
+6. **Control: install 2.12.0 by hand once** (`docs/PILOT.md` §2). A 2.11.0
+   control's release check requires an `x86_64-apple-darwin` archive in
+   `SHA256SUMS` (`cli/src/release/github.rs` at v2.11.0), so it never offers
+   2.12.0. The installer keeps the config and data. Workers have no such
+   check: after the control, update them from the dashboard
+7. This update still ends live terminals (the 2.11.0 daemon has no
+   keepers); the next one will not
+
+## R (done): release v2.11.0 · *shipped*
 
 1. Owner has tried P0 in `just dev`
 2. `just promote` (runs every check, merges `dev` into `main`, pushes nothing)

@@ -39,8 +39,8 @@ model) to build the whole system, one milestone at a time.
 | 5 | `06-milestone-5-projects-autocomplete.md` | Projects, command library, autocomplete |
 | 6 | `07-milestone-6-intelligence-foundation.md` | Agent tool API, datasets, evals, baselines |
 | 7 | `08-milestone-7-finetune-agent.md` | Fine-tuned small model, heartbeat, journal (**V2**) |
-| R1 | `09-reliability-r1-daemon-restart-sessions.md` | Optional keeper architecture for PTYs across daemon restart |
-| 4.G | `10-milestone-4g-terminal-reliability-performance.md` | Real-terminal fidelity, keepers (includes R1), honest status, measured performance |
+| R1 | `09-reliability-r1-daemon-restart-sessions.md` | Keeper architecture for PTYs across daemon restart. **Superseded by T** (built as T5); kept for its design and security requirements |
+| 4.G | `10-milestone-4g-terminal-reliability-performance.md` | Real-terminal fidelity, keepers (includes R1), honest status, measured performance. **Open parts superseded by T** |
 | 4.H | `11-milestone-4h-observability.md` | Pre-V1: continuous health measurements on the control, health page, shareable anonymised report |
 | 6.4 | `12-milestone-6d-agent-sandbox-state.md` | Agent sandbox Sessions, agent state reporting via local socket, agent skill file (V2) |
 | T | `13-terminal-upgrade-package.md` | Terminal upgrade package: watcher fixes, one size per Session, `libghostty-vt` screen, `sentinal watch` pick-up from any Machine, keepers (replaces the open parts of 4.G and R1) |
@@ -54,8 +54,12 @@ dependency, local-socket, or PTY-ownership decisions.
 The recommended path from the current repository is 1b.E → 1c → 1c.1 → 1d →
 3 → 1b.D → 4.0 → 4.A → 4.B → 4.C → 4.D → 4.D.1 → 4.F → 4.E. 4.F comes
 before 4.E so the clean-install pilot and real-phone acceptance exercise the
-phone screens. R1 is a separate reliability project: schedule it before a
-production-stability claim, but do not mix it into watcher or dashboard work.
+phone screens. R1 and the open parts of 4.G were delivered by the terminal
+upgrade package T (T0–T5, 2026-11-24; report in
+`docs/progress/terminal-upgrade.md`); do not paste `09` or `10` again. What is
+left before V1 is 4.E and the real-hardware acceptance runs listed in
+`docs/ROADMAP.md`. Status lives in `docs/ROADMAP.md`, `docs/TASKS.md` and
+`docs/progress/`, never in these prompts: their checkboxes are left unticked.
 
 ## Review checklist (5 minutes per milestone)
 

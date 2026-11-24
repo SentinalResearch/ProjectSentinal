@@ -329,11 +329,31 @@ glass mobile shell and built-in terminal keyboard (4.I mobile, below).
 pages from the sheets on the right.
 
 ## Reliability R1 — Daemon-restart-resilient FULL Sessions
-- [ ] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation
-- [ ] A per-Session owner keeps the PTY and log alive while `sentinald` restarts
-- [ ] A restarted daemon securely reclaims same-user keepers and rebuilds screen/tracker state
-- [ ] Missing, foreign, or inconsistent keepers fail closed and mark the Session interrupted
-- [ ] Service upgrade and crash tests prove the process, screen, log, and audit boundary survive
+Built as T5 of the terminal upgrade package (`prompts/13-terminal-upgrade-package.md`,
+report `docs/progress/terminal-upgrade.md`, tasks in `docs/TASKS.md` section T).
+- [x] Approve a keeper-process architecture and shutdown/upgrade semantics before implementation (2026-11-24, `docs/R1_KEEPER_DESIGN.md` §13)
+- [x] A per-Session owner keeps the PTY and log alive while `sentinald` restarts
+- [x] A restarted daemon securely reclaims same-user keepers and rebuilds screen/tracker state
+- [x] Missing, foreign, or inconsistent keepers fail closed and mark the Session interrupted
+- [ ] Service upgrade and crash tests prove the process, screen, log, and audit boundary survive.
+      Crash and restart: real-process tests pass on macOS. Still open: a real
+      `sentinal update` with a full-screen program running, and keepers on
+      Linux (systemd scope, `SO_PEERCRED`, memory, Q5)
+
+## Terminal upgrade package T — start anywhere, pick up anywhere
+Replaces the open parts of 4.G and R1. Prompt `prompts/13-terminal-upgrade-package.md`.
+- [x] T0 Watcher and daemon fixes (13 items, each with a test that failed first)
+- [x] T1 Display fixes without a protocol change
+- [x] T2 Authoritative screen on `libghostty-vt` (Intel Macs dropped by the owner)
+- [x] T3 One size per Session, set by the latest active viewer
+- [x] T4 `sentinal watch` picks up from any Machine; `sentinal login`
+- [x] T5 Keepers: Sessions survive a daemon restart (see R1 above for what is open)
+- [ ] Owner tries by hand: real `claude` for T4.4, `sentinal login` from a second Machine, the CLI side of T3
+
+## Milestone 4.H — Measure Sentinal on real Machines
+Prompt `prompts/11-milestone-4h-observability.md`; measurements in `docs/progress/milestone-4h.md`.
+- [x] Continuous measurements on the control, health page, downloadable anonymised report
+- [x] First baseline report from the owner's Tailnet (2026-10-24)
 
 ## V2 — Intelligence
 

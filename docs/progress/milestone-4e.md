@@ -12,8 +12,11 @@ accepted:
   and a daily api.github.com check;
 - the `sentinal-pilot` VM, wiped, as the acceptance control.
 
-Implementation in progress (see "Implementation order"). No signing key has
-been created by the assistant; the owner generates and pins it.
+Implementation steps 1–8 are built (see "Implementation record"). The owner
+generated the release keys and pinned two (primary and backup) in
+`packaging/release-keys/allowed_signers`; signed releases up to v2.11.0 have
+shipped with `just ship`. Open: the clean-state acceptance run on real
+Machines (pilot matrix below; checklist in `docs/progress/acceptance-v1.md`).
 Prompt:
 `prompts/05e-milestone-4e-v1-install-discovery-private-pilot.md`.
 
