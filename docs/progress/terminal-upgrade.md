@@ -164,3 +164,70 @@ size back.
 - Panning in a phone's full-screen terminal: touch drags scroll the
   scrollback there, so a Session wider than the phone at 9 px pans only with
   a trackpad or mouse.
+
+## T4: `sentinal watch` picks up from anywhere (2026-11-22)
+
+Design: `docs/WATCH_PICKUP_DESIGN.md`, approved by the owner on 2026-11-22
+with the four recommended decisions. Tested on a working tree based on
+commit `b27e643`.
+
+### What was built
+
+| Part | Where |
+|---|---|
+| Who can be picked up (live, FULL, reachable), order (waiting, running, idle; newest change first), matching, the picker's table and answers | `crates/cli/src/pickup.rs` (pure) |
+| Bare `watch` picks up; `NAME\|ID`, `MACHINE:ID`, `--last`, `--new`, `--machine`, `--json`; never prompts without a terminal (exit 2); one Session attaches at once, none starts a shell | `crates/cli/src/watch_pickup.rs`, `args.rs`, `app.rs` |
+| History on pick-up, after scrolling the window's own screen into its scrollback | `crates/cli/src/client.rs` (`pick_up`) |
+| `sentinal login` / `logout`: the browser's owner sign-in from the terminal, kept 0600 in `owner-session`; other Machines from `/api/v1/control/snapshot`, attached through `/api/v1/machines/{id}/ws` | `crates/cli/src/login.rs` |
+
+No control or wire change: the control's `/api/v1/auth/login` already issues
+the owner sign-in a browser gets.
+
+### Tests
+
+Pick-up rules (9): order, `--last`, IDs here first then anywhere,
+`MACHINE:ID`, title then agent or folder then a title or word start,
+ambiguity, picker answers, running times, the table, what cannot be picked
+up. Arguments: target, `--last`, `--machine`, `--new`, and the refused
+combinations. Login (4 unit, 2 against a stand-in control with the real
+contract): only encrypted origins get the password; the terminal route URL;
+the file is 0600 and forgotten once expired; a wrong password keeps nothing;
+the kept sign-in reads the list; a token the control no longer accepts reads
+as signed out; logout tells the control; an unreachable control. Real
+control: the token from `/api/v1/auth/login` reads the snapshot and logout
+ends it.
+
+Found while checking: a T3 test (`a_size_change_redraws_the_screen_at_the_new_size`)
+attached before the reader had drawn the output, so it failed about one run
+in five; the failure skipped the fake PTY's exit and the test runtime then
+waited forever, which hung `just check` for an hour. Fixed by waiting until
+the output is on the screen; 60 runs of the file passed afterwards.
+
+### Tried by hand (QA instance, real terminals in the Terminal panel)
+
+1. A Session ran a script that printed 120 build lines and asked "Deploy to
+   staging? [y/N]", started with `--detach` (nobody attached).
+2. `sentinal watch` without a terminal listed it first, WAITING, with IDs,
+   said "Only this Machine. `sentinal login` …", and exited 2; `--json`
+   printed the same list; `watch zzz` exited 1 with the list.
+3. `sentinal watch deploy` in a terminal found nothing: the last rule only
+   matched the start of the title. Changed to match any word, then it
+   picked the Session up: all 120 lines in the terminal's scrollback, then
+   the question.
+4. The phone layout showed the question with y / n; tapping y reached the
+   picked-up terminal at once ("you said: y").
+5. Closing that window only detached. `sentinal watch --last` in a new one
+   came back to the same Session, its history and the answer, with the
+   window's own earlier output kept above it (the first try drew over the
+   prompt line; fixed by scrolling the screen away first).
+
+### Not verified
+
+- `sentinal login` by hand and picking up a Session on another Machine: the
+  QA setup has one Machine, and the password prompt needs a person at the
+  terminal. Covered by the tests above; the routed terminal itself is the
+  browser's, covered by `projection-acceptance` in the browser tests.
+- The picker's numbered prompt by hand (needs typing at the terminal); its
+  answers are unit-tested.
+- With `claude` itself, as T4.4 asks: a script with a `[y/N]` question was
+  used instead, so no model was run.

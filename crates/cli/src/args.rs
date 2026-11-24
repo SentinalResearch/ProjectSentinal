@@ -248,6 +248,22 @@ pub enum Command {
     /// shell and the shell stays open afterwards. Detach with Ctrl+J;
     /// closing the window also only detaches.
     Watch {
+        /// Pick up this Session: an ID, MACHINE:ID, its title, its agent
+        /// (`claude`), or its folder. Without one, choose from a list.
+        #[arg(value_name = "NAME|ID", conflicts_with_all = ["command", "new", "last"])]
+        target: Option<String>,
+        /// Pick up the Session that changed most recently.
+        #[arg(long, conflicts_with_all = ["command", "new"])]
+        last: bool,
+        /// Start a new shell Session instead of picking one up.
+        #[arg(long, conflicts_with = "command")]
+        new: bool,
+        /// Only Sessions on this Machine (its name or ID).
+        #[arg(long, value_name = "NAME")]
+        machine: Option<String>,
+        /// Without a terminal: print the list as JSON.
+        #[arg(long)]
+        json: bool,
         /// Session title shown in `ls` and the web UI.
         #[arg(short = 't', long)]
         title: Option<String>,
@@ -329,6 +345,15 @@ pub enum Command {
     },
     /// Remove this Machine's control link (the Machine ID is kept).
     Disconnect,
+    /// Sign in to the control as the owner, so `watch` can pick up Sessions
+    /// on your other Machines. Reads the password from the terminal; the
+    /// sign-in lasts 24 hours, like a browser's.
+    Login {
+        /// The control's origin; defaults to the control this Machine is linked to.
+        control_url: Option<String>,
+    },
+    /// Sign out of the control and forget the sign-in here.
+    Logout,
     /// Manage this Machine's immutable identity.
     Identity {
         /// Identity operation.

@@ -384,8 +384,44 @@ preceding output was returned but the final compressed frame was incomplete.
 
 ### `watch`
 
-Creates a `WATCH` / `FULL` Session and attaches the current terminal to it
-immediately. The Session uses the caller's current directory, current
+One command to start work and to come back to it (T4,
+`docs/WATCH_PICKUP_DESIGN.md`):
+
+```console
+sentinal watch -- COMMAND…        start COMMAND in a new Session and attach
+sentinal watch                     pick up: list live Sessions, choose one
+sentinal watch NAME|ID             pick up that Session
+sentinal watch --last              pick up the Session that changed most recently
+sentinal watch --new               start a new shell Session
+sentinal watch --machine NAME …    only that Machine's Sessions
+```
+
+**Picking up.** A bare `sentinal watch` on a terminal lists the live FULL
+Sessions on this Machine (and on your other Machines after `sentinal
+login`), waiting ones first, then running, then idle:
+
+```console
+$ sentinal watch
+  #  MACHINE   SESSION              STATE     RUNNING
+  1  gpu-box   claude · api         WAITING   2h 10m
+  2  laptop    layout-tests queue   RUNNING   41m
+Pick a Session (1–2), n for a new one, Enter for 1:
+```
+
+With nothing running it starts a new shell Session, as before; with one, it
+picks that one up. You get the Session's recent history (about 2,000 lines)
+in your terminal's scrollback, then the live screen. Picking up does not
+take the screen size from a device that is in use; typing does.
+
+`NAME` is, first rule that matches: an ID (`12`, this Machine first) or
+`MACHINE:ID`; the title; the coding agent (`claude`) or the folder (`api`,
+this Machine only); the start of the title or of any word in it. Several matches are listed
+and the command exits 1. Without a terminal it never asks: it prints the
+list (`--json` for JSON) and exits 2 unless given a Command, an ID or name,
+`--last`, or `--new`. `-t`, `--group` and `--sandbox` imply `--new`.
+
+**Starting.** `sentinal watch -- COMMAND` (or `--new`) creates a `WATCH` /
+`FULL` Session and attaches the current terminal to it immediately. The Session uses the caller's current directory, current
 terminal size (80x24 when unknown or reported as 0x0), and `$SHELL`.
 Detach with `Ctrl+J`; the legacy `Ctrl-\`, then `d` sequence also works. EOF,
 a crashed client, or a closed window also only detach. The shell and anything
@@ -536,6 +572,32 @@ by attaching. While another device's size is in use, long lines are cut at
 this window's edge and the status says "Sized for another device (W×H) ·
 type here to take over", in the row below the screen or in the window title.
 Typing makes this window the size; the screen is redrawn for it.
+
+### `login`, `logout`
+
+```console
+sentinal login [CONTROL_URL]
+sentinal logout
+```
+
+`login` signs this terminal in to the control as the owner, so `watch` can
+list and pick up Sessions on your other Machines. It reads the owner
+password from the terminal with echo off (never from arguments, a pipe, or
+the environment) and gets the same sign-in a browser gets: 24 hours, ended
+by "sign out everywhere" or a password change. `CONTROL_URL` defaults to the
+control this Machine is linked to; it must be `https`, or plain `http` only
+to this computer or a Tailscale address. The sign-in is kept in
+`owner-session` next to this Machine's token, readable only by you.
+`logout` ends it at the control and forgets it here.
+
+| Command | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| `login` | signed in | could not keep it | usage, no terminal, cancelled | control unreachable | wrong password, too many tries |
+| `logout` | signed out (or was not) | could not forget it | — | — | — |
+
+Without a sign-in, `watch` shows only this Machine and says how to see the
+rest. Sessions on another Machine go through the control, which checks the
+sign-in on every frame; the Machine itself still applies capture and audit.
 
 ### `agent-chat`
 

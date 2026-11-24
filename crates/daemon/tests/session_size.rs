@@ -222,6 +222,20 @@ async fn a_size_change_redraws_the_screen_at_the_new_size() {
     h.fake
         .output(session.id, b"abcdefghijklmnopqrstuvwxyz0123456789")
         .unwrap();
+    // The reader draws it on its own thread: wait until it is on the screen.
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !h
+            .sessions
+            .scrollback(session.id)
+            .unwrap()
+            .iter()
+            .any(|line| line.contains("abcdef"))
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the output reaches the screen");
     let laptop = h
         .sessions
         .attach_viewer(

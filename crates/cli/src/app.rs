@@ -322,7 +322,71 @@ async fn dispatch(
         None => default_token_file()?,
     };
     let urls = resolve_daemon_urls(cli.url.as_deref())?;
+    match cli.command {
+        Command::Login { control_url } => {
+            let control_url = match control_url {
+                Some(url) => Some(url),
+                None => linked_control_url().await,
+            };
+            return Ok(exit_code(
+                crate::login::login(
+                    control_url,
+                    &token_file,
+                    crate::login::read_password_from_terminal,
+                    out,
+                    err,
+                )
+                .await,
+            ));
+        }
+        Command::Logout => {
+            return Ok(exit_code(crate::login::logout(&token_file, out, err).await));
+        }
+        command => {
+            return run_with_daemon(
+                Cli {
+                    command,
+                    url: cli.url,
+                    token_file: None,
+                },
+                urls,
+                token_file,
+                out,
+                err,
+            )
+            .await;
+        }
+    }
+}
+
+/// The control this Machine is linked to, if any.
+async fn linked_control_url() -> Option<String> {
+    let socket = connect_command::default_socket()?;
+    match connect_command::local(
+        &socket,
+        protocol::LocalRequest::ConnectionStatus,
+        std::time::Duration::from_secs(5),
+    )
+    .await
+    {
+        Ok(protocol::LocalResponse::Connection { connection }) => connection.control_url,
+        _ => None,
+    }
+}
+
+async fn run_with_daemon(
+    cli: Cli,
+    urls: Vec<String>,
+    token_file: PathBuf,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<ExitCode, AppError> {
     if let Command::Watch {
+        target,
+        last,
+        new,
+        machine,
+        json,
         title,
         group,
         exit,
@@ -350,6 +414,20 @@ async fn dispatch(
             }
             (_, command) => command,
         };
+        // T4: no Command and nothing that only a new Session takes is a pick-up.
+        let new = new || title.is_some() || group.is_some() || sandbox.is_some();
+        if command.is_none() && !new {
+            let pick = crate::watch_pickup::Pick {
+                target,
+                last,
+                machine,
+                json,
+            };
+            if let Some(code) = crate::watch_pickup::run(pick, &urls, &token_file, out, err).await?
+            {
+                return Ok(code);
+            }
+        }
         let options = WatchOptions {
             title,
             group,
@@ -496,6 +574,8 @@ async fn dispatch(
         | Command::Connect { .. }
         | Command::Connection { .. }
         | Command::Disconnect
+        | Command::Login { .. }
+        | Command::Logout
         | Command::Mcp { .. }
         | Command::AgentGuide
         | Command::Agents

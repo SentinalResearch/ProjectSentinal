@@ -152,6 +152,19 @@ impl DaemonClient {
             })?
             .trim()
             .to_string();
+        Self::connect_with(url, &token, token_path).await
+    }
+
+    /// Connect to `url` with `token` (the owner's sign-in to the control, T4.2).
+    pub async fn connect_with_token(url: &str, token: &str) -> Result<Self, ClientError> {
+        Self::connect_with(url, token, std::path::Path::new("owner-session")).await
+    }
+
+    async fn connect_with(
+        url: &str,
+        token: &str,
+        token_path: &std::path::Path,
+    ) -> Result<Self, ClientError> {
         let mut request = url
             .into_client_request()
             .map_err(|error| ClientError::Url {
@@ -190,7 +203,14 @@ impl DaemonClient {
 
     /// Attach this process's terminal until `Ctrl+J`, EOF, or the shell exits.
     pub async fn attach(mut self, session_id: SessionId) -> Result<AttachEnd, ClientError> {
-        self.attach_inner(session_id, None, None, false).await
+        self.attach_inner(session_id, None, None, false, false)
+            .await
+    }
+
+    /// Pick up a Session (T4): its history first, into this terminal's own
+    /// scrollback, then the live screen.
+    pub async fn pick_up(mut self, session_id: SessionId) -> Result<AttachEnd, ClientError> {
+        self.attach_inner(session_id, None, None, false, true).await
     }
 
     /// Attach only if the initial screen arrives before `deadline`.
@@ -200,7 +220,7 @@ impl DaemonClient {
         deadline: Duration,
         size: (u16, u16),
     ) -> Result<AttachEnd, ClientError> {
-        self.attach_inner(session_id, Some(deadline), Some(size), true)
+        self.attach_inner(session_id, Some(deadline), Some(size), true, false)
             .await
     }
 
@@ -210,15 +230,28 @@ impl DaemonClient {
         ready_deadline: Option<Duration>,
         requested_size: Option<(u16, u16)>,
         auto_wrap: bool,
+        history: bool,
     ) -> Result<AttachEnd, ClientError> {
         // T3: say this window's size in ATTACH. A daemon that owns the size
         // answers with SESSION_SIZE before the screen and lays the screen
         // out for this window when it is the only viewer; an older daemon
         // ignores the fields and is sized by RESIZE below, as before.
         let size = requested_size.or_else(terminal_size);
+        if history {
+            // A picked-up Session draws from the top of the screen: first
+            // scroll what is on it into this terminal's own scrollback, so
+            // nothing is drawn over and nothing is lost.
+            let rows = size.map_or(24, |(_, rows)| rows);
+            let mut stdout = tokio::io::stdout();
+            write_all(
+                &mut stdout,
+                &[b"\r\n".repeat(usize::from(rows)), b"\x1b[H".to_vec()].concat(),
+            )
+            .await?;
+        }
         self.send_control(ClientRequest::Attach {
             session_id,
-            history: false,
+            history,
             cols: size.map(|(cols, _)| cols),
             rows: size.map(|(_, rows)| rows),
             mode: size.map(|_| protocol::ViewerMode::Interactive),

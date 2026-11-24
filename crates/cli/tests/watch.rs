@@ -64,6 +64,11 @@ fn bare_watch_has_no_title_or_command() {
             command: None,
             group: None,
             exit: false,
+            target: None,
+            last: false,
+            new: false,
+            machine: None,
+            json: false,
         }
     ));
     // A trailing separator with nothing after it is still a bare Watch.
@@ -71,6 +76,49 @@ fn bare_watch_has_no_title_or_command() {
         parse(&["sentinal", "watch", "--"]),
         Command::Watch { command: None, .. }
     ));
+}
+
+#[test]
+fn watch_takes_a_session_to_pick_up_or_a_command_never_both() {
+    assert!(matches!(
+        parse(&["sentinal", "watch", "gpu-box:12"]),
+        Command::Watch { target: Some(target), command: None, .. } if target == "gpu-box:12"
+    ));
+    assert!(matches!(
+        parse(&["sentinal", "watch", "--last", "--machine", "laptop"]),
+        Command::Watch {
+            last: true,
+            machine: Some(_),
+            ..
+        }
+    ));
+    assert!(matches!(
+        parse(&["sentinal", "watch", "--new"]),
+        Command::Watch {
+            new: true,
+            target: None,
+            ..
+        }
+    ));
+    assert!(matches!(
+        parse(&["sentinal", "watch", "--", "python", "train.py"]),
+        Command::Watch {
+            target: None,
+            command: Some(_),
+            ..
+        }
+    ));
+    for refused in [
+        &["sentinal", "watch", "claude", "--", "ls"][..],
+        &["sentinal", "watch", "--new", "--", "ls"],
+        &["sentinal", "watch", "--last", "claude"],
+        &["sentinal", "watch", "--new", "--last"],
+    ] {
+        assert!(
+            <cli::args::Cli as clap::Parser>::try_parse_from(refused).is_err(),
+            "{refused:?}"
+        );
+    }
 }
 
 #[test]

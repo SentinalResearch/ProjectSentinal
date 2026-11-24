@@ -20,7 +20,9 @@ terminal and from inside another Session. Arguments are passed exactly as
 given; a shell pipeline belongs in a script: `-- ./run.sh`.
 
 Plain `sentinal watch` (no `--detach`) attaches a terminal. Use it only when you
-have a real terminal and a person is driving it.
+have a real terminal and a person is driving it. Without a Command it picks
+up a running Session; without a terminal it only lists them and exits 2, so
+it never waits for an answer.
 
 ## See what is happening
 

@@ -132,9 +132,18 @@ pub fn read_hidden(
     terminal: &mut dyn HiddenTerminal,
     prompt: &str,
 ) -> std::io::Result<ReadOutcome> {
+    read_hidden_up_to(terminal, prompt, MAX_CODE_BYTES)
+}
+
+/// [`read_hidden`] for a line of at most `max` bytes (a password).
+pub fn read_hidden_up_to(
+    terminal: &mut dyn HiddenTerminal,
+    prompt: &str,
+    max: usize,
+) -> std::io::Result<ReadOutcome> {
     terminal.write_text(prompt)?;
     terminal.set_echo(false)?;
-    let result = read_line(terminal);
+    let result = read_line(terminal, max);
     let restored = terminal.set_echo(true);
     let _ = terminal.write_text("\n");
     let outcome = result?;
@@ -142,7 +151,7 @@ pub fn read_hidden(
     Ok(outcome)
 }
 
-fn read_line(terminal: &mut dyn HiddenTerminal) -> std::io::Result<ReadOutcome> {
+fn read_line(terminal: &mut dyn HiddenTerminal, max: usize) -> std::io::Result<ReadOutcome> {
     let mut line = Vec::new();
     loop {
         match terminal.read_byte()? {
@@ -157,10 +166,10 @@ fn read_line(terminal: &mut dyn HiddenTerminal) -> std::io::Result<ReadOutcome> 
                 line.pop();
             }
             Some(byte) if byte >= 0x20 => {
-                if line.len() >= MAX_CODE_BYTES {
+                if line.len() >= max {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
-                        "pairing code is too long",
+                        "the line is too long",
                     ));
                 }
                 line.push(byte);

@@ -504,13 +504,28 @@ decisions).
 - [x] T3.6 Browser test: two windows of different sizes on one Session, type
       in each in turn, rows identical; the bar moves; "Use this size" works
 
-### T4. `sentinal watch` picks up from anywhere · *design first*
+### T4. `sentinal watch` picks up from anywhere · *approved 2026-11-22, built*
 
-- [ ] T4.1 `sentinal watch` with no argument lists and attaches; `NAME|ID`,
-      `--last`, `--new`, `--machine`
-- [ ] T4.2 Sessions on another Machine reached through the control
-- [ ] T4.3 Docs and help
-- [ ] T4.4 Tried by hand in `just dev`
+Design: `docs/WATCH_PICKUP_DESIGN.md` (owner approved the four recommended
+decisions).
+
+- [x] T4.1 Bare `sentinal watch` picks up: waiting first, then running, then
+      idle; none starts a shell, one attaches; `NAME|ID`, `MACHINE:ID`,
+      `--last`, `--new`, `--machine`, `--json`; never prompts without a
+      terminal (exit 2); history on pick-up (`crates/cli/src/pickup.rs`,
+      pure, `watch_pickup.rs`)
+- [x] T4.2 `sentinal login` / `logout`: the browser's owner sign-in (24 h)
+      from the terminal, kept 0600 in `owner-session`; other Machines'
+      Sessions from the control's read model, attached through its terminal
+      route. No control change. Tests: the CLI against a stand-in control
+      with the real contract; the real control accepts and ends the token
+- [x] T4.3 `docs/CLI.md`, `docs/AGENT_GUIDE.md`, `sentinal watch --help`
+- [x] T4.4 Tried by hand on the QA instance with a script asking `[y/N]`
+      (not `claude`): picked up by name with full history, answered from
+      the phone layout, came back with `--last`. Two fixes came from it
+      (match any word of the title; scroll the screen away before drawing).
+      `login` to another Machine not tried by hand (one Machine, and the
+      password needs a person); see `docs/progress/terminal-upgrade.md`
 
 ### T5. Keepers (was Track C)
 
@@ -763,6 +778,10 @@ Full notes: `docs/releases/v2.11.0.md`.
   `events.json`
 
 ### Release notes so far (protocol changes since v2.10.0)
+
+- `sentinal watch` without a Command now picks up a running Session (T4);
+  `--new` starts a shell as a bare `watch` used to. New `sentinal login` /
+  `logout`. No wire change
 
 - One size per Session (T3): `ATTACH.cols`, `rows`, `mode` (optional),
   `VIEWER_STATE`, `ANSWER_PROMPT`, `SESSION_SIZE`; `ViewerMode`. Additive;

@@ -23,7 +23,9 @@ pub mod frame;
 pub mod hook_command;
 pub mod hook_report;
 pub mod hook_script;
+pub mod login;
 pub mod mcp;
+pub mod pickup;
 pub mod rc_file;
 pub mod rc_install;
 pub mod release;
@@ -37,6 +39,7 @@ pub mod update;
 mod update_guard;
 pub mod version;
 pub mod watch;
+pub mod watch_pickup;
 
 /// The guide printed by `sentinal agent-guide`.
 pub const AGENT_GUIDE: &str = include_str!("../../../docs/AGENT_GUIDE.md");

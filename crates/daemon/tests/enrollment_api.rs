@@ -283,6 +283,39 @@ async fn control_projection_snapshot_is_one_bounded_owner_resource() {
     assert!(!snapshot.machines[0].projection_available);
 }
 
+/// `sentinal login` (T4.2) signs in exactly as a browser does: the token from
+/// `/api/v1/auth/login` reads every Machine's Sessions; the Machine token
+/// never does.
+#[tokio::test]
+async fn the_owner_token_sentinal_login_gets_reads_the_control_snapshot() {
+    let d = daemon(true, false, "100.64.0.2:5000");
+    d.owner_session().await;
+    let login = d
+        .send(
+            "POST",
+            "/api/v1/auth/login",
+            None,
+            &[],
+            Some(json!({ "password": PASSWORD })),
+        )
+        .await;
+    assert_eq!(login.status, StatusCode::OK);
+    let token = login.body["token"].as_str().unwrap().to_string();
+    assert!(login.body["expires_at"].as_i64().is_some());
+    let snapshot = d
+        .send("GET", "/api/v1/control/snapshot", Some(&token), &[], None)
+        .await;
+    assert_eq!(snapshot.status, StatusCode::OK);
+    let logout = d
+        .send("POST", "/api/v1/auth/logout", Some(&token), &[], None)
+        .await;
+    assert!(logout.status.is_success());
+    let after = d
+        .send("GET", "/api/v1/control/snapshot", Some(&token), &[], None)
+        .await;
+    assert_eq!(after.status, StatusCode::UNAUTHORIZED, "logout ends it");
+}
+
 #[tokio::test]
 async fn disabled_control_read_model_returns_fallback_status() {
     let d = daemon_with_read_model(true, false, "100.64.0.2:5000", false);
