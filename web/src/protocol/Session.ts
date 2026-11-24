@@ -118,6 +118,11 @@ export type Session = {
    */
   sandbox?: boolean;
   /**
+   * A keeper holds this Session's terminal, so it survives a daemon
+   * restart or update (T5). False for one that ends with the daemon.
+   */
+  kept?: boolean;
+  /**
    * When the session was created.
    */
   created_at: Timestamp;

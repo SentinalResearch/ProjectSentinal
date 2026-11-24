@@ -197,6 +197,36 @@ impl Engine {
         Ok(again)
     }
 
+    /// The whole state as the engine's own snapshot, history trimmed to
+    /// about `history_lines`: a keeper's checkpoint (T5, Q6).
+    pub(crate) fn encode(&self, history_lines: usize) -> Result<Vec<u8>, EngineError> {
+        let history = self.terminal.scrollback_rows().map_err(error)?;
+        if history <= history_lines {
+            return Ok(ghostty_vt::snapshot::encode(&self.terminal)
+                .map_err(error)?
+                .to_vec());
+        }
+        let mut copy = self.copy()?;
+        copy.terminal
+            .set_scrollback_max_lines(Some(history_lines))
+            .map_err(error)?;
+        Ok(ghostty_vt::snapshot::encode(&copy.terminal)
+            .map_err(error)?
+            .to_vec())
+    }
+
+    /// An engine restored from [`encode`](Self::encode), keeping about
+    /// `history_lines` from then on.
+    pub(crate) fn decode(snapshot: &[u8], history_lines: usize) -> Result<Self, EngineError> {
+        let mut terminal = ghostty_vt::snapshot::Decoder::from_slice(snapshot)
+            .decode()
+            .map_err(error)?;
+        terminal
+            .set_scrollback_max_lines(Some(history_lines))
+            .map_err(error)?;
+        Ok(Self { terminal })
+    }
+
     /// An independent copy of the whole state, both screens and history.
     fn copy(&self) -> Result<Self, EngineError> {
         let encoded = ghostty_vt::snapshot::encode(&self.terminal).map_err(error)?;

@@ -54,6 +54,10 @@ enum Command {
     },
     Rows(SyncSender<Option<ScreenRows>>),
     Lines(SyncSender<Vec<String>>),
+    /// The engine's own snapshot, for a keeper (T5).
+    Checkpoint(SyncSender<Option<Vec<u8>>>),
+    /// Replace the screen with a keeper's checkpoint (T5).
+    Restore(Vec<u8>, SyncSender<bool>),
     #[cfg(test)]
     AtBoundary(SyncSender<bool>),
 }
@@ -137,6 +141,19 @@ impl Screen {
         self.ask(Command::Rows).flatten()
     }
 
+    /// The whole screen as the engine's own snapshot, history trimmed to
+    /// the attach history: what a keeper keeps across a restart (T5).
+    pub fn checkpoint(&self) -> Option<Vec<u8>> {
+        self.ask(Command::Checkpoint).flatten()
+    }
+
+    /// Start from a checkpoint instead of a blank screen (T5). False when
+    /// the snapshot could not be read; the screen is then unchanged.
+    pub fn restore(&self, snapshot: Vec<u8>) -> bool {
+        self.ask(|reply| Command::Restore(snapshot, reply))
+            .unwrap_or(false)
+    }
+
     /// History and screen as text lines, oldest first.
     pub fn lines(&self) -> Vec<String> {
         self.ask(Command::Lines).unwrap_or_default()
@@ -205,6 +222,25 @@ fn run(size: ScreenSize, inbox: &Receiver<Command>, output: &broadcast::Sender<V
                     .and_then(|engine| engine.lines().ok())
                     .unwrap_or_default();
                 let _ = reply.send(lines);
+            }
+            Command::Checkpoint(reply) => {
+                let snapshot = engine
+                    .as_ref()
+                    .and_then(|engine| engine.encode(size.attach_history_lines).ok());
+                let _ = reply.send(snapshot);
+            }
+            Command::Restore(snapshot, reply) => {
+                let restored = match Engine::decode(&snapshot, size.history_lines) {
+                    Ok(restored) => {
+                        engine = Some(restored);
+                        true
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, "a keeper's checkpoint could not be read");
+                        false
+                    }
+                };
+                let _ = reply.send(restored);
             }
             #[cfg(test)]
             Command::AtBoundary(reply) => {

@@ -14,6 +14,8 @@
   <true/>
   <key>KeepAlive</key>
   <true/>
+  <key>AbandonProcessGroup</key>
+  <true/>
   <key>StandardOutPath</key>
   <string>/tmp/sentinald.log</string>
   <key>StandardErrorPath</key>

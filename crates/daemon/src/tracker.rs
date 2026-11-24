@@ -76,6 +76,26 @@ impl CommandTracker {
         }
     }
 
+    /// A tracker that carries on a Command already running when the daemon
+    /// restarted (T5).
+    pub fn resume(
+        machine_id: MachineId,
+        cwd: impl Into<String>,
+        ids: TrackerIds,
+        current: Option<Command>,
+    ) -> Self {
+        CommandTracker {
+            machine_id,
+            ids,
+            command_text: current
+                .as_ref()
+                .map(|command| command.text.clone())
+                .unwrap_or_default(),
+            cwd: cwd.into(),
+            current,
+        }
+    }
+
     /// Apply one shell signal at an injected timestamp.
     pub fn handle(
         &mut self,

@@ -15,6 +15,8 @@ mod records;
 pub mod registry;
 mod search;
 mod session_delete;
+mod session_keepers;
+pub use session_keepers::StoredKeeper;
 
 use protocol::{
     CaptureLevel, Event, EventId, EventKind, Machine, Session, SessionId, SessionState, Timestamp,
@@ -62,6 +64,7 @@ const MIGRATIONS: &[(u32, &str)] = &[
     (13, include_str!("../migrations/013_complete.sql")),
     (14, include_str!("../migrations/014_session_delete.sql")),
     (15, include_str!("../migrations/015_machine_instances.sql")),
+    (16, include_str!("../migrations/016_session_keepers.sql")),
 ];
 
 /// The first Event ID never used, even by a deleted Session's Events.
@@ -239,13 +242,16 @@ impl Store {
         Ok(readable_sessions(&values))
     }
 
-    /// Mark all persisted live Sessions interrupted after a daemon restart.
+    /// Mark persisted live Sessions interrupted after a daemon restart, except
+    /// those a keeper still holds (T5: reclaimed, or interrupted one by one
+    /// with their reason).
     pub fn interrupt_orphaned_sessions(&self, at: Timestamp) -> Result<Vec<Event>, StoreError> {
         let mut connection = self.lock()?;
         let transaction = connection.transaction()?;
         let json_values = {
             let mut statement = transaction.prepare(
-                "SELECT json, continued_from FROM sessions WHERE state NOT IN ('COMPLETED','FAILED','INTERRUPTED') ORDER BY id",
+                "SELECT json, continued_from FROM sessions WHERE state NOT IN ('COMPLETED','FAILED','INTERRUPTED')
+                   AND id NOT IN (SELECT session_id FROM session_keepers) ORDER BY id",
             )?;
             let values = statement
                 .query_map([], |row| {

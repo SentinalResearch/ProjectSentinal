@@ -243,3 +243,26 @@ fn recorded_program_output_draws_like_the_program_meant() {
         );
     }
 }
+
+#[test]
+fn a_checkpoint_restores_both_screens_and_history_in_a_fresh_screen() {
+    // T5: what a keeper keeps across a daemon restart.
+    let (screen, _) = screen(30, 5);
+    let mut bytes = Vec::new();
+    for line in 0..40 {
+        bytes.extend_from_slice(format!("line {line}\r\n").as_bytes());
+    }
+    bytes.extend_from_slice(b"\x1b[?1049h\x1b[2J\x1b[HFULL SCREEN");
+    screen.feed(bytes);
+    let checkpoint = screen.checkpoint().unwrap();
+
+    let (fresh, _) = self::screen(30, 5);
+    assert!(fresh.restore(checkpoint));
+    assert_eq!(fresh.rows().unwrap().rows[0], "FULL SCREEN");
+    assert!(fresh.rows().unwrap().alternate);
+    fresh.feed(b"\x1b[?1049l".to_vec());
+    let lines = fresh.lines();
+    assert!(lines.contains(&"line 0".to_string()), "{lines:?}");
+    assert!(lines.contains(&"line 39".to_string()), "{lines:?}");
+    assert!(!fresh.restore(b"not a snapshot".to_vec()));
+}

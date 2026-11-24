@@ -308,6 +308,11 @@ pub struct Session {
     /// Started with `sentinal watch --sandbox`: a separate working folder (6.4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub sandbox: bool,
+    /// A keeper holds this Session's terminal, so it survives a daemon
+    /// restart or update (T5). False for one that ends with the daemon.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[cfg_attr(feature = "ts", ts(as = "Option<bool>", optional))]
+    pub kept: bool,
     /// When the session was created.
     pub created_at: Timestamp,
     /// When `state` last changed.
@@ -348,6 +353,7 @@ impl Session {
             group: None,
             estimate: None,
             sandbox: false,
+            kept: false,
             created_at: at,
             updated_at: at,
         }

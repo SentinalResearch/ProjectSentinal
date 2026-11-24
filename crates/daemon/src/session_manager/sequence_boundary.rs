@@ -72,6 +72,11 @@ impl SequenceBoundary {
         out
     }
 
+    /// Nothing is held back (T5: a point a restart can resume from).
+    pub(crate) fn is_empty(&self) -> bool {
+        self.held.is_empty() && self.state == State::Ground
+    }
+
     /// The output ended: release whatever is held.
     pub(crate) fn finish(&mut self) -> Vec<u8> {
         self.state = State::Ground;

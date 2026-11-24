@@ -12,7 +12,7 @@ use std::{
 };
 
 /// Parameters needed to start a shell in a PTY.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PtySpawnRequest {
     /// Session being started.
     pub session_id: SessionId,
@@ -36,6 +36,8 @@ pub struct PtySpawnRequest {
 type ResizeFn = dyn Fn(u16, u16) -> Result<(), PtyError> + Send + Sync;
 type ControlFn = dyn Fn() -> Result<(), PtyError> + Send + Sync;
 type TryWaitFn = dyn Fn() -> Result<Option<i32>, PtyError> + Send + Sync;
+/// Hand a keeper the screen as of an output offset (T5).
+pub(crate) type CheckpointFn = dyn Fn(u64, &[u8]) + Send + Sync;
 
 /// The I/O and control capabilities of one spawned PTY.
 pub struct SpawnedPty {
@@ -45,6 +47,17 @@ pub struct SpawnedPty {
     pub(crate) resize: Arc<ResizeFn>,
     pub(crate) kill: Arc<ControlFn>,
     pub(crate) try_wait: Arc<TryWaitFn>,
+    /// Set when a keeper holds this PTY (T5): its record and where it keeps
+    /// screen checkpoints.
+    pub(crate) keeper: Option<KeptPty>,
+}
+
+/// What a keeper-backed PTY adds (T5).
+pub(crate) struct KeptPty {
+    /// What the daemon stores to reclaim the keeper after a restart.
+    pub(crate) record: crate::keeper::KeeperRecord,
+    /// Sends the keeper a screen checkpoint.
+    pub(crate) checkpoint: Arc<CheckpointFn>,
 }
 
 /// Errors produced by PTY backends.
@@ -63,6 +76,10 @@ pub enum PtyError {
     /// The fake backend does not know the requested session.
     #[error("fake PTY has no session {0}")]
     UnknownSession(SessionId),
+    /// The keeper holding this Session's terminal ended without its child
+    /// ending first (T5).
+    #[error("the process holding session {0}'s terminal ended unexpectedly")]
+    KeeperLost(SessionId),
 }
 
 /// A source of PTYs for persistent sessions.
@@ -90,8 +107,35 @@ impl PtyBackend for RealPty {
     }
 
     fn spawn(&self, request: &PtySpawnRequest) -> Result<SpawnedPty, PtyError> {
-        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+        let OpenShell {
+            master,
+            child,
+            reader,
+            writer,
+        } = open_shell(request)?;
+        let root_pid = child.process_id();
+        let killer = child.clone_killer();
+        let child = Arc::new(Mutex::new(child));
+        let killer = Arc::new(Mutex::new(killer));
+        let master = Arc::new(Mutex::new(master));
+        let session_id = request.session_id;
+        spawned_from(session_id, root_pid, reader, writer, master, child, killer)
+    }
+}
 
+/// A shell started in a new PTY, before anything owns it.
+pub(crate) struct OpenShell {
+    pub(crate) master: Box<dyn portable_pty::MasterPty + Send>,
+    pub(crate) child: Box<dyn portable_pty::Child + Send + Sync>,
+    pub(crate) reader: Box<dyn Read + Send>,
+    pub(crate) writer: Box<dyn Write + Send>,
+}
+
+/// Open a PTY and start the requested shell in it (the daemon's own PTYs,
+/// and keepers, T5).
+pub(crate) fn open_shell(request: &PtySpawnRequest) -> Result<OpenShell, PtyError> {
+    use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+    {
         let pair = native_pty_system()
             .openpty(PtySize {
                 rows: request.rows,
@@ -125,14 +169,30 @@ impl PtyBackend for RealPty {
             .slave
             .spawn_command(command)
             .map_err(|error| operation_error(request.session_id, "spawn shell in", error))?;
-        let root_pid = child.process_id();
-        let killer = child.clone_killer();
-        let child = Arc::new(Mutex::new(child));
-        let killer = Arc::new(Mutex::new(killer));
-        let master = Arc::new(Mutex::new(pair.master));
+        Ok(OpenShell {
+            master: pair.master,
+            child,
+            reader,
+            writer,
+        })
+    }
+}
 
+type SharedChild = Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>;
+type SharedKiller = Arc<Mutex<Box<dyn portable_pty::ChildKiller + Send + Sync>>>;
+
+fn spawned_from(
+    session_id: SessionId,
+    root_pid: Option<u32>,
+    reader: Box<dyn Read + Send>,
+    writer: Box<dyn Write + Send>,
+    master: Arc<Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
+    child: SharedChild,
+    killer: SharedKiller,
+) -> Result<SpawnedPty, PtyError> {
+    use portable_pty::PtySize;
+    {
         let resize_master = master.clone();
-        let session_id = request.session_id;
         let resize = Arc::new(move |cols, rows| {
             let master = resize_master.lock().map_err(|_| PtyError::Operation {
                 operation: "lock master to resize",
@@ -191,6 +251,7 @@ impl PtyBackend for RealPty {
             resize,
             kill,
             try_wait,
+            keeper: None,
         })
     }
 }
@@ -472,6 +533,7 @@ impl PtyBackend for FakePty {
             resize,
             kill,
             try_wait,
+            keeper: None,
         })
     }
 }

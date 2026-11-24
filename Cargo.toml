@@ -19,6 +19,9 @@ argon2 = "0.5"
 clap = { version = "4", features = ["derive", "env"] }
 futures-util = "0.3"
 portable-pty = "0.9"
+# Keepers (T5, Q1): peer UID of a keeper socket and signals to a Session's
+# process group. The same version `portable-pty` already builds.
+nix = { version = "0.28", default-features = false, features = ["user", "socket", "signal", "process"] }
 regex = "1"
 rusqlite = { version = "0.37", features = ["bundled"] }
 sysinfo = "0.37"

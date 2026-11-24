@@ -529,9 +529,34 @@ decisions).
 
 ### T5. Keepers (was Track C)
 
-- [ ] Owner answers the questions in `docs/R1_KEEPER_DESIGN.md` §13
-- [ ] T5.1–T5.5 keeper per Session, reclaim at startup, updates no longer
-      interrupt Sessions, restart and upgrade tests
+- [x] Owner answers the questions in `docs/R1_KEEPER_DESIGN.md` §13:
+      approved 2026-11-24 with every recommended answer (A1, Q1–Q7)
+- [x] T5.1 `sentinald keeper` (`crates/daemon/src/keeper/`): one per FULL
+      Session, owns the PTY, the shell and a 1 MiB ring; private `0700`
+      directory, `0600` socket, peer UID checked (`nix`), HMAC proof over a
+      fresh nonce, the secret only on its stdin and in the `0600` database.
+      Escapes the service: its own systemd scope (Linux) and process group;
+      the launchd job gains `AbandonProcessGroup`. Falls back to the
+      daemon's own PTY, and says so (`Session.kept` false), when it cannot
+      start. `SENTINAL_KEEPERS=0` turns keepers off
+- [x] T5.2 At startup the daemon reclaims its keepers (PIDs, start times,
+      proof, protocol; fails closed), cuts the log back to its last closed
+      frame, rebuilds the screen from the keeper's checkpoint (the engine's
+      snapshot, history trimmed to 2,000 lines, Q6) plus the output after
+      it, and sends the output it had not processed through the log and the
+      watcher. A running Command carries on. A keeper it cannot reclaim is
+      left alone and its Session interrupted with the reason
+- [x] T5.3 `interrupt_orphaned_sessions` skips Sessions with a keeper row
+      (migration 016)
+- [x] T5.4 `sentinal update`, the worker update and the control update count
+      only terminals no keeper holds. Uninstalling, and a rollback to a
+      release before keepers (Q3), end every keeper first
+- [x] T5.5 Real-process tests (`crates/daemon/tests/keeper_restart.rs`):
+      SIGKILL the daemon mid-output and restart (same shell, the output from
+      during the outage, typing works, each line logged once); a full-screen
+      program after more than the ring (screen from the checkpoint); a keeper
+      crash ends only its terminal; a tampered record fails closed; a keeper
+      speaking another protocol is told to stop
 
 ### Also found, not yet scheduled
 
@@ -778,6 +803,12 @@ Full notes: `docs/releases/v2.11.0.md`.
   `events.json`
 
 ### Release notes so far (protocol changes since v2.10.0)
+
+- Keepers (T5): terminals survive daemon restarts and updates. `Session.kept`
+  (optional). Store migration 016 (`session_keepers`). Session logs are now
+  written as independent zstd frames, with `sessions/<id>.offset`. New
+  `sentinald keeper` and `sentinald keeper stop-all`; launchd plist gains
+  `AbandonProcessGroup`
 
 - `sentinal watch` without a Command now picks up a running Session (T4);
   `--new` starts a shell as a bare `watch` used to. New `sentinal login` /

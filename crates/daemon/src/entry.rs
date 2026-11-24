@@ -236,6 +236,11 @@ pub async fn run() -> Result<(), DaemonError> {
     } else {
         link
     };
+    // Only one daemon per data directory: take the local socket before
+    // touching any Session, so a second start (by hand, or a service manager
+    // racing a running daemon) changes nothing and steals no keeper.
+    let local_socket =
+        UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
     let interrupted = store.interrupt_orphaned_sessions(now())?;
     if !interrupted.is_empty() {
         tracing::info!(
@@ -250,8 +255,15 @@ pub async fn run() -> Result<(), DaemonError> {
         } else {
             Arc::new(FakePty::new())
         }
-    } else {
+    } else if std::env::var_os("SENTINAL_KEEPERS").as_deref() == Some(std::ffi::OsStr::new("0")) {
+        tracing::warn!("keepers are off: terminals end when Sentinal restarts");
         Arc::new(RealPty)
+    } else {
+        // T5: each terminal is held by its own keeper and survives a restart.
+        Arc::new(crate::keeper::KeeperPty::new(
+            crate::keeper::paths::socket_dir(&config.data_dir),
+            now_ms,
+        ))
     };
     let daemon_uid = current_uid(&config.local_socket)?;
     let push = config.control.as_ref().map(|control| {
@@ -315,9 +327,21 @@ pub async fn run() -> Result<(), DaemonError> {
     } else {
         sessions
     };
-    // FULL Sessions were interrupted above; reduced-capture ones are resumed
-    // only when their root process identity still matches.
-    sessions.recover_external_sessions(store.live_sessions()?)?;
+    // T5: terminals a keeper still holds go on; one that cannot be
+    // reclaimed is interrupted with its reason. FULL Sessions without a
+    // keeper were interrupted above.
+    for (session, outcome) in sessions.reclaim_keepers() {
+        tracing::info!(session = session.0, ?outcome, "keeper at startup");
+    }
+    // Reduced-capture Sessions are resumed only when their root process
+    // identity still matches.
+    sessions.recover_external_sessions(
+        store
+            .live_sessions()?
+            .into_iter()
+            .filter(|session| session.capture != protocol::CaptureLevel::Full)
+            .collect(),
+    )?;
     let insights = MachineInsights::new(
         HostFacts::detect(config.bind.to_string(), now()),
         Some(store.clone()),
@@ -329,8 +353,6 @@ pub async fn run() -> Result<(), DaemonError> {
         machine.cpu_cores,
     );
     spawn_external_monitor(sessions.clone());
-    let local_socket =
-        UnixSocketServer::bind(&config.local_socket, SecurityAudit::new(&config.data_dir))?;
     let (recipes, recipe_diagnostics) =
         RecipeCatalog::load(Some(config.config_dir.join("recipes")));
     for diagnostic in recipe_diagnostics {
@@ -696,13 +718,17 @@ fn push_key_file(config_dir: &std::path::Path) -> PathBuf {
 /// The `sentinal` CLI binary installed beside this running `sentinald`.
 /// The dashboard's release service: it runs the sibling `sentinal` CLI and
 /// counts live FULL Sessions an update would interrupt.
-/// Live FULL Sessions on this Machine (an update or restart interrupts them).
+/// Live FULL Sessions on this Machine that an update or restart would end:
+/// those no keeper holds (T5).
 fn live_full_sessions(sessions: SessionManager) -> std::sync::Arc<dyn Fn() -> u32 + Send + Sync> {
     std::sync::Arc::new(move || {
         sessions.list().map_or(0, |list| {
             list.iter()
                 .filter(|session| {
-                    session.capture == protocol::CaptureLevel::Full && !session.state.is_finished()
+                    // T5: a keeper-held terminal survives the update.
+                    session.capture == protocol::CaptureLevel::Full
+                        && !session.state.is_finished()
+                        && !session.kept
                 })
                 .count() as u32
         })
@@ -1005,6 +1031,10 @@ fn operating_system() -> Os {
     } else {
         Os::Linux
     }
+}
+
+fn now_ms() -> i64 {
+    now().0
 }
 
 fn now() -> Timestamp {

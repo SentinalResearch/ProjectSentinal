@@ -27,6 +27,20 @@ use std::{
 };
 use tokio::sync::broadcast;
 
+/// What [`SessionManager::build_handle`] needs.
+pub(super) struct HandleParts {
+    pub(super) id: SessionId,
+    pub(super) root_pid: Option<u32>,
+    pub(super) session: Session,
+    pub(super) writer: Arc<Mutex<Box<dyn std::io::Write + Send>>>,
+    pub(super) resize: Arc<dyn Fn(u16, u16) -> Result<(), crate::pty::PtyError> + Send + Sync>,
+    pub(super) kill: Arc<dyn Fn() -> Result<(), crate::pty::PtyError> + Send + Sync>,
+    pub(super) try_wait: Arc<dyn Fn() -> Result<Option<i32>, crate::pty::PtyError> + Send + Sync>,
+    pub(super) size: (u16, u16),
+    pub(super) tracker: CommandTracker,
+    pub(super) initial_command: Option<Vec<u8>>,
+}
+
 struct PreparedSession {
     session: Session,
     handle: Arc<SessionHandle>,
@@ -34,6 +48,8 @@ struct PreparedSession {
     log_path: PathBuf,
     log_file: File,
     osc_nonce: String,
+    /// The keeper holding the terminal, if one does (T5).
+    keeper: Option<crate::pty::KeptPty>,
 }
 
 #[derive(Clone, Copy)]
@@ -274,6 +290,7 @@ impl SessionManager {
         session.capture = CaptureLevel::Full;
         session.title = request.title;
         session.sandbox = sandbox;
+        session.kept = spawned.keeper.is_some();
         session.pid = spawned.root_pid;
         session.continued_from = continued_from;
         if let Err(error) = session
@@ -284,23 +301,6 @@ impl SessionManager {
             return Err(error.into());
         }
 
-        let (output, _) = broadcast::channel(256);
-        let (structured, _) = broadcast::channel(256);
-        let (size, _) = tokio::sync::watch::channel(viewers::SizeChange {
-            cols: request.cols,
-            rows: request.rows,
-            owner: None,
-        });
-        let screen = crate::screen::Screen::spawn(
-            &id.0.to_string(),
-            crate::screen::ScreenSize {
-                cols: request.cols,
-                rows: request.rows,
-                history_lines: self.inner.config.scrollback_lines,
-                attach_history_lines: self.inner.attach_history_lines,
-            },
-            output.clone(),
-        );
         let SpawnedPty {
             root_pid,
             reader,
@@ -308,11 +308,71 @@ impl SessionManager {
             resize,
             kill,
             try_wait,
+            keeper,
         } = spawned;
-        let handle = Arc::new(SessionHandle {
+        let handle = self.build_handle(HandleParts {
             id,
             root_pid,
-            session: Mutex::new(session.clone()),
+            session: session.clone(),
+            writer,
+            resize,
+            kill,
+            try_wait,
+            size: (request.cols, request.rows),
+            tracker: CommandTracker::new(
+                self.inner.config.machine_id.clone(),
+                cwd.to_string_lossy(),
+                self.inner.tracker_ids.clone(),
+            ),
+            initial_command,
+        });
+        Ok(PreparedSession {
+            session,
+            handle,
+            reader,
+            log_path,
+            log_file,
+            osc_nonce,
+            keeper,
+        })
+    }
+
+    /// The in-memory side of a Session: its screen, viewers, size, tracker
+    /// and watcher (shared by new and reclaimed Sessions, T5).
+    pub(super) fn build_handle(&self, parts: HandleParts) -> Arc<SessionHandle> {
+        let HandleParts {
+            id,
+            root_pid,
+            session,
+            writer,
+            resize,
+            kill,
+            try_wait,
+            size: (cols, rows),
+            tracker,
+            initial_command,
+        } = parts;
+        let (output, _) = broadcast::channel(256);
+        let (structured, _) = broadcast::channel(256);
+        let (size, _) = tokio::sync::watch::channel(viewers::SizeChange {
+            cols,
+            rows,
+            owner: None,
+        });
+        let screen = crate::screen::Screen::spawn(
+            &id.0.to_string(),
+            crate::screen::ScreenSize {
+                cols,
+                rows,
+                history_lines: self.inner.config.scrollback_lines,
+                attach_history_lines: self.inner.attach_history_lines,
+            },
+            output,
+        );
+        Arc::new(SessionHandle {
+            id,
+            root_pid,
+            session: Mutex::new(session),
             writer,
             resize,
             kill,
@@ -320,16 +380,12 @@ impl SessionManager {
             pty_closed: AtomicBool::new(false),
             screen,
             asked: Mutex::new(None),
-            viewers: Mutex::new(viewers::Viewers::new(request.cols, request.rows)),
+            viewers: Mutex::new(viewers::Viewers::new(cols, rows)),
             size,
             structured,
             observations: self.inner.observations.clone(),
             events: self.inner.events.clone(),
-            tracker: Mutex::new(CommandTracker::new(
-                self.inner.config.machine_id.clone(),
-                cwd.to_string_lossy(),
-                self.inner.tracker_ids.clone(),
-            )),
+            tracker: Mutex::new(tracker),
             watcher: Mutex::new(
                 watcher::EventEngine::new(None, self.inner.watcher_adapters.clone())
                     .with_command_activity_required(),
@@ -344,14 +400,6 @@ impl SessionManager {
             attached: Arc::new(AtomicBool::new(false)),
             log_tail: Mutex::new(None),
             adopted_tree: Mutex::default(),
-        });
-        Ok(PreparedSession {
-            session,
-            handle,
-            reader,
-            log_path,
-            log_file,
-            osc_nonce,
         })
     }
 
@@ -396,6 +444,19 @@ impl SessionManager {
         sessions.insert(id, prepared.handle.clone());
         drop(sessions);
 
+        // T5: what a restarted daemon needs to reclaim the keeper.
+        let kept = prepared.keeper.map(|keeper| {
+            if let Some(store) = &self.inner.store {
+                if let Err(error) = store.put_keeper(&crate::keeper::to_stored(&keeper.record)) {
+                    tracing::warn!(session = id.0, %error, "could not record the keeper; this terminal ends if Sentinal restarts");
+                }
+            }
+            super::kept::Kept::new(
+                keeper.checkpoint,
+                super::kept::offset_path(&prepared.log_path),
+                0,
+            )
+        });
         let try_wait = prepared.handle.try_wait.clone();
         tasks::spawn_reader(
             id,
@@ -404,6 +465,7 @@ impl SessionManager {
             tasks::OutputLog {
                 path: prepared.log_path,
                 file: prepared.log_file,
+                kept,
             },
             OscParser::new(prepared.osc_nonce),
             self.inner.store.clone(),

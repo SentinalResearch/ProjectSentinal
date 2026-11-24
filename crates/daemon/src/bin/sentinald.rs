@@ -1,8 +1,35 @@
-//! `sentinald`: the Sentinal daemon.
+//! `sentinald`: the Sentinal daemon. `sentinald keeper` is the process that
+//! holds one terminal across daemon restarts (T5); the daemon starts it.
 
-#[tokio::main]
-async fn main() {
-    let result = daemon::entry::run().await;
+fn main() {
+    let mode: Vec<String> = std::env::args().skip(1).take(2).collect();
+    match mode
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
+        ["keeper", "stop-all"] => match daemon::keeper::stop_all() {
+            Ok(count) => {
+                println!("asked {count} keeper(s) to stop");
+                std::process::exit(0);
+            }
+            Err(error) => {
+                eprintln!("sentinald keeper stop-all: {error}");
+                std::process::exit(1);
+            }
+        },
+        ["keeper", ..] => std::process::exit(daemon::keeper::process::main()),
+        _ => {}
+    }
+    let runtime = match tokio::runtime::Runtime::new() {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            eprintln!("Error: {error:?}");
+            std::process::exit(1);
+        }
+    };
+    let result = runtime.block_on(daemon::entry::run());
     if let Err(error) = &result {
         eprintln!("Error: {error:?}");
     }

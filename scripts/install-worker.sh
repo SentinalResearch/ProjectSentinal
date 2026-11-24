@@ -139,6 +139,10 @@ if [[ "$command_name" == uninstall ]]; then
     [[ -z "$delete_data_confirmation" ]] || echo "DRY RUN — would delete data: $data_dir"
     exit 0
   fi
+  # Keepers (T5) hold terminals across restarts: end them before the program goes.
+  if [[ -x "$bin_dir/sentinald" ]]; then
+    TA_CONFIG="$config_file" "$bin_dir/sentinald" keeper stop-all >/dev/null 2>&1 || true
+  fi
   [[ "$install_service" == false ]] || sentinal_disable_service "$platform"
   rm -f -- "$bin_dir/sentinal" "$bin_dir/sentinald"
   [[ "$modify_path" == false ]] || sentinal_remove_path_from_profiles "$profile_home"
@@ -206,6 +210,12 @@ if [[ -e "$release_state" || -L "$release_state" ]]; then
   sentinal_valid_release_version "$installed_version" || sentinal_install_die "invalid installed release version '$installed_version'"
   if [[ -n "$release_version" && "$(sentinal_compare_release_versions "$release_version" "$installed_version")" == -1 && -z "$rollback_version" ]]; then
     sentinal_install_die "refusing downgrade from $installed_version to $release_version; rerun with --rollback $release_version"
+  fi
+  # Q3: a release from before keepers cannot reclaim them; end them first
+  # so no shell is left that no daemon can reach.
+  if [[ -n "$rollback_version" && "$dry_run" != true && -x "$bin_dir/sentinald" \
+        && "$(sentinal_compare_release_versions "$release_version" "$SENTINAL_FIRST_KEEPER_RELEASE")" == -1 ]]; then
+    TA_CONFIG="$config_file" "$bin_dir/sentinald" keeper stop-all >/dev/null 2>&1 || true
   fi
 else
   installed_version=""

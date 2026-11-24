@@ -1,8 +1,12 @@
 # R1 keeper design: terminals that survive a daemon restart
 
-Status: **awaiting owner approval** (2026-10-23). Nothing here is implemented.
-No production code, fixture, or service file changes until this is approved
-(prompt 09 and milestone 4.G, section P1.1).
+Status: **approved 2026-11-24** with every recommended answer in section 13
+(A1, Q1–Q7) (written 2026-10-23, brought up to date for T5 on 2026-11-24
+after T2–T4). Being implemented as T5. No
+production code, fixture, or service file changes until this is approved
+(prompt 09, milestone 4.G section P1.1, and `prompts/13-terminal-upgrade-package.md`
+§T5). Section 0 lists what changed since October; section 13 has the
+questions with recommended answers.
 
 Inputs: `prompts/09-reliability-r1-daemon-restart-sessions.md` (required
 review), `docs/PLAN_R1_TERMINAL_PERFORMANCE.md` section 1 (options), and the
@@ -17,10 +21,29 @@ owner decisions D1–D4 in `prompts/10-milestone-4g-terminal-reliability-perform
 
 ---
 
+## 0. What changed since October (T2–T4)
+
+Read against the code at `3118401`:
+
+| Then | Now | Effect on this design |
+|---|---|---|
+| `vt100` screen in the daemon | libghostty-vt on a screen thread per Session (`crates/daemon/src/screen/`) | The checkpoint (section 6) becomes the engine's own snapshot (`ghostty_vt::snapshot`), which keeps both screens, modes, the cursor, and history, not `state_formatted()`. Reclaim decodes it into a fresh engine and feeds the replayed bytes after it. Measured with T2: encoding a 10,000-line terminal takes about 6 ms |
+| Attach showed the screen only | Attach can carry about 2,000 lines of history (T2.4) | The checkpoint keeps that much history (trimmed as the attach snapshot is), so a picked-up Session still shows its history after a restart |
+| Each viewer resized the PTY | One size per Session, set by the active viewer (T3) | The keeper reports its PTY size in `Claimed`; the restarted daemon starts the Session's size policy there, and viewers that reconnect get `SESSION_SIZE` as on any attach |
+| `sentinal watch` only started Sessions | It picks them up anywhere (T4) | A restart is now the main way to lose a picked-up Session; keepers close that gap |
+| Migrations up to 010 | Up to `015_machine_instances.sql` | The keeper table is migration **016** |
+| `sentinal uninstall` (planned) | Uninstalling is `scripts/install-worker.sh uninstall` | That script ends the keepers first (section 4) |
+| std peer credentials unstable | Still unstable in Rust 1.97 (`peer_credentials_unix_socket`) | Q1 stands; `nix` is still in `Cargo.lock` through `portable-pty` |
+| Service files | Neither the systemd unit nor the launchd plist sets `KillMode` or `AbandonProcessGroup` | As section 4 says: keepers escape with `systemd-run --scope` and `process_group(0)`, and the plist gains `AbandonProcessGroup` |
+
+Unchanged: the keeper owns only the PTY, the shell and a 1 MiB ring; the
+daemon keeps the log, the screen, the watcher, audit and every network
+listener. Everything in sections 3–9 holds with the substitutions above.
+
 ## 1. Summary
 
 Today `sentinald` owns every PTY: the master fd, the shell (its child), the
-reader thread, the vt100 screen, and the log. When the daemon exits for any
+reader thread, the screen, and the log. When the daemon exits for any
 reason, the masters close, the shells get SIGHUP, and the next start marks
 every FULL Session INTERRUPTED (`store::interrupt_orphaned_sessions`).
 
@@ -58,7 +81,7 @@ a crash).
 | Ring of recent raw output (1 MiB) + last screen checkpoint | none | **keeper** |
 | Raw log file (`sessions/<id>.log.zst`) | daemon | daemon |
 | OSC parsing (shell hook signals, nonce check) | daemon | daemon |
-| vt100 screen, scrollback, attach snapshots | daemon | daemon |
+| Screen (libghostty-vt, T2), history, attach snapshots | daemon | daemon |
 | Command/Event/Metric tracking and persistence | daemon | daemon |
 | Authenticating and authorizing terminal input; input audit records | daemon | daemon (the keeper accepts input only from its authenticated daemon) |
 | Network listeners, browser/CLI protocol | daemon | daemon only; the keeper has no network socket |
@@ -77,7 +100,7 @@ old keepers stay compatible for a long time.
 Linux (systemd --user)
   systemd --user
   ├─ sentinald.service            cgroup: sentinald.service
-  │    └─ sentinald               network listeners, SQLite, vt100, logs
+  │    └─ sentinald               network listeners, SQLite, screens, logs
   ├─ sentinal-keeper-42.scope     cgroup of its own (D4)
   │    └─ sentinald keeper        PTY master, ring, private socket
   │         └─ zsh -l             session leader of the PTY (setsid by portable-pty)
@@ -116,7 +139,7 @@ macOS (launchd)
     way the 4.E worker updater already escapes a restart. The plist also
     gains `AbandonProcessGroup = true` as a second guard. P1.5 verifies both
     on this Mac.
-- **What `sentinal uninstall` does.** Before removing the service, it asks
+- **What uninstalling does** (`scripts/install-worker.sh uninstall`). Before removing the service, it asks
   the daemon to end every keeper (Kill to each, wait up to 5 s), then sends
   SIGTERM to any process left in `sentinal-keeper-*.scope` units (Linux) or
   listed in the keeper directory (macOS), and removes the directory.
@@ -219,10 +242,10 @@ Example reclaim, as the daemon sees it:
   code instead of failing (a new test: kill the daemon mid-frame, the log
   still decompresses up to the last closed frame).
 - **Screen.** Every 5 s while output is changing, the daemon sends the keeper
-  a `Checkpoint`: `state_formatted()` of its screen and the offset it
-  describes (a few KiB to ~50 KiB). On reclaim the daemon creates a fresh
-  parser at the Session's size, applies the checkpoint, then the replayed
-  bytes after it. This gives the exact screen even when more than 1 MiB has
+  a `Checkpoint`: the screen engine's own snapshot (section 0), with history
+  trimmed to `attach_history_lines`, and the offset it describes, in 64 KiB
+  frames. On reclaim the daemon decodes it into a fresh engine at the
+  Session's size, then feeds the replayed bytes after it. This gives the exact screen even when more than 1 MiB has
   been printed since a full-screen program last redrew. Only if the ring
   lost bytes after the checkpoint (a `Gap`) is the screen approximate; the
   daemon then sends a resize to the same size (SIGWINCH), which makes vim,
@@ -237,7 +260,7 @@ Example reclaim, as the daemon sees it:
   is finished normally by its end signal.
 - **Metrics** are sampled from the process tree by PID and need no replay;
   the sampler continues from the shell PID in the keeper record.
-- **Untrusted output.** Replay feeds bytes to the vt100 parser and OSC
+- **Untrusted output.** Replay feeds bytes to the screen engine and the OSC
   parser exactly like live output. Nothing is executed or interpreted beyond
   that.
 
@@ -288,7 +311,7 @@ Example reclaim, as the daemon sees it:
 
 ## 8. Persisted records
 
-New table (migration `011_session_keepers.sql`):
+New table (migration `016_session_keepers.sql`):
 
 ```sql
 CREATE TABLE session_keepers (
@@ -455,7 +478,7 @@ a release older than the first keeper release.
 | Event | Result |
 |---|---|
 | Intentional `systemctl --user stop sentinald` / `launchctl bootout` | Keepers keep running and are reclaimed when the daemon returns. **Question Q4:** or should a plain stop end them? |
-| `sentinal uninstall` | Ends every keeper first (section 4). |
+| `install-worker.sh uninstall` | Ends every keeper first (section 4). |
 | Logout without linger (Linux), logout (macOS) | systemd --user / launchd end the user's processes, including keepers. INTERRUPTED with `KEEPER_MISSING` on next start; "Resume terminal" works as today. |
 | Reboot | Same as logout. |
 | Keeper crash | That Session only (above). |
@@ -520,7 +543,7 @@ All behind the existing `PtyBackend` trait. Tests first in each step.
    section 7 (wrong owner, wrong PID start time, wrong session, bad proof,
    unknown protocol, missing socket).
 6. Service changes: systemd scope launch, launchd `AbandonProcessGroup`,
-   `sentinal uninstall` ends keepers, `sentinal setup` unchanged otherwise.
+   `install-worker.sh uninstall` ends keepers, `sentinal setup` unchanged otherwise.
    Upgrade from 0.2.x: old Sessions are interrupted once, new ones are
    keeper-backed. The update warning (P0.4) stops counting keeper-backed
    terminals.
@@ -555,16 +578,40 @@ latency, and reclaim time, then stops them. It needs no root and leaves only
 
 ## 13. Questions for approval
 
-- **A1.** Approve this design (option A, sections 3–9) for implementation?
-- **Q1.** Peer UID: rely on directory/socket ownership (no new dependency),
-  or add `nix` as a direct dependency for an explicit `getpeereid` check?
-- **Q2.** Secret rotation after each reclaim: later (proposed) or in the
-  first version?
-- **Q3.** When the installer installs a release older than the first keeper
-  release, end all keepers first (proposed), or leave them to the orphan
-  timeout?
-- **Q4.** Should an intentional `systemctl --user stop sentinald` end
-  keepers, or keep them for the daemon's return (proposed: keep; uninstall
-  ends them)?
-- **Q5.** Run the Linux spike (section 12) on a Linux worker and send
-  the output, so the numbers are recorded before implementation.
+Each with the recommended answer first. T5 starts only after these.
+
+- **A1. Approve this design** (option A, sections 0 and 3–9) for T5?
+  **Recommended: yes.** One keeper per Session keeps a crash to one
+  terminal, needs no new runtime dependency, and lets old keepers finish on
+  old code across updates.
+- **Q1. Peer UID check.** Rely on the `0700` directory and `0600` socket
+  ownership, or also check the connecting process's UID?
+  **Recommended: also check, with `nix`'s safe `getpeereid` as a direct
+  daemon dependency.** It is already compiled into every build through
+  `portable-pty`, so nothing new ships; std's version is still unstable. It
+  is listed in `docs/DEPENDENCIES.md` before use.
+- **Q2. Rotate the keeper secret after every reclaim?**
+  **Recommended: later**, not in the first version. The secret never leaves
+  the Machine's `0600` database and is never sent over the socket (only an
+  HMAC proof is).
+- **Q3. Installing a release older than the first keeper release**
+  (a rollback past keepers). **Recommended: end all keepers first**, so no
+  shell is left running that no daemon can reach; their Sessions are marked
+  interrupted with the reason shown.
+- **Q4. An intentional `systemctl --user stop` / `launchctl bootout`.**
+  **Recommended: keepers keep running** and are reclaimed when the daemon
+  returns; uninstalling ends them; a daemon gone for 24 h (D3) ends them.
+- **Q5. Linux numbers.** The October spike was a throwaway and is no
+  longer on this Mac, and Docker does not work here. **Recommended: measure
+  the real keeper instead**, as part of T5's acceptance on a Linux worker
+  (memory with a full ring under 3 MB private, reclaim time, keystroke
+  latency), and record them here before release. Build and the tests run
+  in CI on Linux as for every change.
+- **Q6. Checkpoint** (new, from T2). **Recommended: the engine's own
+  snapshot**, history trimmed to `attach_history_lines` (2,000), sent at
+  most every 5 s and only when the screen changed. Alternative: today's
+  formatted screen only, which restores the picture but not history or
+  the main screen under a full-screen program.
+- **Q7. Ring size** (D2, 1 MiB per keeper). **Recommended: keep 1 MiB.**
+  With the checkpoint holding the screen and history, the ring only has to
+  cover output produced while the daemon is away (an update takes seconds).

@@ -231,3 +231,82 @@ the output is on the screen; 60 runs of the file passed afterwards.
   answers are unit-tested.
 - With `claude` itself, as T4.4 asks: a script with a `[y/N]` question was
   used instead, so no model was run.
+
+## T5: keepers, terminals that survive a daemon restart (2026-11-24)
+
+Design: `docs/R1_KEEPER_DESIGN.md`, approved by the owner on 2026-11-24
+with every recommended answer (A1, Q1–Q7). Tested on a working tree based on
+commit `3118401`, macOS 27.0 (Apple silicon).
+
+### What was built
+
+| Part | Where |
+|---|---|
+| Frames, limits, handshake, HMAC proof, checkpoint pieces | `crates/daemon/src/keeper/protocol.rs` |
+| The 1 MiB ring with absolute offsets and gaps | `keeper/ring.rs` |
+| Socket directory per data directory, `0700`/`0600` checks, peer UID (`nix`) | `keeper/paths.rs` |
+| `sentinald keeper`: PTY, shell, ring, one authenticated controller, backpressure while connected, overwrite while not, `HUP` then `KILL` after 5 s, 24 h orphan timeout, `Shutdown` from any process of the user | `keeper/process.rs` |
+| Daemon side: start (own process group; own systemd scope under systemd), claim with every §7 check, present as a PTY, checkpoints | `keeper/client.rs`, `keeper/mod.rs` (`KeeperPty`, falls back to the daemon's own PTY) |
+| Store: `session_keepers` (migration 016); `interrupt_orphaned_sessions` spares kept Sessions; `interrupt_session` with a reason | `crates/store/src/session_keepers.rs` |
+| Log as independent zstd frames, `sessions/<id>.offset`, checkpoints every 5 s at clean points | `session_manager/kept.rs`, `tasks.rs` |
+| Reclaim at startup: cut the log back, checkpoint + output to the screen, new output through log and watcher, running Command resumed, a redraw nudge after a gap | `session_manager/reclaim.rs`, `tracker.rs` (`resume`) |
+| A keeper that dies ends only its Session (interrupted, with the reason) | `tasks.rs` |
+| `Session.kept`; update warnings (CLI, worker, control) count only terminals no keeper holds | `protocol`, `entry.rs`, `cli/update_guard.rs` |
+| `sentinald keeper stop-all`; uninstall and a rollback before 2.12.0 run it; launchd `AbandonProcessGroup` | `bin/`, `scripts/` |
+
+### Found and fixed while trying it
+
+A second daemon started on the same data directory while one was running
+(by hand here; a service manager could do the same) reclaimed the running
+daemon's keepers and only then stopped on the "another daemon is accepting
+connections" check, leaving those terminals cut off from both. The same
+ordering is why a mistaken start on 2026-11-22 marked a Session of the
+installed daemon interrupted. The daemon now takes its local socket before
+it touches any Session; a test starts a second daemon and checks the first
+one's terminal still works.
+
+### Tests
+
+Keeper protocol and ring (13), socket paths and peer checks, framed log cut
+at a closed frame, offset file, checkpoint restore of both screens and
+history, store keeper rows and the orphan step (3), update warning.
+Real processes (`crates/daemon/tests/keeper_restart.rs`, 6, each ending its
+own keepers): SIGKILL mid-output and restart (same shell PID, output from
+the outage on screen, typing reaches the shell, each line once in the log,
+Stop ends the shell); a full-screen program after 2 MB of output, restored
+from the checkpoint (the daemon logs `checkpoint=true`); a keeper killed
+with SIGKILL ends only its terminal; a tampered record fails closed; a
+keeper speaking protocol 99 gets `Shutdown` and its Session is interrupted;
+a second daemon changes nothing. Ran 8 times in a row without a failure.
+
+### Tried by hand (QA instance)
+
+Two terminals, `top -s 1` and a counter printing a line a second. After the
+QA daemon was killed with SIGKILL and started again, both were RUNNING, the
+daemon logged both reclaimed from checkpoints, the web terminal showed `top`
+live, and the counter's log held ticks 0–166 with no gap and no repeat across
+two restarts.
+
+### Differences from the design
+
+- **No `stream_offset` columns.** The daemon resumes from the last closed log
+  frame (at most 1 s or 64 KiB back). Output in that window is logged once
+  (the log is cut back first), but Events and Commands the watcher saw in it
+  can be recorded twice after a restart. The design's per-row offsets would
+  remove that; not done.
+- **Reasons as text.** An interrupted Session's reason is the text of its
+  warning Event (§8 wording), not a new structured field.
+- **§7 check 4** (the keeper runs the installed `sentinald`) is not checked;
+  the PIDs with start times and the HMAC proof are.
+- **No note in the web app** for a terminal no keeper holds; `Session.kept`
+  carries it, the UI does not show it yet.
+
+### Not verified
+
+- Linux: the systemd scope, peer credentials (`SO_PEERCRED`) and keeper
+  memory were not run on Linux; Q5's measurements are still to be taken on
+  a Linux worker before release.
+- `sentinal update`, a worker update from the dashboard, and the control's
+  self-update with live terminals: covered by the counting tests, not run.
+- Uninstall and rollback ending keepers: script syntax and installer tests
+  only; `stop-all` itself is the code the restart tests use to clean up.

@@ -100,6 +100,11 @@ impl OscParser {
     pub fn finish(&mut self) -> Vec<u8> {
         std::mem::take(&mut self.pending)
     }
+
+    /// Nothing half-read is held: output so far is wholly passed on (T5).
+    pub fn is_idle(&self) -> bool {
+        self.pending.is_empty()
+    }
 }
 
 fn terminator(bytes: &[u8]) -> Option<(usize, usize)> {

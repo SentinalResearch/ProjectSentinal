@@ -8,7 +8,10 @@ use std::io::{BufRead, Read, Write};
 pub(crate) fn live_terminals(sessions: &[Session]) -> usize {
     sessions
         .iter()
-        .filter(|session| session.capture == CaptureLevel::Full && !session.state.is_finished())
+        // T5: a keeper-held terminal survives the update.
+        .filter(|session| {
+            session.capture == CaptureLevel::Full && !session.state.is_finished() && !session.kept
+        })
         .count()
 }
 
@@ -61,7 +64,27 @@ pub(crate) fn confirm(question: &str, input: &mut impl BufRead, out: &mut dyn Wr
 
 #[cfg(test)]
 mod tests {
-    use super::{confirm, decide, warning, Decision};
+    use super::{confirm, decide, live_terminals, warning, Decision};
+
+    #[test]
+    fn a_terminal_a_keeper_holds_is_not_ended_by_an_update() {
+        use protocol::{CaptureLevel, MachineId, Session, SessionId, SessionState, Timestamp};
+        let live = |id, kept| {
+            let mut session = Session::new(
+                SessionId(id),
+                MachineId("m".into()),
+                "/bin/zsh",
+                "/",
+                Timestamp(1),
+            );
+            session.capture = CaptureLevel::Full;
+            session.kept = kept;
+            let _ = session.transition(SessionState::Idle, Timestamp(2));
+            session
+        };
+        assert_eq!(live_terminals(&[live(1, true), live(2, false)]), 1);
+        assert_eq!(live_terminals(&[live(1, true)]), 0);
+    }
 
     #[test]
     fn the_warning_counts_the_terminals_it_ends() {

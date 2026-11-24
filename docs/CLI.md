@@ -211,10 +211,19 @@ sentinal update [--yes] [--prefix DIR]
 sentinal update --rollback VERSION [--yes] [--prefix DIR]
 ```
 
-`update` restarts sentinald, which ends this Machine's live terminals (until
-Reliability R1). When any are running it says so ("This ends 2 live terminals
-on pop-os.", adding "including this one" inside a Session) and asks; without a
-terminal to ask on it stops unless `--yes` is given.
+`update` restarts sentinald. Terminals held by keepers (every terminal from
+the release with keepers on, T5) keep running and are picked up again by the
+new daemon. Only terminals no keeper holds (started before keepers, or whose
+keeper could not start) end; when any are running it says so ("This ends 2
+live terminals on pop-os.", adding "including this one" inside a Session)
+and asks; without a terminal to ask on it stops unless `--yes` is given.
+
+**Keepers.** Each terminal is held by a small `sentinald keeper` process, so
+it survives a daemon crash, restart, or update: the same shell, its screen,
+and the output it printed meanwhile (the last 1 MiB is kept while no daemon
+runs). A keeper with no daemon for 24 hours ends its terminal. Uninstalling
+ends every keeper first, and so does rolling back to a release from before
+keepers. `SENTINAL_KEEPERS=0` in the daemon's environment turns keepers off.
 
 `doctor` reads local installation/configuration state and invokes the native
 service manager and Tailscale status commands. It makes no network request and

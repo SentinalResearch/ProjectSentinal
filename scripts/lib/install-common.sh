@@ -123,6 +123,10 @@ sentinal_systemd_escape() {
   printf '%s' "$value"
 }
 
+# The first release whose daemon holds terminals in keepers (T5).
+# shellcheck disable=SC2034 # used by install-worker.sh
+readonly SENTINAL_FIRST_KEEPER_RELEASE="2.12.0"
+
 sentinal_render_launchd() {
   local daemon_bin="$1" config_file="$2" stdout_file="$3" stderr_file="$4"
   cat <<EOF
@@ -145,6 +149,9 @@ sentinal_render_launchd() {
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
+  <true/>
+  <!-- Keepers (T5) outlive a daemon restart; launchd must not end them. -->
+  <key>AbandonProcessGroup</key>
   <true/>
   <key>StandardOutPath</key>
   <string>$(sentinal_xml_escape "$stdout_file")</string>

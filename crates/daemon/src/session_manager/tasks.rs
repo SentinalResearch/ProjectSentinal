@@ -21,6 +21,8 @@ pub(super) struct OutputLog {
     pub(super) path: PathBuf,
     /// Open owner-only log file.
     pub(super) file: std::fs::File,
+    /// A keeper-held Session's offsets and checkpoints (T5).
+    pub(super) kept: Option<super::kept::Kept>,
 }
 
 pub(super) fn spawn_reader(
@@ -35,10 +37,12 @@ pub(super) fn spawn_reader(
     let OutputLog {
         path: log_path,
         file: log_file,
+        mut kept,
     } = log;
     tokio::task::spawn_blocking(move || {
-        let mut encoder = match zstd::stream::write::Encoder::new(log_file, 0) {
-            Ok(encoder) => encoder.auto_finish(),
+        // T5: independent zstd frames, so a crash loses at most the open one.
+        let mut encoder = match super::kept::FramedLog::new(log_file) {
+            Ok(encoder) => encoder,
             Err(error) => {
                 tracing::error!(session = session_id.0, path = %log_path.display(), %error, "failed to start compressed session log");
                 return;
@@ -71,9 +75,20 @@ pub(super) fn spawn_reader(
                     return;
                 }
             };
+            if let Some(kept) = kept.as_mut() {
+                kept.read(count);
+            }
             let parsed = osc.push(&buffer[..count]);
             let bytes = parsed.output.as_slice();
             if bytes.is_empty() {
+                if let Some(kept) = kept.as_mut() {
+                    kept.settle(
+                        &mut encoder,
+                        &handle.screen,
+                        osc.is_idle(),
+                        boundary.is_empty(),
+                    );
+                }
                 continue;
             }
             if let Err(error) = save(&mut encoder, &mut budget, bytes) {
@@ -92,6 +107,14 @@ pub(super) fn spawn_reader(
             apply_output(session_id, &handle, store.as_deref(), bytes, clock());
             if prompt_ready {
                 type_initial_command(session_id, &handle);
+            }
+            if let Some(kept) = kept.as_mut() {
+                kept.settle(
+                    &mut encoder,
+                    &handle.screen,
+                    osc.is_idle(),
+                    boundary.is_empty(),
+                );
             }
         }
     });
@@ -608,6 +631,8 @@ pub(super) fn spawn_exit_monitor(
                                     if let Err(error) = store.update_session(&session) {
                                         tracing::error!(session = session_id.0, %error, "failed to persist child exit");
                                     }
+                                    // T5: the keeper ends once it has handed over the exit.
+                                    let _ = store.delete_keeper(session_id);
                                 }
                                 // Attached clients stop waiting once the shell is gone.
                                 let _ = handle.structured.send(DaemonMessage::SessionUpdated {
@@ -621,6 +646,21 @@ pub(super) fn spawn_exit_monitor(
                     return;
                 }
                 Ok(None) => tokio::time::sleep(Duration::from_millis(10)).await,
+                Err(PtyError::KeeperLost(_)) => {
+                    // T5: the shell lost its terminal with the keeper (the
+                    // PTY closing hangs it up); the Session cannot go on.
+                    handle
+                        .pty_closed
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
+                    interrupt(
+                        session_id,
+                        &handle,
+                        store.as_deref(),
+                        clock(),
+                        KEEPER_EXITED,
+                    );
+                    return;
+                }
                 Err(error) => {
                     tracing::error!(session = session_id.0, %error, "failed to poll child");
                     return;
@@ -646,6 +686,53 @@ fn save(
         Admit::Skip => return Ok(()),
     }
     encoder.flush()
+}
+
+/// Why a keeper-held Session ended without its shell ending (T5, §8).
+pub(super) const KEEPER_EXITED: &str =
+    "Stopped: the process holding this terminal ended unexpectedly.";
+
+/// Mark a live Session interrupted with `reason`, persist it, tell viewers.
+pub(super) fn interrupt(
+    session_id: SessionId,
+    handle: &SessionHandle,
+    store: Option<&Store>,
+    at: protocol::Timestamp,
+    reason: &str,
+) {
+    let session = match handle.session.lock() {
+        Ok(mut session) if !session.state.is_finished() => {
+            if let Err(error) = session.transition(SessionState::Interrupted, at) {
+                tracing::error!(session = session_id.0, %error, "could not mark the Session interrupted");
+                return;
+            }
+            session.clone()
+        }
+        _ => return,
+    };
+    let event = Event {
+        id: handle.watcher_ids.event(),
+        session_id,
+        command_id: session.current_command,
+        at,
+        kind: EventKind::WarningDetected {
+            message: reason.to_string(),
+        },
+    };
+    if let Some(store) = store {
+        if let Err(error) = store.update_session(&session) {
+            tracing::error!(session = session_id.0, %error, "failed to persist an interruption");
+        }
+        if let Err(error) = store.insert_event(&event) {
+            tracing::error!(session = session_id.0, %error, "failed to persist an interruption Event");
+        }
+        let _ = store.delete_keeper(session_id);
+    }
+    let _ = handle.events.send(event.clone());
+    let _ = handle.structured.send(DaemonMessage::Event { event });
+    let _ = handle
+        .structured
+        .send(DaemonMessage::SessionUpdated { session });
 }
 
 #[cfg(test)]

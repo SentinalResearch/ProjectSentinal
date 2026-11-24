@@ -18,6 +18,7 @@ argon2.workspace = true
 axum.workspace = true
 futures-util.workspace = true
 portable-pty.workspace = true
+nix.workspace = true
 protocol = { path = "../protocol" }
 store = { path = "../store" }
 watcher = { path = "../watcher" }
