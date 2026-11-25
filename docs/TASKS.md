@@ -32,8 +32,8 @@ Read these first, in order:
   `docs/guide/sentinal-guide-overleaf.zip`.
 - **Commit, push, tag, and release only when the owner asks.** Work on the `dev`
   branch. `main` gets work only through `just promote`, and releases only through
-  `just ship X.Y.Z` run by the owner. The next release is **v2.12.0**; do not
-  release it.
+  `just ship X.Y.Z` run by the owner. The latest release is **v2.12.0**; do not
+  release the next one unless the owner asks.
 - **Do not run commands on the owner's VMs.** Write the command; the owner runs it.
 - The product is spelled **Sentinal** (binaries `sentinal`, `sentinald`,
   variables `SENTINAL_*`). Use the spec's words: Machine, Session, Command,
@@ -83,11 +83,11 @@ If the task changes the protocol and something is unclear, stop and ask.
 
 ## State right now
 
-- Production is tag **v2.11.0**. `dev` is 13 commits past it (not pushed):
-  the terminal upgrade package T0–T5 (keepers last, `a461c64`), groups,
-  time left, the Claude Code chat, Q1–Q10 and X24.
-- Next release: **v2.12.0**, owner steps in section R below, notes in
-  `docs/releases/v2.12.0.md` (draft).
+- Latest release is tag **v2.12.0** (2026-11-25): the terminal upgrade
+  package T0–T5 (keepers last, `a461c64`), groups, time left, the Claude Code
+  chat, Q1–Q10 and X24. Notes in `docs/releases/v2.12.0.md`.
+- The Machines still run 2.11.0 until the owner does steps 3, 6 and 7 of
+  section R below (backups, the control by hand, then the workers).
 - **2026-11-08 agent pass:** B2 (::sentinal progress/metric API), B1
   (METRIC_REPORTED + server detection), P1 (Vibe arrows+Enter), P2 (marked
   menus), P4 (Claude "Running N shell command…"), P5 (agent Session names),
@@ -783,7 +783,7 @@ section T above.
 All items done in `98f41d7` and `19be6fe`. Keep it that way: every new file that
 holds credentials or settings must follow `config_dir`.
 
-## R: release v2.12.0 · *owner only*
+## R: release v2.12.0 · *published 2026-11-25; Machines not updated yet*
 
 1. Owner tries the T5 keepers in `just dev` (start `top`, restart the dev
    daemon, the terminal is still there)
