@@ -60,6 +60,22 @@ async function measure(page: Page): Promise<Layout> {
   });
 }
 
+/**
+ * Wait until the terminal has settled in its box: the same width twice in a
+ * row and no sideways overflow. A resize goes through the daemon (one size per
+ * Session, T3), so the screen settles after that round trip, not after a
+ * fixed delay, and it may first grow or shrink to a size sent earlier.
+ */
+async function settle(page: Page) {
+  let last = -1;
+  await expect.poll(async () => {
+    const { host, screenWidth } = await measure(page);
+    const steady = screenWidth === last && screenWidth > 0;
+    last = screenWidth;
+    return steady && Math.max(host.scrollWidth, screenWidth) <= host.clientWidth + 1;
+  }, { intervals: [250], timeout: 5_000 }).toBe(true);
+}
+
 function expectStacked(layout: Layout) {
   // Full content width on top; the details start below it; nothing sideways.
   expect(Math.abs(layout.terminal.left - layout.main.left)).toBeLessThanOrEqual(1);
@@ -95,14 +111,14 @@ test("the terminal fills the left half and stays put while the details scroll", 
   for (const width of [1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(async () => (await measure(page)).terminal.height).toBeGreaterThan(0);
-    await page.waitForTimeout(150); // let the fit addon reflow after the width change
+    await settle(page);
     expectHalves(await measure(page));
     await page.screenshot({ path: test.info().outputPath(`session-${width}.png`), animations: "disabled" });
   }
 
   // A short window forces the details to scroll; the terminal must not move.
   await page.setViewportSize({ width: 1280, height: 280 });
-  await page.waitForTimeout(150);
+  await settle(page);
   const scrolled = await page.evaluate(() => {
     // The glass Session page scrolls its details column; the classic one scrolls main.
     const details = document.querySelector('section[aria-label="Session details"]') as HTMLElement;
@@ -111,6 +127,7 @@ test("the terminal fills the left half and stays put while the details scroll", 
     return scroller.scrollTop;
   });
   expect(scrolled).toBeGreaterThan(0);
+  await settle(page);
   expectHalves(await measure(page));
   const terminalColour = await page.evaluate(() => {
     const viewport = document.querySelector('[data-testid="terminal-host"] .xterm-viewport') as HTMLElement;
@@ -121,21 +138,21 @@ test("the terminal fills the left half and stays put while the details scroll", 
 
   // 1024 px still splits in two halves with nothing hidden behind the terminal.
   await page.setViewportSize({ width: 1024, height: 800 });
-  await page.waitForTimeout(150);
+  await settle(page);
   expectHalves(await measure(page));
 
   // Below 960 px (UX pass, 2026-11-17) halves squeezed the terminal to about
   // 240 px: it now spans the full width on top, with the details below it.
   await page.setViewportSize({ width: 768, height: 800 });
-  await page.waitForTimeout(150);
+  await settle(page);
   expectStacked(await measure(page));
 
   // xterm reflows: a narrower window gives a narrower screen, never a sideways scroll.
   await page.setViewportSize({ width: 1920, height: 900 });
-  await page.waitForTimeout(200);
+  await settle(page);
   const wide = await measure(page);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.waitForTimeout(200);
+  await settle(page);
   const narrow = await measure(page);
   expect(narrow.screenWidth).toBeLessThan(wide.screenWidth);
   expectHalves(narrow);
@@ -236,8 +253,11 @@ test("two windows of different sizes show the same screen, whoever types", async
     await page.keyboard.type(text);
   };
   const sameScreen = async () => {
-    await expect.poll(async () => JSON.stringify(await screen(narrow)), { timeout: 10_000 })
-      .toBe(JSON.stringify(await screen(wide)));
+    // Both sides are read on every try: either window may still be resizing.
+    await expect.poll(async () => {
+      const [a, b] = await Promise.all([screen(narrow), screen(wide)]);
+      return JSON.stringify(a) === JSON.stringify(b) ? "same" : `${JSON.stringify(a)} != ${JSON.stringify(b)}`;
+    }, { timeout: 10_000 }).toBe("same");
   };
 
   await typeIn(wide, "typed in the wide window ");

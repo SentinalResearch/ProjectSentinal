@@ -259,6 +259,10 @@ export function TerminalPane({
         terminal.resize(sessionSize.cols, sessionSize.rows);
       }
     };
+    // A box change never claims the size, not even with focus: focus and
+    // typing do. The daemon keeps the active viewer and still applies its box
+    // from an inactive report, while a claim here could be stale (a window
+    // that has not yet heard another took the size would take it back).
     onBoxChange.current = () => {
       if (sessionSize.owner) {
         // This window sets the size: fit at once, as before T3, and report;
@@ -268,13 +272,13 @@ export function TerminalPane({
         const current = boxSize();
         if (current) {
           setBox(current);
-          report(current.cols, current.rows, document.activeElement === terminal.textarea);
+          report(current.cols, current.rows, false);
         }
         return;
       }
       apply();
       const current = boxSize();
-      if (current) report(current.cols, current.rows, document.activeElement === terminal.textarea);
+      if (current) report(current.cols, current.rows, false);
     };
     apply();
   }, [boxSize, report, sessionSize, terminal]);
